@@ -223,7 +223,7 @@ struct CompactAIAccountBalanceBar: View {
                     ring.frame(width: sideWidth)
                     Spacer(minLength: 0).frame(width: center)
                     horizontalValues
-                        .padding(.horizontal, CompactPillStatusPresentation.trailingInset)
+                        .padding(.horizontal, CompactPillStatusPresentation.accountBalanceSideInset)
                         .frame(width: sideWidth)
                         .environment(\.layoutDirection, direction)
                 }
@@ -269,14 +269,15 @@ struct CompactAIAccountBalanceBar: View {
     }
 
     private var horizontalValues: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                MarqueeText(line, font: .system(size: lines.count > 1 ? 9 : 11, weight: .semibold),
+                MarqueeText(line, font: .system(size: lines.count > 1 ? 9 : 11).monospacedDigit(),
                     textColor: (quotaSeverity(key: "quotaLineSeverity\(index)") ?? severity).balanceColor,
+                    fontWeight: lines.count > 1 ? .medium : .semibold,
                     pointsPerSecond: CompactPillStatusPresentation.accountBalanceScrollSpeed,
                     scrollDirection: direction == .rightToLeft ? .right : .left,
                     repeats: false,
-                    viewportHeight: lines.count > 1 ? 13 : 16)
+                    viewportHeight: lines.count > 1 ? 11 : 16)
             }
         }
         .id(notice.metadata?["quotaAccountID"])

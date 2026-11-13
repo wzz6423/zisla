@@ -10,27 +10,52 @@ import ZislaKit
 struct AIAccountBalanceViewTests {
 
     @Test(arguments: [AIProvider.codex, .gpt], [ColorScheme.light, .dark])
-    func openAIProviderRendersItsInstalledIconWithItsOwnName(provider: AIProvider, colorScheme: ColorScheme) async throws {
+    func openAIProviderUsesTransparentBrandLogoWithItsOwnName(provider: AIProvider, colorScheme: ColorScheme) async throws {
         let cache = AIMascotImageCache()
         let colorSpace = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try #require(CGContext(data: nil, width: 24, height: 24, bitsPerComponent: 8, bytesPerRow: 96,
             space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: 24, height: 24))
-        let image = NSImage(cgImage: try #require(context.makeImage()), size: CGSize(width: 24, height: 24))
-        try #require(cache.image(for: "installed|desktop-\(provider.rawValue)", load: { image }) != nil)
+        let appIcon = NSImage(cgImage: try #require(context.makeImage()), size: CGSize(width: 24, height: 24))
+        try #require(cache.image(for: "installed|desktop-\(provider.rawValue)", load: { appIcon }) != nil)
+        let resources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Resources", isDirectory: true)
+        let asset = try #require(AIMascotLibrary.providerAssetName(for: provider))
+        let cachedLogo = cache.image(for: "provider|\(asset)", url: {
+            AIMascotLibrary.providerAssetURL(for: provider, resourceRoots: [resources])
+        })
+        let logo = try #require(cachedLogo)
+        let source = NSBitmapImageRep(cgImage: try #require(logo.cgImage(forProposedRect: nil, context: nil, hints: nil)))
+        var transparentPixels = 0, visiblePixels = 0
+        for y in 0..<source.pixelsHigh {
+            for x in 0..<source.pixelsWide {
+                let alpha = try #require(source.colorAt(x: x, y: y)).alphaComponent
+                if alpha < 0.01 { transparentPixels += 1 }
+                if alpha > 0.5 { visiblePixels += 1 }
+            }
+        }
+        #expect(transparentPixels > source.pixelsWide * source.pixelsHigh / 5 && visiblePixels > 0,
+            "Brand logos must have transparent space around a visible glyph, without an app-icon backplate")
         let identity = AIMascotIdentity(provider: provider, taskID: "")
         #expect(identity.displayName == (provider == .gpt ? "ChatGPT" : "Codex"))
         let bitmap = try await renderOffscreen(AIMascotView(identity: identity, size: 24, imageCache: cache)
             .environment(\.colorScheme, colorScheme), size: CGSize(width: 24, height: 24))
-        let reference = try await renderOffscreen(Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+        let reference = try await renderOffscreen(Image(nsImage: logo)
+            .renderingMode(provider == .gpt ? .template : .original).resizable().interpolation(.high).scaledToFit()
+            .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
             .frame(width: 24, height: 24), size: CGSize(width: 24, height: 24))
-        let center = try #require(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?.usingColorSpace(.sRGB))
-        let expected = try #require(reference.colorAt(x: reference.pixelsWide / 2, y: reference.pixelsHigh / 2)?.usingColorSpace(.sRGB))
-        #expect(abs(center.redComponent - expected.redComponent) < 0.01
-            && abs(center.greenComponent - expected.greenComponent) < 0.01
-            && abs(center.blueComponent - expected.blueComponent) < 0.01,
-            "Both OpenAI brands must render the installed icon in its original colors")
+        var changedPixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let actual = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let expected = try #require(reference.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if abs(actual.redComponent - expected.redComponent) > 0.02
+                    || abs(actual.greenComponent - expected.greenComponent) > 0.02
+                    || abs(actual.blueComponent - expected.blueComponent) > 0.02 { changedPixels += 1 }
+            }
+        }
+        #expect(changedPixels == 0, "The AI icon must render the transparent brand logo even when an installed app icon is cached")
     }
 
     @Test(arguments: [CGFloat(32), 52])
@@ -273,37 +298,150 @@ struct AIAccountBalanceViewTests {
     }
 
 
-    /// Pixel regions prove camera clearance and both summary lines without treating an image render as device acceptance.
+    /// Pixel regions prove bounded padding and camera clearance without treating an image render as device acceptance.
     @Test(arguments: [CGFloat(0), 80, 180], [false, true])
     func compactBalanceKeepsBothLinesOutsidePhysicalCameraGap(centerInset: CGFloat, rightToLeft: Bool) async throws {
-        let width = centerInset + 160
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
-        controller.update(balances: [.init(id: "chatgpt", providers: [.codex], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])],
-            settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed), language: .english)
-        let notice = try #require(queue.left.first)
-        let image = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: 34, centerInset: centerInset)
-            .foregroundStyle(.white).environment(\.colorScheme, .dark)
-            .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight), size: CGSize(width: width, height: 34))
-        let scale = CGFloat(image.pixelsWide) / width
-        let leftEnd = Int((centerInset > 0 ? (width - centerInset) / 2 : 40) * scale)
-        let rightStart = Int((centerInset > 0 ? (width + centerInset) / 2 : 44) * scale)
-        var leftPixels = 0, rightTop = 0, rightBottom = 0, cameraPixels = 0
-        for x in 0..<image.pixelsWide {
-            for y in 0..<image.pixelsHigh {
-                guard let color = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
-                    max(color.redComponent, color.greenComponent, color.blueComponent) > 0.5 else { continue }
-                if x < leftEnd { leftPixels += 1 }
-                else if x >= rightStart {
-                    if y < image.pixelsHigh / 2 { rightTop += 1 } else { rightBottom += 1 }
-                } else { cameraPixels += 1 }
+        for weeklyOnly in [false, true] {
+            let weekly = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)
+            let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
+            var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+            settings.islandPlacement.mode = .custom
+            controller.update(balances: [.init(id: "chatgpt", providers: [.codex], status: .available,
+                windows: weeklyOnly ? [weekly] : [short, weekly])], settings: settings, language: .english)
+            let notice = try #require(queue.left.first)
+            #expect(notice.metadata?["quotaLine0"] == (weeklyOnly ? "7d 59%" : "5h 10%"))
+            #expect(notice.metadata?["quotaLine1"] == (weeklyOnly ? nil : "7d 59%"))
+            let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
+            let sideWidth = presentation.accountBalanceSideWidth(thickness: 34)
+            let width = centerInset > 0 ? centerInset + sideWidth * 2 : presentation.length(thickness: 34, edge: .top)
+            if centerInset > 0 {
+                #expect(sideWidth <= 57, "Canonical camera wings must not retain the old wide padding; observed \(sideWidth)pt")
+            }
+            for colorScheme in [ColorScheme.light, .dark] {
+                let image = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: 34, centerInset: centerInset)
+                    .foregroundStyle(.white).environment(\.colorScheme, colorScheme)
+                    .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight),
+                    size: CGSize(width: width, height: 34), reduceMotion: true)
+                let scale = CGFloat(image.pixelsWide) / width
+                let leftEnd = centerInset > 0 ? sideWidth : 38
+                let rightStart = centerInset > 0 ? sideWidth + centerInset : 44
+                var ringBounds = CGRect.null, rowBounds = [CGRect.null, CGRect.null], cameraPixels = 0
+                for x in 0..<image.pixelsWide {
+                    for y in 0..<image.pixelsHigh {
+                        let color = try #require(image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                        guard max(color.redComponent, color.greenComponent, color.blueComponent)
+                            > (CGFloat(x) / scale < leftEnd ? 0.03 : 0.3) else { continue }
+                        let pixel = CGRect(x: CGFloat(x) / scale, y: CGFloat(y) / scale, width: 1 / scale, height: 1 / scale)
+                        if pixel.midX < leftEnd { ringBounds = ringBounds.union(pixel) }
+                        else if pixel.midX >= rightStart {
+                            let row = weeklyOnly || y < image.pixelsHigh / 2 ? 0 : 1
+                            rowBounds[row] = rowBounds[row].union(pixel)
+                        } else { cameraPixels += 1 }
+                    }
+                }
+                #expect(cameraPixels == 0, "Balance text must leave the physical camera gap empty")
+                #expect(!ringBounds.isNull && !rowBounds[0].isNull)
+                #expect(weeklyOnly ? rowBounds[1].isNull : !rowBounds[1].isNull,
+                    "Default compact quota must render exactly the real one or two rows")
+                #expect(rowBounds[0].width >= 27, "The full short quota label and percentage must remain visible")
+                if !weeklyOnly {
+                    #expect(rowBounds[1].width >= 27)
+                    #expect(rowBounds[1].midY - rowBounds[0].midY <= 12,
+                        "Two quota rows must stack as tightly as the combined monitor readings")
+                }
+                if centerInset > 0 {
+                    #expect(ringBounds.minX <= 16 && sideWidth - ringBounds.maxX <= 16,
+                        "The provider ring must leave at most 16pt of visible padding on each camera-wing edge; observed \(ringBounds.minX), \(sideWidth - ringBounds.maxX)pt")
+                    let textBounds = rowBounds[0].union(rowBounds[1])
+                    #expect(textBounds.minX - rightStart <= 10 && width - textBounds.maxX <= 10,
+                        "Short quota text must leave only its compact edge padding")
+                }
             }
         }
-        #expect(cameraPixels == 0, "Balance text must not overlap the physical camera")
-        #expect(leftPixels > 0)
-        #expect(rightTop > 0 && rightBottom > 0, "The detailed compact style must render both quota lines")
+    }
+
+    @Test(arguments: [false, true])
+    func compactQuotaRowsUseTheCombinedMonitorDigitTypography(weeklyOnly: Bool) async throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let weekly = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)
+        let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement.mode = .custom
+        controller.update(balances: [.init(id: "quota", providers: [.codex], status: .available,
+            windows: weeklyOnly ? [weekly] : [short, weekly])], settings: settings, language: .english)
+        let notice = try #require(queue.left.first)
+        let lines = weeklyOnly ? ["7d 59%"] : ["5h 10%", "7d 59%"]
+        let font = Font.system(size: weeklyOnly ? 11 : 9, weight: weeklyOnly ? .semibold : .medium).monospacedDigit()
+        let width = CGFloat(68)
+        let actual = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: 34)
+            .environment(\.colorScheme, .dark).foregroundStyle(.white), size: CGSize(width: width + 56, height: 34),
+            reduceMotion: true)
+        let reference = try await renderOffscreen(VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                Text(line).font(font).foregroundStyle((!weeklyOnly && index == 0 ? AIAccountQuotaSeverity.critical : .normal).balanceColor)
+                    .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: weeklyOnly ? 16 : 11).clipped()
+            }
+        }.environment(\.colorScheme, .dark), size: CGSize(width: width, height: 34), reduceMotion: true)
+        let scale = CGFloat(actual.pixelsWide) / (width + 56)
+        var differentTextPixels = 0
+        for y in 0..<reference.pixelsHigh {
+            for x in 0..<reference.pixelsWide {
+                let a = try #require(actual.colorAt(x: x + Int(44 * scale), y: y)?.usingColorSpace(.sRGB))
+                let b = try #require(reference.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if abs(a.redComponent - b.redComponent) > 0.02 || abs(a.greenComponent - b.greenComponent) > 0.02 {
+                    differentTextPixels += 1
+                }
+            }
+        }
+        #expect(differentTextPixels == 0,
+            "Compact quota must render monospaced digits with the monitor's 22pt double-row rhythm and the correct font weight")
+    }
+
+    @Test(arguments: [AppLanguage.english, .arabic])
+    func detailedExtraQuotaRowsKeepAccentsAndArabicMarksInsideTheirViewport(language: AppLanguage) async throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let model = AIAccountQuotaWindow(id: "model", kind: .model, remainingPercent: 59,
+            name: language == .arabic ? "خُطَّة مُمَيَّزَة" : "Édition Ångström")
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
+            aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement.mode = .custom
+        controller.update(balances: [.init(id: "quota", providers: [.codex], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000), model])],
+            settings: settings, language: language)
+        let notice = try #require(queue.left.first)
+        let line = try #require(notice.metadata?["quotaLine1"])
+        let direction: LayoutDirection = language.isRightToLeft ? .rightToLeft : .leftToRight
+        let width = ceil((line as NSString).size(withAttributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)]).width) + 6
+        let actual = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: 34)
+            .environment(\.colorScheme, .dark).environment(\.layoutDirection, direction).foregroundStyle(.white),
+            size: CGSize(width: width + 56, height: 34), reduceMotion: true)
+        let reference = try await renderOffscreen(Text(line).font(.system(size: 9, weight: .medium).monospacedDigit())
+            .foregroundStyle(AIAccountQuotaSeverity.normal.balanceColor).lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .environment(\.colorScheme, .dark).environment(\.layoutDirection, direction),
+            size: CGSize(width: width, height: 34), reduceMotion: true)
+        func ink(_ bitmap: NSBitmapImageRep, startX: Int, startY: Int, endY: Int) throws -> Int {
+            var count = 0
+            for y in startY..<endY {
+                for x in startX..<bitmap.pixelsWide {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    if color.greenComponent > 0.45 && color.greenComponent > color.redComponent * 1.4
+                        && color.greenComponent > color.blueComponent * 1.15 { count += 1 }
+                }
+            }
+            return count
+        }
+        let scale = CGFloat(actual.pixelsWide) / (width + 56)
+        let actualInk = try ink(actual, startX: Int(44 * scale), startY: actual.pixelsHigh / 2, endY: actual.pixelsHigh)
+        let referenceInk = try ink(reference, startX: 0, startY: 0, endY: reference.pixelsHigh)
+        #expect(actualInk == referenceInk,
+            "The full extra quota glyphs must survive the compact row viewport in \(language.rawValue); observed \(actualInk)/\(referenceInk) pixels")
     }
 
     /// Offscreen rendering covers edge-dependent dimensions and nonempty quota content across LTR and RTL layouts.

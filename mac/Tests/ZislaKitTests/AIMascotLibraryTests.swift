@@ -20,12 +20,6 @@ struct AIMascotLibraryTests {
         let actual = AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: resolve,
             applicationDirectories: [], fileExists: { _ in false })
         #expect(actual?.provider == provider && actual?.url == (provider == nil ? nil : application))
-        for candidate in [AIProvider.codex, .gpt] {
-            #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: candidate,
-                resolveBundleIdentifier: resolve, applicationDirectories: [], fileExists: { _ in false })
-                == (candidate == provider ? application : nil),
-                "An installed icon must never be paired with the other OpenAI brand")
-        }
     }
 
     @Test(arguments: [("ChatGPT", AIProvider.gpt), ("Codex", .codex)])

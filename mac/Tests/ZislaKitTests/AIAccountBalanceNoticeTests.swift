@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import ZislaCore
@@ -20,19 +21,65 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.count == 1)
     }
 
-    @Test func chatGPTNoticeUsesTheChatGPTMarkAndPerWindowRemainingColors() throws {
+    @Test(arguments: MediaCompactStyle.allCases)
+    func chatGPTNoticeUsesTheChatGPTMarkAndPerWindowRemainingColors(style: MediaCompactStyle) throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
             windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
                 .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
-        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed,
+        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceCompactStyle: style,
             aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt]), language: .english)
         let notice = try #require(queue.left.first)
         #expect(notice.title == "ChatGPT" && notice.metadata?["quotaProviderID"] == "gpt")
         #expect(notice.metadata?["quotaLine0"] == "5h 10%" && notice.metadata?["quotaLine1"] == "7d 51%")
         #expect(notice.metadata?["quotaLineSeverity0"] == "2" && notice.metadata?["quotaLineSeverity1"] == "0")
         #expect(notice.metadata?["quotaRemainingFraction"] == "0.1")
+    }
+
+    @Test(arguments: AppLanguage.allCases, [false, true])
+    func compactCanonicalRowsKeepTheirAbbreviationsAndIndependentColors(language: AppLanguage, weeklyOnly: Bool) throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let weekly = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)
+        let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
+        let reading = AIAccountBalance(id: "shared", providers: [.gpt], status: .available,
+            windows: weeklyOnly ? [weekly] : [short, weekly])
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement.mode = .custom
+        controller.update(balances: [reading], settings: settings, language: language)
+        let notice = try #require(queue.left.first)
+        let expected = weeklyOnly ? ["7d " + weekly.value(language: language)]
+            : ["5h " + short.value(language: language), "7d " + weekly.value(language: language)]
+        let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
+        #expect(presentation.accountBalanceLines == expected,
+            "Default compact quota must keep the real 5h and 7d rows in \(language.rawValue)")
+        #expect(notice.metadata?["quotaLineSeverity0"] == (weeklyOnly ? "0" : "2"))
+        #expect(notice.metadata?["quotaLineSeverity1"] == (weeklyOnly ? nil : "0"))
+        #expect(notice.metadata?["quota5hSeverity"] == (weeklyOnly ? nil : "2"))
+        #expect(notice.metadata?["quotaLine2"] == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func horizontalQuotaMeasurementAndReadingBudgetUseTheRenderedDigitFont(twoLines: Bool) {
+        let line = String(repeating: "Review 111% · ", count: 8) + "7d 59%"
+        let notice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Codex", style: .status,
+            metadata: twoLines ? ["quotaLine0": "5h 10%", "quotaLine1": line] : ["quotaLine0": line])
+        let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
+        let font = NSFont.monospacedDigitSystemFont(ofSize: twoLines ? 9 : 11, weight: twoLines ? .medium : .semibold)
+        let width = ceil((line as NSString).size(withAttributes: [.font: font]).width)
+        #expect(presentation.length(thickness: 34, edge: .top) == CGFloat(224))
+        #expect(presentation.accountBalanceReadingSeconds(thickness: 34, edge: .top) == Double(width) / 32 + 2.4,
+            "Quota expiry and rotation must give the rendered monospaced digits enough time to reach their tail")
+        let shortLines = twoLines ? ["5h 10%", "7d 11%"] : ["7d 11%"]
+        let shortNotice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Codex", style: .status,
+            metadata: Dictionary(uniqueKeysWithValues: shortLines.enumerated().map { ("quotaLine\($0.offset)", $0.element) }))
+        let shortPresentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: shortNotice, text: "")
+        let shortWidth = shortLines.map { ceil(($0 as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
+        #expect(shortPresentation.length(thickness: 34, edge: .top) == 56 + shortWidth,
+            "Natural quota length must reserve the actual monospaced label width")
+        #expect(shortPresentation.accountBalanceSideWidth(thickness: 34) == max(26, shortWidth) + 12,
+            "Camera wings must reserve the same measured label and their compact insets")
     }
 
 
@@ -214,7 +261,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.count == 1)
         #expect(notice.title == (provider == .gpt ? "ChatGPT" : "Codex"))
         #expect(notice.metadata?["quotaProviderID"] == provider.rawValue)
-        #expect(notice.metadata?["quotaLine0"] == "每周额度 10%")
+        #expect(notice.metadata?["quotaLine0"] == "7d 10%")
         #expect(notice.metadata?["quotaLine2"] == nil)
     }
 
@@ -273,7 +320,7 @@ struct AIAccountBalanceNoticeTests {
         var settings = FeatureSettings(islandLayoutStyle: style)
         settings.compactStatusPriority = [.transient]
         let notice = IslandNotice(id: "ai-balance-low-layout", title: "Claude", style: .status,
-            metadata: ["quotaSeverity": "2", "quotaRemainingFraction": "0.1", "quotaLine0": "5h 10%"])
+            metadata: ["quotaSeverity": "2", "quotaRemainingFraction": "0.1", "quotaLine0": "5h 10%", "quotaLine1": "7d 59%"])
         let screenFrame = CGRect(x: -1440, y: 0, width: 1440, height: 900)
         let screen = ScreenSnapshot(displayID: 1, frame: screenFrame, visibleFrame: screenFrame,
             safeAreaInsets: ScreenInsets(top: gap > 0 ? 34 : 0),
@@ -292,7 +339,9 @@ struct AIAccountBalanceNoticeTests {
         #expect(actual == throughLayout, "Both real layout entry points must reserve the same balance bounds")
         if style == .pill || gap > 0 {
             let center = style == .pill ? max(120, gap) : gap
-            #expect(actual.width - center >= 96, "Both camera wings need room for the ring or short quota and insets")
+            #expect((76...108).contains(actual.width - center),
+                "Short canonical quota must fit both camera wings without the old 24pt inset per wing; observed \(actual.width - center)pt")
+            #expect(actual.midX == screen.frame.midX, "Tightening camera wings must keep the physical camera centered")
         } else {
             #expect(actual.width < 150, "A short reading on a simulated notch must use its ring and text's natural width")
         }
@@ -313,8 +362,9 @@ struct AIAccountBalanceNoticeTests {
             let notice = try #require(queue.left.first)
             #expect(notice.metadata?["quotaProviderID"] == "claude")
             #expect(notice.metadata?["quotaRemainingFraction"] == "0.1")
-            #expect(notice.metadata?["quotaLine0"] == (style == .detailed ? "5h 70%" : "每周额度 10%"))
-            #expect(notice.metadata?["quotaLine1"] == (style == .detailed ? "7d 10%" : nil))
+            #expect(notice.metadata?["quotaLine0"] == "5h 70%")
+            #expect(notice.metadata?["quotaLine1"] == "7d 10%")
+            #expect(notice.metadata?["quotaLineSeverity0"] == "0" && notice.metadata?["quotaLineSeverity1"] == "2")
         }
     }
 
@@ -413,14 +463,21 @@ struct AIAccountBalanceNoticeTests {
     }
 
     /// Amount-only exhaustion must be the limiting compact line even when every percentage window is healthy.
-    @Test func compactModeIdentifiesExhaustedCreditsWhenPercentageWindowsAreHealthy() {
+    @Test(arguments: [AIAccountQuotaKind.credits, .budget])
+    func compactModeIdentifiesExhaustedCreditsWhenPercentageWindowsAreHealthy(kind: AIAccountQuotaKind) {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
-        var reading = balance(70)
-        reading.windows.append(.init(id: "credits", kind: .credits, remaining: 0, unit: .credits))
+        var reading = AIAccountBalance(id: "amount-exhausted", providers: [.claude], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)])
+        let exhausted = AIAccountQuotaWindow(id: "amount", kind: kind, remaining: 0, unit: kind == .credits ? .credits : .usd)
+        reading.windows.append(exhausted)
         controller.update(balances: [reading], settings: FeatureSettings(), language: .simplifiedChinese)
         #expect(queue.left.first?.metadata?["quotaSeverity"] == String(AIAccountQuotaSeverity.exhausted.rawValue))
-        #expect(queue.left.first?.metadata?["quotaLine0"] == "积分余额 0 积分")
+        #expect(queue.left.first?.metadata?["quotaLine0"] == exhausted.label(language: .simplifiedChinese) + " "
+            + exhausted.value(language: .simplifiedChinese))
+        #expect(queue.left.first?.metadata?["quotaLineSeverity0"] == "3")
+        #expect(queue.left.first?.metadata?["quotaLine1"] == nil)
     }
 
     /// Fixed-time rotation covers all selected valid accounts while respecting placement and always-visible policy.

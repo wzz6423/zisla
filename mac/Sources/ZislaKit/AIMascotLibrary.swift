@@ -176,11 +176,6 @@ public enum AIMascotLibrary {
         let identifier: String
         let name: String
         switch provider {
-        case .codex, .gpt:
-            guard let application = installedOpenAIApplication(resolveBundleIdentifier: resolveBundleIdentifier,
-                applicationDirectories: applicationDirectories, fileExists: fileExists),
-                application.provider == provider else { return nil }
-            return application.url
         case .delta: identifier = "com.zed-industries.delta"; name = "Delta"
         case .orca: identifier = "com.stablyai.orca"; name = "Orca"
         case .workbuddy: identifier = "com.workbuddy.workbuddy"; name = "WorkBuddy"

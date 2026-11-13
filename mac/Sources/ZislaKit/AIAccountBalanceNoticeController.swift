@@ -135,14 +135,17 @@ public final class AIAccountBalanceNoticeController {
             edge: settings.islandPlacement.edge)
     }
 
-    /// Compact mode identifies the limiting window, including exhausted credits beside healthy percentages.
-    /// Detailed mode carries the bounded summary in metadata so every compact shape renders the same reading.
+    /// Both styles retain canonical quota rows; compact mode singles out a limiting extra allowance.
     private nonisolated static func notice(_ balance: AIAccountBalance, id: String, style: MediaCompactStyle,
                                           language: AppLanguage, createdAt: Date) -> IslandNotice {
         let provider = balance.providerTitle(language: language)
         let summary = balance.compactLines(language: language)
+        let short = balance.fiveHourWindow
+            ?? balance.windows.first(where: { $0.kind == .rolling && !$0.id.hasPrefix("additional:") })
+        let usesSummary = style == .detailed || balance.limitingWindow?.id == short?.id
+            || balance.limitingWindow?.id == balance.weeklyWindow?.id
         let lines: [String]
-        if style == .detailed { lines = summary }
+        if usesSummary { lines = summary }
         else if let limiting = balance.limitingWindow {
             lines = [limiting.label(language: language) + " " + limiting.value(language: language)]
         } else { lines = [] }
@@ -159,9 +162,7 @@ public final class AIAccountBalanceNoticeController {
         for (index, line) in lines.enumerated() {
             metadata["quotaLine\(index)"] = line
             let lineSeverity: AIAccountQuotaSeverity
-            let short = balance.fiveHourWindow
-                ?? balance.windows.first(where: { $0.kind == .rolling && !$0.id.hasPrefix("additional:") })
-            if style != .detailed { lineSeverity = balance.limitingWindow?.severity ?? .normal }
+            if !usesSummary { lineSeverity = balance.limitingWindow?.severity ?? .normal }
             else if index == 0, let short { lineSeverity = short.severity }
             else if index == 0, let weekly = balance.weeklyWindow { lineSeverity = weekly.severity }
             else {

@@ -317,7 +317,7 @@ struct AIMascotView: View {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }
-        case .codex, .gpt, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
+        case .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
             guard let provider = identity.provider else { return nil }
             return imageCache.image(for: "installed|desktop-\(provider.rawValue)") {
                 AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider).map {
