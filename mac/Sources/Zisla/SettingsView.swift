@@ -1067,57 +1067,60 @@ struct SettingsView: View {
                             }
                         }
                         if isEnabled, expandedClipboardAssistantKind == kind {
-                            ForEach(Array(actions.enumerated()), id: \.element) { offset, action in
-                                rowDivider
-                                settingRow(
-                                    symbol: action.symbolName,
-                                    title: Self.clipboardAssistantActionTitle(action, for: kind),
-                                    detail: "",
-                                    isNested: true,
-                                    isDefaultAction: offset == 0
-                                ) {
-                                    HStack(spacing: 4) {
-                                        IconButton(
-                                            symbol: "arrow.up",
-                                            help: AppLocalization.text("上移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind))),
-                                            size: .compact
-                                        ) {
-                                            Self.moveClipboardAssistantAction(action, for: kind, by: -1, settings: Binding(
-                                                get: { model.settingsStore.settings },
-                                                set: { model.settingsStore.settings = $0 }
-                                            ))
-                                        }
-                                        .disabled(offset == 0)
+                            VStack(spacing: 0) {
+                                ForEach(Array(actions.enumerated()), id: \.element) { offset, action in
+                                    rowDivider
+                                    settingRow(
+                                        symbol: action.symbolName,
+                                        title: Self.clipboardAssistantActionTitle(action, for: kind),
+                                        detail: "",
+                                        isNested: true,
+                                        isDefaultAction: offset == 0
+                                    ) {
+                                        HStack(spacing: 4) {
+                                            IconButton(
+                                                symbol: "arrow.up",
+                                                help: AppLocalization.text("上移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind))),
+                                                size: .compact
+                                            ) {
+                                                Self.moveClipboardAssistantAction(action, for: kind, by: -1, settings: Binding(
+                                                    get: { model.settingsStore.settings },
+                                                    set: { model.settingsStore.settings = $0 }
+                                                ))
+                                            }
+                                            .disabled(offset == 0)
 
-                                        IconButton(
-                                            symbol: "arrow.down",
-                                            help: AppLocalization.text("下移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind))),
-                                            size: .compact
-                                        ) {
-                                            Self.moveClipboardAssistantAction(action, for: kind, by: 1, settings: Binding(
-                                                get: { model.settingsStore.settings },
-                                                set: { model.settingsStore.settings = $0 }
-                                            ))
+                                            IconButton(
+                                                symbol: "arrow.down",
+                                                help: AppLocalization.text("下移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind))),
+                                                size: .compact
+                                            ) {
+                                                Self.moveClipboardAssistantAction(action, for: kind, by: 1, settings: Binding(
+                                                    get: { model.settingsStore.settings },
+                                                    set: { model.settingsStore.settings = $0 }
+                                                ))
+                                            }
+                                            .disabled(offset == actions.count - 1)
                                         }
-                                        .disabled(offset == actions.count - 1)
                                     }
                                 }
-                            }
-                            rowDivider
-                            settingRow(
-                                title: "恢复默认顺序",
-                                detail: "",
-                                isNested: true
-                            ) {
-                                IconButton(
-                                    symbol: "arrow.counterclockwise",
-                                    help: AppLocalization.text("恢复默认顺序"),
-                                    size: .compact
+                                rowDivider
+                                settingRow(
+                                    title: "恢复默认顺序",
+                                    detail: "",
+                                    isNested: true
                                 ) {
-                                    resetClipboardAssistantActionOrder(for: kind)
+                                    IconButton(
+                                        symbol: "arrow.counterclockwise",
+                                        help: AppLocalization.text("恢复默认顺序"),
+                                        size: .compact
+                                    ) {
+                                        resetClipboardAssistantActionOrder(for: kind)
+                                    }
+                                    .disabled(actions == ClipboardAssistantActionOrder.defaults(for: kind))
                                 }
-                                .disabled(actions == ClipboardAssistantActionOrder.defaults(for: kind))
                             }
+                            .padding(.leading, 20)
                         }
                     }
                 }
