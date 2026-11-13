@@ -22,7 +22,7 @@ const load = (entryPoint) => {
 const walk = (node) => [node, ...(node.childNodes ?? []).flatMap(walk)];
 const attr = (node, name) => node.attrs?.find((item) => item.name === name)?.value;
 const nodes = (html) => walk(parseFragment(html));
-const textOf = (html) => html.replace(/<[^>]*>/g, '').replaceAll('&amp;', '&');
+const textOf = (html) => nodes(html).filter((node) => node.nodeName === '#text').map((node) => node.value).join('');
 const styleOf = (node) => Object.fromEntries((attr(node, 'style') ?? '').split(';').filter(Boolean).map((declaration) => {
   const colon = declaration.indexOf(':');
   return [declaration.slice(0, colon), declaration.slice(colon + 1)];
@@ -296,7 +296,7 @@ test('recording playback advances once and holds the final frame', () => {
   const ui = load('src/modules/ToolsModule.tsx');
   const position = (frame) => {
     const html = ui.render(ui.exports.ScreenRecordingModule, {frame});
-    const match = html.replace(/<[^>]+>/g, '').match(/(\d{1,2}):(\d{2}) \/ (\d{1,2}):(\d{2})/);
+    const match = textOf(html).match(/(\d{1,2}):(\d{2}) \/ (\d{1,2}):(\d{2})/);
     assert.ok(match);
     return Number(match[1]) * 60 + Number(match[2]);
   };

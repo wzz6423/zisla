@@ -153,7 +153,7 @@ test('system export and reviewed cleanup retain data requiring review', () => {
 test('window switch and distinct Quick Actions have concrete results', () => {
   const ui = load('src/modules/tour/SettingsTourModule.tsx');
   assert.match(textOf(ui.render(ui.exports.WindowsTourModule, {frame: 140})), /Notes window activated/);
-  for (const [index, example] of ui.exports.quickActionExamples.entries()) {
+  for (const example of ui.exports.quickActionExamples) {
     const pending = textOf(ui.render(ui.exports.QuickActionsTourModule, {frame: example.from + 10}));
     assert.ok(pending.includes(example.input));
     assert.ok(!pending.includes(example.result));
