@@ -76,18 +76,14 @@ export const fr: SiteContent = {
       dashboard: {
         name: 'Accueil',
         caption:
-          'Les cartes dynamiques n’apparaissent que pendant une session de concentration, une tâche IA ou un téléchargement en cours : rien n’occupe l’écran quand il ne se passe rien.',
+          'Les cartes dynamiques n’apparaissent que pendant une session de concentration, une tâche IA ou un téléchargement en cours : rien n’occupe l’écran quand il ne se passe rien. L’accueil regroupe les tâches IA en cours par application.',
         points: ['Apparaît au besoin', 'Progression en temps réel', 'Mise en page adaptative'],
       },
       shelf: {
         name: 'Casier',
         caption:
-          'Faites glisser fichiers, audio, vidéo ou liens sur la bande de déclenchement en haut de l’écran pour les déposer dans le casier, les afficher dans le Finder ou ouvrir le menu de partage de macOS.',
-        points: [
-          'Glisser vers le haut pour déposer',
-          'Afficher dans le Finder',
-          'Menu de partage système',
-        ],
+          'Glissez fichiers, sons, vidéos ou liens en haut de l’écran, puis recherchez, filtrez et sélectionnez plusieurs éléments pour les copier, les partager ou les envoyer aux Notes rapides. Convertissez des images en PDF, envoyez le texte reconnu aux Notes rapides ou ouvrez une vidéo dans le studio d’enregistrement pour la monter. Retrouvez aussi les fichiers dans le Finder.',
+        points: ['Recherche et actions groupées', 'Images vers PDF et Notes rapides', 'Montage vidéo dans le studio'],
       },
       clipboard: {
         name: 'Presse-papiers',
@@ -98,12 +94,8 @@ export const fr: SiteContent = {
       aiMonitor: {
         name: 'Suivi IA',
         caption:
-          'Détecte automatiquement l’activité des CLI IA, apps de bureau et IDE pris en charge et affiche les tâches, l’état, l’évolution cumulée des tokens et une carte thermique des contributions. Seuls les événements structurés sont analysés, jamais le texte des conversations. La détection des tâches Cursor est ajoutée, avec l’usage quotidien chiffré, sans afficher les quotas restants de Cursor et Muse Code ; les longues exécutions d’outils Cursor restent visibles.',
-        points: [
-          'Tâches agrégées entre outils',
-          'Évolution de la consommation de tokens',
-          'Ne lit ni invites ni réponses',
-        ],
+          'Rassemble les tâches et l’état des CLI IA, apps de bureau et IDE. Les données chiffrées fiables alimentent les tendances de tokens et la carte des contributions ; choisissez une date pour voir les tokens d’entrée, de sortie et totaux par fournisseur et modèle. Consultez l’historique dans les réglages, exportez-le entièrement en .xlsx ou effacez-le. Affiche les quotas réels, leur réinitialisation et les alertes de quota faible, dont les fenêtres 5h/7d et les budgets Cursor en dollars lorsqu’ils sont disponibles. Ne lit pas le texte des invites ni des réponses.',
+        points: ['Tâches de plusieurs outils IA', 'Historique par modèle et export .xlsx', 'Quotas et dates de réinitialisation'],
       },
       keyboardSound: {
         name: 'Sons de clavier',
@@ -128,17 +120,13 @@ export const fr: SiteContent = {
       agenda: {
         name: 'Agenda et météo',
         caption:
-          'Affiche la météo de votre position actuelle et de six lieux au maximum que vous choisissez. Consultez, ajoutez et supprimez des événements de calendrier et des rappels, et marquez un rappel comme terminé.',
-        points: [
-          'Cartes météo multi-lieux',
-          'Calendrier et tâches',
-          'Rappel terminé en un geste',
-        ],
+          'Affiche la météo de votre position et de six lieux choisis au maximum. Consultez, ajoutez ou supprimez des événements et rappels, puis marquez les rappels comme terminés. Les événements avec un lien de réunion affichent un compte à rebours 10 minutes avant le début et permettent de rejoindre en un clic. Créez une note de réunion ou associez et dissociez des notes contextuelles existantes.',
+        points: ['Météo et calendrier', 'Compte à rebours de 10 minutes', 'Rejoindre et associer des notes'],
       },
       mail: {
         name: 'Mail',
         caption:
-          'Lit les comptes activés dans Mail. Consultez la boîte de réception, marquez comme lu, répondez, rédigez et placez dans la corbeille depuis l’île, avec des indications claires dès qu’une autorisation manque. Choisissez des fichiers à joindre lors de la rédaction.',
+          'Lit les comptes activés dans Mail. Consultez la boîte de réception, marquez un message ou tous les messages reçus comme lus, répondez, rédigez et déplacez des messages dans la Corbeille depuis l’île. Choisissez des pièces jointes pendant la rédaction ; les autorisations manquantes sont clairement indiquées.',
         points: ['Comptes de Mail', 'Répondre et rédiger dans l’île', 'Autorisations expliquées'],
       },
       quickNotes: {
@@ -159,7 +147,7 @@ export const fr: SiteContent = {
       toolbox: {
         name: 'Utilitaires',
         caption:
-          'Minuteur de concentration, écran maintenu allumé, nettoyage de l’écran, nettoyage du clavier (qui bloque les frappes, F1-F12 comprises, pendant l’opération), téléprompteur, miroir et corbeille, sur une seule page.',
+          'Minuteur de concentration, maintien de l’écran éveillé, nettoyage de l’écran ou du clavier avec blocage des touches F1-F12, téléprompteur, miroir et Corbeille sur une même page. Mettez le Pomodoro en pause, reprenez-le, réinitialisez-le et suivez sa progression dans les vues compactes horizontale et verticale.',
         points: [
           'Minuteur de concentration',
           'Bloque F1-F12 pendant le nettoyage',
@@ -169,7 +157,7 @@ export const fr: SiteContent = {
       system: {
         name: 'État du système',
         caption:
-          'Suivez CPU, GPU, mémoire, disque, réseau, ventilateurs et température NVMe SMART disponible. Affichez l’historique à la minute sur la période voulue ou exportez-le en .xlsx ; il reste conservé jusqu’à votre suppression. Consultez la charge, la santé, les cycles, la température et la capacité de la batterie du Mac et les niveaux des appareils proches, avec IPv4 et IPv6 publiques distinctes. Vérifiez caches, journaux, préférences résiduelles et dossiers de travail IA sans session conservée avant de les déplacer à la Corbeille. Le nettoyage facultatif intervient tous les 7, 15 ou 30 jours : éléments fiables seuls ou tous les éléments traitables, y compris ceux à vérifier. Il est désactivé par défaut.',
+          'Surveille CPU, GPU, mémoire, disque, réseau, ventilateurs et température NVMe SMART disponible. Consultez l’historique à la minute sur une période choisie, exportez-le en .xlsx ou effacez-le dans les réglages. Vérifiez santé, cycles, température et capacité de la batterie, charge des appareils proches et IPv4/IPv6 publiques. Choisissez des modes d’alimentation automatiques sur secteur ou batterie, avec économie d’énergie à 20 % ou moins en option. Chargez immédiatement à 100 % lorsque macOS le permet. Vérifiez caches, journaux, préférences résiduelles et espaces IA orphelins avant de les mettre à la Corbeille ; le nettoyage peut aussi être planifié tous les 7, 15 ou 30 jours. Le nettoyage planifié est désactivé par défaut ; choisissez les éléments fiables seuls ou tous les éléments traitables, y compris ceux à vérifier.',
         points: [
           'Surveillance au niveau de la puce',
           'Graphiques d’historique et export .xlsx',
@@ -181,7 +169,7 @@ export const fr: SiteContent = {
   extensions: {
     eyebrow: 'DANS L’ÎLE ET AUTOUR',
     title: 'Loin de l’île, <span>toujours un outil de bureau.</span>',
-    lede: 'Captures, voix, médias, téléchargements du navigateur et gestion de l’IA apparaissent là où c’est le plus pratique.',
+    lede: 'Captures, outils d’image et d’audio, dictée, médias, téléchargements du navigateur et gestion de l’IA apparaissent là où ils sont faciles à atteindre.',
     ariaLabel: 'Fonctions de bureau indépendantes',
     summaryMono: 'AU-DELÀ DE L’ÎLE',
     summaryLede: 'Les fonctions les plus utilisées, chacune à sa place naturelle.',
@@ -190,12 +178,12 @@ export const fr: SiteContent = {
     features: {
       floatingIsland: {
         title: 'Une île flottante adaptée à votre disposition',
-        description: 'Utilisez la position de la caméra ou choisissez un emplacement sur un bord de l’écran. La position personnalisée est conservée entre les modes. Les présentations compactes horizontales et verticales adaptent leur longueur aux icônes, tâches IA, téléchargements et médias, avec une option pour afficher plus d’informations.',
+        description: 'Utilisez la position de la caméra ou choisissez un emplacement sur un bord de l’écran. La position personnalisée est conservée entre les modes. Les présentations compactes horizontales et verticales adaptent leur longueur aux icônes, tâches IA, téléchargements et médias, avec une option pour afficher plus d’informations. Réorganisez les modules par glisser-déposer dans Réglages → Infos, ou rétablissez l’ordre par défaut.',
         detail: 'Position personnalisée · Icônes persistantes · Informations adaptatives',
       },
       dailyBriefing: {
         title: 'Le bilan de votre journée',
-        description: 'Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible ; une donnée absente n’est pas présentée comme un zéro mesuré. Choisissez un dossier d’export indépendant dans Réglages → Emplacement de sauvegarde.',
+        description: 'Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible ; une donnée absente n’est pas présentée comme un zéro mesuré. Choisissez un dossier d’export indépendant dans Réglages → Emplacement de sauvegarde. Vous pouvez aussi inclure les quotas réels des comptes et l’heure de leur relevé.',
         detail: '8 modèles · Contenu au choix · Aperçu et export PNG programmé',
       },
       userCare: {
@@ -218,6 +206,16 @@ export const fr: SiteContent = {
         description: 'Consultez les états dans Réglages → Autorisations, lancez les demandes prises en charge ou ouvrez la page système correspondante. L’accueil initial utilise la même liste et indique les réglages manuels.',
         detail: 'État des autorisations · Demandes et liens · Commun avec l’accueil',
       },
+      imageTools: {
+        title: 'Outils d’image',
+        description: 'Neuf outils locaux dans les réglages : compression ; conversion PNG, JPEG, WebP, AVIF et JPEG XL ; redimensionnement et recadrage ; comparaison du format le plus léger ; rotation et miroir ; filigranes ; mosaïque et flou ; reconnaissance de texte et de tableaux ; détourage. Exportez par lots ou en ZIP, avec un dossier dédié dans Réglages → Emplacement de sauvegarde.',
+        detail: '9 outils locaux · Cinq formats · Export par lots et ZIP',
+      },
+      audioTools: {
+        title: 'Outils audio',
+        description: 'Vingt-sept opérations locales dans les réglages : conversion, compression, découpe, segmentation, assemblage et mixage, extraction audio d’une vidéo, normalisation LUFS, fondus, vitesse et hauteur, réduction du bruit et suppression des silences, égaliseur, dynamique, canaux et tags. FFmpeg et ffprobe sont nécessaires ; choisissez un fichier ou un dossier pour l’export.',
+        detail: '27 opérations locales · Montage et mixage · FFmpeg et ffprobe',
+      },
       pdf: {
         title: 'Outils PDF',
         description: 'Accessible dans les réglages, en dehors du carrousel de l’île. Quatorze opérations entièrement locales : fusionner, diviser, faire pivoter, recadrer, convertir des images et fichiers Office, convertir en images, exporter le texte, ajouter un filigrane texte ou image, numéroter les pages, chiffrer, supprimer un mot de passe et modifier les métadonnées.',
@@ -233,7 +231,7 @@ export const fr: SiteContent = {
       capture: {
         title: 'Captures, captures défilantes et épinglage',
         description:
-          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue s’ouvre dans le dossier de captures défini dans Réglages → Emplacement de sauvegarde. Les captures épinglées restent en place lors d’une nouvelle capture.',
+          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue s’ouvre dans le dossier de captures défini dans Réglages → Emplacement de sauvegarde. Les captures épinglées restent en place lors d’une nouvelle capture. Utilisez le défilement automatique lent pour les captures longues et capturez en HDR sur les appareils compatibles.',
         detail: 'Surlignage et extraction · Reconnaissance, traduction et copie · Coins arrondis et .xlsx',
       },
       voice: {
@@ -257,7 +255,7 @@ export const fr: SiteContent = {
       copyAssistant: {
         title: 'Actions rapides et étapes suivantes',
         description:
-          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0. Les textes et images enregistrés utilisent le dossier indépendant des actions rapides dans Réglages → Emplacement de sauvegarde.',
+          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0. Les textes et images enregistrés utilisent le dossier indépendant des actions rapides dans Réglages → Emplacement de sauvegarde. Si une app ne s’ouvre pas, les actions rapides peuvent vérifier son intégrité, sa signature et la politique de sécurité de macOS, puis retirer les attributs de quarantaine et l’ouvrir après validation.',
         detail: 'Reconnaissance locale · Conversion aux taux en temps réel · Command+N par défaut',
       },
       aiManagement: {
@@ -281,7 +279,7 @@ export const fr: SiteContent = {
       recommendedTools: {
         title: 'Apps recommandées',
         description:
-          'Découvrez OpenScreen pour la capture vidéo et le montage, DockDoor pour les aperçus de fenêtres et le changement d’app, et Quiet.md pour les notes locales. Ces applications tierces s’installent séparément.',
+          'Découvrez OpenScreen pour la capture vidéo et le montage, DockDoor pour les aperçus de fenêtres et le changement d’app, et Zshell pour un espace de travail de terminal natif macOS. Ces applications tierces s’installent séparément.',
         detail: 'Découvrir des outils de bureau · Apps tierces · Installation séparée',
       },
     },
@@ -289,7 +287,7 @@ export const fr: SiteContent = {
   ai: {
     eyebrow: 'UNE IA SANS BOÎTE NOIRE',
     title: 'Voir l’état de l’IA <span>sans lire la conversation.</span>',
-    lede: 'Tâches, état et évolution des tokens restent sur votre Mac. Cette page décrit la fonction et n’invente aucune capture d’une tâche en cours.',
+    lede: 'Suivez les tâches par application, l’usage des modèles par date et les quotas réels des comptes. Les états et données chiffrées restent sur votre Mac ; le texte des conversations n’est pas lu.',
     summaryMono: 'ÉTAT LOCAL / LIMITES CLAIRES',
     summaryLede:
       'Reliez les outils IA que vous utilisez déjà tout en gardant les limites de contexte que votre travail exige.',
@@ -299,6 +297,7 @@ export const fr: SiteContent = {
     toolsLede:
       'Détecte l’activité des CLI, apps de bureau et IDE pris en charge, et agrège l’état des tâches.',
     toolsAriaLabel: 'Outils IA pris en charge',
+    usageNote: 'Détection des sessions, historique des tokens et quotas des comptes utilisent des sources distinctes. Delta lit son registre chiffré local ; Orca déduplique l’usage du CLI associé sous le fournisseur d’origine. WorkBuddy AI peut détecter les sessions et consulter les crédits ; occupation du contexte et crédits ne sont pas convertis en tokens ou en coût en dollars. Les quotas disponibles dépendent du fournisseur et du mode de connexion.',
     boundariesHeading: 'Seules les limites d’état sont enregistrées',
     privacyPoints: [
       'Analyse uniquement le type d’événement, l’état, l’horodatage, le modèle et l’identifiant de session des événements structurés',
@@ -498,6 +497,14 @@ export const fr: SiteContent = {
       'Liquid Glass sur macOS 26 et versions ultérieures, avec repli automatique sur les matériaux natifs sur macOS 14 et 15',
       'L’encoche physique est déduite de la zone de sécurité du système ; les écrans externes sans encoche reçoivent une barre d’état simulée dans une surcouche dédiée',
     ],
+  },
+  film: {
+    title: "Film de présentation",
+    videoAriaLabel: "Film de présentation de zisla",
+    openVideoLabel: "Ouvrir la vidéo",
+    playbackError: "Impossible de lire la vidéo.",
+    musicLabel: "Musique",
+    excerptLabel: "Extrait",
   },
   footer: {
     brandHomeAriaLabel: 'Retour à l’accueil de zisla',

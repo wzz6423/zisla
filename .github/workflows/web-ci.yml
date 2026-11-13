@@ -97,6 +97,15 @@ jobs:
         working-directory: web
         run: npm run build
 
+      - name: Validate promo film
+        if: steps.check-web.outputs.exists == 'true'
+        run: |
+          if [ -f promo/package.json ]; then
+            npm ci --prefix promo
+            npm --prefix promo run typecheck
+            npm --prefix promo test
+          fi
+
       - name: Audit production dependencies
         if: steps.check-web.outputs.exists == 'true'
         working-directory: web

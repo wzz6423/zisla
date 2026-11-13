@@ -1,0 +1,31 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+  --font-rounded: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+
+  --color-label: rgb(255 255 255);
+  --color-label-2: rgb(235 235 245 / 0.6);
+  --color-label-3: rgb(235 235 245 / 0.3);
+  --color-fill-card: rgb(255 255 255 / 0.12);
+  --color-fill-control: rgb(255 255 255 / 0.1);
+  --color-stroke-card: rgb(255 255 255 / 0.14);
+  --color-divider: rgb(255 255 255 / 0.08);
+  --color-sys-blue: #0a84ff;
+  --color-sys-green: #30d158;
+  --color-sys-orange: #ff9f0a;
+  --color-sys-red: #ff453a;
+  --color-sys-cyan: #64d2ff;
+  --color-sys-purple: #bf5af2;
+  --color-sys-yellow: #ffd60a;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

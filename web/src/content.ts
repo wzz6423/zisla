@@ -27,6 +27,18 @@ export const navHrefs: Record<NavId, string> = {
   developers: '#developers',
 };
 
+export const launchFilmMedia = {
+  video: './media/zisla-launch-1080p60.mp4',
+  poster: './media/zisla-launch-poster.webp',
+  music: {
+    title: 'Funkorama',
+    artist: 'Kevin MacLeod',
+    source: 'https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474',
+    license: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+} as const;
+
 export const proofIds = ['modules', 'os', 'displays', 'local'] as const;
 export type ProofId = (typeof proofIds)[number];
 
@@ -82,6 +94,8 @@ export const crossModuleFeatureIds = [
   'copyAssistant',
   'aiManagement',
   'pet',
+  'imageTools',
+  'audioTools',
   'pdf',
   'permissions',
   'lockScreen',
@@ -103,6 +117,8 @@ export const crossModuleFeatureIcons: Record<CrossModuleFeatureId, string> = {
   copyAssistant: 'copy',
   aiManagement: 'bot',
   pet: 'sparkles',
+  imageTools: 'image',
+  audioTools: 'waves',
   pdf: 'image',
   permissions: 'shield',
   lockScreen: 'lock',
@@ -613,6 +629,14 @@ export interface SiteContent {
     giteeRepoLabel: string;
     checksumLabel: string;
     performancePoints: readonly [string, string, string, string, string];
+  };
+  film: {
+    title: string;
+    videoAriaLabel: string;
+    openVideoLabel: string;
+    playbackError: string;
+    musicLabel: string;
+    excerptLabel: string;
   };
   footer: {
     brandHomeAriaLabel: string;

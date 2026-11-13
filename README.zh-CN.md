@@ -6,6 +6,12 @@
 
 当前实现支持 **macOS 14+**。Apple 芯片 Mac 为受支持配置；Intel 机型可能存在可用的发布包，但不保证兼容性。
 
+[观看完整功能导览 — 2 分 40 秒 · 1080p / 60 fps](https://wzz6423.github.io/zisla/media/zisla-launch-1080p60.mp4)
+
+[![观看 zisla 宣传片](web/public/media/zisla-launch-poster.webp)](https://wzz6423.github.io/zisla/media/zisla-launch-1080p60.mp4)
+
+配乐：Kevin MacLeod《Funkorama》· [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · [来源](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474)。
+
 ## 为什么它适合放在屏幕顶部
 
 - **按需出现，不抢焦点。** 从屏幕顶边展开，必要时固定面板，同时继续在当前应用中工作。

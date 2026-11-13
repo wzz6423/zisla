@@ -77,14 +77,14 @@ export const es = createCatalog({
       dashboard: {
         name: 'Inicio',
         caption:
-          'Las tarjetas dinámicas solo aparecen durante una sesión de concentración, una tarea de IA o una descarga; si no ocurre nada, no ocupan espacio.',
+          'Las tarjetas dinámicas solo aparecen durante una sesión de concentración, una tarea de IA o una descarga; si no ocurre nada, no ocupan espacio. El inicio agrupa las tareas de IA en curso por aplicación.',
         points: ['Aparece cuando hace falta', 'Progreso en tiempo real', 'Diseño adaptable'],
       },
       shelf: {
         name: 'Bandeja',
         caption:
-          'Arrastra archivos, audio, vídeo o enlaces a la franja superior para guardarlos en la bandeja, mostrarlos en Finder o abrir el menú Compartir de macOS.',
-        points: ['Arrastra arriba para guardar', 'Mostrar en Finder', 'Menú Compartir del sistema'],
+          'Arrastra archivos, audio, vídeos o enlaces a la parte superior de la pantalla. Busca, filtra y selecciona varios elementos para copiarlos, compartirlos o enviarlos a Notas rápidas. Convierte imágenes en PDF, envía el texto reconocido a Notas rápidas o abre vídeos en el estudio de grabación para editarlos. También puedes mostrar los archivos en Finder.',
+        points: ['Búsqueda y acciones por lotes', 'Imágenes a PDF y Notas rápidas', 'Edición de vídeo en el estudio'],
       },
       clipboard: {
         name: 'Portapapeles',
@@ -95,8 +95,8 @@ export const es = createCatalog({
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Detecta automáticamente actividad de CLI, apps de escritorio e IDE compatibles y muestra tareas, estado, tendencias de tokens y un mapa de contribuciones. Solo analiza eventos estructurados y nunca lee conversaciones. Se añade detección de tareas de Cursor, junto con uso diario numérico, sin mostrar cuotas restantes de Cursor y Muse Code; las ejecuciones largas de herramientas en Cursor siguen visibles.',
-        points: ['Tareas agrupadas entre herramientas', 'Tendencias de consumo de tokens', 'Nunca lee prompts ni respuestas'],
+          'Reúne tareas y estados de CLI de IA, apps de escritorio e IDE. Los datos numéricos fiables alimentan las tendencias de tokens y el mapa de contribuciones; elige una fecha para ver tokens de entrada, salida y totales por proveedor y modelo. Consulta el historial en Ajustes, expórtalo completo como .xlsx o bórralo. Muestra cuotas reales, fechas de reinicio y avisos de cuota baja, incluidas las ventanas 5h/7d y los presupuestos de Cursor en dólares cuando están disponibles. No lee el texto de prompts ni respuestas.',
+        points: ['Tareas de varias herramientas de IA', 'Historial por modelo y exportación .xlsx', 'Cuotas y fechas de reinicio'],
       },
       keyboardSound: {
         name: 'Sonidos del teclado',
@@ -113,13 +113,13 @@ export const es = createCatalog({
       agenda: {
         name: 'Agenda y tiempo',
         caption:
-          'Muestra el tiempo de tu ubicación y hasta seis lugares elegidos. Consulta, añade y elimina eventos y recordatorios, y marca los recordatorios como completados.',
-        points: ['Tarjetas meteorológicas para varios lugares', 'Calendario y tareas', 'Completa un recordatorio con un toque'],
+          'Muestra el tiempo de tu ubicación y hasta seis lugares elegidos. Consulta, añade o elimina eventos y recordatorios y marca estos como completados. Los eventos con enlace de reunión muestran una cuenta atrás 10 minutos antes de empezar y permiten unirse con un clic. Crea una nota de reunión o vincula y desvincula notas contextuales existentes.',
+        points: ['Tiempo y calendario', 'Cuenta atrás de 10 minutos', 'Unirse y vincular notas'],
       },
       mail: {
         name: 'Correo',
         caption:
-          'Lee las cuentas activadas en Mail, muestra la bandeja de entrada y permite marcar, responder, redactar y mover mensajes a la papelera dentro de la isla, con indicaciones claras si falta un permiso. Selecciona archivos al redactar para adjuntarlos al mensaje.',
+          'Lee las cuentas activadas en Mail. Consulta la bandeja de entrada, marca un mensaje o todos los mensajes de entrada como leídos, responde, redacta y mueve mensajes a la Papelera desde la isla. Elige adjuntos al redactar; los permisos que faltan se explican con claridad.',
         points: ['Cuentas de Mail', 'Responder y redactar en la isla', 'Permisos explicados'],
       },
       quickNotes: {
@@ -136,13 +136,13 @@ export const es = createCatalog({
       toolbox: {
         name: 'Utilidades',
         caption:
-          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado (bloquea incluso F1-F12), teleprompter, espejo y papelera en una sola página.',
+          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado que bloquea también F1-F12, teleprónter, espejo y Papelera en una página. Pausa, reanuda o reinicia el Pomodoro y sigue su progreso en las vistas compactas horizontal y vertical.',
         points: ['Temporizador de concentración', 'Bloquea F1-F12 durante la limpieza', 'Teleprompter y espejo'],
       },
       system: {
         name: 'Estado del sistema',
         caption:
-          'Consulta CPU, GPU, memoria, disco, red, ventiladores y temperatura NVMe SMART disponible. Grafica el historial por minuto de cualquier período o expórtalo como .xlsx; se conserva hasta que lo borres. Revisa la carga, salud, ciclos, temperatura y capacidad de la batería del Mac y los niveles de dispositivos cercanos, con IPv4 e IPv6 públicas separadas. Revisa cachés, registros, preferencias residuales y carpetas de trabajo de IA sin sesiones conservadas antes de moverlas a la Papelera. La limpieza opcional se ejecuta cada 7, 15 o 30 días para elementos fiables o todos los elementos procesables, incluidos los que requieren revisión; viene desactivada.',
+          'Supervisa CPU, GPU, memoria, disco, red, ventiladores y temperatura NVMe SMART disponible. Consulta el historial por minuto para un intervalo de fechas, expórtalo en .xlsx o bórralo en Ajustes. Revisa salud, ciclos, temperatura y capacidad de la batería, carga de dispositivos cercanos e IPv4/IPv6 públicas. Elige modos automáticos de energía con corriente o batería y, si quieres, bajo consumo al 20 % o menos. Carga inmediatamente al 100 % cuando macOS lo permita. Revisa cachés, registros, preferencias residuales y espacios de IA huérfanos antes de moverlos a la Papelera; la limpieza opcional puede hacerse cada 7, 15 o 30 días. La limpieza programada está desactivada por defecto; elige solo elementos fiables o todos los procesables, incluidos los que requieren revisión.',
         points: ['Monitorización a nivel de chip', 'Gráficas de historial y exportación .xlsx', 'Revisa antes de mover a la Papelera'],
       },
     },
@@ -151,7 +151,7 @@ export const es = createCatalog({
     eyebrow: 'DENTRO Y FUERA DE LA ISLA',
     title: 'Lejos de la isla, <span>sigue siendo una herramienta de escritorio.</span>',
     lede:
-      'Capturas, voz, medios, descargas del navegador y gestión de IA aparecen donde resulta más fácil acceder a ellos.',
+      'Capturas, herramientas de imagen y audio, dictado, medios, descargas del navegador y gestión de IA aparecen donde resultan fáciles de alcanzar.',
     ariaLabel: 'Capacidades de escritorio independientes',
     summaryMono: 'MÁS ALLÁ DE LA ISLA',
     summaryLede: 'Capacidades frecuentes, cada una en su lugar natural.',
@@ -160,12 +160,12 @@ export const es = createCatalog({
     features: {
       floatingIsland: {
         title: 'Una isla flotante que se adapta',
-        description: 'Usa la posición de la cámara o elige una posición en el borde de la pantalla. La posición propia se conserva al cambiar de modo. Los diseños compactos horizontales y verticales ajustan su longitud a iconos, tareas de IA, descargas y medios, con una opción para mostrar más información.',
+        description: 'Usa la posición de la cámara o elige una posición en el borde de la pantalla. La posición propia se conserva al cambiar de modo. Los diseños compactos horizontales y verticales ajustan su longitud a iconos, tareas de IA, descargas y medios, con una opción para mostrar más información. Reordena los módulos arrastrándolos en Ajustes → Información o restaura el orden predeterminado.',
         detail: 'Posición propia · Iconos persistentes · Información adaptable',
       },
       dailyBriefing: {
         title: 'Tu día en un informe diario',
-        description: 'Elige entre ocho plantillas, selecciona métricas de uso, escritura, sistema y actividad zisla, y revisa la vista previa. Exporta un PNG manualmente o a una hora diaria. El historial de Tiempo de Uso se incluye si está activado y disponible; los datos ausentes no se presentan como un cero medido. Elige una carpeta de exportación independiente en Ajustes → Ubicación de guardado.',
+        description: 'Elige entre ocho plantillas, selecciona métricas de uso, escritura, sistema y actividad zisla, y revisa la vista previa. Exporta un PNG manualmente o a una hora diaria. El historial de Tiempo de Uso se incluye si está activado y disponible; los datos ausentes no se presentan como un cero medido. Elige una carpeta de exportación independiente en Ajustes → Ubicación de guardado. También puedes incluir las cuotas reales de las cuentas y la hora de su consulta.',
         detail: '8 plantillas · Contenido a elegir · Vista previa y exportación PNG programada',
       },
       userCare: {
@@ -188,6 +188,16 @@ export const es = createCatalog({
         description: 'Consulta el estado en Ajustes → Permisos, inicia solicitudes compatibles o abre la página correspondiente del sistema. La bienvenida inicial usa la misma lista y marca los permisos que se configuran manualmente.',
         detail: 'Estado de permisos · Solicitudes y enlaces · Compartido con la bienvenida',
       },
+      imageTools: {
+        title: 'Herramientas de imagen',
+        description: 'Nueve herramientas locales en Ajustes: comprimir; convertir PNG, JPEG, WebP, AVIF y JPEG XL; redimensionar y recortar; comparar el formato más pequeño; girar y reflejar; marcas de agua; mosaico y desenfoque; reconocer texto y tablas; quitar fondos. Exporta por lotes o en ZIP, con una carpeta propia en Ajustes → Ubicación de guardado.',
+        detail: '9 herramientas locales · Cinco formatos · Exportación por lotes y ZIP',
+      },
+      audioTools: {
+        title: 'Herramientas de audio',
+        description: 'Veintisiete operaciones locales en Ajustes, como convertir, comprimir, recortar, dividir, unir y mezclar, extraer audio de vídeo, normalizar LUFS, fundidos, velocidad y tono, reducción de ruido y eliminación de silencios, EQ, dinámica, canales y etiquetas. Requiere FFmpeg y ffprobe; elige un archivo o una carpeta al exportar.',
+        detail: '27 operaciones locales · Edición y mezcla · FFmpeg y ffprobe',
+      },
       pdf: {
         title: 'Herramientas PDF',
         description: 'Disponible en Ajustes, fuera del carrusel de módulos de la isla. Catorce operaciones locales: unir, dividir, girar, recortar, convertir imágenes y Office, renderizar a imágenes, extraer texto, añadir marcas de agua y números de página, cifrar, quitar contraseñas y editar metadatos.',
@@ -203,7 +213,7 @@ export const es = createCatalog({
       capture: {
         title: 'Capturas, capturas con desplazamiento y fijado',
         description:
-          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo se abre en la carpeta de capturas de Ajustes → Ubicación de guardado. Las capturas fijadas permanecen al volver a capturar.',
+          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo se abre en la carpeta de capturas de Ajustes → Ubicación de guardado. Las capturas fijadas permanecen al volver a capturar. Las capturas largas admiten desplazamiento automático lento; los dispositivos compatibles pueden capturar HDR.',
         detail: 'Resaltar y extraer · Reconocer, traducir y copiar · Esquinas redondas y .xlsx',
       },
       voice: {
@@ -227,7 +237,7 @@ export const es = createCatalog({
       copyAssistant: {
         title: 'Acciones rápidas y siguientes pasos',
         description:
-          'Al activarlo, previsualiza texto, enlaces, archivos o imágenes copiados en una barra independiente y propone abrir, mostrar en Finder, buscar, traducir, calcular o guardar, solo después de tu confirmación. Abre la carpeta del archivo mediante acciones rápidas tras una descarga del navegador o una transferencia AirDrop. Admite las carpetas de Chrome predeterminadas y elegidas, con un interruptor independiente del progreso de descarga. Las IP tienen acciones separadas para consultar y abrir el enlace. La conversión reconoce unidades monetarias menores y el catálogo incluye Emoji 18.0. El texto y las imágenes guardados usan la carpeta independiente de Acciones rápidas en Ajustes → Ubicación de guardado.',
+          'Al activarlo, previsualiza texto, enlaces, archivos o imágenes copiados en una barra independiente y propone abrir, mostrar en Finder, buscar, traducir, calcular o guardar, solo después de tu confirmación. Abre la carpeta del archivo mediante acciones rápidas tras una descarga del navegador o una transferencia AirDrop. Admite las carpetas de Chrome predeterminadas y elegidas, con un interruptor independiente del progreso de descarga. Las IP tienen acciones separadas para consultar y abrir el enlace. La conversión reconoce unidades monetarias menores y el catálogo incluye Emoji 18.0. El texto y las imágenes guardados usan la carpeta independiente de Acciones rápidas en Ajustes → Ubicación de guardado. Si una app no se abre, las acciones rápidas comprueban su integridad, firma y la política de seguridad de macOS. Tras superar las comprobaciones, pueden quitar los atributos de cuarentena y abrirla.',
         detail: 'Activación opcional · Reconocimiento local · Command+N por defecto',
       },
       aiManagement: {
@@ -250,7 +260,7 @@ export const es = createCatalog({
       recommendedTools: {
         title: 'Apps recomendadas',
         description:
-          'Descubre OpenScreen para grabación y edición de vídeo, DockDoor para previsualizar ventanas y cambiar de app, y Quiet.md para notas locales. Son apps de terceros que se instalan por separado.',
+          'Descubre OpenScreen para grabación y edición de vídeo, DockDoor para previsualizar ventanas y cambiar de app, y Zshell como espacio de trabajo de terminal nativo de macOS. Son apps de terceros que se instalan por separado.',
         detail: 'Descubre herramientas de escritorio · Apps de terceros · Instalación aparte',
       },
     },
@@ -259,13 +269,14 @@ export const es = createCatalog({
     eyebrow: 'IA SIN CAJA NEGRA',
     title: 'Mira el estado de la IA <span>sin leer la conversación.</span>',
     lede:
-      'Las tareas, el estado y las tendencias de tokens permanecen en tu Mac. Esta página describe la función y no simula una tarea en ejecución.',
+      'Consulta tareas por aplicación, uso de modelos por fecha y cuotas reales de las cuentas. Los estados y los datos numéricos permanecen en tu Mac; no se lee el texto de las conversaciones.',
     summaryMono: 'ESTADO LOCAL / LÍMITES CLAROS',
     summaryLede: 'Conecta tus herramientas de IA y conserva los límites de contexto que necesita tu trabajo.',
     summaryNote: 'Solo se explican el alcance de detección, los datos y la conexión; no se simula una sesión en vivo.',
     toolsHeading: 'Herramientas de IA compatibles',
     toolsLede: 'Detecta actividad de CLI, apps de escritorio e IDE compatibles y agrupa el estado de las tareas.',
     toolsAriaLabel: 'Herramientas de IA compatibles',
+    usageNote: 'La detección de sesiones, el historial de tokens y las cuotas usan fuentes distintas. Delta utiliza su registro numérico local; Orca elimina duplicados del uso del CLI vinculado y lo atribuye al proveedor original. WorkBuddy AI puede detectar sesiones y consultar créditos; la ocupación del contexto y los créditos no se convierten en tokens ni costes en dólares. La disponibilidad de cuotas depende del proveedor y del método de acceso.',
     boundariesHeading: 'Solo se registra el estado',
     privacyPoints: [
       'Analiza únicamente tipo de evento, estado, hora, modelo e ID de sesión de eventos estructurados',
@@ -442,6 +453,14 @@ export const es = createCatalog({
       'Liquid Glass en macOS 26+, con retorno automático a materiales nativos en macOS 14 y 15',
       'El notch físico se infiere de la zona segura; las pantallas externas sin notch reciben una barra simulada en una superposición dedicada',
     ],
+  },
+  film: {
+    title: "Vídeo de presentación",
+    videoAriaLabel: "Vídeo de presentación de zisla",
+    openVideoLabel: "Abrir el vídeo",
+    playbackError: "No se puede reproducir el vídeo.",
+    musicLabel: "Música",
+    excerptLabel: "Fragmento",
   },
   footer: {
     brandHomeAriaLabel: 'Volver al inicio de zisla',

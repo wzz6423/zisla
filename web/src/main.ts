@@ -36,6 +36,7 @@ import {
   flowStepIds,
   format,
   getSiteContent,
+  launchFilmMedia,
   latestRelease,
   license,
   loadSiteContent,
@@ -889,6 +890,39 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     changelogPagerMarkup +
     '</div></section>';
 
+  const filmSectionMarkup =
+    '<section class="section film-section" id="film" aria-labelledby="filmTitle"><div class="section-wrap"><div class="section-heading reveal"><div><h2 class="section-title" id="filmTitle">' +
+    escapeHtml(content.film.title) +
+    '</h2></div></div><figure class="film-player reveal"><video id="launchFilm" controls playsinline preload="none" width="1920" height="1080" src="' +
+    launchFilmMedia.video +
+    '" poster="' +
+    launchFilmMedia.poster +
+    '" aria-label="' +
+    escapeHtml(content.film.videoAriaLabel) +
+    '"><a href="' +
+    launchFilmMedia.video +
+    '">' +
+    escapeHtml(content.film.openVideoLabel) +
+    '</a></video><p class="film-error" id="filmError" hidden role="status">' +
+    escapeHtml(content.film.playbackError) +
+    ' <a href="' +
+    launchFilmMedia.video +
+    '">' +
+    escapeHtml(content.film.openVideoLabel) +
+    '</a></p><figcaption class="film-credit">' +
+    escapeHtml(content.film.musicLabel) +
+    ': <a href="' +
+    launchFilmMedia.music.source +
+    '" target="_blank" rel="noreferrer"><bdi>' +
+    escapeHtml(launchFilmMedia.music.title + ' — ' + launchFilmMedia.music.artist) +
+    '</bdi></a> · <a href="' +
+    launchFilmMedia.music.licenseUrl +
+    '" target="_blank" rel="noreferrer"><bdi>' +
+    launchFilmMedia.music.license +
+    '</bdi></a> · ' +
+    escapeHtml(content.film.excerptLabel) +
+    '</figcaption></figure></div></section>';
+
   const languageOptions = siteLocales
     .map(
       (value) =>
@@ -935,6 +969,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     })
     .join('');
 
+  document.querySelector<HTMLVideoElement>('#launchFilm')?.pause();
   app.innerHTML =
     '<nav class="section-progress-nav" aria-label="' + escapeHtml(content.header.navAriaLabel) + '">' +
     sectionProgressMarkup + '</nav><main><section class="hero" id="top"><header class="site-header">' +
@@ -950,7 +985,9 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     icon('menu', 18) +
     '</button><nav class="nav" id="siteNavigation" aria-label="' +
     escapeHtml(content.header.navAriaLabel) +
-    '">' +
+    '"><a class="nav-link" href="#film">' +
+    escapeHtml(content.film.title) +
+    '</a>' +
     navIds
       .map((id) => '<a class="nav-link" href="' + navHrefs[id] + '">' + escapeHtml(content.header.navItems[id]) + '</a>')
       .join('') +
@@ -1169,7 +1206,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.developers.checksumLabel) +
     '</a></div></div><ul class="performance-list">' +
     content.developers.performancePoints.map((point) => '<li>' + icon('check', 14) + '<span>' + escapeHtml(point) + '</span></li>').join('') +
-    '</ul></div></div></section>' + changelogSectionMarkup + '</main><footer class="site-footer"><div class="section-wrap reveal-sequence"><div class="footer-word" aria-hidden="true">zisla</div><div class="footer-top reveal-step" style="--reveal-index: 0"><a class="brand" href="#top" aria-label="' +
+    '</ul></div></div></section>' + changelogSectionMarkup + filmSectionMarkup + '</main><footer class="site-footer"><div class="section-wrap reveal-sequence"><div class="footer-word" aria-hidden="true">zisla</div><div class="footer-top reveal-step" style="--reveal-index: 0"><a class="brand" href="#top" aria-label="' +
     escapeHtml(content.footer.brandHomeAriaLabel) +
     '"><img class="brand-mark" src="./assets/zisla-icon.png" alt="" /><span>zisla</span></a><div class="footer-links"><a href="' +
     repositoryLinks.github +
@@ -1206,6 +1243,11 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
   );
 
   setupChangelogPagination();
+
+  const filmError = document.querySelector<HTMLElement>('#filmError');
+  document.querySelector<HTMLVideoElement>('#launchFilm')?.addEventListener('error', () => {
+    filmError!.hidden = false;
+  });
 
   document.querySelector<HTMLButtonElement>('.menu-toggle')?.addEventListener('click', () => {
     const nav = document.querySelector<HTMLElement>('.nav');

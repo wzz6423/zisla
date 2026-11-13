@@ -25,7 +25,7 @@
       "name": "Web CI",
       "file": "web-ci.yml",
       "aliases": ["web"],
-      "paths": ["web/**", ".github/**"],
+      "paths": ["web/**", "promo/**", ".github/**"],
       "checks": ["Web Build & Test"]
     },
     {

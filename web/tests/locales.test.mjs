@@ -34,6 +34,7 @@ for (const locale of siteLocales) await site.loadSiteContent(locale);
 
 const changedFeatureIds = [
   'floatingIsland', 'dailyBriefing', 'userCare', 'contextNotes', 'recording', 'permissions', 'pdf',
+  'imageTools', 'audioTools',
 ];
 const english = site.getSiteContent('en');
 // Read authored overrides before createCatalog can silently merge missing fields from English.
@@ -51,7 +52,7 @@ const iconNames = mainSource.match(/const siteIcons = \{([\s\S]*?)\};/)[1].match
 const renderSource = stripTypeScriptTypes(mainSource.slice(mainSource.indexOf('const app = ')))
   .replace('void showLocale(currentLocale);', '');
 
-const renderInMemory = (locale, releases = site.changelogEntries) => {
+const renderInMemory = (locale, releases = site.changelogEntries, runtimeNodes = {}) => {
   const classList = { add() {}, remove() {}, toggle() {} };
   const node = () => ({ style: {}, dataset: {}, classList, setAttribute() {}, append() {} });
   const app = { ...node(), innerHTML: '' };
@@ -60,7 +61,7 @@ const renderInMemory = (locale, releases = site.changelogEntries) => {
     documentElement: { ...node(), scrollHeight: 800 },
     body: node(),
     head: { querySelector: () => null, append: (element) => metadata.push(element) },
-    querySelector: (selector) => selector === '#app' ? app : null,
+    querySelector: (selector) => selector === '#app' ? app : runtimeNodes[selector] ?? null,
     querySelectorAll: () => [],
     getElementById: () => null,
     createElement: node,
@@ -95,8 +96,9 @@ const strings = (value, path) => {
 const updatedStrings = (content) => [
   ...changedFeatureIds.flatMap((id) => strings(content.extensions.features[id], `extensions.features.${id}`)),
   ...strings(content.showcase.modules.volumeMixer, 'showcase.modules.volumeMixer'),
-  ...['aiMonitor', 'keyboardSound', 'mail', 'system', 'download', 'clipboard', 'quickNotes'].map((id) =>
+  ...['aiMonitor', 'keyboardSound', 'mail', 'system', 'download', 'clipboard', 'quickNotes', 'shelf', 'agenda', 'toolbox', 'dashboard'].map((id) =>
     [`showcase.modules.${id}.caption`, content.showcase.modules[id].caption]),
+  ...['shelf', 'aiMonitor', 'agenda'].flatMap((id) => strings(content.showcase.modules[id].points, `showcase.modules.${id}.points`)),
   ['showcase.modules.keyboardSound.points.2', content.showcase.modules.keyboardSound.points[2]],
   ...['windowPreviews', 'capture', 'pet'].flatMap((id) =>
     ['description', 'detail'].map((field) =>
@@ -105,13 +107,81 @@ const updatedStrings = (content) => [
     [`extensions.features.${id}.description`, content.extensions.features[id].description]),
   ['meta.description', content.meta.description],
   ['meta.ogDescription', content.meta.ogDescription],
+  ['extensions.lede', content.extensions.lede],
+  ['ai.lede', content.ai.lede],
+  ['ai.usageNote', content.ai.usageNote],
   ['download.copy', content.download.copy],
   ['faq.items.permissions.answer', content.faq.items.permissions.answer],
   ['faq.items.storage.answer', content.faq.items.storage.answer],
   ...strings(content.changelog.releaseNotes['v0.1.20'], 'changelog.releaseNotes.v0.1.20'),
   ...strings(content.changelog.releaseNotes['v0.1.21'], 'changelog.releaseNotes.v0.1.21'),
   ...strings(content.changelog.releaseNotes['v0.1.22'], 'changelog.releaseNotes.v0.1.22'),
+  ...strings(content.film, 'film'),
 ];
+
+test('launch film sits after the changelog and before the footer with explicit playback', () => {
+  const content = site.getSiteContent('zh-Hans');
+  const { html } = renderInMemory('zh-Hans');
+  const film = html.match(/<section[^>]+id="film"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(film, 'inline film section is rendered');
+  assert.ok(html.indexOf('id="changelog"') < html.indexOf('id="film"'));
+  assert.ok(html.indexOf('id="film"') < html.indexOf('<footer'));
+  const nav = html.match(/<nav class="nav"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
+  assert.ok(nav.indexOf('href="#film"') < nav.indexOf('href="#showcase"'));
+  assert.ok(nav.includes(`<a class="nav-link" href="#film">${escapedText(content.film.title)}</a>`));
+  assert.doesNotMatch(html.match(/<nav class="section-progress-nav"[\s\S]*?<\/nav>/)[0], /href="#film"/);
+  const video = film.match(/<video\b[^>]*>/)?.[0];
+  assert.ok(video, 'native video player is rendered');
+  assert.match(video, /\scontrols(?:\s|>)/);
+  assert.match(video, /\splaysinline(?:\s|>)/);
+  assert.match(video, /preload="none"/);
+  assert.match(video, /src="\.\/media\/zisla-launch-1080p60\.mp4"/);
+  assert.match(video, /poster="\.\/media\/zisla-launch-poster\.webp"/);
+  assert.match(video, /width="1920" height="1080"/);
+  assert.ok(video.includes(`aria-label="${escapedText(content.film.videoAriaLabel)}"`));
+  assert.doesNotMatch(video, /\s(?:autoplay|loop)(?:\s|=|>)/);
+  assert.doesNotMatch(film, /<dialog\b|role="dialog"/);
+  assert.ok(film.includes(`<a href="./media/zisla-launch-1080p60.mp4">${escapedText(content.film.openVideoLabel)}</a>`));
+  assert.match(film, /id="filmError" hidden role="status"/);
+  const links = [...film.matchAll(/\bhref="([^"]+)"/g)].map((match) => match[1]);
+  assert.ok(links.some((href) => href === 'https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474'));
+  assert.ok(links.some((href) => href === 'https://creativecommons.org/licenses/by/4.0/'));
+  assert.ok(film.includes('Funkorama — Kevin MacLeod'));
+});
+
+test('a media error exposes the localized original-video link', () => {
+  const handlers = new Map();
+  const errorMessage = { hidden: true };
+  renderInMemory('ar', site.changelogEntries, {
+    '#launchFilm': { pause() {}, addEventListener: (event, listener) => handlers.set(event, listener) },
+    '#filmError': errorMessage,
+  });
+  assert.equal(errorMessage.hidden, true, 'no error is shown before playback fails');
+  assert.equal(typeof handlers.get('error'), 'function');
+  handlers.get('error')();
+  assert.equal(errorMessage.hidden, false, 'playback failure exposes the recovery link');
+});
+
+test('rendering another locale pauses the outgoing player', () => {
+  const outgoing = { paused: false, pause() { this.paused = true; }, addEventListener() {} };
+  renderInMemory('en', site.changelogEntries, { '#launchFilm': outgoing });
+  assert.equal(outgoing.paused, true, 'language changes must not leave detached media playing');
+});
+
+test('a detached player error cannot affect the new locale', () => {
+  const handlers = new Map();
+  const outgoingError = { hidden: true };
+  const currentError = { hidden: true };
+  const runtimeNodes = {
+    '#launchFilm': { pause() {}, addEventListener: (event, listener) => handlers.set(event, listener) },
+    '#filmError': outgoingError,
+  };
+  renderInMemory('en', site.changelogEntries, runtimeNodes);
+  runtimeNodes['#filmError'] = currentError;
+  handlers.get('error')();
+  assert.equal(outgoingError.hidden, false, 'the failure belongs to its original player');
+  assert.equal(currentError.hidden, true, 'a fresh locale retains its own playback state');
+});
 
 test('every supported locale has its own name, Open Graph tag, and direction', () => {
   assert.equal(siteLocales.length, 17);
@@ -162,7 +232,7 @@ test('persisted locale values accept canonical supported identifiers only', () =
   }
 });
 
-test('website modules match the current macOS module list and PDF lives outside the carousel', () => {
+test('website modules match macOS and standalone media tools live outside the carousel', () => {
   const settingsSource = readFileSync(new URL('../../mac/Sources/ZislaCore/FeatureSettings.swift', import.meta.url), 'utf8');
   const moduleOrder = settingsSource.slice(settingsSource.indexOf('public enum IslandModuleOrder'))
     .match(/public static let defaultOrder: \[Self\] = \[([\s\S]*?)\]/)?.[1];
@@ -171,10 +241,57 @@ test('website modules match the current macOS module list and PDF lives outside 
   assert.deepEqual([...site.showcaseModuleIds].sort(), macModuleIds.sort());
   assert.equal(site.showcaseModuleIds.length, 12);
   assert.deepEqual(site.showcaseModuleGroups.map(({ id }) => id).sort(), [...site.showcaseModuleIds].sort());
-  assert.equal(new Set(site.crossModuleFeatureIds).size, 17);
-  assert.ok(site.crossModuleFeatureIds.includes('pdf'));
-  assert.ok(!site.showcaseModuleIds.includes('pdf'));
+  assert.equal(new Set(site.crossModuleFeatureIds).size, site.crossModuleFeatureIds.length);
+  for (const id of ['pdf', 'imageTools', 'audioTools']) {
+    assert.ok(site.crossModuleFeatureIds.includes(id), `${id} has a standalone capability card`);
+    assert.ok(!site.showcaseModuleIds.includes(id), `${id} is not an island module`);
+  }
   assert.deepEqual(Object.keys(site.crossModuleFeatureIcons).sort(), [...site.crossModuleFeatureIds].sort());
+});
+
+test('image and audio capabilities describe the native operation counts and export requirements in every language', () => {
+  const imageSource = readFileSync(new URL('../../mac/Sources/ZislaKit/ImageProcessingOptions.swift', import.meta.url), 'utf8');
+  const audioSource = readFileSync(new URL('../../mac/Sources/ZislaKit/AudioProcessingModels.swift', import.meta.url), 'utf8');
+  const imageEnum = imageSource.match(/public enum ImageToolOperation[^\{]*\{([\s\S]*?)public var id/)[1];
+  const audioEnum = audioSource.match(/public enum AudioToolOperation[^\{]*\{([\s\S]*?)public var id/)[1];
+  const imageCount = [...imageEnum.matchAll(/^\s*case (\w+)/gm)].length;
+  const audioCount = [...audioEnum.matchAll(/^\s*case ([\w, ]+)/gm)].flatMap((match) => match[1].split(',')).length;
+  assert.equal(imageCount, 9);
+  assert.equal(audioCount, 27);
+  assert.match(imageSource, /conversionFormats: \[Self\] = \[\.png, \.jpeg, \.webp, \.avif, \.jpegXL\]/);
+  for (const locale of siteLocales) {
+    const features = site.getSiteContent(locale).extensions.features;
+    assert.ok(features.imageTools.detail.includes(String(imageCount)), `${locale}: native image tool count`);
+    assert.ok(features.audioTools.detail.includes(String(audioCount)), `${locale}: native audio tool count`);
+    for (const format of ['PNG', 'JPEG', 'WebP', 'AVIF', 'JPEG XL', 'ZIP']) {
+      assert.ok(features.imageTools.description.includes(format), `${locale}: image export ${format}`);
+    }
+    for (const requirement of ['FFmpeg', 'ffprobe', 'LUFS']) {
+      assert.ok(features.audioTools.description.includes(requirement), `${locale}: audio ${requirement}`);
+    }
+    assert.ok(features.capture.description.includes('HDR'), `${locale}: conditional HDR capture`);
+    const ai = site.getSiteContent(locale).showcase.modules.aiMonitor.caption;
+    for (const term of ['5h/7d', 'Cursor', '.xlsx']) assert.ok(ai.includes(term), `${locale}: AI ${term}`);
+  }
+});
+
+test('current feature descriptions keep meeting, power and application-repair conditions explicit', () => {
+  const content = site.getSiteContent('en');
+  assert.match(content.showcase.modules.dashboard.caption, /AI work is grouped by application on Home/);
+  assert.match(content.showcase.modules.agenda.caption, /Events with a meeting link.*10 minutes before the start.*one-click join/);
+  assert.match(content.showcase.modules.agenda.caption, /Create a meeting note.*link and unlink existing context notes/);
+  assert.match(content.showcase.modules.shelf.caption, /search, filter and select several.*copy, share or send to Quick Notes/);
+  assert.match(content.showcase.modules.shelf.caption, /Convert images to PDF.*send videos to the recording studio/);
+  assert.match(content.showcase.modules.mail.caption, /one message or all inbox messages as read/);
+  assert.match(content.showcase.modules.toolbox.caption, /Pause, resume or reset.*compact horizontal and vertical/);
+  assert.match(content.showcase.modules.system.caption, /automatic power modes for plugged-in and battery use.*20% or below/);
+  assert.match(content.showcase.modules.system.caption, /100% immediately when macOS offers it/);
+  assert.match(content.extensions.features.copyAssistant.description, /integrity, signature and macOS security policy.*after the checks pass/);
+  assert.match(content.extensions.features.capture.description, /slow automatic scrolling.*HDR screenshots on supported devices/);
+  assert.match(content.extensions.features.floatingIsland.description, /Reorder.*Settings → Info/);
+  assert.match(content.extensions.features.dailyBriefing.description, /real account allowances and their sampling times/);
+  assert.match(content.ai.usageNote, /separate data sources.*credits are not converted into tokens or USD cost/);
+  assert.doesNotMatch(content.showcase.modules.aiMonitor.caption, /remaining allowances hidden/);
 });
 
 test('supported AI tools retain Cursor and Muse Code identities', () => {
@@ -189,6 +306,8 @@ for (const locale of siteLocales) {
     const content = site.getSiteContent(locale);
     assert.deepEqual(Object.keys(content.showcase.modules).sort(), [...site.showcaseModuleIds].sort());
     assert.deepEqual(Object.keys(content.extensions.features).sort(), [...site.crossModuleFeatureIds].sort());
+    assert.match(content.extensions.features.recommendedTools.description, /Zshell/);
+    assert.doesNotMatch(content.extensions.features.recommendedTools.description, /Quiet\.md/);
     const authored = new Map(strings(authoredCatalogs.get(locale), '').map(([path, value]) => [path.slice(1), value]));
     const baseline = new Map(updatedStrings(english));
     for (const [path, value] of updatedStrings(content)) {
@@ -211,10 +330,18 @@ for (const locale of siteLocales) {
       assert.ok(rendered.html.includes(expected), `${locale}: ${path} is rendered`);
     }
     assert.equal((rendered.html.match(/class="workflow-module reveal-step"/g) ?? []).length, 12);
-    assert.equal((rendered.html.match(/class="extension-item reveal-step"/g) ?? []).length, 17);
+    assert.equal((rendered.html.match(/class="extension-item reveal-step"/g) ?? []).length, site.crossModuleFeatureIds.length);
     for (const id of changedFeatureIds) {
       const title = escapedText(content.extensions.features[id].title);
       assert.ok(rendered.html.includes(`<h3>${title}</h3>`), `${locale}: rendered ${id}`);
+    }
+    for (const id of ['imageTools', 'audioTools']) {
+      const title = escapedText(content.extensions.features[id].title);
+      const card = rendered.html.split('<article class="extension-item reveal-step"').find((part) =>
+        part.slice(0, part.indexOf('</article>')).includes(`<h3>${title}</h3>`));
+      assert.ok(card, `${locale}: standalone ${id} card`);
+      assert.ok(card.slice(0, card.indexOf('</article>')).includes(`data-lucide="${id === 'imageTools' ? 'image' : 'waves'}"`),
+        `${locale}: ${id} has its matching icon`);
     }
     assert.equal(rendered.document.documentElement.lang, locale);
     assert.equal(rendered.document.documentElement.dir, localeDirection(locale));
