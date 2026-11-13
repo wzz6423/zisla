@@ -778,7 +778,7 @@ struct ScreenRecordingStudioTests {
         }
         try locations.setDirectory(downloads, for: .download)
         let downloadBookmark = try #require(defaults.data(forKey: "download-directory-bookmark"))
-        #expect(model.recordingOutputDirectory == AppPaths.downloads,
+        #expect(model.recordingOutputDirectory == AppPaths.downloads.appendingPathComponent("video", isDirectory: true),
                 "Changing downloads must not change the recording default")
         try model.setRecordingOutputDirectory(custom)
 

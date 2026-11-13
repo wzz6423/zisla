@@ -80,6 +80,7 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         let fixture = try DirectoryFixture()
         defer { fixture.close() }
         let locations = SaveLocationStore(defaults: fixture.defaults)
+        let originalDirectories = locations.directories
         let panel = DirectoryPanel()
         defer { panel.close() }
         panel.response = .OK
@@ -89,7 +90,7 @@ struct ScreenRecordingOutputDirectorySettingsTests {
 
         #expect(locations[selected].path == fixture.directory.path)
         for location in SaveLocation.allCases where location != selected {
-            #expect(locations[location] == AppPaths.downloads)
+            #expect(locations[location] == originalDirectories[location])
         }
         let preferences = (fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:])
         panel.selectedURL = nil

@@ -3775,3 +3775,13 @@
 "自动滚动已暂停，可手动滚动或点击“完成”" = "Défilement auto suspendu. Faites défiler manuellement ou cliquez sur Terminé";
 "自动滚动需要在系统设置中允许辅助功能" = "Autorisez l’accessibilité dans Réglages Système pour défiler automatiquement";
 "无法自动滚动，请手动滚动页面" = "Impossible de défiler automatiquement. Faites défiler la page manuellement";
+
+"灵动岛布局" = "Disposition de Dynamic Island";
+"通知与关怀" = "Notifications et bien-être";
+"调整灵动岛功能顺序、模式与收起态展示优先级。" = "Réglez l’ordre des fonctions de Dynamic Island, le mode et la priorité d’affichage compact.";
+"设置每日简报的内容、模板与导出时间。" = "Définissez le contenu, le modèle et l’heure d’exportation du briefing quotidien.";
+"配置锁屏信息、通知展示与关怀提醒。" = "Configurez les informations de l’écran verrouillé, les notifications et les rappels de bien-être.";
+"配置媒体播放与系统监控。" = "Configurez la lecture multimédia et la surveillance du système.";
+"自动更新依赖组件" = "Mettre à jour automatiquement les dépendances";
+"每天更新已安装的依赖组件" = "Mettre à jour chaque jour les dépendances installées";
+"（默认）" = "(Par défaut)";

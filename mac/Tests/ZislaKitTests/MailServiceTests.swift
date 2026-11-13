@@ -6,6 +6,37 @@ import Testing
 @testable import ZislaKit
 
 struct MailServiceTests {
+    @Test @MainActor
+    func qqPresentationPreservesSystemAccountIdentityInSnapshotsAndScripts() throws {
+        let account = try #require(MailService.accounts(from: [
+            MailScriptAccount(name: "Qq", emailAddresses: ["fixture@qq.com"]),
+        ]).first)
+        let message = try #require(MailService.messages(from: [
+            MailScriptRow(
+                accountName: "Qq", messageID: "42", sender: "fixture@example.com",
+                subject: "Fixture", body: "Fixture body", receivedAt: .distantPast, isRead: false
+            ),
+        ]).first)
+
+        #expect(MailAccount.displayAccountName(account.id) == "QQ")
+        #expect(account.id == "Qq")
+        #expect(account.displayName == "fixture@qq.com")
+        #expect(message.accountName == "Qq")
+        #expect(message.id == "Qq\u{1F}42")
+        #expect(MailService.inboxScript(accountNames: [account.id]).contains("set selectedAccountNames to {\"Qq\"}"))
+        #expect(MailService.markAllReadScript(accountNames: [account.id]).contains("set targetAccountNames to {\"Qq\"}"))
+        for script in [
+            MailService.markReadScript(message: message),
+            MailService.markJunkScript(message: message),
+            MailService.deleteScript(message: message),
+            MailService.replyScript(message: message, body: "Fixture reply"),
+        ] {
+            #expect(script.contains("set targetAccount to first account whose name is \"Qq\""))
+        }
+        #expect(MailService.composeScript(fromAddress: account.primaryEmailAddress, to: ["recipient@example.com"], subject: "Fixture", body: "Fixture body")
+            .contains("set sender of outgoingMessage to \"fixture@qq.com\""))
+    }
+
     @Test(arguments: [false, true]) @MainActor
     func bulkReadDiscardsAnOlderRefreshOrPageAndReloadsTheLoadedWindow(isPagination: Bool) async {
         let started = MailOperationQueueTestGate()

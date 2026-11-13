@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var draggedWeatherLocationID: String?
     @State private var draggedModuleOrder: IslandModuleOrder?
     @State private var draggedCompactStatusPriority: CompactStatusPriority?
+    @State private var activityNoticeScreens = NSScreen.screens
     @State private var sectionSwitchDirection: CGFloat = 1
     @State private var pendingRecommendedToolAction: RecommendedToolAction?
     @State private var isVoiceHistoryClearConfirmationPresented = false
@@ -86,6 +87,9 @@ struct SettingsView: View {
             model.refreshAssistantAccessibility()
             model.backgroundSounds.refresh()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            activityNoticeScreens = NSScreen.screens
+        }
         .onChange(of: settingsStore.settings) { _, _ in
             ensureSelectionIsVisible()
         }
@@ -139,7 +143,8 @@ struct SettingsView: View {
     }
 
     private var settingsSearchResults: [SettingsSearchItem] {
-        SettingsSearchIndex.results(for: input.settingsQuery, settings: settingsStore.settings, locale: locale)
+        SettingsSearchIndex.results(for: input.settingsQuery, settings: settingsStore.settings, locale: locale,
+            displayCount: activityNoticeDisplays.count)
     }
 
     private var searchResultsContent: some View {
@@ -265,6 +270,12 @@ struct SettingsView: View {
                 .id(input.selectedAudioOperation)
         case .info:
             infoContent
+        case .dailyBriefing:
+            dailyBriefingContent
+        case .notifications:
+            notificationsContent
+        case .workflow:
+            workflowContent
         case .mail:
             mailContent
         case .ai:
@@ -626,6 +637,13 @@ struct SettingsView: View {
                             keyPath: \.recommendedToolsAutomaticUpdatesEnabled
                         )
                     }
+                    rowDivider
+                    featureToggle(
+                        "自动更新依赖组件",
+                        detail: "每天更新已安装的依赖组件",
+                        symbol: "arrow.triangle.2.circlepath",
+                        keyPath: \.dependencyToolsAutomaticUpdatesEnabled
+                    )
                 }
             }
             if input.selection == .features {
@@ -951,6 +969,9 @@ struct SettingsView: View {
                         .padding(.leading, 20)
                     }
                     ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
+                        let isEnabled = model.settingsStore.settings.clipboardAssistantEnabledKinds.isEmpty
+                            || model.settingsStore.settings.clipboardAssistantEnabledKinds.contains(kind)
+                        let actions = Self.clipboardAssistantActionOrder(for: kind, settings: model.settingsStore.settings)
                         rowDivider
                         settingRow(
                             symbol: kind.symbolName,
@@ -958,27 +979,65 @@ struct SettingsView: View {
                             detail: Self.clipboardAssistantUsageExamples[kind] ?? "",
                             isNested: true
                         ) {
-                            Toggle("", isOn: Binding(
-                                get: {
-                                    model.settingsStore.settings.clipboardAssistantEnabledKinds.isEmpty
-                                        || model.settingsStore.settings.clipboardAssistantEnabledKinds.contains(kind)
-                                },
-                                set: { enabled in
-                                    var kinds = model.settingsStore.settings.clipboardAssistantEnabledKinds
-                                    if kinds.isEmpty {
-                                        if enabled { return }
-                                        kinds = Set(ClipboardAssistantKind.allCases)
+                            HStack(spacing: 4) {
+                                if isEnabled {
+                                    Menu {
+                                        ForEach(actions, id: \.self) { action in
+                                            Button {
+                                                Self.setPrimaryClipboardAssistantAction(action, for: kind, settings: Binding(
+                                                    get: { model.settingsStore.settings },
+                                                    set: { model.settingsStore.settings = $0 }
+                                                ))
+                                            } label: {
+                                                Label(
+                                                    AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind)),
+                                                    systemImage: action == actions.first ? "checkmark" : action.symbolName
+                                                )
+                                            }
+                                        }
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "star.fill")
+                                            AppLocalizedText(
+                                                Self.clipboardAssistantActionTitle(actions[0], for: kind)
+                                            )
+                                        }
                                     }
-                                    if enabled {
-                                        kinds.insert(kind)
-                                    } else {
-                                        kinds.remove(kind)
+                                    .fixedSize()
+
+                                    IconButton(
+                                        symbol: expandedClipboardAssistantKind == kind
+                                            ? "chevron.up.circle.fill"
+                                            : "chevron.down.circle",
+                                        help: AppLocalization.string(
+                                            expandedClipboardAssistantKind == kind ? "收起" : "展开", locale: locale
+                                        ),
+                                        isActive: expandedClipboardAssistantKind == kind,
+                                        size: .compact
+                                    ) {
+                                        expandedClipboardAssistantKind =
+                                            expandedClipboardAssistantKind == kind ? nil : kind
                                     }
-                                    model.settingsStore.settings.clipboardAssistantEnabledKinds = kinds
                                 }
-                            ))
-                            .labelsHidden()
-                            .toggleStyle(.switch)
+                                Toggle("", isOn: Binding(
+                                    get: { isEnabled },
+                                    set: { enabled in
+                                        var kinds = model.settingsStore.settings.clipboardAssistantEnabledKinds
+                                        if kinds.isEmpty {
+                                            if enabled { return }
+                                            kinds = Set(ClipboardAssistantKind.allCases)
+                                        }
+                                        if enabled {
+                                            kinds.insert(kind)
+                                        } else {
+                                            kinds.remove(kind)
+                                        }
+                                        model.settingsStore.settings.clipboardAssistantEnabledKinds = kinds
+                                    }
+                                ))
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                            }
                         }
                         if let groups = Self.clipboardAssistantExampleGroups[kind] {
                             Self.clipboardAssistantExamples(groups, language: model.languageStore.language, onCopy: copySettingsText)
@@ -1007,98 +1066,61 @@ struct SettingsView: View {
                                 }
                             }
                         }
-                    }
-                }
-                settingsGroup("快捷操作") {
-                    ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
-                        let actions = clipboardAssistantActionOrder(for: kind)
-                        if kind != ClipboardAssistantKind.allCases.first { rowDivider }
-                        settingRow(
-                            symbol: kind.symbolName,
-                            title: assistantKindTitle(kind),
-                            detail: ""
-                        ) {
-                            HStack(spacing: 4) {
-                                Menu {
-                                    ForEach(actions, id: \.self) { action in
-                                        Button {
-                                            setPrimaryClipboardAssistantAction(action, for: kind)
-                                        } label: {
-                                            Label(
-                                                AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind)),
-                                                systemImage: action == actions.first ? "checkmark" : action.symbolName
-                                            )
+                        if isEnabled, expandedClipboardAssistantKind == kind {
+                            VStack(spacing: 0) {
+                                ForEach(Array(actions.enumerated()), id: \.element) { offset, action in
+                                    rowDivider
+                                    settingRow(
+                                        symbol: action.symbolName,
+                                        title: Self.clipboardAssistantActionTitle(action, for: kind),
+                                        detail: "",
+                                        isNested: true,
+                                        isDefaultAction: offset == 0
+                                    ) {
+                                        HStack(spacing: 4) {
+                                            IconButton(
+                                                symbol: "arrow.up",
+                                                help: AppLocalization.text("上移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind))),
+                                                size: .compact
+                                            ) {
+                                                Self.moveClipboardAssistantAction(action, for: kind, by: -1, settings: Binding(
+                                                    get: { model.settingsStore.settings },
+                                                    set: { model.settingsStore.settings = $0 }
+                                                ))
+                                            }
+                                            .disabled(offset == 0)
+
+                                            IconButton(
+                                                symbol: "arrow.down",
+                                                help: AppLocalization.text("下移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind))),
+                                                size: .compact
+                                            ) {
+                                                Self.moveClipboardAssistantAction(action, for: kind, by: 1, settings: Binding(
+                                                    get: { model.settingsStore.settings },
+                                                    set: { model.settingsStore.settings = $0 }
+                                                ))
+                                            }
+                                            .disabled(offset == actions.count - 1)
                                         }
                                     }
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "star.fill")
-                                        AppLocalizedText(
-                                            actions.first.map { Self.clipboardAssistantActionTitle($0, for: kind) } ?? "恢复默认顺序"
-                                        )
-                                    }
                                 }
-                                .fixedSize()
-
-                                IconButton(
-                                    symbol: expandedClipboardAssistantKind == kind
-                                        ? "chevron.up.circle.fill"
-                                        : "chevron.down.circle",
-                                    help: expandedClipboardAssistantKind == kind ? AppLocalization.text("收起") : AppLocalization.text("展开"),
-                                    isActive: expandedClipboardAssistantKind == kind,
-                                    size: .compact
-                                ) {
-                                    expandedClipboardAssistantKind =
-                                        expandedClipboardAssistantKind == kind ? nil : kind
-                                }
-                            }
-                        }
-                        if expandedClipboardAssistantKind == kind {
-                            ForEach(Array(actions.dropFirst().enumerated()), id: \.element) { offset, action in
                                 rowDivider
                                 settingRow(
-                                    symbol: action.symbolName,
-                                    title: Self.clipboardAssistantActionTitle(action, for: kind),
+                                    title: "恢复默认顺序",
                                     detail: "",
                                     isNested: true
                                 ) {
-                                    HStack(spacing: 4) {
-                                        IconButton(
-                                            symbol: "arrow.up",
-                                            help: AppLocalization.text("上移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind))),
-                                            size: .compact
-                                        ) {
-                                            moveClipboardAssistantAction(action, for: kind, by: -1)
-                                        }
-                                        .disabled(offset == 0)
-
-                                        IconButton(
-                                            symbol: "arrow.down",
-                                            help: AppLocalization.text("下移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action, for: kind))),
-                                            size: .compact
-                                        ) {
-                                            moveClipboardAssistantAction(action, for: kind, by: 1)
-                                        }
-                                        .disabled(offset == actions.dropFirst().count - 1)
+                                    IconButton(
+                                        symbol: "arrow.counterclockwise",
+                                        help: AppLocalization.text("恢复默认顺序"),
+                                        size: .compact
+                                    ) {
+                                        resetClipboardAssistantActionOrder(for: kind)
                                     }
+                                    .disabled(actions == ClipboardAssistantActionOrder.defaults(for: kind))
                                 }
                             }
-                            rowDivider
-                            settingRow(
-                                symbol: "arrow.counterclockwise",
-                                title: "恢复默认顺序",
-                                detail: "",
-                                isNested: true
-                            ) {
-                                IconButton(
-                                    symbol: "arrow.counterclockwise",
-                                    help: AppLocalization.text("恢复默认顺序"),
-                                    size: .compact
-                                ) {
-                                    resetClipboardAssistantActionOrder(for: kind)
-                                }
-                                .disabled(actions == ClipboardAssistantActionOrder.defaults(for: kind))
-                            }
+                            .padding(.leading, 20)
                         }
                     }
                 }
@@ -1256,7 +1278,7 @@ struct SettingsView: View {
                             }
                         }
                         rowDivider
-                        settingRow(symbol: "arrow.counterclockwise", title: "恢复默认快捷键", detail: "") {
+                        settingRow(title: "恢复默认快捷键", detail: "") {
                             Button(AppLocalization.text("恢复默认快捷键")) {
                                 model.settingsStore.settings.screenRecordingHotkeys.removeAll()
                                 recordingHotkeyValidationMessage = nil
@@ -1507,7 +1529,6 @@ struct SettingsView: View {
                 }
                 rowDivider
                 settingRow(
-                    symbol: "arrow.counterclockwise",
                     title: "恢复默认顺序",
                     detail: ""
                 ) {
@@ -1534,11 +1555,58 @@ struct SettingsView: View {
                     )
                 }
             }
-            settingsGroup("每日简报") {
-                DailyBriefingSettingsView(model: model)
+            settingsGroup("收起态展示优先级") {
+                let priorities = Self.compactStatusPriorities(settings: settingsStore.settings,
+                    hasSystemMonitorIcons: model.islandHasSystemMonitorIcons)
+                ForEach(Array(priorities.enumerated()), id: \.element) { index, priority in
+                    if index > 0 { rowDivider }
+                    reorderSettingRow(
+                        symbol: compactStatusPrioritySymbol(for: priority),
+                        title: priority.title
+                    ) {
+                        draggedCompactStatusPriority = priority
+                        return NSItemProvider(object: priority.rawValue as NSString)
+                    }
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
+                    .onDrop(
+                        of: ReorderDropDelegate<CompactStatusPriority>.supportedTypes,
+                        delegate: ReorderDropDelegate(
+                            destination: priority,
+                            dragging: $draggedCompactStatusPriority,
+                            move: moveCompactStatusPriority(_:to:)
+                        )
+                    )
+                }
+                rowDivider
+                settingRow(
+                    title: "恢复默认顺序",
+                    detail: ""
+                ) {
+                    IconButton(
+                        symbol: "arrow.counterclockwise",
+                        help: AppLocalization.text("恢复默认顺序"),
+                        size: .compact
+                    ) {
+                        model.settingsStore.settings.compactStatusPriority = CompactStatusPriority.defaultOrder
+                    }
+                    .disabled(
+                        model.settingsStore.settings.compactStatusPriority
+                            == CompactStatusPriority.defaultOrder
+                    )
+                }
+                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
             }
-            workflowContent
+        }
+    }
 
+    private var dailyBriefingContent: some View {
+        settingsGroup("每日简报") {
+            DailyBriefingSettingsView(model: model)
+        }
+    }
+
+    private var notificationsContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
             if model.settingsStore.settings.userCareEnabled {
                 settingsGroup("用户关怀") {
                     settingRow(
@@ -1587,8 +1655,8 @@ struct SettingsView: View {
                         .labelsHidden()
                         .toggleStyle(.switch)
                     }
+                    rowDivider
                 }
-                rowDivider
                 settingRow(
                     symbol: "timer",
                     title: "活动展示",
@@ -1634,60 +1702,9 @@ struct SettingsView: View {
                 }
             }
 
-            settingsGroup("收起态展示优先级") {
-                let priorities = Self.compactStatusPriorities(settings: settingsStore.settings,
-                    hasSystemMonitorIcons: model.islandHasSystemMonitorIcons)
-                ForEach(Array(priorities.enumerated()), id: \.element) { index, priority in
-                    if index > 0 { rowDivider }
-                    reorderSettingRow(
-                        symbol: compactStatusPrioritySymbol(for: priority),
-                        title: priority.title
-                    ) {
-                        draggedCompactStatusPriority = priority
-                        return NSItemProvider(object: priority.rawValue as NSString)
-                    }
-                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-                    .onDrop(
-                        of: ReorderDropDelegate<CompactStatusPriority>.supportedTypes,
-                        delegate: ReorderDropDelegate(
-                            destination: priority,
-                            dragging: $draggedCompactStatusPriority,
-                            move: moveCompactStatusPriority(_:to:)
-                        )
-                    )
-                }
-                rowDivider
-                settingRow(
-                    symbol: "arrow.counterclockwise",
-                    title: "恢复默认顺序",
-                    detail: ""
-                ) {
-                    IconButton(
-                        symbol: "arrow.counterclockwise",
-                        help: AppLocalization.text("恢复默认顺序"),
-                        size: .compact
-                    ) {
-                        model.settingsStore.settings.compactStatusPriority = CompactStatusPriority.defaultOrder
-                    }
-                    .disabled(
-                        model.settingsStore.settings.compactStatusPriority
-                            == CompactStatusPriority.defaultOrder
-                    )
-                }
-                .disabled(!model.settingsStore.settings.sideNoticesEnabled)
-            }
-
-            settingsGroup("通知显示器") {
-                let displays = activityNoticeDisplays
-                if displays.count < 2 {
-                    settingRow(
-                        symbol: "display",
-                        title: displays.first?.name ?? "当前显示器",
-                        detail: "连接另一台显示器后可选择通知展示范围"
-                    ) {
-                        EmptyView()
-                    }
-                } else {
+            let displays = activityNoticeDisplays
+            if !displays.isEmpty {
+                settingsGroup("通知显示器") {
                     ForEach(Array(displays.enumerated()), id: \.element.id) { index, display in
                         if index > 0 { rowDivider }
                         settingRow(
@@ -2395,12 +2412,18 @@ struct SettingsView: View {
     }
 
     private var activityNoticeDisplays: [ActivityNoticeDisplay] {
-        NSScreen.screens.enumerated().compactMap { index, screen in
+        Self.activityNoticeDisplays(on: activityNoticeScreens, locale: locale)
+    }
+
+    static func activityNoticeDisplays(on screens: [NSScreen], locale: Locale) -> [ActivityNoticeDisplay] {
+        let displays = screens.enumerated().compactMap { index, screen -> ActivityNoticeDisplay? in
             let key = NSDeviceDescriptionKey("NSScreenNumber")
             guard let number = screen.deviceDescription[key] as? NSNumber else { return nil }
-            let name = screen.localizedName.isEmpty ? AppLocalization.text("显示器 %ld", index + 1) : screen.localizedName
+            let name = screen.localizedName.isEmpty
+                ? AppLocalization.format("显示器 %ld", locale: locale, [index + 1]) : screen.localizedName
             return ActivityNoticeDisplay(id: number.uint32Value, name: name)
         }
+        return displays.count > 1 ? displays : []
     }
 
     private func activityNoticeDisplayBinding(
@@ -3929,7 +3952,8 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "envelope",
                     title: account.displayName,
-                    detail: account.id == account.displayName ? AppLocalization.text("系统 Mail.app 账户") : account.id
+                    detail: (account.emailAddresses.first ?? account.id) == account.id
+                        ? AppLocalization.text("系统 Mail.app 账户") : MailAccount.displayAccountName(account.id)
                 ) {
                     Toggle("", isOn: mailAccountBinding(for: account.id, availableAccounts: accounts))
                         .labelsHidden()
@@ -3998,37 +4022,40 @@ struct SettingsView: View {
         model.settingsStore.settings.moduleOrder = order
     }
 
-    private func clipboardAssistantActionOrder(
-        for kind: ClipboardAssistantKind
+    private static func clipboardAssistantActionOrder(
+        for kind: ClipboardAssistantKind,
+        settings: FeatureSettings
     ) -> [ClipboardAssistantActionKind] {
         ClipboardAssistantActionOrder.normalized(
-            model.settingsStore.settings.clipboardAssistantActionOrders[kind]
+            settings.clipboardAssistantActionOrders[kind]
                 ?? ClipboardAssistantActionOrder.defaults(for: kind),
             for: kind
         )
     }
 
-    private func setPrimaryClipboardAssistantAction(
-        _ action: ClipboardAssistantActionKind,
-        for kind: ClipboardAssistantKind
-    ) {
-        var order = clipboardAssistantActionOrder(for: kind)
-        order.removeAll { $0 == action }
-        order.insert(action, at: 0)
-        model.settingsStore.settings.clipboardAssistantActionOrders[kind] = order
-    }
-
-    private func moveClipboardAssistantAction(
+    static func setPrimaryClipboardAssistantAction(
         _ action: ClipboardAssistantActionKind,
         for kind: ClipboardAssistantKind,
-        by offset: Int
+        settings: Binding<FeatureSettings>
     ) {
-        var order = clipboardAssistantActionOrder(for: kind)
-        guard let index = order.firstIndex(of: action), index > 0 else { return }
+        var order = clipboardAssistantActionOrder(for: kind, settings: settings.wrappedValue)
+        order.removeAll { $0 == action }
+        order.insert(action, at: 0)
+        settings.wrappedValue.clipboardAssistantActionOrders[kind] = order
+    }
+
+    static func moveClipboardAssistantAction(
+        _ action: ClipboardAssistantActionKind,
+        for kind: ClipboardAssistantKind,
+        by offset: Int,
+        settings: Binding<FeatureSettings>
+    ) {
+        var order = clipboardAssistantActionOrder(for: kind, settings: settings.wrappedValue)
+        guard let index = order.firstIndex(of: action) else { return }
         let destination = index + offset
-        guard destination > order.startIndex, order.indices.contains(destination) else { return }
+        guard order.indices.contains(destination) else { return }
         order.swapAt(index, destination)
-        model.settingsStore.settings.clipboardAssistantActionOrders[kind] = order
+        settings.wrappedValue.clipboardAssistantActionOrders[kind] = order
     }
 
     private func resetClipboardAssistantActionOrder(for kind: ClipboardAssistantKind) {
@@ -4111,21 +4138,28 @@ struct SettingsView: View {
     }
 
     private func settingRow<Trailing: View>(
-        symbol: String,
+        symbol: String? = nil,
         title: String,
         detail: String,
         detailLineLimit: Int? = nil,
         isNested: Bool = false,
+        isDefaultAction: Bool = false,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(input.selection.iconColor(for: symbol), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            if !isNested, let symbol {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(input.selection.iconColor(for: symbol), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
             VStack(alignment: .leading, spacing: 2) {
-                AppLocalizedText(title)
+                (Text(AppLocalization.string(title, locale: locale))
+                    + (isDefaultAction
+                        ? Text(" " + AppLocalization.string("（默认）", locale: locale))
+                            .foregroundColor(.secondary)
+                        : Text("")))
                     .font(.system(size: 13, weight: .medium))
                     .fitsLines(2)
                     .truncationMode(.tail)
@@ -4140,7 +4174,7 @@ struct SettingsView: View {
             Spacer(minLength: 8)
             trailing()
         }
-        .padding(.leading, isNested ? 24 : 4)
+        .padding(.leading, isNested || symbol == nil ? 46 : 4)
         .padding(.trailing, 4)
         .frame(maxWidth: .infinity, minHeight: 56)
         .settingsSearchAnchor(SettingsSearchAnchor.row(AppLocalization.string(title, locale: locale)))
@@ -4318,7 +4352,7 @@ private struct PetImportSource: Identifiable {
     var id: URL { url }
 }
 
-private struct ActivityNoticeDisplay: Identifiable {
+struct ActivityNoticeDisplay: Identifiable {
     let id: UInt32
     let name: String
 }
@@ -4753,10 +4787,11 @@ private struct SettingsAppearanceWindowPreview: View {
 
 enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
     case basics
-    case sound
+    case information
     case files
     case capture
     case aiAndVoice
+    case sound
     case others
     case permissions
     case recommendationsAndUpdates
@@ -4766,6 +4801,7 @@ enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .basics: "基础功能"
+        case .information: "信息"
         case .sound: "声音"
         case .files: "文件"
         case .capture: "截图与录屏"
@@ -4785,7 +4821,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case features
     case info
+    case dailyBriefing
+    case notifications
+    case workflow
     case clipboardAssistant
+    case mail
+    case weather
     case screenshot
     case recording
     case pdfTools
@@ -4793,12 +4834,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case audioTools
     case ai
     case voice
-    case mail
     case keyboardSound
-    case download
-    case saveLocations
     case scheduledCleanup
-    case weather
+    case saveLocations
+    case download
     case networkProxy
     case pet
     case permissions
@@ -4809,12 +4848,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var group: SettingsSectionGroup {
         switch self {
-        case .general, .features, .info: .basics
+        case .general, .features: .basics
+        case .info, .dailyBriefing, .notifications, .workflow, .clipboardAssistant, .mail, .weather: .information
         case .keyboardSound: .sound
         case .pdfTools, .imageTools, .audioTools: .files
         case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
-        case .clipboardAssistant, .download, .saveLocations, .scheduledCleanup, .mail, .weather, .networkProxy, .pet: .others
+        case .download, .saveLocations, .scheduledCleanup, .networkProxy, .pet: .others
         case .permissions: .permissions
         case .recommendations, .updates: .recommendationsAndUpdates
         }
@@ -4836,7 +4876,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .imageTools: "图片工具"
         case .audioTools: "音频工具"
         case .recording: "录屏"
-        case .info: "信息"
+        case .info: "灵动岛布局"
+        case .dailyBriefing: "每日简报"
+        case .notifications: "通知与关怀"
+        case .workflow: "工作流"
         case .mail: "邮件"
         case .ai: "AI"
         case .voice: "语音"
@@ -4864,6 +4907,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .audioTools: "waveform.circle.fill"
         case .recording: "record.circle"
         case .info: "info.circle.fill"
+        case .dailyBriefing: "doc.text.image"
+        case .notifications: "heart.fill"
+        case .workflow: "arrow.triangle.branch"
         case .mail: "envelope.fill"
         case .ai: "sparkles"
         case .voice: "mic.fill"
@@ -4882,10 +4928,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var iconColor: Color {
         switch self {
         case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
-        case .info, .mail, .saveLocations, .networkProxy: Color(nsColor: .systemBlue)
+        case .info, .dailyBriefing, .mail, .saveLocations, .networkProxy: Color(nsColor: .systemBlue)
         case .clipboardAssistant, .screenshot, .imageTools, .ai, .recommendations: Color(nsColor: .systemIndigo)
-        case .recording, .pdfTools, .audioTools, .voice, .scheduledCleanup: Color(nsColor: .systemRed)
-        case .download, .updates: Color(nsColor: .systemGreen)
+        case .notifications, .recording, .pdfTools, .audioTools, .voice, .scheduledCleanup: Color(nsColor: .systemRed)
+        case .workflow, .download, .updates: Color(nsColor: .systemGreen)
         case .weather: Color(nsColor: .systemCyan)
         case .pet: Color(nsColor: .systemOrange)
         }
@@ -4948,7 +4994,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .imageTools: "在本机压缩、转换、缩放与批量导出图片。"
         case .audioTools: "转换、剪辑与处理本地音频。"
         case .recording: "录制屏幕、编辑视频与保存项目。"
-        case .info: "配置媒体、系统监控、锁屏与通知显示。"
+        case .info: "调整灵动岛功能顺序、模式与收起态展示优先级。"
+        case .dailyBriefing: "设置每日简报的内容、模板与导出时间。"
+        case .notifications: "配置锁屏信息、通知展示与关怀提醒。"
+        case .workflow: "配置媒体播放与系统监控。"
         case .mail: "读取已配置的 Mail.app 账户并提醒新邮件"
         case .ai: "管理 AI CLI 与 Skills。"
         case .voice: "配置语音输入、整理模型与本机记录。"
@@ -4964,10 +5013,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Information owns toolbar ordering even when every optional information feature is disabled.
+    /// Information configuration stays reachable when its optional features are disabled.
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .info, .saveLocations, .scheduledCleanup, .networkProxy, .permissions:
+        case .general, .features, .info, .dailyBriefing, .notifications, .workflow,
+             .saveLocations, .scheduledCleanup, .networkProxy, .permissions:
             return true
         case .recommendations:
             return settings.recommendedToolsEnabled

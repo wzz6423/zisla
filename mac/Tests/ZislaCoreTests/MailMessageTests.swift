@@ -3,6 +3,46 @@ import Testing
 @testable import ZislaCore
 
 struct MailMessageTests {
+    @Test(arguments: ["qq", "Qq", "qQ", "QQ"])
+    func qqAccountNamesKeepBrandCapitalizationWithoutChangingIdentity(name: String) {
+        let account = MailAccount(name: name)
+        let addressedAccount = MailAccount(name: name, emailAddresses: ["fixture@qq.com"])
+
+        #expect(MailAccount.displayAccountName(name) == "QQ")
+        #expect(account.displayName == "QQ")
+        #expect(account.id == name)
+        #expect(account.emailAddresses.isEmpty)
+        #expect(account.primaryEmailAddress == nil)
+        #expect(addressedAccount.displayName == "fixture@qq.com")
+        #expect(addressedAccount.id == name)
+        #expect(addressedAccount.emailAddresses == ["fixture@qq.com"])
+        #expect(addressedAccount.primaryEmailAddress == "fixture@qq.com")
+    }
+
+    @Test(arguments: ["", "Gmail", "iCloud", "Outlook", "个人邮箱", "Qqq", "QQ 工作", "Qq@example.com", "fixture@qq.com"])
+    func otherAccountNamesAndEmailAddressesKeepTheirOriginalSpelling(name: String) {
+        let account = MailAccount(name: name)
+        let addressedAccount = MailAccount(name: name, emailAddresses: ["fixture@qq.com"])
+
+        #expect(MailAccount.displayAccountName(name) == name)
+        #expect(account.displayName == name)
+        #expect(account.id == name)
+        #expect(addressedAccount.id == name)
+        #expect(addressedAccount.displayName == "fixture@qq.com")
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func localizedRepliesPreserveQQBrandCapitalization(language: AppLanguage) {
+        let accountName = MailAccount.displayAccountName("Qq")
+        let text = AppLocalization.format("通过 %@ 回复给 %@", locale: language.locale, [accountName, "fixture@example.com"])
+
+        #expect(AppLanguage.allCases.count == 17)
+        #expect(AppLocalization.string(accountName, language: language) == "QQ")
+        #expect(text.contains("QQ"))
+        #expect(!text.contains("Qq"))
+        #expect(text.contains("fixture@example.com"))
+    }
+
     @Test
     func titleAndPreviewNormalizeMailboxContent() {
         let message = MailMessage(

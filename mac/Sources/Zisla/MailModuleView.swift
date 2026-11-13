@@ -302,7 +302,7 @@ struct MailModuleView: View {
                             .font(.islandMicro())
                             .foregroundStyle(.secondary)
                             .fitsSingleLine()
-                        Text("\(message.accountName) · \(message.receivedAt, format: .dateTime.month().day().hour().minute())")
+                        Text("\(MailAccount.displayAccountName(message.accountName)) · \(message.receivedAt, format: .dateTime.month().day().hour().minute())")
                             .font(.islandMicro())
                             .foregroundStyle(.tertiary)
                             .fitsSingleLine()
@@ -619,7 +619,7 @@ private struct MailComposerView: View {
             Text(replyTarget?.title ?? "")
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(2)
-            Text(AppLocalization.text("通过 %@ 回复给 %@", replyTarget?.accountName ?? "", replyTarget?.sender ?? ""))
+            Text(AppLocalization.text("通过 %@ 回复给 %@", MailAccount.displayAccountName(replyTarget?.accountName ?? ""), replyTarget?.sender ?? ""))
                 .font(.islandMicro())
                 .foregroundStyle(.secondary)
         }
@@ -650,15 +650,15 @@ private struct MailComposerView: View {
                     // group by account, show all addresses under each account inline
                     ForEach(availableAccounts) { account in
                         let identities = senderIdentities.filter { $0.accountName == account.id }
-                        Section(account.id) {
+                        Section(MailAccount.displayAccountName(account.id)) {
                             ForEach(identities) { identity in
                                 Button {
                                     selectedSenderAddress = identity.address
                                 } label: {
                                     if selectedIdentity?.id == identity.id {
-                                        Label(identity.address, systemImage: "checkmark")
+                                        Label(MailAccount.displayAccountName(identity.address), systemImage: "checkmark")
                                     } else {
-                                        Text(identity.address)
+                                        Text(MailAccount.displayAccountName(identity.address))
                                     }
                                 }
                             }
@@ -666,10 +666,10 @@ private struct MailComposerView: View {
                     }
                 } label: {
                     HStack(spacing: 3) {
-                        Text(selectedIdentity?.address ?? AppLocalization.text("系统默认账户"))
+                        Text(selectedIdentity.map { MailAccount.displayAccountName($0.address) } ?? AppLocalization.text("系统默认账户"))
                             .fitsSingleLine()
                         if let identity = selectedIdentity, identity.accountName != identity.address {
-                            Text("· \(identity.accountName)")
+                            Text("· \(MailAccount.displayAccountName(identity.accountName))")
                                 .font(.islandMicro())
                                 .foregroundStyle(.tertiary)
                                 .fitsSingleLine()
@@ -689,10 +689,10 @@ private struct MailComposerView: View {
                     .foregroundStyle(.secondary)
                     .fitsSingleLine()
                     .frame(width: 52, alignment: .leading)
-                Text(identity.address)
+                Text(MailAccount.displayAccountName(identity.address))
                     .font(.system(size: 11, weight: .medium))
                 if identity.accountName != identity.address {
-                    Text("· \(identity.accountName)")
+                    Text("· \(MailAccount.displayAccountName(identity.accountName))")
                         .font(.islandMicro())
                         .foregroundStyle(.tertiary)
                 }

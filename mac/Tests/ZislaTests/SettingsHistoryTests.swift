@@ -47,6 +47,36 @@ struct SettingsHistoryTests {
     }
 
     @Test
+    func splitInformationPagesKeepDistinctHistoryWhenTheirFeaturesAreDisabled() {
+        let input = SettingsInput()
+        let destinations: [(SettingsSection, SettingsSearchAnchor)] = [
+            (.info, .group("灵动岛功能顺序")),
+            (.dailyBriefing, .group("每日简报")),
+            (.notifications, .row("活动展示")),
+            (.workflow, .row("播放来源")),
+        ]
+        let settings = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false,
+            lockScreenInfoEnabled: false, sideNoticesEnabled: false, userCareEnabled: false)
+        for (page, anchor) in destinations {
+            input.select(page, searchTarget: anchor)
+        }
+        for (page, anchor) in destinations.dropLast().reversed() {
+            input.navigate(backward: true, settings: settings)
+            #expect(input.selection == page)
+            #expect(input.searchTarget == anchor)
+        }
+        input.navigate(backward: true, settings: settings)
+        #expect(input.selection == .general)
+        #expect(!input.canNavigate(backward: true, settings: settings))
+        for (page, anchor) in destinations {
+            input.navigate(backward: false, settings: settings)
+            #expect(input.selection == page)
+            #expect(input.searchTarget == anchor)
+        }
+        #expect(!input.canNavigate(backward: false, settings: settings))
+    }
+
+    @Test
     func repeatedDestinationsDoNotAddStepsOrDiscardTheForwardBranch() {
         let input = SettingsInput()
         input.select(.features)

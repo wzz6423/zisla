@@ -3779,3 +3779,13 @@
 "自动滚动已暂停，可手动滚动或点击“完成”" = "Đã tạm dừng cuộn tự động. Cuộn thủ công hoặc nhấp Xong";
 "自动滚动需要在系统设置中允许辅助功能" = "Cho phép Trợ năng trong Cài đặt hệ thống để cuộn tự động";
 "无法自动滚动，请手动滚动页面" = "Không thể cuộn tự động. Hãy cuộn trang thủ công";
+
+"灵动岛布局" = "Bố cục Dynamic Island";
+"通知与关怀" = "Thông báo và chăm sóc";
+"调整灵动岛功能顺序、模式与收起态展示优先级。" = "Điều chỉnh thứ tự tính năng Dynamic Island, chế độ và mức ưu tiên hiển thị thu gọn.";
+"设置每日简报的内容、模板与导出时间。" = "Đặt nội dung, mẫu và thời gian xuất bản tóm tắt hằng ngày.";
+"配置锁屏信息、通知展示与关怀提醒。" = "Cấu hình thông tin màn hình khóa, thông báo và lời nhắc chăm sóc sức khỏe.";
+"配置媒体播放与系统监控。" = "Cấu hình phát phương tiện và giám sát hệ thống.";
+"自动更新依赖组件" = "Tự động cập nhật thành phần phụ thuộc";
+"每天更新已安装的依赖组件" = "Cập nhật các thành phần phụ thuộc đã cài đặt mỗi ngày";
+"（默认）" = "(Mặc định)";

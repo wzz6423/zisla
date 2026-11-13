@@ -168,7 +168,7 @@ struct SettingsSplitViewTests {
         let fixture = Fixture()
         defer { fixture.close() }
         fixture.input.select(selection)
-        fixture.state.height = 500
+        fixture.state.height = selection == .keyboardSound ? 1100 : 500
         fixture.state.colorScheme = colorScheme
         fixture.state.isEnabled = true
         await fixture.layout()
@@ -264,7 +264,7 @@ struct SettingsSplitViewTests {
         fixture.state.settings.weatherEnabled = false
         fixture.state.settings.updateChecksEnabled = false
         fixture.state.settings.recommendedToolsEnabled = false
-        fixture.state.height = 680
+        fixture.state.height = 900
         await fixture.layout()
         #expect(scroller.isHidden, "A short sidebar must not keep an empty scroll track")
         #expect(!fixture.window.isVisible)
@@ -334,24 +334,24 @@ struct SettingsSplitViewTests {
             #expect(!sidebarWindow.isVisible)
         }
 
-        try await expectHeadings(["基础功能", "其他", "权限"])
+        try await expectHeadings(["基础功能", "信息", "其他", "权限"])
         settings.pdfToolsEnabled = true
-        try await expectHeadings(["基础功能", "文件", "其他", "权限"])
+        try await expectHeadings(["基础功能", "信息", "文件", "其他", "权限"])
         settings.pdfToolsEnabled = false
         settings.screenshotEnabled = true
-        try await expectHeadings(["基础功能", "截图与录屏", "其他", "权限"])
+        try await expectHeadings(["基础功能", "信息", "截图与录屏", "其他", "权限"])
         settings.screenshotEnabled = false
         settings.screenRecordingEnabled = true
-        try await expectHeadings(["基础功能", "截图与录屏", "其他", "权限"])
+        try await expectHeadings(["基础功能", "信息", "截图与录屏", "其他", "权限"])
         settings.screenRecordingEnabled = false
         settings.updateChecksEnabled = true
-        try await expectHeadings(["基础功能", "其他", "权限", "反馈更新"])
+        try await expectHeadings(["基础功能", "信息", "其他", "权限", "反馈更新"])
         settings.recommendedToolsEnabled = true
-        try await expectHeadings(["基础功能", "其他", "权限", "推荐与反馈更新"])
+        try await expectHeadings(["基础功能", "信息", "其他", "权限", "推荐与反馈更新"])
         settings.updateChecksEnabled = false
-        try await expectHeadings(["基础功能", "其他", "权限", "推荐与反馈更新"])
+        try await expectHeadings(["基础功能", "信息", "其他", "权限", "推荐与反馈更新"])
         settings.recommendedToolsEnabled = false
-        try await expectHeadings(["基础功能", "其他", "权限"])
+        try await expectHeadings(["基础功能", "信息", "其他", "权限"])
     }
 
     private struct SidebarPage: View {

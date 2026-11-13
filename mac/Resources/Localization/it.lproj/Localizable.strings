@@ -3779,3 +3779,13 @@
 "自动滚动已暂停，可手动滚动或点击“完成”" = "Scorrimento automatico sospeso. Scorri manualmente o fai clic su Fine";
 "自动滚动需要在系统设置中允许辅助功能" = "Consenti l’accessibilità in Impostazioni di Sistema per scorrere automaticamente";
 "无法自动滚动，请手动滚动页面" = "Impossibile scorrere automaticamente. Scorri la pagina manualmente";
+
+"灵动岛布局" = "Layout di Dynamic Island";
+"通知与关怀" = "Notifiche e benessere";
+"调整灵动岛功能顺序、模式与收起态展示优先级。" = "Regola l’ordine delle funzioni di Dynamic Island, la modalità e la priorità della vista compatta.";
+"设置每日简报的内容、模板与导出时间。" = "Imposta il contenuto, il modello e l’orario di esportazione del riepilogo giornaliero.";
+"配置锁屏信息、通知展示与关怀提醒。" = "Configura le informazioni della schermata di blocco, le notifiche e i promemoria per il benessere.";
+"配置媒体播放与系统监控。" = "Configura la riproduzione multimediale e il monitoraggio del sistema.";
+"自动更新依赖组件" = "Aggiorna automaticamente le dipendenze";
+"每天更新已安装的依赖组件" = "Aggiorna ogni giorno le dipendenze installate";
+"（默认）" = "(Predefinito)";

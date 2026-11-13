@@ -1260,7 +1260,7 @@ final class AppModel: ObservableObject {
     windowPreview.stop()
     settingsStore.flushPendingChanges()
     islandClipboardHandoff.cancel()
-    managedTools.setAutomaticUpdatesEnabled(false)
+    managedTools.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
     keyboardSound.stop()
     clipboardHistory.flushPendingChanges()
     clipboardHistory.stopCleanup()
@@ -3363,7 +3363,8 @@ final class AppModel: ObservableObject {
     pomodoro.userCareEnabled = settings.userCareEnabled
     configureUpdatePolling(enabled: settings.updateChecksEnabled)
     managedTools.setAutomaticUpdatesEnabled(
-      settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled
+      recommendedTools: settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled,
+      dependencyTools: settings.dependencyToolsAutomaticUpdatesEnabled
     )
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
     clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)

@@ -817,6 +817,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mailCompactStyle: MailCompactStyle
     public var recommendedToolsEnabled: Bool
     public var recommendedToolsAutomaticUpdatesEnabled: Bool
+    public var dependencyToolsAutomaticUpdatesEnabled: Bool
     public var updateChecksEnabled: Bool
     public var automaticDownloadEnabled: Bool
     /// Target channel for automatic and manual update checks.
@@ -1031,6 +1032,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mailCompactStyle: MailCompactStyle = .compact,
         recommendedToolsEnabled: Bool = true,
         recommendedToolsAutomaticUpdatesEnabled: Bool = false,
+        dependencyToolsAutomaticUpdatesEnabled: Bool = false,
         updateChecksEnabled: Bool = true,
         automaticDownloadEnabled: Bool = true,
         updateChannel: UpdateChannel = .release,
@@ -1170,6 +1172,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mailCompactStyle = mailCompactStyle
         self.recommendedToolsEnabled = recommendedToolsEnabled
         self.recommendedToolsAutomaticUpdatesEnabled = recommendedToolsAutomaticUpdatesEnabled
+        self.dependencyToolsAutomaticUpdatesEnabled = dependencyToolsAutomaticUpdatesEnabled
         self.updateChecksEnabled = updateChecksEnabled
         self.automaticDownloadEnabled = automaticDownloadEnabled
         self.updateChannel = updateChannel
@@ -1359,6 +1362,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mailCompactStyle
         case recommendedToolsEnabled
         case recommendedToolsAutomaticUpdatesEnabled
+        case dependencyToolsAutomaticUpdatesEnabled
         case updateChecksEnabled
         case automaticDownloadEnabled
         case updateChannel
@@ -1579,6 +1583,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mailCompactStyle = try container.decodeIfPresent(MailCompactStyle.self, forKey: .mailCompactStyle) ?? defaults.mailCompactStyle
         recommendedToolsEnabled = try container.decodeIfPresent(Bool.self, forKey: .recommendedToolsEnabled) ?? defaults.recommendedToolsEnabled
         recommendedToolsAutomaticUpdatesEnabled = try container.decodeIfPresent(Bool.self, forKey: .recommendedToolsAutomaticUpdatesEnabled) ?? defaults.recommendedToolsAutomaticUpdatesEnabled
+        dependencyToolsAutomaticUpdatesEnabled = try container.decodeIfPresent(Bool.self, forKey: .dependencyToolsAutomaticUpdatesEnabled) ?? defaults.dependencyToolsAutomaticUpdatesEnabled
         updateChecksEnabled = try container.decodeIfPresent(Bool.self, forKey: .updateChecksEnabled) ?? defaults.updateChecksEnabled
         if let automaticDownload = try container.decodeIfPresent(Bool.self, forKey: .automaticDownloadEnabled) {
             automaticDownloadEnabled = automaticDownload

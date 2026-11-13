@@ -22,8 +22,10 @@ public final class ManagedToolService: ObservableObject {
     private let homebrewRunner: (([String], [String: String]) async throws -> String)?
     private let automaticUpdateSleep: @Sendable (Duration) async throws -> Void
     private var automaticUpdateTask: Task<Void, Never>?
+    private var automaticUpdateTools: [ManagedTool] = []
     private var automaticUpdatePassInProgress = false
 
+    private static let dependencyTools: Set<ManagedTool> = [.ytDLP, .ffmpeg, .libreOffice, .libvips, .libavif]
     private static let cacheKey = "managed-tool-state-cache-v1"
     private static let latestVersionCacheLifetime: TimeInterval = 5 * 60
     private static let maximumDownloadBytes = 512 * 1024 * 1024
@@ -62,16 +64,20 @@ public final class ManagedToolService: ObservableObject {
         automaticUpdateTask?.cancel()
     }
 
-    public func setAutomaticUpdatesEnabled(_ enabled: Bool) {
-        if !enabled {
-            automaticUpdateTask?.cancel()
-            automaticUpdateTask = nil
-            return
+    public func setAutomaticUpdatesEnabled(recommendedTools: Bool, dependencyTools: Bool) {
+        let tools = ManagedTool.allCases.filter {
+            Self.dependencyTools.contains($0) ? dependencyTools : recommendedTools
         }
-        guard automaticUpdateTask == nil else { return }
+        guard automaticUpdateTools != tools else { return }
+        automaticUpdateTools = tools
+        let previousTask = automaticUpdateTask
+        previousTask?.cancel()
+        guard !tools.isEmpty else { return }
         automaticUpdateTask = Task { [weak self, automaticUpdateSleep] in
+            // Wait for any in-flight package transaction before beginning the newly enabled scope.
+            await previousTask?.value
             while !Task.isCancelled {
-                await self?.updateInstalledTools()
+                await self?.updateInstalledTools(tools)
                 do {
                     try Task.checkCancellation()
                     try await automaticUpdateSleep(.seconds(24 * 60 * 60))
@@ -439,12 +445,12 @@ public final class ManagedToolService: ObservableObject {
 
     // MARK: - Download and install
 
-    func updateInstalledTools() async {
+    func updateInstalledTools(_ tools: [ManagedTool] = ManagedTool.allCases) async {
         // A disabled scheduler may still be finishing a Homebrew transaction when enabled again.
         guard !automaticUpdatePassInProgress else { return }
         automaticUpdatePassInProgress = true
         defer { automaticUpdatePassInProgress = false }
-        for tool in ManagedTool.allCases {
+        for tool in tools {
             guard !Task.isCancelled else { return }
             guard states[tool]?.isBusy != true else { continue }
             guard let resolved = resolvedExecutable(for: tool) else {

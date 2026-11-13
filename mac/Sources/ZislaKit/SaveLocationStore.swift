@@ -36,6 +36,17 @@ public enum SaveLocation: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    var defaultDirectory: URL {
+        switch self {
+        case .download: AppPaths.downloads
+        case .pdfTools: AppPaths.downloads.appendingPathComponent("pdf", isDirectory: true)
+        case .imageTools, .screenshot: AppPaths.downloads.appendingPathComponent("picture", isDirectory: true)
+        case .recording: AppPaths.downloads.appendingPathComponent("video", isDirectory: true)
+        case .quickActions: AppPaths.downloads.appendingPathComponent("quick", isDirectory: true)
+        case .dailyBriefing: AppPaths.downloads.appendingPathComponent("daily", isDirectory: true)
+        }
+    }
+
     var bookmarkKey: String {
         self == .download ? "download-directory-bookmark" : "save-location-\(rawValue)-bookmark"
     }
@@ -58,11 +69,13 @@ public final class SaveLocationStore: ObservableObject {
             let pathKey = location.pathKey!
             if defaults.object(forKey: location.bookmarkKey) == nil,
                defaults.object(forKey: pathKey) == nil {
-                // Freeze the effective shared location once so later download changes stay independent.
+                // Preserve inherited bookmarks while keeping later download changes independent.
                 if let bookmark = defaults.data(forKey: SaveLocation.download.bookmarkKey) {
                     defaults.set(bookmark, forKey: location.bookmarkKey)
+                    defaults.set(download.directory.path, forKey: pathKey)
+                } else {
+                    defaults.set(location.defaultDirectory.path, forKey: pathKey)
                 }
-                defaults.set(download.directory.path, forKey: pathKey)
             }
             stores[location] = ScreenRecordingOutputDirectoryStore(defaults: defaults,
                 bookmarkKey: location.bookmarkKey, pathKey: pathKey)

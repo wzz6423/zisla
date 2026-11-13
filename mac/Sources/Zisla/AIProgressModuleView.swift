@@ -352,6 +352,7 @@ struct UsageTrendChart: View {
             GeometryReader { geometry in
                 if let plotFrame = proxy.plotFrame {
                     let frame = geometry[plotFrame]
+                    let width = geometry.size.width
                     ForEach(dateLabels, id: \.timestamp) { point in
                         if let x = proxy.position(forX: point.timestamp) {
                             Text(point.timestamp, format: .dateTime.month(.twoDigits).day(.twoDigits))
@@ -360,7 +361,7 @@ struct UsageTrendChart: View {
                                 .fixedSize()
                                 .alignmentGuide(HorizontalAlignment.center) { size in
                                     min(frame.minX + x, max(size.width / 2,
-                                        frame.minX + x + size.width - geometry.size.width))
+                                        frame.minX + x + size.width - width))
                                 }
                                 .frame(width: 0, alignment: .center)
                                 .position(x: frame.minX + x, y: frame.maxY + 8)

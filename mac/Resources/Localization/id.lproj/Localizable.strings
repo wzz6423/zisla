@@ -3779,3 +3779,13 @@
 "自动滚动已暂停，可手动滚动或点击“完成”" = "Pengguliran otomatis dijeda. Gulir manual atau klik Selesai";
 "自动滚动需要在系统设置中允许辅助功能" = "Izinkan Aksesibilitas di Pengaturan Sistem untuk menggulir otomatis";
 "无法自动滚动，请手动滚动页面" = "Tidak dapat menggulir otomatis. Gulir halaman secara manual";
+
+"灵动岛布局" = "Tata Letak Dynamic Island";
+"通知与关怀" = "Notifikasi dan Kesehatan";
+"调整灵动岛功能顺序、模式与收起态展示优先级。" = "Atur urutan fitur Dynamic Island, mode, dan prioritas tampilan ringkas.";
+"设置每日简报的内容、模板与导出时间。" = "Atur konten, templat, dan waktu ekspor ringkasan harian.";
+"配置锁屏信息、通知展示与关怀提醒。" = "Atur informasi layar kunci, notifikasi, dan pengingat kesehatan.";
+"配置媒体播放与系统监控。" = "Atur pemutaran media dan pemantauan sistem.";
+"自动更新依赖组件" = "Perbarui Dependensi Secara Otomatis";
+"每天更新已安装的依赖组件" = "Perbarui dependensi yang terpasang setiap hari";
+"（默认）" = "(Default)";

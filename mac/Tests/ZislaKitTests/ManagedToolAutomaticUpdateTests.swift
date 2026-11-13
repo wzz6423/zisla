@@ -6,6 +6,81 @@ import ZislaCore
 
 @MainActor
 struct ManagedToolAutomaticUpdateTests {
+    @Test(arguments: ManagedTool.allCases, [(false, false), (true, false), (false, true), (true, true)])
+    func schedulerUpdatesOnlyTheEnabledScope(tool: ManagedTool, enabled: (Bool, Bool)) async throws {
+        let fixture = Fixture(tool: tool)
+        let clock = UpdateClock()
+        let service = fixture.service(sleep: { _ in try await clock.sleep() })
+        await service.refreshInstalledVersions()
+        let originalState = service.states[tool]
+        fixture.commands = []
+        let dependencies: Set<ManagedTool> = [.ytDLP, .ffmpeg, .libreOffice, .libvips, .libavif]
+        let shouldUpdate = dependencies.contains(tool) ? enabled.1 : enabled.0
+
+        service.setAutomaticUpdatesEnabled(recommendedTools: enabled.0, dependencyTools: enabled.1)
+        if enabled.0 || enabled.1 { await clock.waitForSleeps(1) }
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        if enabled.0 || enabled.1 { await clock.waitForCancellations(1) }
+
+        if !shouldUpdate {
+            #expect(fixture.commands.isEmpty, "Disabled scope issued a package command for \(tool)")
+            #expect(fixture.releaseRequests.isEmpty, "Disabled scope requested a release for \(tool)")
+            #expect(service.states[tool] == originalState)
+        } else if tool.usesHomebrew {
+            #expect(fixture.commands.filter { $0.first == "upgrade" } == [["upgrade", fixture.kind, fixture.name]])
+            #expect(service.states[tool]?.installedVersion == "2.0.0")
+            #expect(service.states[tool]?.errorMessage == nil)
+        } else {
+            #expect(fixture.releaseRequests == [fixture.name])
+            #expect(service.states[tool]?.errorMessage != nil)
+        }
+        #expect(service.states[tool]?.phase == .idle)
+        #expect(!fixture.commands.contains { ["install", "tap"].contains($0.first ?? "") })
+        #expect(!FileManager.default.fileExists(atPath: fixture.root.path))
+    }
+
+    @Test(arguments: [ManagedTool.ffmpeg, .libreOffice, .libvips, .libavif])
+    func missingDependenciesNeverStartPackageUpdates(tool: ManagedTool) async throws {
+        let fixture = Fixture(tool: tool)
+        fixture.executableExists = false
+        let clock = UpdateClock()
+        let service = fixture.service(sleep: { _ in try await clock.sleep() })
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: true)
+        await clock.waitForSleeps(1)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        await clock.waitForCancellations(1)
+
+        #expect(fixture.commands.isEmpty)
+        #expect(fixture.releaseRequests.isEmpty)
+        #expect(service.states[tool]?.isInstalled == false)
+        #expect(!FileManager.default.fileExists(atPath: fixture.root.path))
+    }
+
+    @Test
+    func dependencySettingPersistsIndependentlyAndResetDisablesUpdates() throws {
+        let defaults = InMemoryToolDefaults()
+        defaults.set(Data(#"{"recommendedToolsEnabled":false,"recommendedToolsAutomaticUpdatesEnabled":true,"mediaEnabled":false}"#.utf8),
+            forKey: "feature-settings-v1")
+        let store = FeatureSettingsStore(defaults: defaults)
+        #expect(!store.settings.dependencyToolsAutomaticUpdatesEnabled)
+        store.settings.dependencyToolsAutomaticUpdatesEnabled = true
+        store.flushPendingChanges()
+
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings.dependencyToolsAutomaticUpdatesEnabled)
+        #expect(!restored.settings.recommendedToolsEnabled)
+        #expect(restored.settings.recommendedToolsAutomaticUpdatesEnabled)
+        #expect(!restored.settings.mediaEnabled)
+        restored.settings.recommendedToolsAutomaticUpdatesEnabled = false
+        restored.flushPendingChanges()
+        let independent = FeatureSettingsStore(defaults: defaults)
+        #expect(independent.settings.dependencyToolsAutomaticUpdatesEnabled)
+        #expect(!independent.settings.recommendedToolsAutomaticUpdatesEnabled)
+        independent.reset()
+        independent.flushPendingChanges()
+        #expect(!FeatureSettingsStore(defaults: defaults).settings.dependencyToolsAutomaticUpdatesEnabled)
+    }
+
     @Test(arguments: [ManagedTool.fzf, .kaku, .openScreen])
     func updatesOnlyRegisteredPackagesWithoutInstallingOrTapping(_ tool: ManagedTool) async throws {
         let fixture = Fixture(tool: tool)
@@ -87,21 +162,125 @@ struct ManagedToolAutomaticUpdateTests {
         #expect(service.states[.fzf]?.installedVersion == version)
     }
 
-    @Test(arguments: ["info", "upgrade"])
-    func dependencyFailureKeepsStateIdleAndCanRecoverOnTheNextCycle(_ failedCommand: String) async throws {
-        let fixture = Fixture()
+    @Test(arguments: [ManagedTool.fzf, .ffmpeg, .libreOffice, .libvips, .libavif], ["info", "upgrade"])
+    func dependencyFailureKeepsStateIdleAndCanRecoverOnTheNextCycle(tool: ManagedTool, failedCommand: String) async throws {
+        let fixture = Fixture(tool: tool)
         fixture.failedCommand = failedCommand
         let service = fixture.service()
 
         await service.updateInstalledTools()
-        #expect(service.states[.fzf]?.phase == .idle)
-        #expect(service.states[.fzf]?.installedVersion == "1.0.0")
-        #expect(service.states[.fzf]?.errorMessage != nil)
+        #expect(service.states[tool]?.phase == .idle)
+        #expect(service.states[tool]?.installedVersion == "1.0.0")
+        #expect(service.states[tool]?.errorMessage != nil)
 
         fixture.failedCommand = nil
         await service.updateInstalledTools()
+        #expect(service.states[tool]?.installedVersion == "2.0.0")
+        #expect(service.states[tool]?.errorMessage == nil)
+    }
+
+    @Test
+    func disablingDependenciesDuringReadPreventsUpgradeWhileRecommendationsContinue() async throws {
+        let fixture = Fixture(tool: .ffmpeg)
+        let clock = UpdateClock()
+        let entered = Gate()
+        let resume = Gate()
+        fixture.beforeCommand = { arguments in
+            if arguments.first == "info" {
+                await entered.open()
+                await resume.wait()
+            }
+        }
+        let service = fixture.service(sleep: { _ in try await clock.sleep() })
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: true)
+        await entered.wait()
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
+        await resume.open()
+        await clock.waitForSleeps(1)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        await clock.waitForCancellations(1)
+
+        #expect(fixture.commands == [
+            ["list", "--versions", "--formula", "ffmpeg"],
+            ["info", "--formula", "--json=v2", "ffmpeg"],
+        ])
+        #expect(fixture.version == "1.0.0")
+        #expect(service.states[.ffmpeg]?.installedVersion == "1.0.0")
+        #expect(service.states[.ffmpeg]?.phase == .idle)
+        #expect(service.states[.ffmpeg]?.errorMessage == nil)
+    }
+
+    @Test
+    func applyingTheSameScopeDuringReadDoesNotRestartThePass() async throws {
+        let fixture = Fixture(tool: .ffmpeg)
+        let clock = UpdateClock()
+        let entered = Gate()
+        let resume = Gate()
+        fixture.beforeCommand = { arguments in
+            if arguments.first == "info" {
+                await entered.open()
+                await resume.wait()
+            }
+        }
+        let service = fixture.service(sleep: { _ in try await clock.sleep() })
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: true)
+        await entered.wait()
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: true)
+        await resume.open()
+        await clock.waitForSleeps(1)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        await clock.waitForCancellations(1)
+
+        #expect(fixture.commands.filter { $0.first == "info" }.count == 1)
+        #expect(fixture.commands.filter { $0.first == "upgrade" }.count == 1)
+        #expect(service.states[.ffmpeg]?.installedVersion == "2.0.0")
+        #expect(service.states[.ffmpeg]?.phase == .idle)
+    }
+
+    @Test
+    func enablingDependenciesWaitsForActivePackageTransactionThenUpdatesImmediately() async throws {
+        let fixture = Fixture()
+        let entered = Gate()
+        let resume = Gate()
+        let clock = UpdateClock()
+        var versions = ["fzf": "1.0.0", "ffmpeg": "1.0.0"]
+        var events: [String] = []
+        let service = ManagedToolService(
+            toolsDirectory: fixture.root, bundleURL: fixture.root, defaults: fixture.defaults,
+            executableResolver: { tool in
+                [.fzf, .ffmpeg].contains(tool) ? (fixture.root.appendingPathComponent(tool.executableName), .homebrew) : nil
+            },
+            homebrewRunner: { arguments, _ in
+                let name = arguments.last!
+                switch arguments.first {
+                case "list": return "\(name) \(versions[name]!)"
+                case "info": return "{\"formulae\":[{\"name\":\"\(name)\",\"versions\":{\"stable\":\"2.0.0\"}}]}"
+                case "upgrade":
+                    events.append("\(name)-started")
+                    if name == "fzf" { await entered.open(); await resume.wait() }
+                    #expect(!Task.isCancelled, "An active package transaction must finish without cancellation")
+                    versions[name] = "2.0.0"
+                    events.append("\(name)-finished")
+                    return ""
+                default: Issue.record("Unexpected automatic command: \(arguments)"); return ""
+                }
+            },
+            automaticUpdateSleep: { _ in try await clock.sleep() }
+        )
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
+        await entered.wait()
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: true)
+        await Task.yield()
+        await resume.open()
+        await clock.waitForSleeps(1)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        await clock.waitForCancellations(1)
+
+        #expect(events == ["fzf-started", "fzf-finished", "ffmpeg-started", "ffmpeg-finished"])
         #expect(service.states[.fzf]?.installedVersion == "2.0.0")
-        #expect(service.states[.fzf]?.errorMessage == nil)
+        #expect(service.states[.ffmpeg]?.installedVersion == "2.0.0")
+        #expect(service.states[.fzf]?.phase == .idle)
+        #expect(service.states[.ffmpeg]?.phase == .idle)
     }
 
     @Test(arguments: [1, 2, 3])
@@ -206,20 +385,19 @@ struct ManagedToolAutomaticUpdateTests {
             },
             automaticUpdateSleep: { _ in try await clock.sleep() }
         )
-        service.setAutomaticUpdatesEnabled(true)
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
         await entered.wait()
-        service.setAutomaticUpdatesEnabled(false)
-        service.setAutomaticUpdatesEnabled(true)
-        await clock.waitForSleeps(1)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
+        await Task.yield()
         #expect(upgrades == ["fzf"])
-        service.setAutomaticUpdatesEnabled(false)
-        await clock.waitForCancellations(1)
         await resume.open()
-        for await states in service.$states.values {
-            if states[.fzf]?.phase == .idle { break }
-        }
+        await clock.waitForSleeps(1)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        await clock.waitForCancellations(1)
+        #expect(upgrades == ["fzf", "ripgrep"])
         #expect(versions["fzf"] == "2.0.0")
-        #expect(versions["ripgrep"] == "1.0.0")
+        #expect(versions["ripgrep"] == "2.0.0")
     }
 
     @Test
@@ -231,8 +409,8 @@ struct ManagedToolAutomaticUpdateTests {
             try await clock.sleep()
         })
         #expect(fixture.commands.isEmpty)
-        service.setAutomaticUpdatesEnabled(true)
-        service.setAutomaticUpdatesEnabled(true)
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
         await clock.waitForSleeps(1)
         #expect(fixture.commands.filter { $0.first == "info" }.count == 1)
 
@@ -240,15 +418,37 @@ struct ManagedToolAutomaticUpdateTests {
         await clock.advance()
         await clock.waitForSleeps(2)
         #expect(fixture.commands.filter { $0.first == "upgrade" }.count == 2)
-        service.setAutomaticUpdatesEnabled(false)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
         await clock.waitForCancellations(1)
+        for _ in 0..<4 {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        #expect(await clock.pendingSleeps == 0, "Disabled scheduling must release every daily timer")
         #expect(fixture.commands.filter { $0.first == "info" }.count == 2)
 
-        service.setAutomaticUpdatesEnabled(true)
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
         await clock.waitForSleeps(3)
-        service.setAutomaticUpdatesEnabled(false)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
         await clock.waitForCancellations(2)
         #expect(fixture.commands.filter { $0.first == "info" }.count == 3)
+    }
+
+    @Test
+    func disablingDependenciesPreservesTheEnabledRecommendationScheduler() async throws {
+        let fixture = Fixture()
+        let clock = UpdateClock()
+        let service = fixture.service(sleep: { _ in try await clock.sleep() })
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: true)
+        await clock.waitForSleeps(1)
+        fixture.version = "1.0.0"
+        service.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
+        await clock.waitForSleeps(2)
+        #expect(service.states[.fzf]?.installedVersion == "2.0.0")
+        #expect(fixture.commands.filter { $0.first == "upgrade" }.count == 2)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        await clock.waitForCancellations(2)
     }
 
     @Test
@@ -257,7 +457,7 @@ struct ManagedToolAutomaticUpdateTests {
         let clock = UpdateClock()
         var service: ManagedToolService? = fixture.service(sleep: { _ in try await clock.sleep() })
         weak var weakService = service
-        service?.setAutomaticUpdatesEnabled(true)
+        service?.setAutomaticUpdatesEnabled(recommendedTools: true, dependencyTools: false)
         await clock.waitForSleeps(1)
         service = nil
         await clock.waitForCancellations(1)
@@ -301,6 +501,7 @@ struct ManagedToolAutomaticUpdateTests {
         var executableExists = true
         var commands: [[String]] = []
         var environments: [[String: String]] = []
+        var releaseRequests: [String] = []
         var failedCommand: String?
         var beforeCommand: (([String]) async -> Void)?
 
@@ -309,14 +510,17 @@ struct ManagedToolAutomaticUpdateTests {
             switch tool.installationSource {
             case .homebrewCask(let name): self.name = name; kind = "--cask"
             case .homebrewFormula(let name): self.name = name; kind = "--formula"
-            case .githubRelease: preconditionFailure("Use a Homebrew tool fixture")
+            case .githubRelease(let name): self.name = name; kind = ""
             }
         }
 
         func service(sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) -> ManagedToolService {
             ManagedToolService(
                 toolsDirectory: root.appendingPathComponent("Tools"), bundleURL: root, defaults: defaults,
-                releaseLoader: { _ in Issue.record("Unexpected GitHub request"); return Data() },
+                releaseLoader: { [self] repository in
+                    releaseRequests.append(repository)
+                    throw URLError(.notConnectedToInternet)
+                },
                 executableResolver: { [self] candidate in
                     candidate == tool && executableExists ? (root.appendingPathComponent(tool.executableName), .homebrew) : nil
                 },
@@ -363,6 +567,8 @@ private actor UpdateClock {
     private var cancellations = 0
     private var sleepers: [UUID: CheckedContinuation<Void, Error>] = [:]
     private var observers: [(Int, Bool, CheckedContinuation<Void, Never>)] = []
+
+    var pendingSleeps: Int { sleepers.count }
 
     func sleep() async throws {
         let id = UUID()
@@ -430,9 +636,13 @@ struct ManagedToolGitHubAutomaticUpdateTests {
     func replacesAnInstalledBinaryAndCleansStagingFiles() async throws {
         let fixture = try GitHubFixture()
         defer { fixture.cleanUp() }
-        let service = fixture.service()
+        let clock = UpdateClock()
+        let service = fixture.service(sleep: { _ in try await clock.sleep() })
 
-        await service.updateInstalledTools()
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: true)
+        await clock.waitForSleeps(1)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        await clock.waitForCancellations(1)
 
         #expect(service.states[.ytDLP]?.installedVersion == "2.0.0")
         #expect(service.states[.ytDLP]?.location == .managed)
@@ -491,9 +701,16 @@ struct ManagedToolGitHubAutomaticUpdateTests {
         let fixture = try GitHubFixture()
         defer { fixture.cleanUp() }
         try FileManager.default.removeItem(at: fixture.executable)
-        let service = fixture.service(load: { _ in Issue.record("Missing tool triggered a release lookup"); return Data() })
+        let clock = UpdateClock()
+        let service = fixture.service(
+            load: { _ in Issue.record("Missing tool triggered a release lookup"); return Data() },
+            sleep: { _ in try await clock.sleep() }
+        )
 
-        await service.updateInstalledTools()
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: true)
+        await clock.waitForSleeps(1)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        await clock.waitForCancellations(1)
 
         #expect(AutomaticToolDownloadProtocol.requests == 0)
         #expect(!FileManager.default.fileExists(atPath: fixture.executable.path))
@@ -510,9 +727,9 @@ struct ManagedToolGitHubAutomaticUpdateTests {
             await resume.wait()
             return GitHubFixture.release
         })
-        service.setAutomaticUpdatesEnabled(true)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: true)
         await entered.wait()
-        service.setAutomaticUpdatesEnabled(false)
+        service.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
         await resume.open()
         // The idle transition is the completion event for a cancellation-resistant loader.
         for await states in service.$states.values {
@@ -543,7 +760,8 @@ struct ManagedToolGitHubAutomaticUpdateTests {
 
         func service(
             load: ((String) async throws -> Data)? = nil,
-            resolve: (() -> (url: URL, location: ManagedToolState.Location)?)? = nil
+            resolve: (() -> (url: URL, location: ManagedToolState.Location)?)? = nil,
+            sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
         ) -> ManagedToolService {
             let configuration = URLSessionConfiguration.ephemeral
             configuration.protocolClasses = [AutomaticToolDownloadProtocol.self]
@@ -556,7 +774,8 @@ struct ManagedToolGitHubAutomaticUpdateTests {
                     if let resolve { return resolve() }
                     return FileManager.default.fileExists(atPath: executable.path) ? (executable, .managed) : nil
                 },
-                homebrewRunner: { _, _ in Issue.record("GitHub update invoked Homebrew"); return "" }
+                homebrewRunner: { _, _ in Issue.record("GitHub update invoked Homebrew"); return "" },
+                automaticUpdateSleep: sleep
             )
         }
 

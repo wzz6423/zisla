@@ -13,7 +13,7 @@ struct IslandAppIconIntegrationTests {
         let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"),
             encoding: .utf8)
         let start = try #require(source.range(of: "    private var infoContent: some View {"))
-        let end = try #require(source.range(of: "            settingsGroup(\"每日简报\")", range: start.upperBound..<source.endIndex))
+        let end = try #require(source.range(of: "    private var dailyBriefingContent:", range: start.upperBound..<source.endIndex))
         let section = String(source[start.lowerBound..<end.lowerBound])
         let call = try NSRegularExpression(
             pattern: #"featureToggle\("([^"]+)"[^\n]*keyPath: \\\.islandAppIconEnabled\)"#
