@@ -7,6 +7,33 @@ import Testing
 struct AIAccountBalanceServiceTests {
     private let now = Date(timeIntervalSince1970: 1_910_000_000)
 
+    @Test(arguments: [AIProvider?.none, .codex, .gpt])
+    func sharedAliasesUseInstalledBrandWithoutChangingQuotaOrExplicitSelections(installedProvider: AIProvider?) async throws {
+        BalanceURLProtocol.configure(["/backend-api/wham/usage": (0..<3).map { _ in
+            .json(#"{"rate_limit":{"primary_window":{"used_percent":90,"limit_window_seconds":18000}}}"#)
+        }])
+        let service = makeService(openAIProvider: { installedProvider })
+        let shared = try #require(try await service.accountBalances(for: [.codex, .gpt]).first)
+        let expected: AIProvider = installedProvider == .gpt ? .gpt : .codex
+        #expect(shared.displayProvider == expected)
+        #expect(Set(shared.providers) == [.codex, .gpt], "Both aliases must remain selectable on the shared account")
+        #expect(shared.providerTitle(language: .english) == (expected == .gpt ? "ChatGPT" : "Codex"))
+        for provider in [AIProvider.codex, .gpt] {
+            let selected = try #require(try await service.accountBalances(for: [provider]).first)
+            #expect(selected.providers == [provider] && selected.displayProvider == provider)
+            #expect(selected.id == shared.id && selected.windows == shared.windows)
+        }
+        #expect(BalanceURLProtocol.requests.count == 3, "Each selection must still query the shared account only once")
+    }
+
+    @Test func installedOpenAIBrandDoesNotRelabelOtherSharedAccounts() async throws {
+        BalanceURLProtocol.configure(["/api/usage-summary": [.json(#"{"individualUsage":{"plan":{"used":900,"limit":1000}}}"#)]])
+        let rows = try await makeService(openAIProvider: { .gpt }).accountBalances(for: [.cursor, .grokBot])
+        #expect(rows.count == 1 && rows.first?.providers == [.cursor, .grokBot])
+        #expect(rows.first?.providerTitle(language: .english) == "Cursor / Grok Bot")
+        #expect(BalanceURLProtocol.requests.count == 1)
+    }
+
     #if DEBUG
     @Test(arguments: [Set<AIProvider>(), [.codex]])
     func explicitFixtureOverridesSelectionAndNeverReadsAccounts(providers: Set<AIProvider>) async throws {
@@ -229,10 +256,12 @@ struct AIAccountBalanceServiceTests {
     private func makeService(credentials: @escaping @Sendable (AIProvider, Date, AIAccountBalanceQoderRegion) throws -> AIAccountBalanceCredential? = { _, _, _ in
         AIAccountBalanceCredential(token: "fixture-secret", accountID: "fixture-account")
     }, debug: @escaping @Sendable () -> [AIAccountBalance]? = { nil },
-        muse: @escaping @Sendable () async throws -> Data? = { nil }) -> AIAccountBalanceService {
+        muse: @escaping @Sendable () async throws -> Data? = { nil },
+        openAIProvider: @escaping @Sendable () -> AIProvider? = { nil }) -> AIAccountBalanceService {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BalanceURLProtocol.self]
-        return .init(credentials: credentials, configuration: configuration, now: { now }, museUsage: muse, debugBalances: debug)
+        return .init(credentials: credentials, configuration: configuration, now: { now }, museUsage: muse,
+            debugBalances: debug, preferredOpenAIProvider: openAIProvider)
     }
 }
 

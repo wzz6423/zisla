@@ -242,15 +242,17 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
 struct AIMascotView: View {
     var identity: AIMascotIdentity
     var size: CGFloat
-    @ObservedObject private var imageCache = AIMascotImageCache.shared
+    @ObservedObject private var imageCache: AIMascotImageCache
     @Environment(\.colorScheme) private var colorScheme
 
     init(
         identity: AIMascotIdentity,
-        size: CGFloat
+        size: CGFloat,
+        imageCache: AIMascotImageCache = .shared
     ) {
         self.identity = identity
         self.size = size
+        self.imageCache = imageCache
     }
 
     var body: some View {

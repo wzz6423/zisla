@@ -152,6 +152,21 @@ public enum AIMascotLibrary {
         )
     }
 
+    /// The ChatGPT-branded desktop app can retain the Codex bundle ID, so its declared name decides the brand.
+    public static func installedOpenAIApplication(
+        resolveBundleIdentifier: (String) -> URL? = { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) },
+        applicationDirectories: [URL] = FileManager.default.urls(for: .applicationDirectory, in: .allDomainsMask),
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> (provider: AIProvider, url: URL)? {
+        guard let url = installedApplicationURL(bundleIdentifiers: ["com.openai.codex", "com.openai.chat"],
+            applicationNames: ["ChatGPT", "Codex"], resolveBundleIdentifier: resolveBundleIdentifier,
+            applicationDirectories: applicationDirectories, fileExists: fileExists) else { return nil }
+        let name = InstalledApplicationCatalog.installedApplication(at: url)?.displayName
+            ?? url.deletingPathExtension().lastPathComponent
+        guard let provider = AIProvider(token: name), provider == .codex || provider == .gpt else { return nil }
+        return (provider, url)
+    }
+
     public static func installedDesktopAgentApplicationURL(
         for provider: AIProvider,
         resolveBundleIdentifier: (String) -> URL? = { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) },

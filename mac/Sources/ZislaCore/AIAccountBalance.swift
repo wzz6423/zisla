@@ -199,7 +199,8 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
     }
 
     public func providerTitle(language: AppLanguage) -> String {
-        providers.map { $0 == .gpt ? "ChatGPT" : AIAccountBalanceCatalog.providerName($0) }.joined(separator: " / ")
+        let brands = providers.allSatisfy { $0 == .codex || $0 == .gpt } ? Array(providers.prefix(1)) : providers
+        return brands.map { $0 == .gpt ? "ChatGPT" : AIAccountBalanceCatalog.providerName($0) }.joined(separator: " / ")
     }
 
     /// Reserves the first of at most two lines for a canonical 5h or rolling window.

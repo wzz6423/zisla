@@ -3,7 +3,8 @@ import Testing
 @testable import ZislaCore
 
 struct AIAccountBalanceTests {
-    @Test(arguments: [([AIProvider.codex], "Codex"), ([.gpt], "ChatGPT"), ([.codex, .gpt], "Codex / ChatGPT")], AppLanguage.allCases)
+    @Test(arguments: [([AIProvider.codex], "Codex"), ([.gpt], "ChatGPT"),
+        ([.codex, .gpt], "Codex"), ([.gpt, .codex], "ChatGPT")], AppLanguage.allCases)
     func sharedAccountKeepsSelectedProviderBrandsAndTwoRealDurationReadings(selection: ([AIProvider], String), language: AppLanguage) {
         let (providers, title) = selection
         let reading = AIAccountBalance(id: "shared", providers: providers, status: .available,

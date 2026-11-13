@@ -11,6 +11,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
     private let now: @Sendable () -> Date
     private let museUsage: @Sendable () async throws -> Data?
     private let debugBalances: @Sendable () -> [AIAccountBalance]?
+    private let preferredOpenAIProvider: @Sendable () -> AIProvider?
 
     /// Uses read-only login sources and a bounded Muse usage command with automatic updates disabled.
     /// An explicit debug fixture isolates all account reads, including when the fixture is malformed.
@@ -41,11 +42,13 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
     init(credentials: @escaping @Sendable (AIProvider, Date, AIAccountBalanceQoderRegion) throws -> AIAccountBalanceCredential?,
          configuration: URLSessionConfiguration = .ephemeral, now: @escaping @Sendable () -> Date = Date.init,
          museUsage: @escaping @Sendable () async throws -> Data? = { nil },
-         debugBalances: @escaping @Sendable () -> [AIAccountBalance]? = { nil }) {
+         debugBalances: @escaping @Sendable () -> [AIAccountBalance]? = { nil },
+         preferredOpenAIProvider: @escaping @Sendable () -> AIProvider? = { AIMascotLibrary.installedOpenAIApplication()?.provider }) {
         self.credentials = credentials
         self.now = now
         self.museUsage = museUsage
         self.debugBalances = debugBalances
+        self.preferredOpenAIProvider = preferredOpenAIProvider
         configuration.httpShouldSetCookies = false
         configuration.httpCookieStorage = nil
         configuration.urlCache = nil
@@ -89,6 +92,9 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
     private func refresh(_ group: [AIProvider], selected: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion) async throws -> AIAccountBalance {
         let provider = group[0]
         var row = AIAccountBalanceCatalog.placeholder(for: group.filter { selected.contains($0) })
+        if provider == .codex, row.providers.count > 1, preferredOpenAIProvider() == .gpt {
+            row.providers = [.gpt, .codex]
+        }
         guard row.status == .notSignedIn || row.status == .additionalCredentialsRequired else { return row }
         let time = now()
         do {
