@@ -77,14 +77,14 @@ export const it = createCatalog({
       dashboard: {
         name: 'Home',
         caption:
-          'Le schede dinamiche compaiono solo durante una sessione di concentrazione, un’attività IA o un download; quando non succede nulla non occupano spazio.',
+          'Le schede dinamiche compaiono solo durante una sessione di concentrazione, un’attività IA o un download; quando non succede nulla non occupano spazio. La pagina iniziale raggruppa per applicazione le attività IA in corso.',
         points: ['Appare quando serve', 'Progresso in tempo reale', 'Layout adattivo'],
       },
       shelf: {
         name: 'Scaffale',
         caption:
-          'Trascina file, audio, video o link sulla fascia superiore per conservarli nello scaffale, mostrarli nel Finder o aprire il menu Condividi di macOS.',
-        points: ['Trascina in alto per riporre', 'Mostra nel Finder', 'Menu Condividi di sistema'],
+          'Trascina file, audio, video o link nella parte alta dello schermo, poi cerca, filtra e seleziona più elementi per copiarli, condividerli o inviarli alle Note rapide. Converti immagini in PDF, invia il testo riconosciuto alle Note rapide o apri i video nello studio di registrazione per modificarli. Puoi anche mostrare i file nel Finder.',
+        points: ['Ricerca e azioni in gruppo', 'Immagini in PDF e Note rapide', 'Modifica video nello studio'],
       },
       clipboard: {
         name: 'Appunti',
@@ -95,8 +95,8 @@ export const it = createCatalog({
       aiMonitor: {
         name: 'Monitor IA',
         caption:
-          'Rileva automaticamente l’attività di CLI, app desktop e IDE supportati, mostrando attività, stato, tendenze dei token e una mappa dei contributi. Analizza solo eventi strutturati e non legge le conversazioni. Sono aggiunti il rilevamento delle attività Cursor e l’utilizzo giornaliero numerico, senza mostrare quote residue di Cursor e Muse Code; le lunghe esecuzioni degli strumenti di Cursor restano visibili.',
-        points: ['Attività aggregate tra gli strumenti', 'Tendenze del consumo di token', 'Non legge prompt o risposte'],
+          'Raccoglie attività e stato di CLI IA, app desktop e IDE. I dati numerici affidabili alimentano le tendenze dei token e la mappa dei contributi; scegli una data per vedere token di input, output e totali per fornitore e modello. Nelle impostazioni puoi consultare lo storico, esportarlo interamente in .xlsx o cancellarlo. Mostra quote reali, orari di ripristino e avvisi di quota bassa, incluse finestre 5h/7d e budget Cursor in dollari quando disponibili. Non legge il testo di prompt o risposte.',
+        points: ['Attività di più strumenti IA', 'Storico dei modelli ed export .xlsx', 'Quote e orari di ripristino'],
       },
       keyboardSound: {
         name: 'Suoni della tastiera',
@@ -113,13 +113,13 @@ export const it = createCatalog({
       agenda: {
         name: 'Agenda e meteo',
         caption:
-          'Mostra il meteo della posizione attuale e di fino a sei luoghi scelti. Visualizza, aggiungi ed elimina eventi e promemoria, quindi segna i promemoria come completati.',
-        points: ['Schede meteo per più luoghi', 'Calendario e attività', 'Completa un promemoria con un tocco'],
+          'Mostra il meteo della posizione attuale e di un massimo di sei luoghi scelti. Consulta, aggiungi o elimina eventi e promemoria e segna questi ultimi come completati. Gli eventi con un link di riunione mostrano un conto alla rovescia 10 minuti prima dell’inizio e permettono di partecipare con un clic. Crea una nota di riunione o collega e scollega note contestuali esistenti.',
+        points: ['Meteo e calendario', 'Conto alla rovescia di 10 minuti', 'Partecipa e collega le note'],
       },
       mail: {
         name: 'Mail',
         caption:
-          'Legge gli account attivati in Mail, mostra la posta in arrivo e consente di segnare, rispondere, comporre e spostare i messaggi nel Cestino dall’isola, con indicazioni chiare quando manca un permesso. Seleziona file durante la composizione per allegarli al messaggio.',
+          'Legge gli account attivati in Mail. Controlla la posta in arrivo, segna un messaggio o tutti i messaggi in arrivo come letti, rispondi, scrivi e sposta messaggi nel Cestino dall’isola. Scegli gli allegati durante la composizione; le autorizzazioni mancanti sono spiegate chiaramente.',
         points: ['Account Mail', 'Rispondi e componi nell’isola', 'Permessi trasparenti'],
       },
       quickNotes: {
@@ -136,13 +136,13 @@ export const it = createCatalog({
       toolbox: {
         name: 'Utility',
         caption:
-          'Timer di concentrazione, schermo sempre attivo, pulizia dello schermo e della tastiera (blocca anche F1-F12), teleprompter, specchio e Cestino in un’unica pagina.',
+          'Timer di concentrazione, schermo sempre attivo, pulizia dello schermo e della tastiera con blocco anche di F1-F12, teleprompter, specchio e Cestino su una pagina. Metti in pausa, riprendi o reimposta il Pomodoro e segui i progressi nelle viste compatte orizzontale e verticale.',
         points: ['Timer di concentrazione', 'Blocca F1-F12 durante la pulizia', 'Teleprompter e specchio'],
       },
       system: {
         name: 'Stato del sistema',
         caption:
-          'Controlla CPU, GPU, memoria, disco, rete, ventole e temperatura NVMe SMART disponibile. Visualizza lo storico al minuto per qualsiasi periodo o esporta .xlsx; rimane finché non lo cancelli. Consulta carica, salute, cicli, temperatura e capacità della batteria del Mac e i livelli dei dispositivi vicini, con IPv4 e IPv6 pubblici separati. Controlla cache, log, preferenze residue e cartelle di lavoro IA senza sessioni conservate prima di spostarle nel Cestino. La pulizia opzionale interviene ogni 7, 15 o 30 giorni per elementi attendibili o tutti quelli gestibili, compresi quelli da verificare; inizialmente è disattivata.',
+          'Monitora CPU, GPU, memoria, disco, rete, ventole e temperatura NVMe SMART disponibile. Consulta lo storico al minuto per un intervallo di date, esportalo in .xlsx o cancellalo nelle impostazioni. Controlla salute, cicli, temperatura e capacità della batteria, carica dei dispositivi vicini e IPv4/IPv6 pubblici. Scegli modalità energetiche automatiche con alimentatore o batteria, con risparmio energetico opzionale al 20% o meno. Carica subito al 100% quando macOS lo consente. Esamina cache, registri, preferenze residue e spazi IA orfani prima di spostarli nel Cestino; la pulizia opzionale può avvenire ogni 7, 15 o 30 giorni. La pulizia pianificata è disattivata per impostazione predefinita; scegli solo elementi affidabili o tutti quelli gestibili, inclusi quelli da verificare.',
         points: ['Monitoraggio a livello di chip', 'Grafici dello storico ed export .xlsx', 'Controlla prima di spostare nel Cestino'],
       },
     },
@@ -151,7 +151,7 @@ export const it = createCatalog({
     eyebrow: 'DENTRO E FUORI DALL’ISOLA',
     title: 'Lontano dall’isola, <span>resta uno strumento desktop.</span>',
     lede:
-      'Schermate, voce, media, download del browser e gestione IA compaiono dove sono più facili da raggiungere.',
+      'Schermate, strumenti per immagini e audio, dettatura, media, download del browser e gestione IA compaiono dove sono facili da raggiungere.',
     ariaLabel: 'Capacità desktop indipendenti',
     summaryMono: 'OLTRE L’ISOLA',
     summaryLede: 'Funzioni frequenti, ognuna nel suo posto naturale.',
@@ -160,12 +160,12 @@ export const it = createCatalog({
     features: {
       floatingIsland: {
         title: 'Un’isola fluttuante che si adatta',
-        description: 'Usa la posizione della fotocamera o scegli un punto sul bordo dello schermo. La posizione personalizzata viene ricordata tra le modalità. I layout compatti orizzontali e verticali adattano la lunghezza a icone, attività IA, download e contenuti multimediali, con un’opzione per mostrare più informazioni.',
+        description: 'Usa la posizione della fotocamera o scegli un punto sul bordo dello schermo. La posizione personalizzata viene ricordata tra le modalità. I layout compatti orizzontali e verticali adattano la lunghezza a icone, attività IA, download e contenuti multimediali, con un’opzione per mostrare più informazioni. Riordina i moduli trascinandoli in Impostazioni → Info o ripristina l’ordine predefinito.',
         detail: 'Posizione personalizzata · Icone persistenti · Informazioni adattive',
       },
       dailyBriefing: {
         title: 'La tua giornata in un resoconto',
-        description: 'Scegli tra otto modelli e seleziona dati di utilizzo, digitazione, sistema e attività zisla. Controlla l’anteprima ed esporta un PNG manualmente o ogni giorno all’ora scelta. La cronologia Tempo di utilizzo è inclusa se attiva e disponibile; i dati mancanti non sono mostrati come uno zero misurato. Scegli una cartella di esportazione indipendente in Impostazioni → Posizione di salvataggio.',
+        description: 'Scegli tra otto modelli e seleziona dati di utilizzo, digitazione, sistema e attività zisla. Controlla l’anteprima ed esporta un PNG manualmente o ogni giorno all’ora scelta. La cronologia Tempo di utilizzo è inclusa se attiva e disponibile; i dati mancanti non sono mostrati come uno zero misurato. Scegli una cartella di esportazione indipendente in Impostazioni → Posizione di salvataggio. Puoi includere anche le quote reali degli account e l’ora del rilevamento.',
         detail: '8 modelli · Contenuti a scelta · Anteprima ed esportazione PNG programmata',
       },
       userCare: {
@@ -188,6 +188,16 @@ export const it = createCatalog({
         description: 'Controlla lo stato in Impostazioni → Permessi, avvia richieste supportate o apri la pagina di sistema corretta. Il benvenuto iniziale usa lo stesso elenco e indica i permessi da configurare manualmente.',
         detail: 'Stato dei permessi · Richieste e collegamenti · Condiviso con il benvenuto',
       },
+      imageTools: {
+        title: 'Strumenti immagine',
+        description: 'Nove strumenti locali nelle impostazioni: compressione; conversione PNG, JPEG, WebP, AVIF e JPEG XL; ridimensionamento e ritaglio; confronto del formato più piccolo; rotazione e specchio; filigrane; mosaico e sfocatura; riconoscimento di testo e tabelle; rimozione dello sfondo. Esporta in gruppo o in ZIP, con una cartella dedicata in Impostazioni → Posizione di salvataggio.',
+        detail: '9 strumenti locali · Cinque formati · Export in gruppo e ZIP',
+      },
+      audioTools: {
+        title: 'Strumenti audio',
+        description: 'Ventisette operazioni locali nelle impostazioni: conversione, compressione, taglio, divisione, unione e mixaggio, estrazione audio dai video, normalizzazione LUFS, dissolvenze, velocità e tono, riduzione del rumore e rimozione dei silenzi, EQ, dinamica, canali e tag. Richiede FFmpeg e ffprobe; scegli un file o una cartella per l’esportazione.',
+        detail: '27 operazioni locali · Modifica e mixaggio · FFmpeg e ffprobe',
+      },
       pdf: {
         title: 'Strumenti PDF',
         description: 'Disponibile nelle Impostazioni, fuori dal carosello dei moduli dell’isola. Quattordici operazioni sul Mac: unisci, dividi, ruota, ritaglia, converti immagini e file Office, renderizza immagini, estrai testo, aggiungi filigrane e numeri di pagina, cifra, rimuovi password e modifica metadati.',
@@ -203,7 +213,7 @@ export const it = createCatalog({
       capture: {
         title: 'Schermate, catture lunghe e fissaggio',
         description:
-          'Cattura, fissa o unisci schermate a scorrimento con scorciatoie personalizzabili. Evidenzia, estrai aree di immagine, arrotonda gli angoli e conserva le annotazioni all’esportazione. Riconosci e copia il testo, traducilo e copia il risultato oppure esporta tabelle riconosciute in .xlsx. Conserva le catture sullo scaffale. Le impostazioni verificano i conflitti con voce e azioni rapide. La finestra si apre nella cartella delle schermate definita in Impostazioni → Posizione di salvataggio. Le schermate fissate restano al loro posto nelle catture successive.',
+          'Cattura, fissa o unisci schermate a scorrimento con scorciatoie personalizzabili. Evidenzia, estrai aree di immagine, arrotonda gli angoli e conserva le annotazioni all’esportazione. Riconosci e copia il testo, traducilo e copia il risultato oppure esporta tabelle riconosciute in .xlsx. Conserva le catture sullo scaffale. Le impostazioni verificano i conflitti con voce e azioni rapide. La finestra si apre nella cartella delle schermate definita in Impostazioni → Posizione di salvataggio. Le schermate fissate restano al loro posto nelle catture successive. Le acquisizioni lunghe supportano lo scorrimento automatico lento e i dispositivi compatibili possono acquisire in HDR.',
         detail: 'Evidenziazione ed estrazione · Riconosci, traduci e copia · Angoli arrotondati e .xlsx',
       },
       voice: {
@@ -227,7 +237,7 @@ export const it = createCatalog({
       copyAssistant: {
         title: 'Azioni rapide e passi successivi',
         description:
-          'Quando è attivo, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Apri la cartella del file con le azioni rapide dopo un download del browser o un trasferimento AirDrop. Supporta le cartelle predefinite e scelte in Chrome, con un interruttore indipendente dall’avanzamento dei download. Gli IP hanno azioni separate per la ricerca e l’apertura dei link. Le conversioni riconoscono le unità monetarie minori e il catalogo include Emoji 18.0. Testo e immagini salvati usano la cartella indipendente delle azioni rapide in Impostazioni → Posizione di salvataggio.',
+          'Quando è attivo, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Apri la cartella del file con le azioni rapide dopo un download del browser o un trasferimento AirDrop. Supporta le cartelle predefinite e scelte in Chrome, con un interruttore indipendente dall’avanzamento dei download. Gli IP hanno azioni separate per la ricerca e l’apertura dei link. Le conversioni riconoscono le unità monetarie minori e il catalogo include Emoji 18.0. Testo e immagini salvati usano la cartella indipendente delle azioni rapide in Impostazioni → Posizione di salvataggio. Se un’app non si apre, le Azioni rapide verificano integrità, firma e criteri di sicurezza di macOS. Superati i controlli, possono rimuovere gli attributi di quarantena e aprirla.',
         detail: 'Attivazione opzionale · Riconoscimento locale · Command+N predefinito',
       },
       aiManagement: {
@@ -259,13 +269,14 @@ export const it = createCatalog({
     eyebrow: 'IA SENZA SCATOLA NERA',
     title: 'Guarda lo stato IA <span>senza leggere la conversazione.</span>',
     lede:
-      'Attività, stato e tendenze dei token restano sul Mac. Questa pagina descrive la funzione senza simulare un’attività in esecuzione.',
+      'Segui le attività per applicazione, l’uso dei modelli per data e le quote reali degli account. Stati e dati numerici restano sul Mac; il testo delle conversazioni non viene letto.',
     summaryMono: 'STATO LOCALE / CONFINI CHIARI',
     summaryLede: 'Collega gli strumenti IA che usi, mantenendo i confini di contesto necessari al lavoro.',
     summaryNote: 'Qui spieghiamo solo ambito di rilevamento, dati e connessione; nessuna sessione dal vivo viene simulata.',
     toolsHeading: 'Strumenti IA supportati',
     toolsLede: 'Rileva attività da CLI, app desktop e IDE supportati e aggrega lo stato delle attività.',
     toolsAriaLabel: 'Strumenti IA supportati',
+    usageNote: 'Rilevamento delle sessioni, storico dei token e quote usano fonti diverse. Delta utilizza il suo registro numerico locale; Orca deduplica l’uso del CLI associato e lo attribuisce al fornitore originale. WorkBuddy AI può rilevare sessioni e consultare crediti; occupazione del contesto e crediti non sono convertiti in token o costi in dollari. Le quote disponibili dipendono dal fornitore e dal metodo di accesso.',
     boundariesHeading: 'Viene registrato solo lo stato',
     privacyPoints: [
       'Analizza solo tipo di evento, stato, ora, modello e ID sessione degli eventi strutturati',

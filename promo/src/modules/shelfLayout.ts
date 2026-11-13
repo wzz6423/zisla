@@ -1,7 +1,7 @@
 export const SHELF_LAYOUT = {
   shareWidth: 84,
   columnGap: 6,
-  gridTop: 121,
+  gridTop: 91,
   itemWidth: 66,
   itemHeight: 84,
   pitchX: 74,

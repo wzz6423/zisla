@@ -4,6 +4,7 @@ import {AudioLines, CircleArrowDown, Sparkles, Timer} from 'lucide-react';
 import {ProgressTrack} from '../components/Glass';
 import {AlbumArt, BrowserGlyph, ProviderLogo, formatTime} from '../components/IslandChrome';
 import {aiTasks, brands, download, focus, track} from '../content';
+import type {AiTask} from '../content';
 import {clamp01, color} from '../theme';
 
 export type HomeCardKind = 'focus' | 'ai' | 'media' | 'download';
@@ -12,8 +13,9 @@ type HomeModuleProps = {
   cards: readonly HomeCardKind[];
   downloadProgress?: number;
   aiProgress?: number;
-  // 番茄钟剩余秒数
+  // Keep the countdown in film time across scene boundaries.
   focusRemaining?: number;
+  tasks?: readonly AiTask[];
 };
 
 const FOCUS_LENGTH = 25 * 60;
@@ -44,12 +46,13 @@ const Card = ({kind, children}: {kind: HomeCardKind; children: ReactNode}) => {
   );
 };
 
-export const HomeModule = ({cards, downloadProgress = 0, aiProgress = 0, focusRemaining = focus.remaining}: HomeModuleProps) => {
-  const task = aiTasks[0];
+export const HomeModule = ({cards, downloadProgress = 0, aiProgress = 0, focusRemaining = focus.remaining, tasks = aiTasks.slice(0, 1)}: HomeModuleProps) => {
+  const groups = [...new Set(tasks.map((task) => task.provider))].map((provider) => ({provider, tasks: tasks.filter((task) => task.provider === provider)}));
+  const entries = cards.flatMap<{kind: HomeCardKind; group: typeof groups[number] | undefined}>((kind) => kind === 'ai' ? groups.map((group) => ({kind, group})) : [{kind, group: undefined}]);
   return (
     <div className="absolute inset-0 flex flex-wrap content-start gap-2 px-[9px] py-[7px]">
-      {cards.map((kind) => (
-        <div key={kind} className="h-16 shrink-0" style={{width: cards.length === 1 ? 734 : 363}}>
+      {entries.map(({kind, group}) => (
+        <div key={group?.provider ?? kind} className="h-16 shrink-0" style={{width: entries.length === 1 ? 734 : 363}}>
           <Card kind={kind}>
             {kind === 'focus' ? (
               <div className="flex items-center gap-[9px]">
@@ -60,15 +63,16 @@ export const HomeModule = ({cards, downloadProgress = 0, aiProgress = 0, focusRe
                 </div>
               </div>
             ) : null}
-            {kind === 'ai' && task ? (
-              <div className="flex w-full items-center gap-2">
-                <ProviderLogo provider={task.provider} size={24} />
+            {group ? (
+              <div className="flex w-full items-center gap-2" data-feature="ai.applicationSummary" data-provider={group.provider} data-task-count={group.tasks.length}>
+                <ProviderLogo provider={group.provider} size={24} />
                 <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
-                  <div className="truncate text-[10px] leading-[12px] font-semibold">{task.title}</div>
-                  <div className="flex items-center gap-2">
-                    <ProgressTrack value={aiProgress} tint={brands[task.provider].color} width={270} height={3} />
+                  <div className="truncate text-[10px] leading-[12px] font-semibold">{group.tasks.length > 1 ? brands[group.provider].name : group.tasks[0]!.title}</div>
+                  <div className="text-[9px] font-medium text-label-2">{group.tasks.length} running</div>
+                  {group.tasks.length === 1 ? <div className="flex items-center gap-2">
+                    <ProgressTrack value={aiProgress} tint={brands[group.provider].color} width={270} height={3} />
                     <Percent value={aiProgress} />
-                  </div>
+                  </div> : null}
                 </div>
               </div>
             ) : null}

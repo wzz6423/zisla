@@ -4,13 +4,15 @@ import {GlassPanel} from '../../components/Glass';
 import {Cursor, ClickRipple} from '../../components/Cursor';
 import {Caption, Headline} from '../../components/Caption';
 import {MenuBar, Notch, Wallpaper} from '../../components/Desktop';
+import {Island} from '../../components/Island';
+import {IslandBody, StatusHeader, TABS} from '../../components/IslandChrome';
 import {FilmMotion, linear, springAt} from '../../motion';
-import {clamp01, color, white} from '../../theme';
+import {clamp01, color, islandHeightFor, white} from '../../theme';
 
 export type TourStep = {id: string; title: string; caption: string; from: number; duration: number; features: readonly string[]};
 
 export const tourAt = <T extends TourStep>(steps: readonly T[], frame: number, duration: number, nominalDuration: number) => {
-  const position = Math.min(nominalDuration - 1, Math.max(0, frame * nominalDuration / duration));
+  const position = Math.min(nominalDuration - 1, Math.max(0, frame * (nominalDuration - 1) / (duration - 1)));
   const step = steps.find((candidate) => position >= candidate.from && position < candidate.from + candidate.duration)!;
   return {step, frame: position - step.from};
 };
@@ -24,6 +26,19 @@ export const TourSurface = ({title, caption, frame, fps, children}: {title: stri
     <GlassPanel radius={22} opacity={clamp01(springAt(frame, fps, 0, FilmMotion.pop, 22))} style={{left: 120, top: 174, width: 1040, height: 446}}>
       {children}
     </GlassPanel>
+    <Caption text={caption} size={17} bottom={35} />
+  </>
+);
+
+export const NativeModuleSurface = ({title, caption, module, height, children}: {title: string; caption: string; module: keyof typeof TABS; height: number; children: ReactNode}) => (
+  <>
+    <Wallpaper dim={0.22} />
+    <MenuBar />
+    <Island reveal={1} height={islandHeightFor(height)}>
+      <IslandBody header={<StatusHeader />} active={TABS[module]}>{children}</IslandBody>
+    </Island>
+    <Notch />
+    <Headline lines={[title]} top={Math.max(400, islandHeightFor(height) + 40)} size={34} />
     <Caption text={caption} size={17} bottom={35} />
   </>
 );

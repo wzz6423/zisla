@@ -1,5 +1,5 @@
-// 片中所有样例数据都是虚构的：任务、文件、歌曲、歌词、城市、日程、笔记均为原创，
-// 不使用本机真实数据，也不使用受版权保护的真实歌词。
+// Demo tasks, files, songs, lyrics, cities, events and notes are fictional.
+// They contain no local user data or lyrics from existing works.
 import {color} from './theme';
 
 export const clock = {date: 'Wed Nov 11', time: '9:41 AM', uptime: 'Uptime: 6 d 4 h 12 min'};
@@ -67,7 +67,7 @@ export const tokenTrend = {
 export const tokenAbbreviation = (tokens: number): string =>
   tokens >= 1_000_000 ? `${(tokens / 1_000_000).toFixed(1)}M` : `${Math.round(tokens / 1000)}k`;
 
-// 24 周 × 7 天的贡献热力图。用固定种子的线性同余生成，保证每次渲染完全一致。
+// A fixed seed keeps the 24-week heatmap identical across renders.
 const heatSeed = (week: number, day: number): number => {
   let value = (week * 7 + day) * 2654435761 + 1013904223;
   value = (value ^ (value >>> 13)) * 1274126177;
@@ -84,7 +84,7 @@ export const heatmap = {
     {week: 17, label: 'M10'},
     {week: 21, label: 'M11'},
   ],
-  // 0 = 无用量，1–4 = 四档绿色
+  // Zero means no usage; one through four select green intensity.
   level: (week: number, day: number): number => {
     const value = heatSeed(week, day);
     const weekend = day >= 5 ? 0.55 : 1;
@@ -96,7 +96,7 @@ export const heatmap = {
     return 4;
   },
   total: 86_400_000,
-  // 影片里光标停在最后一列的第 3 天
+  // The cursor selects the third day in the final column.
   selected: {week: 23, day: 2, label: 'Nov 11'},
 };
 
@@ -105,10 +105,10 @@ export const track = {
   artist: 'Mira Solen',
   album: 'Night Cartography',
   duration: 282,
-  // 片头时已经播到的秒数，之后各幕按全片时间往后走
+  // Later scenes advance from this offset using global film time.
   elapsed: 74,
   art: ['#ff9d6c', '#b8446a', '#1d2350'] as const,
-  // 原创歌词，非任何真实作品
+  // Original demo lyrics, independent of the soundtrack.
   lyrics: [
     'City lights are folding into paper',
     'We drift above the rooftops, weightless',
@@ -126,22 +126,23 @@ export const track = {
 };
 
 export const shelfCategories = [
-  {name: 'All', count: 8},
-  {name: 'Notes', count: 1},
-  {name: 'Screenshots', count: 1},
-  {name: 'Folder', count: 1},
-  {name: 'Image', count: 2},
-  {name: 'URL', count: 1},
-  {name: 'Video', count: 1},
-  {name: 'Audio', count: 0},
-  {name: 'Text', count: 1},
-  {name: 'Document', count: 1},
-  {name: 'Archive', count: 1},
-  {name: 'Code', count: 1},
-  {name: 'Other', count: 0},
+  {name: 'All'},
+  {name: 'Notes'},
+  {name: 'Screenshots'},
+  {name: 'Folder'},
+  {name: 'Image'},
+  {name: 'URL'},
+  {name: 'Video'},
+  {name: 'Audio'},
+  {name: 'Text'},
+  {name: 'Document'},
+  {name: 'Archive'},
+  {name: 'Code'},
+  {name: 'Other'},
 ] as const;
 
 export type ShelfKind =
+  | 'note'
   | 'image'
   | 'folder'
   | 'url'
@@ -195,7 +196,7 @@ export const notes = {
   ],
 } as const;
 
-// 代码类凑满六条：第四幕筛到 Code 时列表正好铺满一格
+// Six code entries fill the filtered clipboard viewport.
 export const clipboard = {
   items: [
     {kind: 'code', preview: 'let island = IslandLayout(module: .ai)'},
@@ -247,7 +248,7 @@ export const agenda = {
   ],
 };
 
-// remaining 是片头时番茄钟剩余的秒数，和歌曲进度一样按全片时间往下减
+// Remaining seconds decrease with global film time, like playback progress.
 export const focus = {phase: 'Focus', remaining: 18 * 60 + 44};
 
 export const monitors = [

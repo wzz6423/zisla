@@ -7,7 +7,7 @@ import {buildSync} from 'esbuild';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import * as Remotion from 'remotion';
-import {CROSSFADE, SCENES, TOTAL_FRAMES} from '../src/timeline.ts';
+import {FPS, CROSSFADE, SCENES, TOTAL_FRAMES} from '../src/timeline.ts';
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -43,39 +43,36 @@ const load = (entryPoint) => {
   };
 };
 
-test('model totals and account warnings match the visible fictional data', () => {
+test('model totals and quota warnings preserve their native units', () => {
   const ui = load('src/modules/AIAnalyticsModule.tsx');
-  const {AIAnalyticsModule, aiModelUsage, aiModelTokenTotal, aiGatewayBalances} = ui.exports;
+  const {AIAnalyticsModule, aiModelUsage, aiModelTokenTotal, aiBalancesAt} = ui.exports;
   assert.equal(aiModelTokenTotal, 601_000);
   assert.equal(aiModelTokenTotal, aiModelUsage.reduce((total, item) => total + item.inputTokens + item.outputTokens, 0));
-  const original = aiGatewayBalances[0].available;
-  try {
-    for (const [available, warnings] of [[original, 1], [aiGatewayBalances[0].minimumBalance, 1], [aiGatewayBalances[0].minimumBalance - 0.01, 2], [0, 2]]) {
-      aiGatewayBalances[0].available = available;
-      const html = ui.render(AIAnalyticsModule);
-      assert.equal((html.match(/Low balance · min/g) ?? []).length, warnings);
-      assert.equal((html.match(/Checked 09:41/g) ?? []).length, 3);
-      assert.equal((html.match(/Input /g) ?? []).length, 3);
-      assert.equal((html.match(/Output /g) ?? []).length, 3);
-    }
-  } finally {
-    aiGatewayBalances[0].available = original;
+  const normal = ui.render(AIAnalyticsModule, {balances: aiBalancesAt(false)});
+  const low = ui.render(AIAnalyticsModule, {balances: aiBalancesAt(true)});
+  assert.ok(normal.includes('72%') && low.includes('8%'));
+  for (const html of [normal, low]) {
+    assert.ok(html.includes('5h') && html.includes('7d'));
+    assert.ok(html.includes('$68.5'), 'Cursor budget is retained as USD');
   }
 });
 
-test('reading mail, completing a draft and sending follow the displayed state sequence', () => {
+test('mail sends once, then marks the inbox read without replaying the composer', () => {
   const ui = load('src/scenes/SceneMail.tsx');
-  const {SceneMail} = ui.exports;
-  assert.doesNotMatch(ui.render(SceneMail, {}, 60), /New Message/);
-  assert.match(ui.render(SceneMail, {}, 100), /10:30 review/);
-  assert.match(ui.render(SceneMail, {}, 225), /New Message/);
-  assert.match(ui.render(SceneMail, {}, 285), /mira\.solen@example\.com/);
-  assert.match(ui.render(SceneMail, {}, 458), /See you at 10:30\./);
-  assert.doesNotMatch(ui.render(SceneMail, {}, 458), /Message sent/);
-  assert.match(ui.render(SceneMail, {}, 480), /lucide-loader-circle/);
-  const sent = ui.render(SceneMail, {}, 530);
+  const {SceneMail, MAIL_TIMING: timing} = ui.exports;
+  assert.doesNotMatch(ui.render(SceneMail, {}, timing.read), /New Message/);
+  assert.match(ui.render(SceneMail, {}, timing.compose + 16), /New Message/);
+  assert.match(ui.render(SceneMail, {}, timing.subject), /mira\.solen@example\.com/);
+  assert.match(ui.render(SceneMail, {}, timing.send - 1), /See you at 10:30\./);
+  assert.match(ui.render(SceneMail, {}, timing.send + 5), /lucide-loader-circle/);
+  const sent = ui.render(SceneMail, {}, timing.sent + 18);
   assert.match(sent, /Message sent/);
   assert.doesNotMatch(sent, /New Message/);
+  for (const frame of [timing.allRead, 539, 580]) {
+    const done = ui.render(SceneMail, {}, frame);
+    assert.match(done, /All messages marked as read/);
+    assert.doesNotMatch(done, /New Message/);
+  }
 });
 
 test('image, audio and PDF previews show completed output only at the end', () => {
@@ -102,13 +99,16 @@ test('system previews stay deterministic and within their displayed units', () =
   }
 });
 
-test('the outro credits the music author, license and excerpt', () => {
+test('each version credits only its own music and continuous excerpt', () => {
   const ui = load('src/scenes/Scene5Outro.tsx');
-  const html = ui.render(ui.exports.Scene5Outro, {}, 300);
-  assert.match(html, /Music: Origami by Scott Buckley/);
-  assert.match(html, /CC BY 4\.0/);
-  assert.ok(html.includes('scottbuckley.com.au'));
-  assert.match(html, /186s edit/);
+  for (const [music, title, artist, site] of [['funk', 'Funkorama', 'Kevin MacLeod', 'incompetech.com'], ['cinematic', 'The Miracle of Flight', 'Scott Buckley', 'scottbuckley.com.au']]) {
+    const html = ui.render(ui.exports.Scene5Outro, {music}, 210);
+    assert.ok(html.includes(`Music: ${title} by ${artist}`));
+    assert.ok(html.includes(site));
+    assert.match(html, /CC BY 4\.0/);
+    assert.ok(html.includes(`${TOTAL_FRAMES / FPS}s continuous edit`));
+    assert.ok(!html.includes('Origami'));
+  }
 });
 
 test('the image, audio and PDF tour exposes every current native operation', () => {
@@ -122,7 +122,8 @@ test('the image, audio and PDF tour exposes every current native operation', () 
     const declaration = source.slice(source.indexOf(`enum ${name}`)).split('var id:')[0];
     const expected = [...declaration.matchAll(/^\s*case (.+)$/gm)].flatMap((match) => match[1].split(',').map((id) => id.trim()));
     assert.deepEqual(list.map(([id]) => id), expected, `${kind}: a native operation is missing or invented`);
-    const frames = kind === 'pdf' ? [120, 400] : [120, 300, 480];
+    const end = ui.exports.creativeToolSteps[kind].at(-1);
+    const frames = Array.from({length: Math.ceil((end.from + end.duration) / 10)}, (_, i) => i * 10);
     const shown = frames.map((frame) => ui.render(ui.exports.CreativeToolsModule, {kind, frame})).join('');
     for (const [id, label] of list) {
       assert.ok(shown.includes(`data-operation="${id}"`), `${kind}: ${id} never appears in the video`);
@@ -131,22 +132,18 @@ test('the image, audio and PDF tour exposes every current native operation', () 
   }
 });
 
-test('creative tool output is withheld until the current operation completes', () => {
+test('creative tool output is withheld until the selected operation completes', () => {
   const ui = load('src/modules/CreativeToolsModule.tsx');
-  for (const [kind, completed] of [
-    ['image', 'Cover.webp'], ['audio', 'Interview-trimmed.wav'], ['pdf', 'Launch brief.pdf'],
-  ]) {
-    const pending = ui.render(ui.exports.CreativeToolsModule, {kind, frame: 0});
-    assert.match(pending, /Processing…/);
-    assert.ok(!pending.includes(completed), `${kind}: output appeared before processing`);
-    const done = ui.render(ui.exports.CreativeToolsModule, {kind, frame: 120});
-    assert.ok(done.includes(completed), `${kind}: completed output is absent`);
-    assert.doesNotMatch(done, /Processing…/);
+  for (const kind of ['image', 'audio', 'pdf']) {
+    for (const step of ui.exports.creativeToolSteps[kind]) {
+      const pending = ui.render(ui.exports.CreativeToolsModule, {kind, frame: step.from + step.actionAt});
+      assert.match(pending, /Processing…/);
+      assert.ok(!pending.includes(`data-creative-output`));
+      const done = ui.render(ui.exports.CreativeToolsModule, {kind, frame: step.from + step.completeAt});
+      assert.ok(done.includes(step.output));
+      assert.doesNotMatch(done, /Processing…/);
+    }
   }
-  const next = ui.render(ui.exports.CreativeToolsModule, {kind: 'audio', frame: 181});
-  assert.match(next, /Normalize loudness/);
-  assert.match(next, /Processing…/);
-  assert.doesNotMatch(next, /Interview-trimmed.wav/);
 });
 
 test('the actual film entries render every native module and advertised feature', () => {
@@ -173,14 +170,15 @@ test('the actual film entries render every native module and advertised feature'
   assert.deepEqual(Object.keys(moduleCoverage).sort(), [...nativeOrder.matchAll(/\.(\w+)/g)].map((match) => match[1]).sort());
   const featureCoverage = {
     floatingIsland: ['layouts', 'island.camera'], pet: ['layouts', 'Pixel Chick (Imported)'],
-    dailyBriefing: ['everyday', 'Saved: Daily briefing'], userCare: ['everyday', 'resets the reminder timer'],
+    dailyBriefing: ['everyday', 'Saved: Daily briefing'], userCare: ['settings', 'resets the reminder timer'],
     contextNotes: ['everyday', 'Saved · Shown when you return'], windowPreviews: ['settings', 'Notes window activated'],
-    capture: ['creative', 'Long capture pinned'], recording: ['creative', 'Product walkthrough.mp4 exported'],
+    capture: ['creative', 'Pinned · Existing pins retained'], recording: ['creative', 'Exported · 12 seconds'],
     voice: ['everyday', 'Cleaned transcript inserted'], media: ['flow', 'Paper Lanterns'],
     browserDownloads: ['flow', 'Open Folder'], copyAssistant: ['settings', '€18.40 copied'],
     aiManagement: ['settings', 'Skills synced to enabled CLIs'], pdf: ['creative', 'Launch brief-protected.pdf'],
     permissions: ['settings', 'Microphone permission granted'], lockScreen: ['settings', 'Playback paused'],
     recommendedTools: ['settings', 'Quiet.md opened as a separate app'],
+    imageTools: ['creative', 'Subject.png'], audioTools: ['creative', 'Interview-normalize.wav'],
   };
   const website = readFileSync(new URL('../../web/src/content.ts', import.meta.url), 'utf8');
   const advertised = website.match(/crossModuleFeatureIds = \[([\s\S]*?)\]/)[1];
@@ -191,8 +189,8 @@ test('the actual film entries render every native module and advertised feature'
   for (const feature of ['island.notch', 'island.custom.top', 'island.custom.bottom', 'island.custom.left', 'island.custom.right', 'pet.left', 'pet.right']) {
     assert.ok(rendered.get('layouts').includes(feature), `${feature}: missing from the actual film`);
   }
-  for (const outcome of ['Subject.png', 'Interview-normalized.wav', 'Test-tone.wav']) assert.ok(rendered.get('creative').includes(outcome));
-  for (const outcome of ['Keyboard input resumed', 'Camera stopped', 'Review item kept', 'Low power mode applied', 'macOS background sounds']) assert.ok(rendered.get('desktop').includes(outcome));
+  for (const outcome of ['Subject.png', 'Interview-normalize.wav', 'Test-tone.wav']) assert.ok(rendered.get('creative').includes(outcome));
+  for (const outcome of ['Keyboard input resumed', 'Camera stopped', 'Review item kept', 'Low power mode applied', 'macOS background sounds', 'Charge to 100% requested']) assert.ok(rendered.get('desktop').includes(outcome));
 });
 
 test('native link downloading chooses source format and reaches a saved audio file', () => {
@@ -214,14 +212,16 @@ test('native link downloading chooses source format and reaches a saved audio fi
   for (const [id, label] of downloadPlatforms) assert.ok(completed.includes(`data-platform="${id}">${label}`));
 });
 
-test('the creative tour keeps its last operation result through the crossfade lead', () => {
+test('the creative tour keeps its final result when compressed and through the crossfade', () => {
   const ui = load('src/scenes/SceneCreativeTools.tsx');
+  const nominal = ui.exports.CREATIVE_TOUR_DURATION;
   assert.deepEqual(ui.exports.creativeTourAt(-1), ui.exports.creativeTourAt(0));
-  assert.deepEqual(ui.exports.creativeTourAt(1800), ui.exports.creativeTourAt(1800 * 2716 / 2700, 2716));
-  assert.equal(ui.exports.creativeTourAt(3000).frame, 539);
-  const last = ui.exports.creativeTourAt(2715, 2716);
-  assert.equal(last.group.id, 'pdf');
-  const html = ui.render(ui.exports.SceneCreativeTools, {duration: 2716}, 2715);
-  assert.match(html, /Launch brief-protected.pdf/);
-  assert.match(html, /data-feature="pdf" style="opacity:1"/);
+  for (const duration of [nominal, SCENES.creative.duration + CROSSFADE]) {
+    const last = ui.exports.creativeTourAt(duration - 1, duration);
+    assert.equal(last.group.id, 'pdf');
+    assert.ok(last.frame >= 298 && last.frame <= 299);
+    assert.equal(ui.exports.creativeTourAt(duration + 20, duration).group.id, last.group.id);
+    const html = ui.render(ui.exports.SceneCreativeTools, {duration}, duration - 1);
+    assert.match(html, /Launch brief-protected.pdf/);
+  }
 });

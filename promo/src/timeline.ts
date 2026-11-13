@@ -4,16 +4,16 @@ export const FPS = 60;
 export const CROSSFADE = 16;
 
 export const SCENES = {
-  awakening: {from: 0, duration: 480},
-  layouts: {from: 480, duration: 1200},
-  aiCenter: {from: 1680, duration: 720},
-  flow: {from: 2400, duration: 780},
-  mail: {from: 3180, duration: 600},
-  everyday: {from: 3780, duration: 1560},
-  creative: {from: 5340, duration: 2700},
-  desktop: {from: 8040, duration: 1500},
-  settings: {from: 9540, duration: 1200},
-  outro: {from: 10740, duration: 420},
+  awakening: {from: 0, duration: 300},
+  layouts: {from: 300, duration: 960},
+  aiCenter: {from: 1260, duration: 840},
+  flow: {from: 2100, duration: 900},
+  mail: {from: 3000, duration: 480},
+  everyday: {from: 3480, duration: 1440},
+  creative: {from: 4920, duration: 1920},
+  desktop: {from: 6840, duration: 1380},
+  settings: {from: 8220, duration: 1080},
+  outro: {from: 9300, duration: 300},
 } as const;
 
 export const TOTAL_FRAMES = SCENES.outro.from + SCENES.outro.duration;

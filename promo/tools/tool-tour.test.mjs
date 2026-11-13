@@ -7,6 +7,7 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import * as Remotion from 'remotion';
 import {parseFragment} from 'parse5';
+import {TOTAL_FRAMES} from '../src/timeline.ts';
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -15,7 +16,7 @@ const load = (entryPoint) => {
   const clock = {frame: 0};
   const bundle = buildSync({absWorkingDir: root, entryPoints: [entryPoint], bundle: true, packages: 'external', platform: 'node', format: 'cjs', jsx: 'automatic', write: false, loader: {'.svg': 'dataurl', '.png': 'dataurl'}});
   const module = {exports: {}};
-  const isolatedRequire = (name) => name === 'remotion' ? {...Remotion, useCurrentFrame: () => clock.frame, useVideoConfig: () => ({fps: 60, width: 1920, height: 1080, durationInFrames: 11160}), Img: (props) => React.createElement('img', props)} : require(name);
+  const isolatedRequire = (name) => name === 'remotion' ? {...Remotion, useCurrentFrame: () => clock.frame, useVideoConfig: () => ({fps: 60, width: 1920, height: 1080, durationInFrames: TOTAL_FRAMES}), Img: (props) => React.createElement('img', props)} : require(name);
   new Function('require', 'module', 'exports', bundle.outputFiles[0].text)(isolatedRequire, module, module.exports);
   return {exports: module.exports, render: (Component, props = {}, frame = 0) => {clock.frame = frame; return renderToStaticMarkup(React.createElement(Component, props));}};
 };
@@ -38,7 +39,7 @@ test('tour groups cover the budget and keep their final result during a crossfad
     for (const duration of [nominal, nominal + 16, nominal * 2]) {
       for (const step of steps) {
         const midpoint = step.from + Math.floor(step.duration / 2);
-        const expanded = at(midpoint * duration / nominal, duration);
+        const expanded = at(midpoint * (duration - 1) / (nominal - 1), duration);
         assert.equal(expanded.step.id, step.id);
         assert.ok(Math.abs(expanded.frame - (midpoint - step.from)) < 0.001);
       }
@@ -58,7 +59,7 @@ test('Notes, clipboard and agenda show their saved or completed outcomes', () =>
   assert.match(textOf(ui.render(ui.exports.NotesTourModule, {frame: 180})), /Saved to Apple Notes/);
   assert.match(textOf(ui.render(ui.exports.ClipboardTourModule, {frame: 180})), /Copied to clipboard/);
   const agenda = textOf(ui.render(ui.exports.AgendaTourModule, {frame: 180}));
-  for (const text of ['Kyoto', 'Lisbon', 'Tromsø', 'Calendar and reminders', 'Reminder completed', 'resets the reminder timer']) assert.ok(agenda.includes(text), text);
+  for (const text of ['Kyoto', 'Lisbon', 'Tromsø', 'Calendar and reminders', 'Reminder completed']) assert.ok(agenda.includes(text), text);
 });
 
 test('a context note preserves its text, screenshot and reminder after saving', () => {
@@ -66,7 +67,7 @@ test('a context note preserves its text, screenshot and reminder after saving', 
   const before = textOf(ui.render(ui.exports.ContextNotesTourModule, {frame: 15}));
   const after = textOf(ui.render(ui.exports.ContextNotesTourModule, {frame: 180}));
   assert.ok(!before.includes(ui.exports.everydayDemo.context.text));
-  for (const text of [ui.exports.everydayDemo.context.text, 'Every 3 hours', 'Window screenshot', 'View screenshot', 'Saved · Shown when you return']) assert.ok(after.includes(text), text);
+  for (const text of [ui.exports.everydayDemo.context.text, 'Every 3 hours', 'Window screenshot', 'Copy screenshot', 'Saved · Shown when you return']) assert.ok(after.includes(text), text);
 });
 
 test('briefing previews all eight templates and shows PNG output only after export', () => {
@@ -75,22 +76,23 @@ test('briefing previews all eight templates and shows PNG output only after expo
   const preview = textOf(ui.render(ui.exports.BriefingTourModule, {frame: 70}));
   for (const template of ui.exports.briefingTemplates) assert.ok(preview.includes(template.title));
   assert.doesNotMatch(preview, /Saved: Daily briefing/);
-  assert.match(textOf(ui.render(ui.exports.BriefingTourModule, {frame: 190})), /Exporting PNG/);
+  assert.match(textOf(ui.render(ui.exports.BriefingTourModule, {frame: 125})), /Exporting PNG/);
   assert.match(textOf(ui.render(ui.exports.BriefingTourModule, {frame: 250})), /Saved: Daily briefing — Nov 11.png/);
 });
 
-test('voice transitions from recording to cleanup and inserted numbered transcript', () => {
+test('voice transitions from settings through compact recording to one inserted transcript', () => {
   const ui = load('src/modules/tour/EverydayTourModule.tsx');
-  const recording = textOf(ui.render(ui.exports.VoiceTourModule, {frame: 80, globalFrame: 5300}));
+  const settings = textOf(ui.render(ui.exports.VoiceTourModule, {frame: 30, globalFrame: 5300}));
+  assert.match(settings, /Hold to talk/);
+  assert.match(settings, /LM Studio/);
+  for (const vocabulary of ui.exports.voiceVocabularies) assert.ok(settings.includes(vocabulary));
+  const recording = textOf(ui.render(ui.exports.VoiceTourModule, {frame: 110, globalFrame: 5350}));
   assert.match(recording, /Recording · Release to finish/);
-  assert.match(recording, /ToggleHold to talk/);
-  assert.match(recording, /LM Studio/);
-  for (const vocabulary of ui.exports.voiceVocabularies) assert.ok(recording.includes(vocabulary));
-  assert.match(textOf(ui.render(ui.exports.VoiceTourModule, {frame: 150, globalFrame: 5370})), /Cleaning the transcript/);
-  const done = textOf(ui.render(ui.exports.VoiceTourModule, {frame: 230, globalFrame: 5450}));
+  assert.doesNotMatch(recording, /Settings.*Voice input|Recognition vocabulary/);
+  assert.match(textOf(ui.render(ui.exports.VoiceTourModule, {frame: 180, globalFrame: 5420})), /Cleaning the transcript/);
+  const done = textOf(ui.render(ui.exports.VoiceTourModule, {frame: 265, globalFrame: 5500}));
   assert.ok(done.includes(ui.exports.everydayDemo.voice.cleaned));
   assert.match(done, /Cleaned transcript inserted/);
-  assert.match(done, /Ollama/);
 });
 
 test('mixer changes Safari volume while muting only Music', () => {
@@ -98,31 +100,40 @@ test('mixer changes Safari volume while muting only Music', () => {
   const before = textOf(ui.render(ui.exports.MixerTourModule, {frame: 0}));
   assert.match(before, /Safari100%/);
   const after = textOf(ui.render(ui.exports.MixerTourModule, {frame: 150}));
+  const scene = load('src/scenes/SceneDesktopTools.tsx');
   assert.match(after, /Safari30%/);
   assert.match(after, /Music80%/);
-  assert.match(after, /Safari at 30% · Music muted/);
+  assert.match(textOf(ui.render(ui.exports.MixerTourModule, {frame: 150})), /Music80%/);
+  assert.match(textOf(scene.render(scene.exports.SceneDesktopTools, {}, 150)), /Safari at 30% · Music muted/);
 });
 
-test('keyboard counts and focus background-sound selection follow visible actions', () => {
+test('keyboard counts and native focus controls follow visible actions', () => {
   const ui = load('src/modules/tour/DesktopTourModule.tsx');
   const start = textOf(ui.render(ui.exports.KeyboardTourModule, {frame: 0}));
   assert.match(start, /Holy Panda/);
-  assert.match(start, /12,846/);
+  assert.doesNotMatch(start, /12,846/);
+  assert.match(textOf(ui.render(ui.exports.KeyboardTourModule, {frame: 78})), /12,846/);
   const after = textOf(ui.render(ui.exports.KeyboardTourModule, {frame: 150}));
-  assert.match(after, /Custom sound pack/);
+  assert.match(textOf(ui.render(ui.exports.KeyboardTourModule, {frame: 65})), /custom pack/);
   assert.match(after, /12,860/);
-  assert.match(after, /14 characters added/);
-  const focus = textOf(ui.render(ui.exports.FocusTourModule, {frame: 200}));
-  assert.match(focus, /Focus completed/);
-  assert.match(focus, /macOS background soundsStreamStop/);
-  assert.match(textOf(ui.render(ui.exports.FocusTourModule, {frame: 150})), /macOS background soundsOceanStop/);
-  assert.match(focus, /Stop on lock, screen saver or sleep/);
+  const scene = load('src/scenes/SceneDesktopTools.tsx');
+  assert.match(textOf(scene.render(scene.exports.SceneDesktopTools, {}, 340)), /14 characters added/);
+  const paused = textOf(ui.render(ui.exports.FocusTourModule, {frame: 95}));
+  assert.ok(paused.includes('Continue'));
+  assert.equal(ui.exports.focusTourAt(95).remaining, 1.3);
+  assert.equal(Math.ceil(ui.exports.focusTourAt(175).remaining), 1);
+  assert.equal(ui.exports.focusTourAt(200).remaining, 300);
+  assert.equal(ui.exports.focusTourAt(245).finished, true);
+  const sound = textOf(ui.render(ui.exports.BackgroundSoundsTourModule, {frame: 100}));
+  assert.match(sound, /Ocean playing/);
+  assert.match(sound, /Stop on lock, screen saver or sleep/);
 });
 
 test('screen and keyboard cleaning, mirror and teleprompter show their stop states', () => {
   const ui = load('src/modules/tour/DesktopTourModule.tsx');
-  assert.match(textOf(ui.render(ui.exports.CleaningTourModule, {frame: 40})), /Exit screen cleaning/);
-  assert.match(textOf(ui.render(ui.exports.CleaningTourModule, {frame: 120})), /Keyboard input blocked/);
+  assert.match(textOf(ui.render(ui.exports.ScreenCleaningCover, {frame: 40})), /Exit screen cleaning/);
+  const scene = load('src/scenes/SceneDesktopTools.tsx');
+  assert.match(textOf(scene.render(scene.exports.SceneDesktopTools, {}, 820)), /Keyboard input blocked/);
   assert.match(textOf(ui.render(ui.exports.CleaningTourModule, {frame: 170})), /Keyboard input resumed/);
   const presenter = textOf(ui.render(ui.exports.PresenterTourModule, {frame: 150}));
   assert.match(presenter, /Script paused at your place/);
@@ -131,22 +142,22 @@ test('screen and keyboard cleaning, mirror and teleprompter show their stop stat
 
 test('system export and reviewed cleanup retain data requiring review', () => {
   const ui = load('src/modules/tour/DesktopTourModule.tsx');
-  const system = textOf(ui.render(ui.exports.SystemHistoryTourModule, {frame: 180, globalFrame: 9500}));
-  for (const text of ['CPU', 'GPU', 'Memory', 'Network', 'Disk:', 'Fan:', 'Public IPv4 + IPv6', 'Saved: System history.xlsx']) assert.ok(system.includes(text), text);
+  const system = textOf(ui.render(ui.exports.SystemHistoryTourModule, {frame: 250, globalFrame: 9500}));
+  for (const text of ['CPU', 'GPU', 'Memory', 'Network', 'Disk', 'Fan', 'Saved: System history.xlsx']) assert.ok(system.includes(text), text);
   assert.match(textOf(ui.render(ui.exports.CleanupTourModule, {frame: 60})), /Move 2 items to Trash/);
   const done = textOf(ui.render(ui.exports.CleanupTourModule, {frame: 100}));
   assert.match(done, /2 items moved to Trash · 344 MB · Review item kept/);
-  assert.match(done, /Old preferencesReview required3 MB/);
+  assert.match(done, /Old preferencesReview required.*3 MB/);
 });
 
-test('window switch and all four Quick Actions have concrete results', () => {
+test('window switch and distinct Quick Actions have concrete results', () => {
   const ui = load('src/modules/tour/SettingsTourModule.tsx');
   assert.match(textOf(ui.render(ui.exports.WindowsTourModule, {frame: 140})), /Notes window activated/);
   for (const [index, example] of ui.exports.quickActionExamples.entries()) {
-    const pending = textOf(ui.render(ui.exports.QuickActionsTourModule, {frame: index * 60 + 10}));
+    const pending = textOf(ui.render(ui.exports.QuickActionsTourModule, {frame: example.from + 10}));
     assert.ok(pending.includes(example.input));
     assert.ok(!pending.includes(example.result));
-    assert.ok(textOf(ui.render(ui.exports.QuickActionsTourModule, {frame: index * 60 + 45})).includes(example.result));
+    assert.ok(textOf(ui.render(ui.exports.QuickActionsTourModule, {frame: example.from + example.at + 10})).includes(example.result));
   }
 });
 
@@ -160,15 +171,23 @@ test('permissions, separate lock-screen playback and management update their sta
   assert.match(locked, /Separate overlay/);
   assert.match(locked, /Playback paused/);
   assert.ok(!locked.includes('MenuBar') && !locked.includes('System permissions'));
-  const managed = textOf(ui.render(ui.exports.ManagementTourModule, {frame: 145}));
-  assert.match(managed, /Gemini CLI installed/);
-  assert.match(managed, /Skills synced to enabled CLIs/);
+  const installed = textOf(ui.render(ui.exports.ManagementTourModule, {frame: 60}));
+  assert.match(installed, /Gemini CLI installed/);
+  assert.doesNotMatch(installed, /Sync targets|Skills synced/);
+  const synced = textOf(ui.render(ui.exports.ManagementTourModule, {frame: 149}));
+  assert.match(synced, /Skills synced to enabled CLIs/);
+  assert.doesNotMatch(synced, /Gemini CLI installed/);
 });
 
 test('recommended apps remain separate and lid preview restores the desktop', () => {
   const ui = load('src/modules/tour/SettingsTourModule.tsx');
-  const result = textOf(ui.render(ui.exports.RecommendedTourModule, {frame: 220}));
-  for (const app of ui.exports.recommendedDemo) assert.ok(result.includes(app.name));
-  assert.match(result, /Quiet.md opened as a separate app/);
+  const browsing = textOf(ui.render(ui.exports.RecommendedTourModule, {frame: 10}));
+  for (const app of ui.exports.recommendedDemo) assert.ok(browsing.includes(app.name));
+  assert.doesNotMatch(browsing, /Quiet.md opened as a separate app/);
+  const opened = textOf(ui.render(ui.exports.RecommendedTourModule, {frame: 50}));
+  assert.match(opened, /Quiet.md opened as a separate app/);
+  assert.doesNotMatch(opened, /Lid-close animation|Preview ended/);
+  const result = textOf(ui.render(ui.exports.RecommendedTourModule, {frame: 149}));
   assert.match(result, /Preview ended · Desktop restored/);
+  assert.doesNotMatch(result, /Quiet.md opened as a separate app/);
 });

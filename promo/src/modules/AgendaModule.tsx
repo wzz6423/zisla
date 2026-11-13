@@ -1,4 +1,4 @@
-import {Circle, CircleCheck, Cloud, Plus, RefreshCw, Snowflake, Sun, Trash2} from 'lucide-react';
+import {Circle, CircleCheck, Cloud, Plus, RefreshCw, Snowflake, StickyNote, Sun, Trash2, Video} from 'lucide-react';
 import {Hairline} from '../components/Glass';
 import {agenda, weather} from '../content';
 import {clamp01, color, white} from '../theme';
@@ -8,8 +8,8 @@ const WEATHER_TINTS = {cloud: color.secondary, sun: color.yellow, snow: color.cy
 // 真实界面的行首色条按类型写死：普通事件蓝、提醒紫
 const KIND_TINT = {event: color.blue, reminder: color.purple} as const;
 
-// 天气与日程：左天气栏 184 宽，右两周日期条 + 当天事项。done 为已勾掉的提醒数（可小数）。
-export const AgendaModule = ({done = 0}: {done?: number}) => {
+// Meeting actions belong to the event row; the reminder completion stays independent.
+export const AgendaModule = ({done = 0, meeting = false}: {done?: number; meeting?: boolean}) => {
   let reminderIndex = -1;
   const today = agenda.days[agenda.today];
   return (
@@ -81,8 +81,9 @@ export const AgendaModule = ({done = 0}: {done?: number}) => {
                 <div style={{width: 3, height: 25, borderRadius: 1.5, background: KIND_TINT[item.kind]}} />
                 <div className="min-w-0 flex-1" style={{opacity: 1 - 0.5 * checked}}>
                   <div className="truncate text-[10px] leading-[13px] font-semibold">{item.title}</div>
-                  <div className="text-[9px] leading-[12px] text-label-2">{isReminder ? `Reminder · ${item.time || 'Today'}` : item.time}</div>
+                  <div className="text-[9px] leading-[12px] text-label-2">{isReminder ? `Reminder · ${item.time || 'Today'}` : meeting && item.title === 'Design review' ? '9:41' : item.time}</div>
                 </div>
+                {meeting && item.title === 'Design review' ? <><Video size={11} color={color.blue} /><StickyNote size={11} color={color.secondary} /></> : null}
                 {isReminder ? (
                   checked > 0.5 ? (
                     <CircleCheck size={11} strokeWidth={2.4} color={color.green} />

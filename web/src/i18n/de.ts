@@ -75,14 +75,14 @@ export const de: SiteContent = {
       dashboard: {
         name: 'Start',
         caption:
-          'Live-Karten erscheinen nur, solange eine Fokuszeit, eine KI-Aufgabe oder ein Download läuft – ohne Aktivität nimmt nichts zusätzlichen Platz ein.',
+          'Live-Karten erscheinen nur, solange eine Fokuszeit, eine KI-Aufgabe oder ein Download läuft – ohne Aktivität nimmt nichts zusätzlichen Platz ein. Auf der Startseite werden laufende KI-Aufgaben nach Anwendung gruppiert.',
         points: ['Erscheint bei Bedarf', 'Fortschritt in Echtzeit', 'Layout passt sich selbst an'],
       },
       shelf: {
         name: 'Ablage',
         caption:
-          'Zieh Dateien, Audio, Video oder Links auf den Auslösestreifen am oberen Bildschirmrand, um sie in der Ablage zu parken, im Finder anzuzeigen oder das Teilen-Menü von macOS zu öffnen.',
-        points: ['Nach oben ziehen und parken', 'Im Finder anzeigen', 'Teilen-Menü des Systems'],
+          'Ziehen Sie Dateien, Audio, Videos oder Links an den oberen Bildschirmrand. Suchen und filtern Sie Ablagen, wählen Sie mehrere aus und kopieren, teilen oder senden Sie sie an Schnellnotizen. Wandeln Sie Bilder in PDF um, senden Sie erkannten Bildtext an Schnellnotizen oder bearbeiten Sie Videos im Aufnahmestudio. Dateien lassen sich auch im Finder anzeigen.',
+        points: ['Suche und Sammelaktionen', 'Bilder als PDF und Schnellnotizen', 'Videos im Studio bearbeiten'],
       },
       clipboard: {
         name: 'Zwischenablage',
@@ -93,12 +93,8 @@ export const de: SiteContent = {
       aiMonitor: {
         name: 'KI-Überblick',
         caption:
-          'Erkennt automatisch Aktivität unterstützter KI-CLIs, Desktop-Apps und IDEs und zeigt Aufgaben, Status, den Verlauf verbrauchter Tokens und eine Beitrags-Heatmap. Ausgewertet werden nur strukturierte Ereignisse, niemals Gesprächstext. Die Aufgabenerkennung für Cursor sowie tägliche numerische Nutzung ohne Anzeige verbleibender Kontingente für Cursor und Muse Code sind ergänzt. Lange Werkzeugläufe in Cursor bleiben sichtbar.',
-        points: [
-          'Aufgaben aus mehreren Werkzeugen',
-          'Verlauf des Token-Verbrauchs',
-          'Liest keine Prompts und Antworten',
-        ],
+          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen.',
+        points: ['Aufgaben aus mehreren KI-Werkzeugen', 'Modellverlauf und .xlsx-Export', 'Kontingente und Rücksetzzeiten'],
       },
       keyboardSound: {
         name: 'Tastaturklänge',
@@ -123,13 +119,13 @@ export const de: SiteContent = {
       agenda: {
         name: 'Termine und Wetter',
         caption:
-          'Zeigt das Wetter am aktuellen Standort und an bis zu sechs selbst gewählten Orten. Kalendertermine und Erinnerungen lassen sich ansehen, hinzufügen und löschen, Erinnerungen zusätzlich als erledigt markieren.',
-        points: ['Wetterkarten für mehrere Orte', 'Kalender und Aufgaben', 'Erinnerung sofort erledigt'],
+          'Zeigt das Wetter am aktuellen Standort und an bis zu sechs gewählten Orten. Kalenderereignisse und Erinnerungen lassen sich ansehen, hinzufügen, löschen und abschließen. Ereignisse mit einem Besprechungslink zeigen ab 10 Minuten vor Beginn einen Countdown und erlauben den Beitritt per Klick. Erstellen Sie eine Besprechungsnotiz oder verknüpfen und lösen Sie vorhandene ortsbezogene Notizen.',
+        points: ['Wetter und Kalender', 'Countdown 10 Minuten vorher', 'Beitreten und Notizen verknüpfen'],
       },
       mail: {
         name: 'Mail',
         caption:
-          'Liest die in Mail aktivierten Accounts. In der Island kannst du den Eingang ansehen, als gelesen markieren, antworten, neue Nachrichten verfassen und in den Papierkorb legen – mit klarem Hinweis, sobald eine Berechtigung fehlt. Wählen Sie beim Verfassen Dateien als Anhänge aus.',
+          'Liest die in Mail aktivierten Konten. Prüfen Sie den Posteingang, markieren Sie eine oder alle Posteingangsnachrichten als gelesen, antworten Sie, verfassen Sie Nachrichten oder verschieben Sie sie in den Papierkorb. Anhänge lassen sich beim Schreiben auswählen; fehlende Berechtigungen werden klar erklärt.',
         points: ['Accounts aus Mail', 'Antworten und verfassen', 'Nachvollziehbare Hinweise'],
       },
       quickNotes: {
@@ -146,7 +142,7 @@ export const de: SiteContent = {
       toolbox: {
         name: 'Kleine Werkzeuge',
         caption:
-          'Fokus-Timer, Display wach halten, Bildschirmreinigung, Tastaturreinigung (blockiert währenddessen Tastendrücke einschließlich F1-F12), Teleprompter, Spiegel und Papierkorb auf einer Seite.',
+          'Fokustimer, Bildschirm wach halten, Bildschirmreinigung, Tastaturreinigung mit Sperre auch für F1-F12, Teleprompter, Spiegel und Papierkorb auf einer Seite. Den Pomodoro können Sie auch in der horizontalen und vertikalen Kompaktansicht pausieren, fortsetzen oder zurücksetzen und den Fortschritt verfolgen.',
         points: [
           'Fokus-Timer',
           'Blockiert F1-F12 beim Reinigen',
@@ -156,7 +152,7 @@ export const de: SiteContent = {
       system: {
         name: 'Systemstatus',
         caption:
-          'Prüfe CPU, GPU, Speicher, Datenträger, Netzwerk, Lüfter und verfügbare NVMe-SMART-Temperaturen. Zeige den minütlichen Verlauf für jeden Zeitraum oder exportiere .xlsx; der Verlauf bleibt bis zum manuellen Löschen erhalten. Sieh Ladung, Batteriezustand, Ladezyklen, Temperatur und Kapazität des Mac und nahe Geräte, mit getrennten öffentlichen IPv4- und IPv6-Adressen. Prüfe Caches, Protokolle, Einstellungsreste und KI-Arbeitsordner ohne gespeicherte Sitzung vor dem Verschieben in den Papierkorb. Optionale Bereinigung läuft alle 7, 15 oder 30 Tage für vertrauenswürdige oder alle bearbeitbaren Einträge, einschließlich prüfpflichtiger; standardmäßig ist sie aus.',
+          'Überwacht CPU, GPU, Arbeitsspeicher, Laufwerke, Netzwerk, Lüfter und verfügbare NVMe-SMART-Temperatur. Sehen Sie in den Einstellungen den minütlichen Verlauf für einen Zeitraum an, exportieren Sie .xlsx oder löschen Sie ihn. Prüfen Sie Batteriezustand, Zyklen, Temperatur, Kapazität, Geräte in der Nähe und öffentliche IPv4/IPv6. Wählen Sie automatische Energiemodi für Netz- und Batteriebetrieb, optional mit Stromsparmodus bei 20 % oder weniger. Laden Sie sofort auf 100 %, wenn macOS dies anbietet. Prüfen Sie Caches, Protokolle, Einstellungsreste und verwaiste KI-Arbeitsbereiche vor dem Verschieben in den Papierkorb; die Bereinigung kann alle 7, 15 oder 30 Tage laufen. Die geplante Bereinigung ist standardmäßig aus; wählen Sie nur vertrauenswürdige oder alle bearbeitbaren Elemente, auch solche mit Prüfbedarf.',
         points: [
           'Überwachung bis zum Chip',
           'Verlaufsdiagramme und .xlsx-Export',
@@ -168,7 +164,7 @@ export const de: SiteContent = {
   extensions: {
     eyebrow: 'IN DER ISLAND UND DANEBEN',
     title: 'Auch abseits der Island <span>ein Werkzeug für den Schreibtisch.</span>',
-    lede: 'Bildschirmfotos, Sprache, Medien, Browser-Downloads und KI-Verwaltung erscheinen dort, wo sie am schnellsten zur Hand sind.',
+    lede: 'Bildschirmfotos, Bild- und Audiowerkzeuge, Spracheingabe, Medien, Browser-Downloads und KI-Verwaltung erscheinen dort, wo sie leicht erreichbar sind.',
     ariaLabel: 'Eigenständige Schreibtisch-Funktionen',
     summaryMono: 'JENSEITS DER ISLAND',
     summaryLede: 'Häufig genutzte Funktionen, jede an ihrem natürlichen Platz.',
@@ -177,12 +173,12 @@ export const de: SiteContent = {
     features: {
       floatingIsland: {
         title: 'Eine schwebende Insel für Ihre Anordnung',
-        description: 'Nutzen Sie die Kameraposition oder wählen Sie eine eigene Position an einem Bildschirmrand. Sie bleibt beim Moduswechsel gespeichert. Horizontale und vertikale Kompaktansichten passen ihre Länge an Statussymbole, KI-Aufgaben, Downloads und Medien an und können weitere Informationen anzeigen.',
+        description: 'Nutzen Sie die Kameraposition oder wählen Sie eine eigene Position an einem Bildschirmrand. Sie bleibt beim Moduswechsel gespeichert. Horizontale und vertikale Kompaktansichten passen ihre Länge an Statussymbole, KI-Aufgaben, Downloads und Medien an und können weitere Informationen anzeigen. Ordnen Sie die Module unter Einstellungen → Info per Drag-and-drop neu oder stellen Sie die Standardreihenfolge wieder her.',
         detail: 'Eigene Position · Dauerhafte Statussymbole · Anpassbare Informationen',
       },
       dailyBriefing: {
         title: 'Ihr Tag als Tagesbericht',
-        description: 'Wählen Sie aus acht Vorlagen und bestimmen Sie Nutzungs-, Tipp-, System- und zisla-Aktivitätsdaten. Prüfen Sie die Vorschau und exportieren Sie ein PNG manuell oder täglich zur gewählten Zeit. Der Bildschirmzeitverlauf wird nur bei Aktivierung und Verfügbarkeit verwendet; fehlende Daten gelten nicht als gemessene Null. Wählen Sie einen eigenen Exportordner unter Einstellungen → Speicherort.',
+        description: 'Wählen Sie aus acht Vorlagen und bestimmen Sie Nutzungs-, Tipp-, System- und zisla-Aktivitätsdaten. Prüfen Sie die Vorschau und exportieren Sie ein PNG manuell oder täglich zur gewählten Zeit. Der Bildschirmzeitverlauf wird nur bei Aktivierung und Verfügbarkeit verwendet; fehlende Daten gelten nicht als gemessene Null. Wählen Sie einen eigenen Exportordner unter Einstellungen → Speicherort. Echte Kontingente der Konten und die Zeit ihrer Abfrage lassen sich ebenfalls aufnehmen.',
         detail: '8 Vorlagen · Inhalte wählen · Vorschau und geplanter PNG-Export',
       },
       userCare: {
@@ -205,6 +201,16 @@ export const de: SiteContent = {
         description: 'Prüfen Sie den Status unter Einstellungen → Berechtigungen, starten Sie unterstützte Anfragen oder öffnen Sie die zuständige Systemseite. Die erste Begrüßung nutzt dieselbe Liste und kennzeichnet manuelle Einstellungen.',
         detail: 'Berechtigungsstatus · Anfragen und Links · Auch bei der Begrüßung',
       },
+      imageTools: {
+        title: 'Bildwerkzeuge',
+        description: 'Neun lokale Werkzeuge in den Einstellungen: Komprimieren; PNG, JPEG, WebP, AVIF und JPEG XL umwandeln; Skalieren und Zuschneiden; das kleinste Format vergleichen; Drehen und Spiegeln; Wasserzeichen; Mosaik und Weichzeichnen; Text- und Tabellenerkennung; Freistellen. Exportieren Sie Stapel oder ZIP-Dateien mit eigenem Bildordner unter Einstellungen → Speicherort.',
+        detail: '9 lokale Werkzeuge · Fünf Formate · Stapel- und ZIP-Export',
+      },
+      audioTools: {
+        title: 'Audiowerkzeuge',
+        description: '27 lokale Vorgänge in den Einstellungen, etwa Umwandeln, Komprimieren, Schneiden, Aufteilen, Verbinden und Mischen, Audio aus Videos extrahieren, LUFS-Normalisierung, Blenden, Tempo und Tonhöhe, Rausch- und Stilleentfernung, EQ, Dynamik, Kanäle und Tags. FFmpeg und ffprobe sind erforderlich; wählen Sie eine Datei oder einen Ordner für den Export.',
+        detail: '27 lokale Vorgänge · Bearbeiten und Mischen · FFmpeg und ffprobe',
+      },
       pdf: {
         title: 'PDF-Werkzeuge',
         description: 'In den Einstellungen verfügbar, außerhalb des Modulkarussells der Insel. Vierzehn Vorgänge, die vollständig auf deinem Mac laufen: zusammenführen, aufteilen, drehen, beschneiden, Bilder und Office-Dateien umwandeln, in Bilder umwandeln, Text exportieren, Text- oder Bildwasserzeichen setzen, Seitenzahlen ergänzen, verschlüsseln, Passwort entfernen und Metadaten bearbeiten.',
@@ -220,7 +226,7 @@ export const de: SiteContent = {
       capture: {
         title: 'Bildschirmfotos, Scroll-Aufnahmen und Anheften',
         description:
-          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im Screenshotordner unter Einstellungen → Speicherort. Angeheftete Screenshots bleiben bei weiteren Aufnahmen erhalten.',
+          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im Screenshotordner unter Einstellungen → Speicherort. Angeheftete Screenshots bleiben bei weiteren Aufnahmen erhalten. Lange Aufnahmen unterstützen langsames automatisches Scrollen; auf kompatiblen Geräten sind HDR-Bildschirmfotos möglich.',
         detail: 'Markieren und extrahieren · Erkennen, übersetzen und kopieren · Runde Ecken und .xlsx',
       },
       voice: {
@@ -244,7 +250,7 @@ export const de: SiteContent = {
       copyAssistant: {
         title: 'Schnellaktionen und nächste Schritte',
         description:
-          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts. IP-Abfragen und das Öffnen von Links sind getrennte Aktionen. Währungsumrechnungen erkennen lokale Untereinheiten; der Emoji-Katalog enthält Emoji 18.0. Gespeicherte Texte und Bilder verwenden den separaten Schnellaktionenordner unter Einstellungen → Speicherort.',
+          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts. IP-Abfragen und das Öffnen von Links sind getrennte Aktionen. Währungsumrechnungen erkennen lokale Untereinheiten; der Emoji-Katalog enthält Emoji 18.0. Gespeicherte Texte und Bilder verwenden den separaten Schnellaktionenordner unter Einstellungen → Speicherort. Wenn sich eine App nicht öffnen lässt, prüfen Schnellaktionen ihre Integrität, Signatur und die macOS-Sicherheitsrichtlinien. Nach bestandener Prüfung können sie Quarantänemerkmale entfernen und die App öffnen.',
         detail: 'Lokale Erkennung · Live-Wechselkursumrechnung · Standard Command+N',
       },
       aiManagement: {
@@ -276,7 +282,7 @@ export const de: SiteContent = {
   ai: {
     eyebrow: 'KI OHNE BLACKBOX',
     title: 'KI-Status sehen, <span>ohne das Gespräch zu lesen.</span>',
-    lede: 'Aufgaben, Status und Token-Verläufe bleiben auf deinem Mac. Diese Seite beschreibt die Funktion und erfindet kein Bild einer laufenden Aufgabe.',
+    lede: 'Verfolgen Sie Aufgaben nach Anwendung, Modellnutzung nach Datum und echte Kontingente der Konten. Status und Zahlen bleiben auf Ihrem Mac; Gesprächstexte werden nicht gelesen.',
     summaryMono: 'LOKALER STATUS / KLARE GRENZEN',
     summaryLede:
       'Verbinde die KI-Werkzeuge, die du schon nutzt, und behalte die Kontextgrenzen, die deine Arbeit braucht.',
@@ -286,6 +292,7 @@ export const de: SiteContent = {
     toolsLede:
       'Erkennt Aktivität unterstützter CLIs, Desktop-Apps und IDEs und bündelt den Aufgabenstatus.',
     toolsAriaLabel: 'Unterstützte KI-Werkzeuge',
+    usageNote: 'Sitzungserkennung, Token-Verlauf und Kontingente nutzen getrennte Datenquellen. Delta liest sein lokales Zahlenprotokoll; Orca entfernt doppelte Nutzung des gebundenen CLI und ordnet sie dem ursprünglichen Anbieter zu. WorkBuddy AI kann Sitzungen erkennen und Credits abfragen; Kontextbelegung und Credits werden nicht in Tokens oder US-Dollar umgerechnet. Verfügbare Kontingente hängen vom Anbieter und der Anmeldung ab.',
     boundariesHeading: 'Aufgezeichnet werden nur Statusgrenzen',
     privacyPoints: [
       'Wertet aus strukturierten Ereignissen nur Ereignistyp, Status, Zeit, Modell und Sitzungs-ID aus',

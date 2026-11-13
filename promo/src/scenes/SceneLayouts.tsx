@@ -2,7 +2,7 @@ import {Check, ChevronDown, Grip, Image as ImageIcon, PawPrint} from 'lucide-rea
 import {Img, useCurrentFrame, useVideoConfig} from 'remotion';
 import {Caption, Headline} from '../components/Caption';
 import {ClickRipple, Cursor} from '../components/Cursor';
-import {MenuBar, Wallpaper} from '../components/Desktop';
+import {MenuBar, Notch, Wallpaper} from '../components/Desktop';
 import {GlassPanel, Hairline} from '../components/Glass';
 import {Island} from '../components/Island';
 import {ProviderLogo} from '../components/IslandChrome';
@@ -27,21 +27,16 @@ const FloatingPill = ({state}: {state: LayoutState}) => {
   const vertical = state.placement.edge === 'left' || state.placement.edge === 'right';
   const camera = state.placement.mode === 'camera';
   return (
-    <div className="absolute" data-feature={camera ? 'island.camera' : `island.custom.${state.placement.edge}`} data-layout-style="pill" data-placement={state.placement.mode} data-edge={state.placement.edge} style={{left: state.rect.x, top: state.rect.y, width: state.rect.width, height: state.rect.height}}>
-      <GlassPanel radius={16} tint="#000" className="flex items-center" style={{inset: 0, justifyContent: camera ? 'space-between' : 'center', flexDirection: vertical ? 'column' : 'row', gap: vertical ? 14 : 8, padding: camera ? '0 12px' : '8px 12px', borderColor: state.editing ? color.blue : color.strokeCard}}>
+    <div className="absolute" data-feature={camera ? 'island.camera' : `island.custom.${state.placement.edge}`} data-layout-style="pill" data-placement={state.placement.mode} data-placement-stage={state.editing ? 'preview' : 'committed'} data-edge={state.placement.edge} style={{left: state.rect.x, top: state.rect.y, width: state.rect.width, height: state.rect.height}}>
+      <GlassPanel radius={state.editing ? 12 : 16} tint="#000" className="flex items-center" style={{inset: 0, justifyContent: camera ? 'space-between' : 'center', flexDirection: vertical ? 'column' : 'row', gap: state.editing ? 0 : 6, padding: state.editing ? 0 : camera ? '0 12px' : vertical ? '12px 4px' : '4px 12px', border: 'none', boxShadow: `inset 0 0 0 ${state.editing ? 2 : 1}px ${state.editing ? color.blue : color.strokeCard}`}}>
         {state.editing ? (
-          <div className="flex gap-[2px]" style={{flexDirection: vertical ? 'column' : 'row'}}>
+          <div className="flex gap-[2px]">
             {[0, 1, 2].map((dot) => <span key={dot} className="rounded-full" style={{width: 3, height: 3, background: white(0.8)}} />)}
           </div>
         ) : (
           <>
-            <ProviderLogo provider="claude" size={20} />
-            {camera ? null : vertical ? (
-              <div className="flex flex-col items-center gap-[1px] text-[11px] leading-[13px] font-medium" aria-label="Build">
-                {'Build'.split('').map((letter, index) => <span key={index}>{letter}</span>)}
-              </div>
-            ) : <span className="text-[11px] font-medium">Build</span>}
-            <span className="font-rounded tabular text-[12px] font-semibold" style={{color: color.green}}>74%</span>
+            <ProviderLogo provider="claude" size={24} />
+            <span className="font-rounded tabular text-[11px] font-medium" data-active-tasks={3}>3</span>
           </>
         )}
       </GlassPanel>
@@ -113,7 +108,7 @@ const SettingsWindow = ({state, frame, fps}: {state: LayoutState; frame: number;
             <Hairline />
             <div className="flex h-[40px] items-center justify-between text-[12px]">
               <span>Island position</span>
-              <SelectControl value={state.placement.mode === 'camera' ? 'Camera position' : 'Custom position'} choices={['Camera position', 'Custom position']} selected={state.placement.mode === 'camera' ? 0 : 1} open={state.menu === 'position' || state.menu === 'camera'} />
+              <SelectControl value={state.placement.mode === 'camera' ? 'Camera position' : 'Custom position'} choices={['Camera position', 'Custom position']} selected={state.placement.mode === 'camera' ? 0 : 1} open={state.menu === 'position'} />
             </div>
             {state.placement.mode === 'custom' ? (
               <>
@@ -135,7 +130,7 @@ const PlacementOverlay = () => (
   <>
     <div className="absolute inset-0" style={{background: 'rgba(76,76,76,0.65)'}} />
     <div className="absolute flex flex-col items-center gap-4" style={{left: 360, top: 399, width: 560}}>
-      <div className="text-center text-[15px] font-medium">Drag the pill to a screen edge. Press Return to finish.</div>
+      <div className="text-center text-[15px] font-medium">Drag the pill to a screen edge. Press Return to finish or Esc to cancel.</div>
       <div className="flex gap-3">
         <div className="rounded-[6px] px-[18px] py-[7px] text-[12px] font-medium" style={{background: white(0.16)}}>Cancel</div>
         <div className="rounded-[6px] px-[22px] py-[7px] text-[12px] font-medium" style={{background: color.blue}}>Done</div>
@@ -183,8 +178,6 @@ export const SceneLayouts = ({duration = LAYOUTS_DURATION}: {duration?: number; 
     : state.style === 'notch' ? 'Notch mode'
       : state.placement.mode === 'camera' ? 'Dynamic Island mode · Camera position'
         : `Dynamic Island mode · Custom position · ${state.placement.edge.charAt(0).toUpperCase() + state.placement.edge.slice(1)} edge`;
-  const petHeight = 24;
-  const petWidth = petHeight * state.pet.width / state.pet.height;
   return (
     <>
       <Wallpaper dim={0.1} />
@@ -194,17 +187,20 @@ export const SceneLayouts = ({duration = LAYOUTS_DURATION}: {duration?: number; 
       {state.editing ? <PlacementOverlay /> : <SettingsWindow state={state} frame={frame} fps={fps} />}
       {state.style === 'notch' ? (
         <div data-feature="island.notch" data-layout-style="notch" data-placement="camera" data-edge="top">
-          <Island reveal={0} height={34} wing={40} left={<ProviderLogo provider="claude" size={20} />} right={<span className="text-[12px] font-semibold">74%</span>} progress={{value: 0.74, tint: color.claude}} />
+          <Island reveal={0} height={34} wing={40} left={<ProviderLogo provider="claude" size={20} />} right={<span className="text-[12px] font-semibold" data-active-tasks={3}>3</span>} />
         </div>
       ) : <FloatingPill state={state} />}
+      <Notch />
+      {!state.editing && state.placement.mode === 'custom' ? <div data-feature="island.custom.confirmed" data-edge={state.placement.edge} /> : null}
       {state.pets ? (
-        <div className="absolute" data-feature={`pet.${state.petSide}`} data-pet-side={state.petSide} style={{left: state.petSide === 'left' ? state.rect.x - 4 - petWidth : state.rect.x + state.rect.width + 4, top: state.rect.y + (state.rect.height - petHeight) / 2}}>
-          <LayoutPet pet={state.pet} frame={frame} fps={fps} size={petHeight} />
+        <div className="absolute" data-feature={`pet.${state.petSide}`} data-pet-side={state.petSide} style={{left: state.petRect.x, top: state.petRect.y}}>
+          <LayoutPet pet={state.pet} frame={frame} fps={fps} size={state.petRect.height} />
         </div>
       ) : null}
+      {state.importStage === 'imported' ? <div data-feature="pet.imported" data-pet-name={state.petName} /> : null}
       {state.importStage === 'file' || state.importStage === 'name' || state.importStage === 'processing' ? <PetImportSheet state={state} frame={frame} fps={fps} /> : null}
       <Cursor x={state.cursor.x} y={state.cursor.y} pressed={state.pressed ? 1 : 0} opacity={clamp01(linear(state.local, [0, 12], [0, 1]))} />
-      {state.editing ? <ClickRipple x={PLACEMENT_CONFIRM.x} y={PLACEMENT_CONFIRM.y} progress={state.confirmation} /> : null}
+      <ClickRipple x={PLACEMENT_CONFIRM.x} y={PLACEMENT_CONFIRM.y} progress={state.confirmation} />
       <Caption text={state.pets ? 'Built-in companions. Import your own images or videos.' : 'Notch mode, camera position, or any screen edge.'} opacity={fadeWindow(state.local, 30, LAYOUTS_DURATION - 8, 14)} bottom={60} size={16} />
       {state.pets ? <div className="absolute inset-x-0 text-center text-[9px] text-label-2" style={{bottom: 6}}>Pet art: Kenney Animal Pack Redux · CC0 1.0</div> : null}
     </>

@@ -13,10 +13,12 @@ import {SceneSettings} from './scenes/SceneSettings';
 import {Scene5Outro} from './scenes/Scene5Outro';
 import {CROSSFADE, SCENES} from './timeline';
 import {clamp01} from './theme';
+import {soundtracks} from './soundtrack';
+import type {SoundtrackVariant} from './soundtrack';
 
 type Entry = {
   id: string;
-  Scene: FC<{duration?: number; globalFrom?: number}>;
+  Scene: FC<{duration?: number; globalFrom?: number; music?: SoundtrackVariant}>;
   from: number;
   duration: number;
 };
@@ -35,24 +37,24 @@ export const ENTRIES: readonly Entry[] = [
   {id: 'outro', Scene: Scene5Outro, ...SCENES.outro},
 ];
 
-const SceneLayer: FC<{entry: Entry; lead: number}> = ({entry, lead}) => {
+const SceneLayer: FC<{entry: Entry; lead: number; music: SoundtrackVariant}> = ({entry, lead, music}) => {
   const frame = useCurrentFrame();
   return (
     <Stage opacity={clamp01((frame + 1) / (lead + 1))}>
-      <entry.Scene duration={lead + entry.duration} globalFrom={entry.from - lead} />
+      <entry.Scene duration={lead + entry.duration} globalFrom={entry.from - lead} music={music} />
     </Stage>
   );
 };
 
-export const LaunchFilm: FC = () => (
+export const LaunchFilm: FC<{music?: SoundtrackVariant}> = ({music = 'funk'}) => (
   <>
     {/* Scene compositions remain silent so the soundtrack is never duplicated. */}
-    <Audio src={staticFile('audio/zisla-launch.mp3')} />
+    <Audio src={staticFile(soundtracks[music].audio)} />
     {ENTRIES.map((entry, index) => {
       const lead = index > 0 ? CROSSFADE : 0;
       return (
         <Sequence key={entry.id} from={entry.from - lead} durationInFrames={lead + entry.duration} layout="none">
-          <SceneLayer entry={entry} lead={lead} />
+          <SceneLayer entry={entry} lead={lead} music={music} />
         </Sequence>
       );
     })}

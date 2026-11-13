@@ -69,8 +69,8 @@ const MESSAGES = [
   },
 ] as const;
 
-export const mailUnreadCount = (selected: 0 | 1): number =>
-  MESSAGES.filter((item, index) => item.unread && !(index === 1 && selected === 1)).length;
+export const mailUnreadCount = (selected: 0 | 1, allRead = false): number =>
+  allRead ? 0 : MESSAGES.filter((item, index) => item.unread && !(index === 1 && selected === 1)).length;
 
 type MailModuleProps = {
   frame: number;
@@ -81,6 +81,7 @@ type MailModuleProps = {
   body: string;
   focus: 'to' | 'subject' | 'body' | null;
   sending: boolean;
+  allRead?: boolean;
 };
 
 const MailCaret = ({frame}: {frame: number}) => (
@@ -90,7 +91,7 @@ const MailCaret = ({frame}: {frame: number}) => (
   />
 );
 
-export const MailModule = ({frame, selected, compose, to, subject, body, focus, sending}: MailModuleProps) => {
+export const MailModule = ({frame, selected, compose, to, subject, body, focus, sending, allRead = false}: MailModuleProps) => {
   const message = MESSAGES[selected];
   const ready = body.trim().length > 0;
 
@@ -99,7 +100,7 @@ export const MailModule = ({frame, selected, compose, to, subject, body, focus, 
       <div className="flex shrink-0 flex-col" style={{width: 232, paddingRight: 8}}>
         <div className="flex h-[28px] shrink-0 items-center gap-[4px] px-[4px]">
           <span className="text-[12px] font-semibold">Mail</span>
-          <span className="tabular text-[9px] font-bold" style={{color: color.blue}}>{mailUnreadCount(selected)}</span>
+          <span className="tabular text-[9px] font-bold" style={{color: color.blue}}>{mailUnreadCount(selected, allRead)}</span>
           <IconButton compact icon={ListFilter} />
           <div className="min-w-[2px] flex-1" />
           <IconButton compact icon={CircleCheck} />
@@ -108,7 +109,7 @@ export const MailModule = ({frame, selected, compose, to, subject, body, focus, 
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
           {MESSAGES.map((item, index) => {
-            const unread = item.unread && !(index === 1 && selected === 1);
+            const unread = !allRead && item.unread && !(index === 1 && selected === 1);
             return (
               <div
                 key={item.title}

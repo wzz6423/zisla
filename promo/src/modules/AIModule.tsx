@@ -11,23 +11,21 @@ import {alpha, clamp01, color, white} from '../theme';
 export type AiRow = {
   task: AiTask;
   progress?: number;
-  // 已运行秒数
+  // Elapsed runtime in seconds.
   run: number;
-  // 0–1，任务刚出现时整行从 0 高度长出来
+  // Rows grow into their allocated height when a task arrives.
   enter?: number;
 };
 
 type AIModuleProps = {
   frame: number;
   rows: readonly AiRow[];
-  // 0–1，趋势线从左向右画出
   trend: number;
   todayTokens: number;
-  // 0–1，热力图按列浮现
   heat: number;
   todayLevel: number;
-  // 0–1，今天那一格的选中描边与信息行
   selection: number;
+  selectedDay?: ReactNode;
 };
 
 const pad = (value: number): string => String(value).padStart(2, '0');
@@ -99,7 +97,7 @@ const TaskRow = ({row, frame}: {row: AiRow; frame: number}) => {
 
 type Point = readonly [number, number];
 
-// 与 Swift Charts 的 .monotone 插值同一类曲线：切线取相邻斜率的调和平均，保证不出现过冲
+// Harmonic tangents match the native monotone curve without overshooting neighboring samples.
 const monotonePath = (points: readonly Point[]): string => {
   const first = points[0];
   if (!first || points.length < 2) {
@@ -134,10 +132,10 @@ const CHART = {height: 128, left: 30, right: 14, top: 6, bottom: 22};
 const CHART_MAX = 1_000_000;
 const TICKS = [0, 250_000, 500_000, 750_000, 1_000_000];
 
-const TrendChart = ({reveal, todayTokens}: {reveal: number; todayTokens: number}) => {
+export const TrendChart = ({reveal, todayTokens, width = RIGHT_WIDTH, height = CHART.height}: {reveal: number; todayTokens: number; width?: number; height?: number}) => {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const plotWidth = RIGHT_WIDTH - CHART.left - CHART.right;
-  const plotHeight = CHART.height - CHART.top - CHART.bottom;
+  const plotWidth = width - CHART.left - CHART.right;
+  const plotHeight = height - CHART.top - CHART.bottom;
   const baseline = CHART.top + plotHeight;
   const yFor = (tokens: number): number => CHART.top + plotHeight * (1 - tokens / CHART_MAX);
   const count = tokenTrend.points.length;
@@ -149,19 +147,19 @@ const TrendChart = ({reveal, todayTokens}: {reveal: number; todayTokens: number}
   const last = points[count - 1] ?? [0, 0];
   const labelStyle: CSSProperties = {fontSize: 9, fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fill: color.secondary};
   return (
-    <svg width={RIGHT_WIDTH} height={CHART.height} className="shrink-0">
+    <svg width={width} height={height} className="shrink-0" data-feature="ai.usage.trend" data-today-tokens={todayTokens}>
       <defs>
         <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={color.blue} stopOpacity={0.28} />
           <stop offset="1" stopColor={color.blue} stopOpacity={0.02} />
         </linearGradient>
         <clipPath id={`${id}-clip`}>
-          <rect x={CHART.left - 4} y={0} width={(plotWidth + 8) * clamp01(reveal)} height={CHART.height} />
+          <rect x={CHART.left - 4} y={0} width={(plotWidth + 8) * clamp01(reveal)} height={height} />
         </clipPath>
       </defs>
       {TICKS.map((tick) => (
         <g key={tick}>
-          <line x1={CHART.left} x2={RIGHT_WIDTH - CHART.right} y1={yFor(tick)} y2={yFor(tick)} stroke={white(0.12)} strokeWidth={0.5} />
+          <line x1={CHART.left} x2={width - CHART.right} y1={yFor(tick)} y2={yFor(tick)} stroke={white(0.12)} strokeWidth={0.5} />
           <text x={CHART.left - 6} y={yFor(tick) + 3} textAnchor="end" style={labelStyle}>
             {tick === 0 ? '0' : tokenAbbreviation(tick)}
           </text>
@@ -173,7 +171,7 @@ const TrendChart = ({reveal, todayTokens}: {reveal: number; todayTokens: number}
         <circle cx={last[0]} cy={last[1]} r={3.2} fill="#fff" stroke={color.blue} strokeWidth={1.6} />
       </g>
       {tokenTrend.points.map((point, index) => (
-        <text key={point.label} x={points[index]?.[0] ?? 0} y={CHART.height - 4} textAnchor="middle" style={labelStyle}>
+        <text key={point.label} x={points[index]?.[0] ?? 0} y={height - 4} textAnchor="middle" style={labelStyle}>
           {point.label}
         </text>
       ))}
@@ -186,6 +184,7 @@ const HEAT_HEIGHT = 110;
 const CELL_WIDTH = (RIGHT_WIDTH - HEAT_GAP * (heatmap.weeks - 1)) / heatmap.weeks;
 const CELL_HEIGHT = (HEAT_HEIGHT - HEAT_GAP * 6) / 7;
 const HEAT_ALPHA = [0, 0.25, 0.45, 0.7, 1];
+export const AI_HEATMAP_TARGET = {x: 752 - CELL_WIDTH / 2, y: 141 + 14 + 12 + CHART.height + 12 + heatmap.selected.day * (CELL_HEIGHT + HEAT_GAP) + CELL_HEIGHT / 2};
 
 const heatStyle = (level: number): CSSProperties =>
   level <= 0
@@ -197,7 +196,7 @@ const Heatmap = ({reveal, todayLevel, selection, todayTokens}: {reveal: number; 
   for (let week = 0; week < heatmap.weeks; week++) {
     for (let day = 0; day < 7; day++) {
       const isToday = week === heatmap.selected.week && day === heatmap.selected.day;
-      // 今天之后的日期还没发生，真实界面里是空的
+      // Future dates stay blank, as in the native calendar.
       if (week === heatmap.selected.week && day > heatmap.selected.day) {
         continue;
       }
@@ -205,6 +204,8 @@ const Heatmap = ({reveal, todayLevel, selection, todayTokens}: {reveal: number; 
         <div
           key={`${week}-${day}`}
           className="absolute"
+          data-usage-date={isToday ? '2026-11-11' : undefined}
+          data-selected={isToday && selection > 0.01 ? true : undefined}
           style={{
             left: week * (CELL_WIDTH + HEAT_GAP),
             top: day * (CELL_HEIGHT + HEAT_GAP),
@@ -220,7 +221,7 @@ const Heatmap = ({reveal, todayLevel, selection, todayTokens}: {reveal: number; 
     }
   }
   return (
-    <div className="flex shrink-0 flex-col gap-[3px]">
+    <div className="flex shrink-0 flex-col gap-[3px]" data-feature="ai.usage.heatmap">
       <div className="relative" style={{width: RIGHT_WIDTH, height: HEAT_HEIGHT}}>
         {cells}
       </div>
@@ -249,11 +250,11 @@ const Heatmap = ({reveal, todayLevel, selection, todayTokens}: {reveal: number; 
   );
 };
 
-export const AIModule = ({frame, rows, trend, todayTokens, heat, todayLevel, selection}: AIModuleProps) => {
+export const AIModule = ({frame, rows, trend, todayTokens, heat, todayLevel, selection, selectedDay}: AIModuleProps) => {
   const active = rows.filter((row) => (row.enter ?? 1) > 0.5).length;
   return (
-    <div className="absolute inset-0 flex gap-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+    <div className="flex gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-3" data-feature="ai.tasks" data-active-tasks={active}>
         <SectionTitle
           icon={Cpu}
           label="Run task"
@@ -271,6 +272,7 @@ export const AIModule = ({frame, rows, trend, todayTokens, heat, todayLevel, sel
         <SectionTitle icon={ChartLine} label="Token usage trend" size={11} />
         <TrendChart reveal={trend} todayTokens={todayTokens} />
         <Heatmap reveal={heat} todayLevel={todayLevel} selection={selection} todayTokens={todayTokens} />
+        {selectedDay}
       </div>
     </div>
   );

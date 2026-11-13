@@ -76,14 +76,14 @@ export const en: SiteContent = {
       dashboard: {
         name: 'Home',
         caption:
-          'Live cards appear only while a focus session, AI task or download is running, so nothing takes up space when nothing is happening.',
+          'Live cards appear only while a focus session, AI task or download is running, so nothing takes up space when nothing is happening. Running AI work is grouped by application on Home.',
         points: ['Appears on demand', 'Live progress', 'Layout adapts automatically'],
       },
       shelf: {
         name: 'Shelf',
         caption:
-          'Drag files, audio, video or links onto the trigger strip at the top of the screen to drop them on the shelf, reveal them in Finder, or open the macOS share menu.',
-        points: ['Drag to the top to stash', 'Reveal in Finder', 'System share menu'],
+          'Drag files, audio, video or links to the top of the screen, then search, filter and select several shelf items to copy, share or send to Quick Notes. Convert images to PDF, recognise image text into Quick Notes, or send videos to the recording studio for editing. Reveal files in Finder whenever needed.',
+        points: ['Search and batch actions', 'Images to PDF and Quick Notes', 'Edit videos in the studio'],
       },
       clipboard: {
         name: 'Clipboard',
@@ -94,12 +94,8 @@ export const en: SiteContent = {
       aiMonitor: {
         name: 'AI monitor',
         caption:
-          'Aggregates tasks and status from AI CLIs, desktop apps and IDEs, including Delta, Orca, WorkBuddy and WorkBuddy AI. Cumulative token trends and a contribution heatmap use reliable numeric usage where available, without parsing prompt or reply text. Cursor task detection is added, while Cursor and Muse Code provide daily numeric usage with remaining allowances hidden; Cursor tasks stay visible during long tool runs.',
-        points: [
-          'Tasks aggregated across tools',
-          'Token consumption trends',
-          'Never reads prompts or replies',
-        ],
+          'Aggregates AI tasks and status from CLIs, desktop apps and IDEs. Numeric usage powers token trends and a contribution heatmap; select a date for input, output and total tokens by provider and model. View, export all history as .xlsx or clear it in Settings. Check real account allowances, reset times and low-quota notices, including 5h/7d windows and Cursor USD budgets when available. Prompt and reply text is not read.',
+        points: ['Tasks across AI tools', 'Model history and .xlsx export', 'Account allowances and reset times'],
       },
       keyboardSound: {
         name: 'Keyboard sounds',
@@ -116,13 +112,13 @@ export const en: SiteContent = {
       agenda: {
         name: 'Agenda and weather',
         caption:
-          'Shows weather for your current location plus up to six places you pick. View, add and delete calendar events and reminders, and mark reminders as done.',
-        points: ['Weather cards for several places', 'Calendar and to-dos', 'Complete a reminder in one tap'],
+          'Shows weather for your current location and up to six chosen places. View, add and delete calendar events and reminders, and complete reminders. Events with a meeting link show a countdown from 10 minutes before the start and a one-click join action. Create a meeting note or link and unlink existing context notes.',
+        points: ['Weather and calendar', '10-minute meeting countdown', 'Join meetings and link notes'],
       },
       mail: {
         name: 'Mail',
         caption:
-          'Reads the accounts you have enabled in Mail. Check the inbox, mark messages as read, reply, compose and move to Trash inside the island, with clear guidance whenever a permission is missing. Choose files while composing to attach them to the message.',
+          'Reads the accounts enabled in Mail. Check the inbox, mark one message or all inbox messages as read, reply, compose and move messages to Trash inside the island. Choose attachments while composing, with clear guidance when a permission is missing.',
         points: ['Mail accounts', 'Reply and compose in the island', 'Transparent permission guidance'],
       },
       quickNotes: {
@@ -139,13 +135,13 @@ export const en: SiteContent = {
       toolbox: {
         name: 'Utilities',
         caption:
-          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning (which blocks key presses including F1-F12 while it runs), a teleprompter, a mirror and the Trash, all on one page.',
+          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning that blocks keys including F1-F12, a teleprompter, a mirror and the Trash, all on one page. Pause, resume or reset the Pomodoro timer and follow its progress in compact horizontal and vertical layouts.',
         points: ['Focus countdown', 'Blocks F1-F12 while cleaning', 'Teleprompter and mirror'],
       },
       system: {
         name: 'System status',
         caption:
-          'Monitor CPU, GPU, memory, disk, network, fans and available NVMe SMART temperature. Chart minute-level history for any time range or export .xlsx; history stays until you clear it. Check this Mac’s battery charge, health, cycle count, temperature and capacity and nearby device levels, with separate public IPv4 and IPv6. Review caches, logs, preference leftovers and orphaned AI session workspaces before moving items to Trash. Optional cleanup runs every 7, 15 or 30 days, with trusted-only or all actionable items, including those requiring review; it is off by default.',
+          'Monitor CPU, GPU, memory, disk, network, fans and available NVMe SMART temperature. View minute-level history for any date range, export .xlsx or clear it in Settings. Check battery health, cycle count, temperature, capacity and nearby device levels, plus public IPv4 and IPv6. Choose automatic power modes for plugged-in and battery use, with optional Low Power Mode at 20% or below. Charge to 100% immediately when macOS offers it. Review caches, logs, preference leftovers and orphaned AI workspaces before moving them to Trash; optional cleanup runs every 7, 15 or 30 days. Scheduled cleanup is off by default; choose trusted items only or all actionable items, including those needing review.',
         points: ['Chip-level monitoring', 'History charts and .xlsx export', 'Review before moving to Trash'],
       },
     },
@@ -153,7 +149,7 @@ export const en: SiteContent = {
   extensions: {
     eyebrow: 'INSIDE AND OUTSIDE THE ISLAND',
     title: 'Away from the island, <span>still a desktop tool.</span>',
-    lede: 'Screenshots, voice, media, browser downloads and AI management each show up wherever they are easiest to reach.',
+    lede: 'Screenshots, image and audio tools, voice, media, browser downloads and AI management each appear where they are easiest to reach.',
     ariaLabel: 'Standalone desktop capabilities',
     summaryMono: 'BEYOND THE ISLAND',
     summaryLede: 'Frequently used capabilities, each where it feels natural.',
@@ -162,12 +158,12 @@ export const en: SiteContent = {
     features: {
       floatingIsland: {
         title: 'A floating island that follows your layout',
-        description: 'Use the camera position or choose a custom position along a screen edge. Your custom placement is remembered when switching modes. Compact horizontal and vertical layouts adapt their length to status icons, AI tasks, downloads and media, with an option to show more information.',
+        description: 'Use the camera position or choose a custom position along a screen edge. Your custom placement is remembered when switching modes. Compact horizontal and vertical layouts adapt their length to status icons, AI tasks, downloads and media, with an option to show more information. Reorder island modules or restore the default order in Settings → Info.',
         detail: 'Custom placement · Persistent status icons · Adaptive information',
       },
       dailyBriefing: {
         title: 'Your day, in a daily briefing',
-        description: 'Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available; unavailable data is not presented as measured zero. Choose a separate export folder in Settings → Save Location.',
+        description: 'Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available; unavailable data is not presented as measured zero. Choose a separate export folder in Settings → Save Location. Optionally include real account allowances and their sampling times.',
         detail: '8 templates · Select content · Preview and scheduled PNG export',
       },
       userCare: {
@@ -190,6 +186,16 @@ export const en: SiteContent = {
         description: 'Review permission status in Settings → Permissions, start supported requests or open the relevant System Settings page. The same permission list is available during first-launch onboarding; manual permissions are labelled accordingly.',
         detail: 'Permission status · Requests and settings links · Shared with onboarding',
       },
+      imageTools: {
+        title: 'Image tools',
+        description: 'Nine local tools in Settings: compress; convert PNG, JPEG, WebP, AVIF and JPEG XL; resize and crop; compare the smallest format; rotate and mirror; add watermarks; mosaic and blur; recognise text and tables; and remove backgrounds. Export batches or ZIP files, with a separate image-tools folder in Settings → Save Location.',
+        detail: '9 local tools · Five formats · Batch and ZIP export',
+      },
+      audioTools: {
+        title: 'Audio tools',
+        description: 'Twenty-seven local operations in Settings, including conversion, compression, trimming, splitting, joining and mixing, extracting audio from video, LUFS normalisation, fades, speed and pitch, noise and silence removal, EQ, dynamics, channels and tags. Requires FFmpeg and ffprobe; choose a file or folder for export.',
+        detail: '27 local operations · Editing and mixing · FFmpeg and ffprobe',
+      },
       pdf: {
         title: 'PDF tools',
         description: 'Available in Settings rather than the island module carousel. Fourteen operations that all run on your Mac: merge, split, rotate, crop, convert images and Office files, render to images, extract text, add text or image watermarks, add page numbers, encrypt, remove a password and edit metadata.',
@@ -205,7 +211,7 @@ export const en: SiteContent = {
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
         description:
-          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the screenshot folder set in Settings → Save Location. Pinned screenshots stay in place when capturing again.',
+          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the screenshot folder set in Settings → Save Location. Pinned screenshots stay in place when capturing again. Use slow automatic scrolling for long captures, and capture HDR screenshots on supported devices.',
         detail: 'Highlight and extract · OCR, translation and copy · Rounded corners and .xlsx',
       },
       voice: {
@@ -229,7 +235,7 @@ export const en: SiteContent = {
       copyAssistant: {
         title: 'Quick Actions and smart next steps',
         description:
-          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0. Saved text and images use the separate Quick Actions folder in Settings → Save Location.',
+          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0. Saved text and images use the separate Quick Actions folder in Settings → Save Location. When an app will not open, Quick Actions can check its integrity, signature and macOS security policy, then remove quarantine flags and open it after the checks pass.',
         detail: 'On-device recognition · Live currency conversion · Command+N by default',
       },
       aiManagement: {
@@ -261,7 +267,7 @@ export const en: SiteContent = {
   ai: {
     eyebrow: 'AI WITHOUT A BLACK BOX',
     title: 'See AI status <span>without reading the conversation.</span>',
-    lede: 'Bring session status from CLIs, desktop apps and IDEs into the island. Token trends use reliable numeric usage, never context occupancy as consumption.',
+    lede: 'Follow tasks by application, inspect model usage by date and check real account allowances. Status and numeric records stay on your Mac; conversations are not read.',
     summaryMono: 'ON-DEVICE STATUS / CLEAR BOUNDARIES',
     summaryLede: 'Different harnesses. One place for status.',
     summaryNote:
@@ -271,7 +277,7 @@ export const en: SiteContent = {
       'Detects supported CLI, desktop and IDE activity. Delta, Orca, WorkBuddy and WorkBuddy AI each retain their own name.',
     toolsAriaLabel: 'Supported AI tools and harnesses',
     usageNote:
-      'Session detection does not imply usage tracking. Delta uses its local numeric usage ledger. Orca reuses and deduplicates bound CLI usage under the underlying provider. WorkBuddy AI is session-only for now: context occupancy and credits are not converted into cumulative tokens or USD cost.',
+      'Session detection, token history and account allowances have separate data sources. Delta uses its local numeric ledger; Orca deduplicates bound CLI usage under the underlying provider. WorkBuddy AI can detect sessions and query credits; context occupancy and credits are not converted into tokens or USD cost. Quota availability follows the provider and login method.',
     boundariesHeading: 'Only status boundaries are recorded',
     privacyPoints: [
       'Parses status metadata (including session titles, timestamps, models and session identifiers) and reliable numeric usage only',

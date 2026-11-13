@@ -6,25 +6,25 @@ import {GLASS_BLUR, Waveform, waveLevels} from '../components/Glass';
 import {Island, modulePhase} from '../components/Island';
 import {AlbumArt, IslandBody, NowPlayingHeader, TABS, lyricAt} from '../components/IslandChrome';
 import {HomeModule} from '../modules/HomeModule';
-import {copy, track} from '../content';
+import {aiTasks, copy, track} from '../content';
 import {FilmMotion, ZislaMotion, ease, easeOutAt, linear, springAt} from '../motion';
 import {BAR_HEIGHT, MODULE_HEIGHT, STAGE, alpha, black, clamp01, color, islandHeightFor, lerp, white} from '../theme';
 
 const CENTER = STAGE.width / 2;
 
-// 光标进入触发区 → 岛体展开 → 光标离开 → 收回。全片只有这一段是完整的一次进出。
+// Show one full enter, expand, leave and collapse interaction in the opening.
 const REVEAL_START = 168;
 const COLLAPSE_START = 396;
 
-export const Scene1Awakening = () => {
-  const frame = useCurrentFrame();
+export const Scene1Awakening = ({duration = 360}: {duration?: number}) => {
+  const frame = Math.min(479, useCurrentFrame() * 480 / duration);
   const {fps} = useVideoConfig();
 
   const enter = springAt(frame, fps, REVEAL_START, ZislaMotion.islandReveal, 42);
   const exit = springAt(frame, fps, COLLAPSE_START, ZislaMotion.islandRecycle, 34);
   const reveal = Math.max(0, enter - exit);
 
-  // 媒体先起播，收起态两侧的封面与波形才跟着出现
+  // Compact artwork and waves appear only after playback starts.
   const playing = frame >= 404;
   const wing = lerp(0, 74, clamp01((frame - 410) / 26));
   const levels = waveLevels(frame, 1, 0);
@@ -50,7 +50,7 @@ export const Scene1Awakening = () => {
       <Wallpaper dim={0.1} />
       <MenuBar />
 
-      {/* 顶部中央 6 pt 触发区：光标进入前先亮起，岛体展开后由岛体盖住 */}
+      {/* Highlight the 6 pt trigger before entry; the expanded island covers it. */}
       <div className="absolute" style={{left: CENTER - 110, top: BAR_HEIGHT, width: 220, height: 6, opacity: hint}}>
         <div className="absolute inset-0" style={{background: `linear-gradient(to bottom, ${white(0.6)}, ${white(0)})`}} />
         <div
@@ -69,7 +69,7 @@ export const Scene1Awakening = () => {
 
       <Island
         reveal={reveal}
-        height={islandHeightFor(MODULE_HEIGHT.home)}
+        height={islandHeightFor(MODULE_HEIGHT.home + 72 * clamp01(springAt(frame, fps, 252, ZislaMotion.surfaceResize, 24)))}
         wing={wing}
         left={<AlbumArt size={26} radius={5} />}
         right={<Waveform width={34} height={18} levels={levels} />}
@@ -80,7 +80,7 @@ export const Scene1Awakening = () => {
           active={TABS.home}
         >
           <div style={modulePhase(moduleIn, 1, true)}>
-            <HomeModule cards={['media', 'download']} downloadProgress={downloadProgress} />
+            <HomeModule cards={['media', 'ai']} downloadProgress={downloadProgress} tasks={aiTasks.slice(0, frame >= 252 ? 3 : 1)} aiProgress={0.74} />
           </div>
         </IslandBody>
       </Island>

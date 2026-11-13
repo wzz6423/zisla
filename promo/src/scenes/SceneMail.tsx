@@ -11,21 +11,17 @@ import {MAIL_HEIGHT, MailModule, mailDraft, mailUnreadCount} from '../modules/Ma
 import {ZislaMotion, ease, fadeWindow, linear, springAt, track} from '../motion';
 import {ISLAND, STAGE, black, clamp01, color, islandHeightFor, white} from '../theme';
 
-const OPEN = 22;
-const READ = 90;
-const COMPOSE = 210;
-const TO = 246;
-const SUBJECT = 306;
-const BODY = 366;
-const SEND = 468;
-const SENT = 500;
+export const MAIL_DURATION = 540;
+export const MAIL_TIMING = {read: 48, compose: 138, to: 162, subject: 207, body: 244, send: 348, sent: 372, allRead: 430} as const;
+const OPEN = 14;
+const {read: READ, compose: COMPOSE, to: TO, subject: SUBJECT, body: BODY, send: SEND, sent: SENT} = MAIL_TIMING;
 
 const MAIL_ROW = {x: 372, y: 246};
 const COMPOSE_BUTTON = {x: 444, y: 155};
 const SEND_BUTTON = {x: 974, y: 523};
 
-export const SceneMail = () => {
-  const frame = useCurrentFrame();
+export const SceneMail = ({duration = MAIL_DURATION}: {duration?: number}) => {
+  const frame = Math.min(MAIL_DURATION - 1, useCurrentFrame() * MAIL_DURATION / duration);
   const {fps} = useVideoConfig();
   const selected = frame < READ ? 0 : 1;
   const compose = Math.min(linear(frame, [COMPOSE, COMPOSE + 12], [0, 1]), linear(frame, [SENT, SENT + 12], [1, 0]));
@@ -37,6 +33,7 @@ export const SceneMail = () => {
   const body = mailDraft.body.slice(0, Math.floor(typedChars(frame, BODY, mailDraft.body.length, 64, fps)));
   const focus = frame < TO || frame >= SEND ? null : frame < SUBJECT ? 'to' : frame < BODY ? 'subject' : 'body';
   const sending = frame >= SEND && frame < SENT;
+  const allRead = frame >= MAIL_TIMING.allRead;
 
   const cursorX = track(frame, [
     [0, 1066],
@@ -54,6 +51,8 @@ export const SceneMail = () => {
     [SEND - 14, SEND_BUTTON.x],
     [SEND + 12, SEND_BUTTON.x],
     [SENT + 34, 1070],
+    [MAIL_TIMING.allRead - 15, 420],
+    [MAIL_TIMING.allRead + 18, 420],
   ]);
   const cursorY = track(frame, [
     [0, 430],
@@ -71,9 +70,11 @@ export const SceneMail = () => {
     [SEND - 14, SEND_BUTTON.y],
     [SEND + 12, SEND_BUTTON.y],
     [SENT + 34, 577],
+    [MAIL_TIMING.allRead - 15, 155],
+    [MAIL_TIMING.allRead + 18, 155],
   ]);
-  const pressed = [READ, COMPOSE, TO - 6, SUBJECT - 6, BODY - 6, SEND].some((at) => frame >= at && frame < at + 6) ? 1 : 0;
-  const cursorOpacity = Math.min(linear(frame, [0, 10], [0, 1]), linear(frame, [SENT + 30, SENT + 50], [1, 0]));
+  const pressed = [READ, COMPOSE, TO - 6, SUBJECT - 6, BODY - 6, SEND, MAIL_TIMING.allRead].some((at) => frame >= at && frame < at + 6) ? 1 : 0;
+  const cursorOpacity = Math.min(linear(frame, [0, 10], [0, 1]), linear(frame, [MAIL_TIMING.allRead + 20, MAIL_TIMING.allRead + 40], [1, 0]));
 
   return (
     <>
@@ -85,11 +86,11 @@ export const SceneMail = () => {
           height={islandHeightFor(MAIL_HEIGHT)}
           wing={40}
           left={<Mail size={17} strokeWidth={2} color={white(0.92)} />}
-          right={<span className="tabular text-[12px] font-semibold" style={{color: color.blue}}>{mailUnreadCount(selected)}</span>}
+          right={<span className="tabular text-[12px] font-semibold" style={{color: color.blue}}>{mailUnreadCount(selected, allRead)}</span>}
         >
           <IslandBody header={<StatusHeader />} active={TABS.mail}>
             <div className="absolute inset-0" style={modulePhase(moduleIn, 1, true)}>
-              <MailModule frame={frame} selected={selected} compose={compose} to={to} subject={subject} body={body} focus={focus} sending={sending} />
+              <MailModule frame={frame} selected={selected} compose={compose} to={to} subject={subject} body={body} focus={focus} sending={sending} allRead={allRead} />
             </div>
           </IslandBody>
           {frame >= SENT ? (
@@ -97,7 +98,7 @@ export const SceneMail = () => {
               className="absolute flex items-center rounded-[8px] px-[10px] text-[10.5px] font-medium"
               style={{left: ISLAND.moduleInset, right: ISLAND.moduleInset, bottom: ISLAND.moduleInset, height: 26, background: black(0.62), color: white(0.9), opacity: notice, transform: `translateY(${10 * (1 - notice)}px)`}}
             >
-              Message sent
+              {allRead ? 'All messages marked as read' : 'Message sent'}
             </div>
           ) : null}
         </Island>
@@ -107,7 +108,7 @@ export const SceneMail = () => {
         <ClickRipple x={SEND_BUTTON.x} y={SEND_BUTTON.y} progress={linear(frame, [SEND, SEND + 22], [0, 1])} />
         <Cursor x={cursorX} y={cursorY} pressed={pressed} opacity={cursorOpacity} />
       </Camera>
-      <Caption text="Read, write, and send from the island." opacity={fadeWindow(frame, OPEN + 22, 604, 14)} bottom={40} />
+      <Caption text="Read, write, send. Mark the inbox read in one click." opacity={fadeWindow(frame, OPEN + 22, MAIL_DURATION - 1, 14)} bottom={40} />
     </>
   );
 };

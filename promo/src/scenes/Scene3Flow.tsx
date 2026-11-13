@@ -27,6 +27,8 @@ import {ShelfModule} from '../modules/ShelfModule';
 import {shelfItemPoint, shelfMenuPlacement} from '../modules/shelfLayout';
 import {FilmMotion, ZislaMotion, ease, easeOutAt, fadeWindow, linear, springAt} from '../motion';
 import {filmFrame} from '../timeline';
+import {ShelfSelectionTour} from '../modules/tour/ShelfSelectionTour';
+import {NativeModuleSurface} from '../modules/tour/TourSurface';
 import {ISLAND, MODULE_HEIGHT, STAGE, clamp01, color, islandHeightFor, lerp, white} from '../theme';
 
 const CENTER = STAGE.width / 2;
@@ -68,12 +70,14 @@ const BROWSER = {x: 260, y: 150, width: 760, height: 470};
 // Center of the existing Open Folder quick action.
 const TOAST_ACTION = {x: 808, y: 18};
 
-export const Scene3Flow = () => {
-  const localFrame = useCurrentFrame();
-  const frame = localFrame * 780 / 600;
+export const FLOW_DURATION = 1080;
+export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
+  const sourceFrame = useCurrentFrame();
+  const localFrame = Math.min(FLOW_DURATION - 1, sourceFrame * FLOW_DURATION / duration);
+  const frame = Math.min(localFrame, 540) * 780 / 540;
   const {fps} = useVideoConfig();
   // Shared media and focus counters stay continuous across scenes.
-  const played = filmFrame('flow', localFrame);
+  const played = filmFrame('flow', sourceFrame);
   const elapsed = song.elapsed + played / fps;
   const levels = waveLevels(frame, 1, 0);
   const spectrum = [0, 1, 2, 3, 4, 5, 6].flatMap((seed) => [...waveLevels(frame, 1, seed)]);
@@ -135,12 +139,16 @@ export const Scene3Flow = () => {
 
   const mediaWing = lerp(74, 0, clamp01((frame - HANDOFF.grab - 16) / 20));
 
-  if (localFrame >= 600) return (
+  if (localFrame >= 540 && localFrame < 780) return <NativeModuleSurface title="Select once. Act on the right files." caption="Multi-select · Images to PDF · OCR to Notes · Video to Studio" module="shelf" height={355}>
+    <ShelfSelectionTour frame={localFrame - 540} />
+  </NativeModuleSurface>;
+
+  if (localFrame >= 780) return (
     <>
       <Wallpaper dim={0.25} /><MenuBar /><Notch />
-      <Headline lines={['Bring the video. Keep the audio.']} top={104} size={38} align="left" opacity={clamp01((localFrame - 600) / 12)} />
-      <GlassPanel style={{left: 120, top: 185, width: 1040, height: 452}}><DownloadTourModule frame={localFrame - 600} /></GlassPanel>
-      <Cursor x={localFrame < 666 ? 195 : localFrame < 686 ? 316 : 1073} y={localFrame < 666 ? 287 : localFrame < 686 ? 367 : 425} pressed={localFrame >= 686 && localFrame < 692 ? 1 : 0} opacity={clamp01((localFrame - 608) / 12)} />
+      <Headline lines={['Bring the video. Keep the audio.']} top={104} size={38} align="left" opacity={clamp01((localFrame - 780) / 12)} />
+      <GlassPanel style={{left: 120, top: 185, width: 1040, height: 452}}><DownloadTourModule frame={localFrame - 780} /></GlassPanel>
+      <Cursor x={localFrame < 846 ? 195 : localFrame < 866 ? 316 : 1073} y={localFrame < 846 ? 287 : localFrame < 866 ? 367 : 425} pressed={localFrame >= 866 && localFrame < 872 ? 1 : 0} opacity={Math.min(clamp01((localFrame - 788) / 12), linear(localFrame, [955, 979], [1, 0]))} />
     </>
   );
 

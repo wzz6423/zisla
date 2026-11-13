@@ -1,8 +1,10 @@
 import type {LucideIcon} from 'lucide-react';
+import type {ReactNode} from 'react';
 import {
   AlignLeft,
   Archive,
   Camera,
+  Check,
   ClipboardPaste,
   CodeXml,
   Copy,
@@ -17,8 +19,10 @@ import {
   Search,
   Share,
   SquarePen,
+  StickyNote,
   Video,
   X,
+  CircleCheck,
 } from 'lucide-react';
 import {TextButton} from '../components/Glass';
 import type {ShelfItem, ShelfKind} from '../content';
@@ -27,6 +31,7 @@ import {black, color} from '../theme';
 import {shelfItemLayout} from './shelfLayout';
 
 export const SHELF_ICONS: Record<ShelfKind, LucideIcon> = {
+  note: StickyNote,
   image: Image,
   folder: Folder,
   url: Link,
@@ -55,6 +60,8 @@ export const CATEGORY_ICONS: readonly LucideIcon[] = [
   FileQuestion,
 ];
 
+export const shelfCategoryCounts = (items: readonly ShelfItem[]) => [items.length, ...(['note', 'screenshot', 'folder', 'image', 'url', 'video', 'audio', 'text', 'document', 'archive', 'code'] as const).map((kind) => items.filter((item) => item.kind === kind).length), 0];
+
 type ShelfModuleProps = {
   items: readonly ShelfItem[];
   // A fractional count animates the last file settling into the grid.
@@ -68,6 +75,8 @@ type ShelfModuleProps = {
   // Highlight the shelf drop target while the file hovers over it.
   dropHover?: number;
   selectedCategory?: number;
+  selection?: readonly number[];
+  detail?: ReactNode;
 };
 
 export const ShelfModule = ({
@@ -78,6 +87,8 @@ export const ShelfModule = ({
   actionGlow = 0,
   dropHover = 0,
   selectedCategory = 0,
+  selection,
+  detail,
 }: ShelfModuleProps) => (
   <div className="absolute inset-0 flex gap-[6px]">
     <div
@@ -117,7 +128,8 @@ export const ShelfModule = ({
         <div className="flex items-center gap-[6px]">
           <TextButton icon={SquarePen} label="Take a note" />
           <TextButton icon={ClipboardPaste} label="Paste" />
-          <div className="flex items-center gap-[6px]" style={{opacity: moreButtons}}>
+          <TextButton icon={CircleCheck} label={selection ? 'Done' : 'Select'} />
+          <div className="flex items-center gap-[6px]" style={{opacity: selection ? 0 : moreButtons}}>
             <TextButton icon={FileText} label="Quick Notes" />
             <TextButton icon={Copy} label="Copy" />
             <TextButton icon={Share} label="Share" highlight={actionGlow} />
@@ -125,24 +137,25 @@ export const ShelfModule = ({
           </div>
         </div>
       </div>
-      <div className="flex h-[61px] shrink-0 flex-wrap content-center items-center gap-[6px] px-[10px] py-[6px]">
+      <div className="flex h-[31px] shrink-0 items-center gap-[6px] overflow-hidden px-[10px] py-[3px]">
         {shelfCategories.map((category, index) => {
           const Icon = CATEGORY_ICONS[index] ?? Inbox;
           const selected = index === selectedCategory;
+          const count = shelfCategoryCounts(items)[index]!;
           return (
             <div
               key={category.name}
-              className="flex items-center gap-[5px] rounded-full px-2 py-1 text-[10px] font-medium"
+              className="flex shrink-0 items-center gap-[5px] rounded-full px-2 py-1 text-[10px] font-medium"
               style={{
                 background: selected ? color.fillCard : 'transparent',
                 boxShadow: selected ? '0 1px 3px rgba(0,0,0,0.25)' : undefined,
                 color: selected ? color.label : color.secondary,
-                opacity: category.count === 0 ? 0.4 : 1,
+                opacity: count === 0 && index !== 0 ? 0.4 : 1,
               }}
             >
               <Icon size={10} strokeWidth={2.4} />
               <span>{category.name}</span>
-              <span className="tabular font-mono text-[9px] text-label-3">{category.count}</span>
+              {index > 0 ? <span className="tabular font-mono text-[9px] text-label-3">{count}</span> : null}
             </div>
           );
         })}
@@ -152,7 +165,8 @@ export const ShelfModule = ({
         <span className="text-[11px] text-label-3">Search Shelf Content</span>
       </div>
       <div style={{height: 1, background: color.divider}} />
-      <div className="relative min-h-0 flex-1" style={{padding: '7px 8px 7px 4px'}}>
+      {selection ? <div className="flex shrink-0 items-center gap-[10px] px-[10px]" data-feature="shelf.selection" style={{height: 27, fontSize: 10}}><span>{selection.length} items selected</span><div className="flex-1" /><span>Select all</span><span>Clear selection</span><span>Actions ⌄</span></div> : null}
+      {detail ? <div className="relative min-h-0 flex-1">{detail}</div> : <div className="relative min-h-0 flex-1" style={{padding: '7px 8px 7px 4px'}}>
         {items.length === 0 ? (
           <div
             className="flex h-full flex-col items-center justify-center gap-[7px]"
@@ -193,12 +207,12 @@ export const ShelfModule = ({
                 className="absolute flex items-center justify-center rounded-full"
                 style={{right: 0, top: 0, width: 14, height: 14, background: black(0.72)}}
               >
-                <X size={8} strokeWidth={3.2} color="#fff" />
+                {selection ? selection.includes(index) ? <Check size={9} strokeWidth={2.5} color="#fff" /> : <span style={{width: 8, height: 8, border: '1px solid #fff', borderRadius: 2}} /> : <X size={8} strokeWidth={3.2} color="#fff" />}
               </div>
             </div>
           );
         })}
-      </div>
+      </div>}
     </div>
   </div>
 );

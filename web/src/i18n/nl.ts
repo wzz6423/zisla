@@ -77,14 +77,14 @@ export const nl = createCatalog({
       dashboard: {
         name: 'Home',
         caption:
-          'Livekaarten verschijnen alleen tijdens een focussessie, AI-taak of download; als er niets gebeurt, nemen ze geen ruimte in.',
+          'Livekaarten verschijnen alleen tijdens een focussessie, AI-taak of download; als er niets gebeurt, nemen ze geen ruimte in. Op de startpagina wordt lopend AI-werk per app gegroepeerd.',
         points: ['Verschijnt op aanvraag', 'Live voortgang', 'Lay-out past zich aan'],
       },
       shelf: {
         name: 'Plank',
         caption:
-          'Sleep bestanden, audio, video of links naar de strook bovenaan om ze op de plank te zetten, in Finder te tonen of het macOS-deelmenu te openen.',
-        points: ['Sleep naar boven om te bewaren', 'Tonen in Finder', 'Systeemdeelmenu'],
+          'Sleep bestanden, audio, video of links naar de bovenkant van het scherm. Zoek en filter items, selecteer er meerdere en kopieer, deel of stuur ze naar Snelle notities. Zet afbeeldingen om naar PDF, stuur herkende tekst naar Snelle notities of bewerk video’s in de opnamestudio. Je kunt bestanden ook in Finder tonen.',
+        points: ['Zoeken en batchacties', 'Afbeeldingen naar PDF en Snelle notities', 'Video’s bewerken in de studio'],
       },
       clipboard: {
         name: 'Klembord',
@@ -95,8 +95,8 @@ export const nl = createCatalog({
       aiMonitor: {
         name: 'AI-monitor',
         caption:
-          'Detecteert activiteit van ondersteunde AI-CLI’s, desktopapps en IDE’s en toont taken, status, tokentrends en een bijdrageheatmap. Alleen gestructureerde gebeurtenissen worden gelezen; gesprekken nooit. Taakdetectie voor Cursor en dagelijks numeriek gebruik zonder resterende quota te tonen voor Cursor en Muse Code zijn toegevoegd; lange tooltaken in Cursor blijven zichtbaar.',
-        points: ['Taken uit tools samengevoegd', 'Trends in tokenverbruik', 'Leest geen prompts of antwoorden'],
+          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst.',
+        points: ['Taken uit meerdere AI-tools', 'Modelgeschiedenis en .xlsx-export', 'Accountquota en resettijden'],
       },
       keyboardSound: {
         name: 'Toetsenbordgeluiden',
@@ -113,13 +113,13 @@ export const nl = createCatalog({
       agenda: {
         name: 'Agenda en weer',
         caption:
-          'Toont het weer op je huidige locatie en op maximaal zes gekozen plaatsen. Bekijk, voeg toe en verwijder agenda-items en herinneringen, en markeer herinneringen als klaar.',
-        points: ['Weerkaarten voor meerdere plaatsen', 'Agenda en taken', 'Herinnering met één tik voltooien'],
+          'Toont het weer op je locatie en op maximaal zes gekozen plaatsen. Bekijk, voeg toe of verwijder agenda-items en herinneringen en markeer herinneringen als voltooid. Items met een vergaderlink tellen vanaf 10 minuten voor de start af en laten je met één klik deelnemen. Maak een vergadernotitie of koppel en ontkoppel bestaande contextnotities.',
+        points: ['Weer en agenda', 'Aftellen vanaf 10 minuten vooraf', 'Deelnemen en notities koppelen'],
       },
       mail: {
         name: 'Mail',
         caption:
-          'Leest ingeschakelde Mail-accounts, toont de inbox en laat je berichten markeren, beantwoorden, opstellen en naar de prullenmand verplaatsen in het eiland, met duidelijke uitleg als een machtiging ontbreekt. Kies tijdens het schrijven bestanden om als bijlagen toe te voegen.',
+          'Leest de accounts die in Mail zijn ingeschakeld. Bekijk de inbox, markeer één bericht of alle inboxberichten als gelezen, antwoord, schrijf en verplaats berichten naar de prullenmand vanuit het eiland. Kies bijlagen tijdens het schrijven; ontbrekende rechten worden duidelijk uitgelegd.',
         points: ['Mail-accounts', 'Antwoorden en opstellen in het eiland', 'Heldere machtigingsuitleg'],
       },
       quickNotes: {
@@ -136,13 +136,13 @@ export const nl = createCatalog({
       toolbox: {
         name: 'Hulpprogramma’s',
         caption:
-          'Focusafteller, scherm wakker houden, scherm- en toetsenbordreiniging (blokkeert ook F1-F12), teleprompter, spiegel en prullenmand op één pagina.',
+          'Focustimer, scherm wakker houden, schermreiniging, toetsenbordreiniging die ook F1-F12 blokkeert, teleprompter, spiegel en prullenmand op één pagina. Pauzeer, hervat of reset de Pomodoro en volg de voortgang in compacte horizontale en verticale weergaven.',
         points: ['Focusafteller', 'Blokkeert F1-F12 tijdens reinigen', 'Teleprompter en spiegel'],
       },
       system: {
         name: 'Systeemstatus',
         caption:
-          'Controleer CPU, GPU, geheugen, schijf, netwerk, ventilatoren en beschikbare NVMe-SMART-temperatuur. Toon de geschiedenis per minuut voor elke periode of exporteer .xlsx; deze blijft tot je haar wist. Bekijk lading, batterijconditie, laadcycli, temperatuur en capaciteit van de Mac en niveaus van nabije apparaten, met aparte openbare IPv4 en IPv6. Controleer caches, logboeken, achtergebleven voorkeuren en AI-werkmappen zonder bewaarde sessie voordat je ze naar de prullenmand verplaatst. Optionele opruiming werkt elke 7, 15 of 30 dagen voor vertrouwde of alle verwerkbare items, inclusief items die controle vereisen; standaard uit.',
+          'Bewaakt CPU, GPU, geheugen, schijf, netwerk, ventilatoren en beschikbare NVMe-SMART-temperatuur. Bekijk geschiedenis per minuut voor een datumbereik, exporteer .xlsx of wis het in Instellingen. Controleer batterijconditie, cycli, temperatuur, capaciteit, apparaten in de buurt en openbare IPv4/IPv6. Kies automatische energiemodi voor netstroom en batterij, optioneel met energiebesparing bij 20% of minder. Laad direct tot 100% wanneer macOS dat aanbiedt. Controleer caches, logs, achtergebleven voorkeuren en verweesde AI-werkruimten voor je ze naar de prullenmand verplaatst; optioneel opruimen kan elke 7, 15 of 30 dagen. Gepland opruimen staat standaard uit; kies alleen vertrouwde items of alle verwerkbare items, ook die nog beoordeeld moeten worden.',
         points: ['Monitoring op chipniveau', 'Geschiedenisgrafieken en .xlsx-export', 'Controleren vóór verplaatsen naar prullenmand'],
       },
     },
@@ -151,7 +151,7 @@ export const nl = createCatalog({
     eyebrow: 'BINNEN EN BUITEN HET EILAND',
     title: 'Buiten het eiland, <span>nog steeds een desktoptool.</span>',
     lede:
-      'Schermafbeeldingen, spraak, media, browserdownloads en AI-beheer verschijnen waar ze het makkelijkst bereikbaar zijn.',
+      'Schermafbeeldingen, beeld- en audiotools, dicteren, media, browserdownloads en AI-beheer verschijnen waar ze makkelijk bereikbaar zijn.',
     ariaLabel: 'Zelfstandige desktopfuncties',
     summaryMono: 'VOORBIJ HET EILAND',
     summaryLede: 'Veelgebruikte functies, elk op een natuurlijke plek.',
@@ -160,12 +160,12 @@ export const nl = createCatalog({
     features: {
       floatingIsland: {
         title: 'Een zwevend eiland dat zich aanpast',
-        description: 'Gebruik de camerapositie of kies een plek aan een schermrand. De eigen positie blijft bewaard bij het wisselen van modus. Horizontale en verticale compacte weergaven passen hun lengte aan pictogrammen, AI-taken, downloads en media aan en kunnen meer informatie tonen.',
+        description: 'Gebruik de camerapositie of kies een plek aan een schermrand. De eigen positie blijft bewaard bij het wisselen van modus. Horizontale en verticale compacte weergaven passen hun lengte aan pictogrammen, AI-taken, downloads en media aan en kunnen meer informatie tonen. Sleep modules in Instellingen → Info naar een andere plek of herstel de standaardvolgorde.',
         detail: 'Eigen positie · Blijvende statuspictogrammen · Aanpasbare informatie',
       },
       dailyBriefing: {
         title: 'Uw dag in een dagoverzicht',
-        description: 'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul. Kies een aparte exportmap onder Instellingen → Opslaglocatie.',
+        description: 'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul. Kies een aparte exportmap onder Instellingen → Opslaglocatie. Je kunt ook echte accountquota en de tijd van de meting opnemen.',
         detail: '8 sjablonen · Inhoud kiezen · Voorvertoning en geplande PNG-export',
       },
       userCare: {
@@ -188,6 +188,16 @@ export const nl = createCatalog({
         description: 'Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. Het eerste welkomstscherm gebruikt dezelfde lijst en markeert handmatige instellingen.',
         detail: 'Toestemmingsstatus · Aanvragen en links · Gedeeld met het welkom',
       },
+      imageTools: {
+        title: 'Afbeeldingstools',
+        description: 'Negen lokale tools in Instellingen: comprimeren; PNG, JPEG, WebP, AVIF en JPEG XL omzetten; schalen en bijsnijden; het kleinste formaat vergelijken; draaien en spiegelen; watermerken; mozaïek en vervaging; tekst en tabellen herkennen; achtergronden verwijderen. Exporteer batches of ZIP-bestanden, met een eigen map in Instellingen → Opslaglocatie.',
+        detail: '9 lokale tools · Vijf formaten · Batch- en ZIP-export',
+      },
+      audioTools: {
+        title: 'Audiogereedschap',
+        description: '27 lokale bewerkingen in Instellingen, zoals omzetten, comprimeren, knippen, splitsen, samenvoegen en mixen, audio uit video halen, LUFS-normalisatie, fades, snelheid en toonhoogte, ruis en stilte verwijderen, EQ, dynamiek, kanalen en tags. Vereist FFmpeg en ffprobe; kies een bestand of map voor de export.',
+        detail: '27 lokale bewerkingen · Bewerken en mixen · FFmpeg en ffprobe',
+      },
       pdf: {
         title: 'PDF-tools',
         description: 'Beschikbaar in Instellingen, buiten de modulecarrousel van het eiland. Veertien bewerkingen op je Mac: samenvoegen, splitsen, draaien, bijsnijden, afbeeldingen en Office-bestanden converteren, renderen, tekst exporteren, watermerken en paginanummers toevoegen, versleutelen, wachtwoord verwijderen en metadata bewerken.',
@@ -203,7 +213,7 @@ export const nl = createCatalog({
       capture: {
         title: 'Schermafbeeldingen, scrollcaptures en vastzetten',
         description:
-          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de screenshotmap onder Instellingen → Opslaglocatie. Vastgezette afbeeldingen blijven bij nieuwe captures staan.',
+          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de screenshotmap onder Instellingen → Opslaglocatie. Vastgezette afbeeldingen blijven bij nieuwe captures staan. Gebruik langzaam automatisch scrollen voor lange schermafbeeldingen; ondersteunde apparaten kunnen HDR vastleggen.',
         detail: 'Markeren en extraheren · Herkennen, vertalen en kopiëren · Ronde hoeken en .xlsx',
       },
       voice: {
@@ -227,7 +237,7 @@ export const nl = createCatalog({
       copyAssistant: {
         title: 'Snelle acties en volgende stappen',
         description:
-          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0. Opgeslagen tekst en afbeeldingen gebruiken de aparte map voor snelle acties onder Instellingen → Opslaglocatie.',
+          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0. Opgeslagen tekst en afbeeldingen gebruiken de aparte map voor snelle acties onder Instellingen → Opslaglocatie. Als een app niet opent, kunnen Snelle acties de integriteit, handtekening en het macOS-beveiligingsbeleid controleren. Na geslaagde controles kunnen ze quarantainekenmerken verwijderen en de app openen.',
         detail: 'Optionele schakelaar · Lokale herkenning · Command+N standaard',
       },
       aiManagement: {
@@ -259,13 +269,14 @@ export const nl = createCatalog({
     eyebrow: 'AI ZONDER BLACK BOX',
     title: 'Zie AI-status <span>zonder het gesprek te lezen.</span>',
     lede:
-      'Taken, status en tokentrends blijven op je Mac. Deze pagina beschrijft de functie en doet niet alsof er een live taakscherm is.',
+      'Bekijk taken per app, modelgebruik per datum en echte accountquota. Status en numerieke gegevens blijven op je Mac; gesprekken worden niet gelezen.',
     summaryMono: 'LOKALE STATUS / DUIDELIJKE GRENZEN',
     summaryLede: 'Verbind de AI-tools die je gebruikt en houd de contextgrenzen van je werk intact.',
     summaryNote: 'Alleen detectiebereik, gegevensgrenzen en verbinding worden uitgelegd; er wordt geen sessie nagebootst.',
     toolsHeading: 'Ondersteunde AI-tools',
     toolsLede: 'Detecteert activiteit van ondersteunde CLI’s, desktopapps en IDE’s en bundelt de taakstatus.',
     toolsAriaLabel: 'Ondersteunde AI-tools',
+    usageNote: 'Sessiedetectie, tokengeschiedenis en accountquota gebruiken aparte bronnen. Delta gebruikt zijn lokale cijferregister; Orca ontdubbelt het gebruik van de gekoppelde CLI en wijst het toe aan de oorspronkelijke aanbieder. WorkBuddy AI kan sessies detecteren en credits opvragen; contextbezetting en credits worden niet omgerekend naar tokens of kosten in dollars. Beschikbare quota hangen af van de aanbieder en inlogmethode.',
     boundariesHeading: 'Alleen statusgrenzen worden vastgelegd',
     privacyPoints: [
       'Leest uit gestructureerde gebeurtenissen alleen type, status, tijd, model en sessie-ID',

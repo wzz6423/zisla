@@ -3,22 +3,24 @@ import chickSprite from '../../../mac/Resources/Pets/chick/sprite.png';
 import {ease, track} from '../motion';
 import {BAR_HEIGHT, NOTCH_WIDTH, STAGE} from '../theme';
 
-export const LAYOUTS_DURATION = 1200;
+export const LAYOUTS_DURATION = 1020;
 export const LAYOUT_ACTIONS = {
-  pill: 132,
-  chooseCustom: 252,
-  custom: 270,
-  bottom: 384,
-  left: 516,
-  right: 648,
-  camera: 780,
-  chick: 906,
-  petRight: 930,
-  chooseFile: 996,
-  importSheet: 1032,
-  name: 1048,
-  import: 1094,
-  imported: 1114,
+  pill: 108,
+  chooseCustom: 222,
+  custom: 246,
+  bottom: 330,
+  left: 414,
+  right: 498,
+  confirm: 582,
+  confirmed: 588,
+  pets: 642,
+  chick: 690,
+  petRight: 738,
+  chooseFile: 786,
+  importSheet: 822,
+  name: 834,
+  import: 888,
+  imported: 906,
 } as const;
 
 export const LAYOUT_SETTINGS = {x: 404, y: 246, width: 472, triggerX: 777, styleY: 322, positionY: 363, adjustY: 404};
@@ -29,18 +31,18 @@ type Placement = {mode: 'camera' | 'custom'; edge: Edge; offset: number; inwardD
 export type LayoutFrame = {x: number; y: number; width: number; height: number};
 
 const CAMERA: Placement = {mode: 'camera', edge: 'top', offset: 0.5, inwardDistance: 0};
-const THICKNESS = 32;
-const LENGTH = 240;
+export const PLACEMENT_PREVIEW_SIZE = 24;
+const ACTIVITY_THICKNESS = 32;
+const ACTIVITY_LENGTH = 62;
+const DRAG_FRAMES = 42;
 const INSET = 8;
 const CURSOR_POINTS = [
-  [0, 1040, 480], [104, 777, 322], [127, 777, 400], [138, 777, 400],
-  [228, 777, 363], [246, 777, 439], [252, 777, 439], [306, 696, 454],
-  [366, 777, 404], [420, 696, 454], [498, 777, 404], [552, 696, 454],
-  [630, 777, 404], [684, 696, 454], [756, 777, 363], [775, 777, 405],
-  [786, 777, 405], [882, 777, 322], [901, 777, 400], [912, 777, 400],
-  [916, 777, 404], [925, 777, 482], [936, 777, 482], [988, 777, 363],
-  [1004, 777, 363], [1026, 780, 432], [1038, 780, 432], [1048, 565, 419],
-  [1084, 772, 514], [1100, 772, 514], [1142, 1010, 540],
+  [0, 1040, 480], [82, 777, 322], [102, 777, 400], [108, 777, 400],
+  [196, 777, 363], [216, 777, 439], [222, 777, 439], [588, 696, 454],
+  [622, 1040, 440], [656, 777, 322], [684, 777, 400], [690, 777, 400],
+  [710, 777, 404], [732, 777, 482], [738, 777, 482], [776, 777, 363],
+  [786, 777, 363], [816, 780, 432], [822, 780, 432], [834, 565, 419],
+  [878, 772, 514], [888, 772, 514], [906, 772, 514], [954, 1010, 540],
 ] as const;
 
 export const CUSTOM_PLACEMENTS: readonly {at: number; placement: Placement}[] = [
@@ -51,16 +53,21 @@ export const CUSTOM_PLACEMENTS: readonly {at: number; placement: Placement}[] = 
 ];
 
 // ScreenLayout uses bottom-up offsets on vertical edges; CSS coordinates run from the top.
-export const placementFrame = (placement: Placement): LayoutFrame => {
-  if (placement.mode === 'camera') return {x: (STAGE.width - LENGTH) / 2, y: 2, width: LENGTH, height: THICKNESS};
+export const placementFrame = (placement: Placement, preview = false): LayoutFrame => {
+  if (placement.mode === 'camera') return {x: (STAGE.width - NOTCH_WIDTH - 80) / 2, y: 2, width: NOTCH_WIDTH + 80, height: ACTIVITY_THICKNESS};
   const vertical = placement.edge === 'left' || placement.edge === 'right';
-  const width = vertical ? THICKNESS : LENGTH;
-  const height = vertical ? LENGTH : THICKNESS;
-  const gap = Math.min(THICKNESS * 3, Math.max(INSET, placement.inwardDistance));
+  const thickness = preview ? PLACEMENT_PREVIEW_SIZE : ACTIVITY_THICKNESS;
+  const length = preview ? PLACEMENT_PREVIEW_SIZE : ACTIVITY_LENGTH + (vertical ? 6 : 0);
+  const width = vertical ? thickness : length;
+  const height = vertical ? length : thickness;
+  const gap = Math.min(thickness * 3, Math.max(INSET, placement.inwardDistance));
   const x = Math.min(STAGE.width - INSET - width, Math.max(INSET, STAGE.width * placement.offset - width / 2));
   const y = Math.min(STAGE.height - INSET - height, Math.max(INSET, STAGE.height * (1 - placement.offset) - height / 2));
   switch (placement.edge) {
-    case 'top': return {x, y: gap, width, height};
+    case 'top': {
+      const overlapsNotch = x < (STAGE.width + NOTCH_WIDTH) / 2 && x + width > (STAGE.width - NOTCH_WIDTH) / 2 && gap < BAR_HEIGHT - 2;
+      return {x, y: overlapsNotch ? BAR_HEIGHT - 2 + INSET : gap, width, height};
+    }
     case 'bottom': return {x, y: STAGE.height - gap - height, width, height};
     case 'left': return {x: gap, y, width, height};
     case 'right': return {x: STAGE.width - gap - width, y, width, height};
@@ -73,7 +80,7 @@ export const placementNearest = (x: number, y: number, preferredEdge: Edge): Pla
   const nearest = distances.filter((entry) => Math.abs(entry[1] - distance) < 0.001);
   const edge = (nearest.find((entry) => entry[0] === preferredEdge) ?? nearest[0])![0];
   const vertical = edge === 'left' || edge === 'right';
-  const gap = Math.min(THICKNESS * 3, Math.max(INSET, distance - THICKNESS / 2));
+  const gap = Math.min(PLACEMENT_PREVIEW_SIZE * 3, Math.max(INSET, distance - PLACEMENT_PREVIEW_SIZE / 2));
   return {mode: 'custom', edge, offset: vertical ? 1 - y / STAGE.height : x / STAGE.width, inwardDistance: gap === INSET ? 0 : gap};
 };
 
@@ -91,42 +98,52 @@ export const petMotionAt = (frame: number, fps: number) => {
 export const layoutStateAt = (frame: number, duration = LAYOUTS_DURATION) => {
   const local = frame * LAYOUTS_DURATION / duration;
   const style = local < LAYOUT_ACTIONS.pill ? 'notch' : 'pill';
-  let placement = CAMERA;
-  let editing = false;
-  let dragging = false;
-  let confirmation = 0;
-  let cursor = {x: LAYOUT_SETTINGS.triggerX, y: LAYOUT_SETTINGS.styleY};
-  let pressed = false;
+  const editing = local >= LAYOUT_ACTIONS.chooseCustom && local < LAYOUT_ACTIONS.confirmed;
+  const dragging = editing && local >= LAYOUT_ACTIONS.custom && local < LAYOUT_ACTIONS.right + DRAG_FRAMES;
+  const confirmation = Math.min(1, Math.max(0, (local - LAYOUT_ACTIONS.confirm) / 18));
+  const committedPlacement = local < LAYOUT_ACTIONS.confirmed ? CAMERA : CUSTOM_PLACEMENTS[3]!.placement;
+  let previewPlacement: Placement = {...CAMERA, mode: 'custom'};
+  let cursor = {
+    x: track(local, CURSOR_POINTS.map(([at, x]) => [at, x])),
+    y: track(local, CURSOR_POINTS.map(([at, , y]) => [at, y])),
+  };
   for (const step of CUSTOM_PLACEMENTS) {
-    const previous = placement.mode === 'camera' && local >= LAYOUT_ACTIONS.chooseCustom && local < LAYOUT_ACTIONS.camera
-      ? {...placement, mode: 'custom' as const} : placement;
-    const start = step.at - 18;
-    if (local >= step.at + 18) placement = step.placement;
+    const previous = previewPlacement;
+    const from = placementFrame(previous, true);
+    const to = placementFrame(step.placement, true);
+    if (local >= step.at + DRAG_FRAMES) previewPlacement = step.placement;
     else if (local >= step.at) {
-      const from = placementFrame(previous);
-      const to = placementFrame(step.placement);
-      const x = ease(local, [step.at, step.at + 18], [from.x + from.width / 2, to.x + to.width / 2]);
-      const y = ease(local, [step.at, step.at + 18], [from.y + from.height / 2, to.y + to.height / 2]);
-      placement = placementNearest(x, y, previous.edge);
-    }
-    if (local >= start && local < step.at + 36) {
-      if (local < step.at) placement = previous;
-      editing = true;
-      dragging = local >= step.at && local < step.at + 18;
-      confirmation = Math.min(1, Math.max(0, (local - step.at - 30) / 18));
-      const from = placementFrame(previous);
-      const to = placementFrame(step.placement);
       cursor = {
-        x: track(local, [[start, LAYOUT_SETTINGS.triggerX], [step.at, from.x + from.width / 2], [step.at + 18, to.x + to.width / 2], [step.at + 29, PLACEMENT_CONFIRM.x], [step.at + 36, PLACEMENT_CONFIRM.x]]),
-        y: track(local, [[start, step.at === LAYOUT_ACTIONS.custom ? 439 : LAYOUT_SETTINGS.adjustY], [step.at, from.y + from.height / 2], [step.at + 18, to.y + to.height / 2], [step.at + 29, PLACEMENT_CONFIRM.y], [step.at + 36, PLACEMENT_CONFIRM.y]]),
+        x: ease(local, [step.at, step.at + DRAG_FRAMES], [from.x + from.width / 2, to.x + to.width / 2]),
+        y: ease(local, [step.at, step.at + DRAG_FRAMES], [from.y + from.height / 2, to.y + to.height / 2]),
       };
-      pressed = dragging || (local >= step.at + 30 && local < step.at + 36)
-        || (local >= LAYOUT_ACTIONS.chooseCustom && local < LAYOUT_ACTIONS.chooseCustom + 6);
+      previewPlacement = placementNearest(cursor.x, cursor.y, previous.edge);
+      break;
+    }
+    if (editing && local >= step.at && local < step.at + DRAG_FRAMES * 2) {
+      cursor = {
+        x: to.x + to.width / 2,
+        y: to.y + to.height / 2,
+      };
     }
   }
-  if (local >= LAYOUT_ACTIONS.camera) placement = CAMERA;
-  const rect = style === 'notch' ? {x: (STAGE.width - NOTCH_WIDTH - 80) / 2, y: 0, width: NOTCH_WIDTH + 80, height: BAR_HEIGHT + 2} : placementFrame(placement);
-  const pets = local >= LAYOUT_ACTIONS.camera;
+  if (editing && local < LAYOUT_ACTIONS.custom) {
+    const from = placementFrame(previewPlacement, true);
+    cursor = {
+      x: ease(local, [LAYOUT_ACTIONS.chooseCustom, LAYOUT_ACTIONS.custom], [LAYOUT_SETTINGS.triggerX, from.x + from.width / 2]),
+      y: ease(local, [LAYOUT_ACTIONS.chooseCustom, LAYOUT_ACTIONS.custom], [439, from.y + from.height / 2]),
+    };
+  } else if (editing && local >= LAYOUT_ACTIONS.right + DRAG_FRAMES) {
+    const from = placementFrame(previewPlacement, true);
+    cursor = {
+      x: ease(local, [LAYOUT_ACTIONS.right + DRAG_FRAMES + 12, LAYOUT_ACTIONS.confirm - 6], [from.x + from.width / 2, PLACEMENT_CONFIRM.x]),
+      y: ease(local, [LAYOUT_ACTIONS.right + DRAG_FRAMES + 12, LAYOUT_ACTIONS.confirm - 6], [from.y + from.height / 2, PLACEMENT_CONFIRM.y]),
+    };
+  }
+  const pressed = dragging || [LAYOUT_ACTIONS.pill, LAYOUT_ACTIONS.chooseCustom, LAYOUT_ACTIONS.confirm, LAYOUT_ACTIONS.chick, LAYOUT_ACTIONS.petRight, LAYOUT_ACTIONS.chooseFile, LAYOUT_ACTIONS.importSheet, LAYOUT_ACTIONS.name, LAYOUT_ACTIONS.import].some((at) => local >= at && local < at + 6);
+  const placement = editing ? previewPlacement : committedPlacement;
+  const rect = style === 'notch' ? {x: (STAGE.width - NOTCH_WIDTH - 80) / 2, y: 0, width: NOTCH_WIDTH + 80, height: BAR_HEIGHT} : placementFrame(placement, editing);
+  const pets = local >= LAYOUT_ACTIONS.pets;
   const pet = local < LAYOUT_ACTIONS.chick ? layoutPets.bear : layoutPets.chick;
   const petSide = local < LAYOUT_ACTIONS.petRight ? 'left' : 'right';
   const importStage = local < LAYOUT_ACTIONS.chooseFile ? null
@@ -136,20 +153,20 @@ export const layoutStateAt = (frame: number, duration = LAYOUTS_DURATION) => {
   const petName = importStage === 'imported' ? 'Pixel Chick (Imported)' : pet.name;
   const name = local < LAYOUT_ACTIONS.name ? 'Pocket Chick'
     : 'Pixel Chick'.slice(0, Math.min(11, Math.floor((local - LAYOUT_ACTIONS.name) / 3)));
-  const menu = local >= 104 && local < LAYOUT_ACTIONS.pill ? 'style'
-    : local >= 228 && local < LAYOUT_ACTIONS.chooseCustom ? 'position'
-      : local >= LAYOUT_ACTIONS.camera - 24 && local < LAYOUT_ACTIONS.camera ? 'camera'
-        : local >= 882 && local < LAYOUT_ACTIONS.chick ? 'pet'
-          : local >= 916 && local < LAYOUT_ACTIONS.petRight ? 'side' : null;
-
-  if (!editing) {
-    cursor = {
-      x: track(local, CURSOR_POINTS.map(([at, x]) => [at, x])),
-      y: track(local, CURSOR_POINTS.map(([at, , y]) => [at, y])),
-    };
-    pressed = [LAYOUT_ACTIONS.pill, LAYOUT_ACTIONS.chooseCustom, LAYOUT_ACTIONS.camera, LAYOUT_ACTIONS.chick, LAYOUT_ACTIONS.petRight, LAYOUT_ACTIONS.chooseFile, LAYOUT_ACTIONS.importSheet, LAYOUT_ACTIONS.name, LAYOUT_ACTIONS.import].some((at) => local >= at && local < at + 6);
-  }
-  return {local, style, placement, rect, editing, dragging, confirmation, cursor, pressed, pets, pet, petSide, petName, importStage, name, menu};
+  const menu = local >= 82 && local < LAYOUT_ACTIONS.pill ? 'style'
+    : local >= 196 && local < LAYOUT_ACTIONS.chooseCustom ? 'position'
+      : local >= 656 && local < LAYOUT_ACTIONS.chick ? 'pet'
+        : local >= 710 && local < LAYOUT_ACTIONS.petRight ? 'side' : null;
+  const vertical = placement.edge === 'left' || placement.edge === 'right';
+  const petHeight = 24;
+  const petWidth = petHeight * pet.width / pet.height;
+  const petRect = {
+    x: vertical ? rect.x + (rect.width - petWidth) / 2 : petSide === 'left' ? rect.x - 4 - petWidth : rect.x + rect.width + 4,
+    y: vertical ? petSide === 'left' ? rect.y - 4 - petHeight : rect.y + rect.height + 4 : rect.y + (rect.height - petHeight) / 2,
+    width: petWidth,
+    height: petHeight,
+  };
+  return {local, style, placement, committedPlacement, rect, editing, dragging, confirmation, cursor, pressed, pets, pet, petSide, petRect, petName, importStage, name, menu};
 };
 
 export type LayoutState = ReturnType<typeof layoutStateAt>;

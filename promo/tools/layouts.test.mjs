@@ -18,7 +18,7 @@ const load = (entryPoint) => {
   const isolatedRequire = (name) => name === 'remotion' ? {
     ...Remotion,
     useCurrentFrame: () => clock.frame,
-    useVideoConfig: () => ({fps: 60, width: 1920, height: 1080, durationInFrames: 1200}),
+    useVideoConfig: () => ({fps: 60, width: 1920, height: 1080, durationInFrames: 1020}),
     Img: (props) => React.createElement('img', props),
   } : require(name);
   new Function('require', 'module', 'exports', bundle.outputFiles[0].text)(isolatedRequire, module, module.exports);
@@ -35,7 +35,7 @@ test('a chosen style changes the visible notch into a camera pill', () => {
   const before = layoutStateAt(LAYOUT_ACTIONS.pill - 1);
   const after = layoutStateAt(LAYOUT_ACTIONS.pill + 18);
   assert.equal(before.style, 'notch');
-  assert.equal(before.rect.height, 36);
+  assert.equal(before.rect.height, 34);
   assert.equal(after.style, 'pill');
   assert.equal(after.placement.mode, 'camera');
   assert.equal(after.rect.x + after.rect.width / 2, 640);
@@ -48,32 +48,39 @@ test('a chosen style changes the visible notch into a camera pill', () => {
   assert.match(camera, /data-feature="island.camera"/);
 });
 
-test('dragging reaches all four edges, rotates the layout and keeps confirmed positions', () => {
+test('one continuous preview reaches all four edges and commits only the final position', () => {
   const ui = load('src/scenes/SceneLayouts.tsx');
-  const expectedFrames = [[264, 56, 240, 32], [712, 672, 240, 32], [24, 254.4, 32, 240], [1192, 240, 32, 240]];
+  const expectedFrames = [[372, 56, 24, 24], [820, 680, 24, 24], [24, 362.4, 24, 24], [1200, 348, 24, 24]];
   for (const [index, step] of CUSTOM_PLACEMENTS.entries()) {
     const drag = layoutStateAt(step.at + 8);
-    const confirmed = layoutStateAt(step.at + 38);
-    const later = layoutStateAt(step.at + 65);
+    const preview = layoutStateAt(step.at + 46);
     assert.equal(drag.dragging, true);
     assert.equal(drag.pressed, true);
-    assert.equal(confirmed.editing, false);
-    assert.equal(confirmed.placement.mode, 'custom');
-    assert.equal(confirmed.placement.edge, step.placement.edge);
+    assert.equal(preview.editing, true);
+    assert.equal(preview.committedPlacement.mode, 'camera', 'Dragging must not commit before Done');
+    assert.equal(preview.placement.mode, 'custom');
+    assert.equal(preview.placement.edge, step.placement.edge);
     for (const [field, expected] of Object.entries({x: expectedFrames[index][0], y: expectedFrames[index][1], width: expectedFrames[index][2], height: expectedFrames[index][3]})) {
-      assert.ok(Math.abs(confirmed.rect[field] - expected) < 1e-9, `Wrong ${field} on ${step.placement.edge} edge`);
+      assert.ok(Math.abs(preview.rect[field] - expected) < 1e-9, `Wrong ${field} on ${step.placement.edge} preview`);
     }
-    assert.deepEqual(later.rect, confirmed.rect, 'Confirmed placement must remain in position');
-    const vertical = step.placement.edge === 'left' || step.placement.edge === 'right';
-    assert.equal(confirmed.rect.height > confirmed.rect.width, vertical);
-    const html = ui.render(ui.exports.SceneLayouts, {}, step.at + 38);
+    const html = ui.render(ui.exports.SceneLayouts, {}, step.at + 46);
     assert.match(html, new RegExp(`data-feature="island.custom.${step.placement.edge}"`));
-    assert.doesNotMatch(html, /Press Return to finish/);
+    assert.match(html, /data-placement-stage="preview"/);
+    assert.match(html, /Press Return to finish/);
   }
-  for (let frame = LAYOUT_ACTIONS.chooseCustom; frame < LAYOUT_ACTIONS.camera; frame += 3) {
+  for (let frame = LAYOUT_ACTIONS.chooseCustom; frame < LAYOUT_ACTIONS.confirmed; frame += 3) {
     const {rect} = layoutStateAt(frame);
     assert.ok(rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= 1280 && rect.y + rect.height <= 720, `Pill leaves the screen at frame ${frame}`);
   }
+  const confirmed = layoutStateAt(LAYOUT_ACTIONS.confirmed);
+  assert.equal(confirmed.editing, false);
+  assert.equal(confirmed.placement.edge, 'right');
+  assert.deepEqual(confirmed.rect, {x: 1192, y: 326, width: 32, height: 68});
+  assert.deepEqual(layoutStateAt(LAYOUTS_DURATION - 1).rect, confirmed.rect);
+  const html = ui.render(ui.exports.SceneLayouts, {}, LAYOUT_ACTIONS.confirmed + 12);
+  assert.match(html, /data-feature="island.custom.confirmed"/);
+  assert.match(html, /data-active-tasks="3"/);
+  assert.doesNotMatch(html, /Press Return to finish|>Build<|>74%</);
 });
 
 test('custom offsets retain bottom-up vertical positions and cap the inward distance', () => {
@@ -88,35 +95,41 @@ test('custom offsets retain bottom-up vertical positions and cap the inward dist
   assert.equal(boundary.y, 8);
   assert.equal(placementNearest(64, 64, 'left').edge, 'left');
   assert.equal(placementNearest(64, 64, 'top').edge, 'top');
+  assert.equal(placementNearest(640, 360, 'top').inwardDistance, 72, 'Dragging toward the center keeps the native three-thickness inset cap');
+  const preview = placementFrame({mode: 'custom', edge: 'right', offset: 0.5, inwardDistance: 1000}, true);
+  assert.equal(1280 - preview.x - preview.width, 72, 'Preview distance is capped by its real 24-point thickness');
+  const notch = placementFrame({mode: 'custom', edge: 'top', offset: 0.5, inwardDistance: 0}, true);
+  assert.equal(notch.y, 40, 'Preview must clear the physical notch');
 });
 
 test('the cursor reaches selected options and the displayed confirmation and import buttons', () => {
-  for (const [at, expectedX, expectedY] of [[LAYOUT_ACTIONS.pill, 777, 400], [LAYOUT_ACTIONS.chooseCustom, 777, 439], [LAYOUT_ACTIONS.camera, 777, 405], [LAYOUT_ACTIONS.chick, 777, 400], [LAYOUT_ACTIONS.petRight, 777, 482], [LAYOUT_ACTIONS.chooseFile, 777, 363], [LAYOUT_ACTIONS.importSheet, 780, 432], [LAYOUT_ACTIONS.name, 565, 419], [LAYOUT_ACTIONS.import, 772, 514]]) {
+  for (const [at, expectedX, expectedY] of [[LAYOUT_ACTIONS.pill, 777, 400], [LAYOUT_ACTIONS.chooseCustom, 777, 439], [LAYOUT_ACTIONS.chick, 777, 400], [LAYOUT_ACTIONS.petRight, 777, 482], [LAYOUT_ACTIONS.chooseFile, 777, 363], [LAYOUT_ACTIONS.importSheet, 780, 432], [LAYOUT_ACTIONS.name, 565, 419], [LAYOUT_ACTIONS.import, 772, 514]]) {
     const state = layoutStateAt(at);
     assert.ok(Math.abs(state.cursor.x - expectedX) < 1 && Math.abs(state.cursor.y - expectedY) < 1, `Cursor misses the selected control at frame ${at}`);
     assert.equal(state.pressed, true);
   }
-  for (const step of CUSTOM_PLACEMENTS) {
-    const confirmation = layoutStateAt(step.at + 31);
-    assert.ok(confirmation.cursor.x >= 648 && confirmation.cursor.x <= 720);
-    assert.ok(confirmation.cursor.y >= 438 && confirmation.cursor.y <= 470);
-    assert.equal(confirmation.pressed, true);
-  }
+  const confirmation = layoutStateAt(LAYOUT_ACTIONS.confirm + 1);
+  assert.equal(confirmation.cursor.x, 696);
+  assert.equal(confirmation.cursor.y, 454);
+  assert.equal(confirmation.pressed, true);
+  for (const step of CUSTOM_PLACEMENTS.slice(0, -1)) assert.equal(layoutStateAt(step.at + 62).confirmation, 0, 'Only the final choice gets a confirmation');
 });
 
 test('pet selection and side change alter the companion, and import applies the chosen name', () => {
   const ui = load('src/scenes/SceneLayouts.tsx');
-  const left = ui.render(ui.exports.SceneLayouts, {}, 842);
+  const leftFrame = LAYOUT_ACTIONS.pets + 12;
+  const left = ui.render(ui.exports.SceneLayouts, {}, leftFrame);
   assert.match(left, /data-pet-id="bear"/);
   assert.match(left, /data-pet-side="left"/);
-  const leftX = Number(left.match(/data-feature="pet.left"[^>]*style="left:([^p]+)px/)?.[1]);
-  assert.ok(leftX < 520, 'The left pet must be drawn before the camera pill');
-  const right = ui.render(ui.exports.SceneLayouts, {}, 971);
+  const leftState = layoutStateAt(leftFrame);
+  assert.equal(leftState.petRect.y + leftState.petRect.height + 4, leftState.rect.y, 'Left pet is above a vertical pill');
+  const rightFrame = LAYOUT_ACTIONS.petRight + 12;
+  const right = ui.render(ui.exports.SceneLayouts, {}, rightFrame);
   assert.match(right, /data-pet-id="chick"/);
   assert.match(right, /data-pet-side="right"/);
-  const rightX = Number(right.match(/data-feature="pet.right"[^>]*style="left:([^p]+)px/)?.[1]);
-  assert.equal(rightX, 764, 'The right pet must be drawn after the camera pill');
-  assert.match(ui.render(ui.exports.SceneLayouts, {}, 1010), /Pocket Chick.png/);
+  const rightState = layoutStateAt(rightFrame);
+  assert.equal(rightState.petRect.y, rightState.rect.y + rightState.rect.height + 4, 'Right pet is below a vertical pill');
+  assert.match(ui.render(ui.exports.SceneLayouts, {}, LAYOUT_ACTIONS.chooseFile + 12), /Pocket Chick.png/);
   const named = ui.render(ui.exports.SceneLayouts, {}, LAYOUT_ACTIONS.import - 1);
   assert.match(named, /Pixel Chick/);
   assert.doesNotMatch(named, /Pixel Chick \(Imported\)/);
@@ -147,7 +160,7 @@ test('pets use the exact bundled CC0 images and the native single-frame animatio
   const movedImage = ui.render(ui.exports.LayoutPet, {pet: layoutPets.bear, frame: 42, fps: 60, size: 56});
   assert.notEqual(initialImage, movedImage, 'The pet image must use the frame-driven animation');
   assert.match(initialImage, /data-pet-frame="0"/);
-  for (let frame = 0; frame <= 1200; frame += 3) {
+  for (let frame = 0; frame <= LAYOUTS_DURATION; frame += 3) {
     const motion = petMotionAt(frame, 60);
     assert.ok(motion.scale >= 0.97 && motion.scale <= 1.03);
     assert.ok(Math.abs(motion.lift) <= 0.04);
@@ -155,17 +168,19 @@ test('pets use the exact bundled CC0 images and the native single-frame animatio
 });
 
 test('duration scaling preserves the ending and the confirmed import during crossfade lead', () => {
-  const normal = layoutStateAt(600);
-  const longer = layoutStateAt(608, 1216);
+  const normal = layoutStateAt(510);
+  const longer = layoutStateAt(518, 1036);
   assert.deepEqual(normal, longer);
-  const last = layoutStateAt(1215, 1216);
+  const last = layoutStateAt(1035, 1036);
   assert.equal(last.importStage, 'imported');
   assert.equal(last.petSide, 'right');
   assert.equal(last.style, 'pill');
-  assert.equal(last.placement.mode, 'camera');
+  assert.equal(last.placement.mode, 'custom');
+  assert.equal(last.placement.edge, 'right');
   assert.ok(last.local < LAYOUTS_DURATION);
   const ui = load('src/scenes/SceneLayouts.tsx');
-  const html = ui.render(ui.exports.SceneLayouts, {duration: 1216}, 1215);
+  const html = ui.render(ui.exports.SceneLayouts, {duration: 1036}, 1035);
   assert.match(html, /Pixel Chick \(Imported\)/);
-  assert.match(html, /data-feature="island.camera"/);
+  assert.match(html, /data-feature="island.custom.right"/);
+  assert.match(html, /data-feature="pet.imported"/);
 });

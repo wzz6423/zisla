@@ -23,7 +23,8 @@ test('the full feature tour fills its timeline without gaps', () => {
   const scenes = Object.values(SCENES);
   assert.equal(scenes.length, 10);
   assert.equal(FPS, 60);
-  assert.equal(TOTAL_FRAMES, 11160);
+  assert.equal(TOTAL_FRAMES, 9600);
+  assert.ok(TOTAL_FRAMES / FPS < 186, 'The revised tour must be shorter than the previous film');
   assert.equal(scenes[0].from, 0);
   for (let index = 1; index < scenes.length; index++) {
     assert.equal(scenes[index].from, scenes[index - 1].from + scenes[index - 1].duration);
