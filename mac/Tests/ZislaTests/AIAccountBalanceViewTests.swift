@@ -9,6 +9,30 @@ import ZislaKit
 @MainActor
 struct AIAccountBalanceViewTests {
 
+    @Test(arguments: [AIProvider.codex, .gpt], [ColorScheme.light, .dark])
+    func openAIProviderRendersItsInstalledIconWithItsOwnName(provider: AIProvider, colorScheme: ColorScheme) async throws {
+        let cache = AIMascotImageCache()
+        let colorSpace = try #require(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try #require(CGContext(data: nil, width: 24, height: 24, bitsPerComponent: 8, bytesPerRow: 96,
+            space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 24, height: 24))
+        let image = NSImage(cgImage: try #require(context.makeImage()), size: CGSize(width: 24, height: 24))
+        try #require(cache.image(for: "installed|desktop-\(provider.rawValue)", load: { image }) != nil)
+        let identity = AIMascotIdentity(provider: provider, taskID: "")
+        #expect(identity.displayName == (provider == .gpt ? "ChatGPT" : "Codex"))
+        let bitmap = try await renderOffscreen(AIMascotView(identity: identity, size: 24, imageCache: cache)
+            .environment(\.colorScheme, colorScheme), size: CGSize(width: 24, height: 24))
+        let reference = try await renderOffscreen(Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+            .frame(width: 24, height: 24), size: CGSize(width: 24, height: 24))
+        let center = try #require(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?.usingColorSpace(.sRGB))
+        let expected = try #require(reference.colorAt(x: reference.pixelsWide / 2, y: reference.pixelsHigh / 2)?.usingColorSpace(.sRGB))
+        #expect(abs(center.redComponent - expected.redComponent) < 0.01
+            && abs(center.greenComponent - expected.greenComponent) < 0.01
+            && abs(center.blueComponent - expected.blueComponent) < 0.01,
+            "Both OpenAI brands must render the installed icon in its original colors")
+    }
+
     @Test(arguments: [CGFloat(32), 52])
     func concentricQuotaRingsKeepFiveHoursInsideAndWeekOutside(diameter: CGFloat) throws {
         func render(_ inner: Double?, _ innerSeverity: AIAccountQuotaSeverity?, _ outer: Double?,

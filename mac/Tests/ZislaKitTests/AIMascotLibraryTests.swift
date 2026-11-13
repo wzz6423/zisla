@@ -5,6 +5,46 @@ import Testing
 @testable import ZislaKit
 
 struct AIMascotLibraryTests {
+    @Test(arguments: [("ChatGPT", Optional(AIProvider.gpt)), ("Codex", .codex), ("Gemini", nil)])
+    func openAIApplicationUsesDeclaredBrandEvenWithTheSharedBundleID(brand: String, provider: AIProvider?) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-openai-brand-\(UUID())", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let application = root.appendingPathComponent("Renamed.app", isDirectory: true)
+        let contents = application.appendingPathComponent("Contents", isDirectory: true)
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        let info = ["CFBundleIdentifier": "com.openai.codex", "CFBundleDisplayName": brand,
+            "CFBundleName": "Codex", "CFBundlePackageType": "APPL"]
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: contents.appendingPathComponent("Info.plist"))
+        let resolve: (String) -> URL? = { $0 == "com.openai.codex" ? application : nil }
+        let actual = AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: resolve,
+            applicationDirectories: [], fileExists: { _ in false })
+        #expect(actual?.provider == provider && actual?.url == (provider == nil ? nil : application))
+        for candidate in [AIProvider.codex, .gpt] {
+            #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: candidate,
+                resolveBundleIdentifier: resolve, applicationDirectories: [], fileExists: { _ in false })
+                == (candidate == provider ? application : nil),
+                "An installed icon must never be paired with the other OpenAI brand")
+        }
+    }
+
+    @Test(arguments: [("ChatGPT", AIProvider.gpt), ("Codex", .codex)])
+    func openAIApplicationCanResolveByFileNameWithoutBundleMetadata(brand: String, provider: AIProvider) {
+        let directory = URL(fileURLWithPath: "/fixture/Applications", isDirectory: true)
+        let application = directory.appendingPathComponent("\(brand).app", isDirectory: true)
+        let actual = AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: { _ in nil },
+            applicationDirectories: [directory], fileExists: { $0 == application })
+        #expect(actual?.provider == provider && actual?.url == application)
+    }
+
+    @Test func missingOrUnrecognizedOpenAIApplicationsHaveNoInstalledBrand() {
+        #expect(AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: { _ in nil },
+            applicationDirectories: [], fileExists: { _ in false }) == nil)
+        #expect(AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: { _ in
+            URL(fileURLWithPath: "/fixture/Unknown.app", isDirectory: true)
+        }, applicationDirectories: [], fileExists: { _ in false }) == nil)
+    }
+
     @Test
     func desktopAgentIconsResolveKnownBundlesAndOfflineAssets() {
         let examples: [(AIProvider, String, String, String)] = [

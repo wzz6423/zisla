@@ -5,6 +5,21 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceNoticeTests {
+    @Test(arguments: [[AIProvider.codex, .gpt], [.gpt, .codex]], [false, true])
+    func sharedAccountNoticesUseOneNameMatchingTheirIcon(providers: [AIProvider], pinned: Bool) throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let reading = AIAccountBalance(id: "shared", providers: providers, status: .available,
+            windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)])
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: !pinned, aiAccountBalancePinnedInCustomIsland: pinned)
+        settings.islandPlacement.mode = .custom
+        controller.update(balances: [reading], settings: settings, language: .english)
+        let notice = try #require(queue.left.first)
+        #expect(notice.title == (providers.first == .gpt ? "ChatGPT" : "Codex"))
+        #expect(notice.metadata?["quotaProviderID"] == providers.first?.rawValue)
+        #expect(queue.left.count == 1)
+    }
+
     @Test func chatGPTNoticeUsesTheChatGPTMarkAndPerWindowRemainingColors() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }

@@ -242,15 +242,17 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
 struct AIMascotView: View {
     var identity: AIMascotIdentity
     var size: CGFloat
-    @ObservedObject private var imageCache = AIMascotImageCache.shared
+    @ObservedObject private var imageCache: AIMascotImageCache
     @Environment(\.colorScheme) private var colorScheme
 
     init(
         identity: AIMascotIdentity,
-        size: CGFloat
+        size: CGFloat,
+        imageCache: AIMascotImageCache = .shared
     ) {
         self.identity = identity
         self.size = size
+        self.imageCache = imageCache
     }
 
     var body: some View {
@@ -315,7 +317,7 @@ struct AIMascotView: View {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }
-        case .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
+        case .codex, .gpt, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
             guard let provider = identity.provider else { return nil }
             return imageCache.image(for: "installed|desktop-\(provider.rawValue)") {
                 AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider).map {
