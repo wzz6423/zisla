@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {buildSync} from 'esbuild';
@@ -11,7 +12,7 @@ import * as Remotion from 'remotion';
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-const load = (entryPoint) => {
+const load = (entryPoint, mutate = (source) => source) => {
   const clock = {frame: 0};
   const bundle = buildSync({absWorkingDir: root, entryPoints: [entryPoint], bundle: true, packages: 'external', platform: 'node', format: 'cjs', jsx: 'automatic', write: false, loader: {'.svg': 'dataurl', '.png': 'dataurl'}});
   const module = {exports: {}};
@@ -21,7 +22,7 @@ const load = (entryPoint) => {
     useVideoConfig: () => ({fps: 60, width: 1920, height: 1080, durationInFrames: 960}),
     Img: (props) => React.createElement('img', props),
   } : require(name);
-  new Function('require', 'module', 'exports', bundle.outputFiles[0].text)(isolatedRequire, module, module.exports);
+  new Function('require', 'module', 'exports', mutate(bundle.outputFiles[0].text))(isolatedRequire, module, module.exports);
   return {exports: module.exports, render: (Component, props = {}, frame = 0) => {
     clock.frame = frame;
     return parseFragment(renderToStaticMarkup(React.createElement(Component, props)));
@@ -37,7 +38,7 @@ const analytics = load('src/modules/AIAnalyticsModule.tsx');
 const scene = load('src/scenes/Scene2AICenter.tsx');
 const {AI_ACTIONS, AI_DURATION, aiSceneStateAt, Scene2AICenter} = scene.exports;
 
-test('selected model totals use input plus output and display Codex usage under ChatGPT', () => {
+test('selected model totals use input plus output and show the ChatGPT brand for Codex usage', () => {
   const {DailyModelUsageList, aiModelUsage, aiModelTokenTotal} = analytics.exports;
   assert.equal(aiModelTokenTotal, 601_000);
   assert.equal(aiModelTokenTotal, aiModelUsage.reduce((total, usage) => total + usage.inputTokens + usage.outputTokens, 0));
@@ -50,13 +51,28 @@ test('selected model totals use input plus output and display Codex usage under 
     const row = all(list).find((node) => attr(node, 'data-model') === usage.model);
     assert.equal(Number(attr(row, 'data-token-total')), usage.inputTokens + usage.outputTokens);
   }
+  const verifyLogo = (ui) => {
+    const tree = ui.render(ui.exports.DailyModelUsageList);
+    const row = all(tree).find((node) => attr(node, 'data-model') === 'GPT-5.1 Codex');
+    const src = attr(all(row).find((node) => node.tagName === 'img'), 'src');
+    const data = src.slice(src.indexOf(',') + 1);
+    const svg = src.slice(0, src.indexOf(',')).endsWith(';base64') ? Buffer.from(data, 'base64').toString() : decodeURIComponent(data);
+    assert.equal(svg, readFileSync(new URL('../../mac/Resources/BrandIcons/openai.svg', import.meta.url), 'utf8'));
+  };
+  verifyLogo(analytics);
+  const wrongLogo = load('src/modules/AIAnalyticsModule.tsx', (source) => {
+    assert.ok(source.includes('src: openai_default'));
+    return source.replace('src: openai_default', 'src: cursor_default');
+  });
+  assert.throws(() => verifyLogo(wrongLogo), undefined, 'A different brand mark must fail the rendered model-row check');
 });
 
 test('quota cards preserve 5h and 7d windows, reset dates and a separate Cursor dollar budget', () => {
   const {AIAnalyticsModule, aiAccountBalances, quotaFraction} = analytics.exports;
   const normal = analytics.render(AIAnalyticsModule);
   assert.match(textOf(feature(normal, 'ai.quota.claude')), /Claude5h 72%.*11\/11 13:00 resets7d 44%.*11\/15 09:00 resets/);
-  assert.match(textOf(feature(normal, 'ai.quota.codex')), /Codex \/ ChatGPT5h 68%.*7d 31%/);
+  assert.match(textOf(feature(normal, 'ai.quota.codex')), /^Codex5h 68%.*7d 31%/);
+  assert.doesNotMatch(textOf(feature(normal, 'ai.quota.codex')), /ChatGPT/);
   assert.match(textOf(feature(normal, 'ai.budget.cursor')), /CursorAvailable budget \$68\.5.*12\/01 00:00 resets/);
   assert.doesNotMatch(textOf(normal), /gateway|Used |Checked |Input /);
   for (const balance of aiAccountBalances) for (const window of balance.windows) {

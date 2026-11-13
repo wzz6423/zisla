@@ -1,6 +1,7 @@
 import {Img} from 'remotion';
 import {Gauge, List} from 'lucide-react';
 import cursorLogo from '../../../mac/Resources/BrandIcons/cursor.svg';
+import openaiLogo from '../../../mac/Resources/BrandIcons/openai.svg';
 import {ProviderLogo} from '../components/IslandChrome';
 import type {Provider} from '../content';
 import {tokenAbbreviation} from '../content';
@@ -47,7 +48,7 @@ export const aiAccountBalances: readonly AccountBalance[] = [
     {id: 'five_hour', kind: 'fiveHours', remainingPercent: 72, unit: 'percent', resetsAt: '2026-11-11T13:00:00+08:00', durationSeconds: 18_000},
     {id: 'seven_day', kind: 'weekly', remainingPercent: 44, unit: 'percent', resetsAt: '2026-11-15T09:00:00+08:00', durationSeconds: 604_800},
   ]},
-  {provider: 'codex', title: 'Codex / ChatGPT', windows: [
+  {provider: 'codex', title: 'Codex', windows: [
     {id: 'five_hour', kind: 'fiveHours', remainingPercent: 68, unit: 'percent', resetsAt: '2026-11-11T14:10:00+08:00', durationSeconds: 18_000},
     {id: 'seven_day', kind: 'weekly', remainingPercent: 31, unit: 'percent', resetsAt: '2026-11-16T09:00:00+08:00', durationSeconds: 604_800},
   ]},
@@ -89,7 +90,7 @@ export const DailyModelUsageList = ({width = RIGHT_WIDTH}: {width?: number}) => 
       {aiModelUsage.map((usage) => (
         <div key={`${usage.provider}:${usage.model}`} className="flex flex-col gap-[5px]" data-model={usage.model} data-token-total={usage.inputTokens + usage.outputTokens}>
           <div className="flex h-[14px] items-center gap-[5px] text-[11px] font-semibold">
-            <ProviderLogo provider={usage.provider} size={13} />
+            {usage.provider === 'codex' ? <Img src={openaiLogo} style={{width: 13, height: 13, objectFit: 'contain'}} /> : <ProviderLogo provider={usage.provider} size={13} />}
             <span>{providerTitle[usage.provider]}</span>
           </div>
           <div className="flex h-[14px] items-baseline justify-between gap-[6px] text-[10px] font-medium">
