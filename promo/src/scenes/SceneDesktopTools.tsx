@@ -10,17 +10,17 @@ import {BackgroundSoundsTourModule, BatteryTourModule, CleanupTourModule, Compac
 import {NativeModuleSurface, TourPointer, TourSurface, TourPointerTrack, tourAt} from '../modules/tour/TourSurface';
 import {color, islandHeightFor} from '../theme';
 
-export const DESKTOP_TOUR_DURATION = 1620;
+export const DESKTOP_TOUR_DURATION = 1710;
 export const DESKTOP_TOUR_STEPS = [
   {id: 'mixer', title: 'Give every app its own volume.', caption: 'Adjust playing apps independently and mute only the one you choose.', from: 0, duration: 180, features: ['volumeMixer']},
   {id: 'keyboard', title: 'Make typing sound and feel your own.', caption: 'Twenty voices, local typing trends and a per-key heatmap.', from: 180, duration: 180, features: ['keyboardSound']},
   {id: 'focus', title: 'Focus, with controls right at hand.', caption: 'Start · Pause · Continue · Reset · Keep awake', from: 360, duration: 240, features: ['toolbox', 'focus', 'powerAssertions']},
   {id: 'sounds', title: 'Choose the sound around your work.', caption: 'Background sounds stop on lock, screen saver or sleep.', from: 600, duration: 120, features: ['backgroundSounds']},
-  {id: 'cleaning', title: 'A moment to clean the screen and keys.', caption: 'Cover the screen or block keyboard input, then return to work.', from: 720, duration: 150, features: ['screenCleaning', 'keyboardCleaning', 'trash']},
-  {id: 'presenter', title: 'Read your script. Check your camera.', caption: 'Scroll · Pause · Close the camera', from: 870, duration: 150, features: ['teleprompter', 'cameraMirror']},
-  {id: 'system', title: 'See your Mac’s work over time.', caption: 'Live metrics · History · Spreadsheet export', from: 1020, duration: 270, features: ['system', 'systemHistory']},
-  {id: 'battery', title: 'See where the power goes.', caption: 'Charge to 100% · Health · Automatic power modes', from: 1290, duration: 180, features: ['battery', 'chargeToFull', 'automaticPowerMode']},
-  {id: 'cleanup', title: 'Review it. Move it to Trash.', caption: 'Keep review items. Confirm only the selected cleanup.', from: 1470, duration: 150, features: ['systemCleanup']},
+  {id: 'cleaning', title: 'A moment to clean the screen and keys.', caption: 'Cover the screen or block keyboard input, then return to work.', from: 720, duration: 240, features: ['screenCleaning', 'keyboardCleaning', 'trash']},
+  {id: 'presenter', title: 'Read your script. Check your camera.', caption: 'Scroll · Pause · Close the camera', from: 960, duration: 150, features: ['teleprompter', 'cameraMirror']},
+  {id: 'system', title: 'See your Mac’s work over time.', caption: 'Live metrics · History · Spreadsheet export', from: 1110, duration: 270, features: ['system', 'systemHistory']},
+  {id: 'battery', title: 'See where the power goes.', caption: 'Charge to 100% · Health · Automatic power modes', from: 1380, duration: 180, features: ['battery', 'chargeToFull', 'automaticPowerMode']},
+  {id: 'cleanup', title: 'Review it. Move it to Trash.', caption: 'Keep review items. Confirm only the selected cleanup.', from: 1560, duration: 150, features: ['systemCleanup']},
 ] as const;
 
 export const desktopTourAt = (frame: number, duration = DESKTOP_TOUR_DURATION) => tourAt(DESKTOP_TOUR_STEPS, frame, duration, DESKTOP_TOUR_DURATION);
@@ -63,10 +63,10 @@ export const SceneDesktopTools = ({duration = DESKTOP_TOUR_DURATION, globalFrom 
   }
   if (state.step.id === 'focus') return <FocusSurface frame={state.frame} title={state.step.title} caption={state.step.caption} />;
   if (state.step.id === 'cleaning') {
-    const cleaningFrame = state.frame * 180 / 150;
-    if (cleaningFrame >= 32 && cleaningFrame < 70) return <ScreenCleaningCover frame={cleaningFrame} />;
-    const cleaning = cleaningFrame >= 86 && cleaningFrame < 110;
-    return <NativeModuleSurface title={state.step.title} caption={cleaning ? 'Keyboard input blocked · Includes F1–F12' : cleaningFrame >= 110 ? 'Screen restored · Keyboard input resumed' : state.step.caption} module="toolbox" height={136}><FocusTourModule frame={239} />{cleaning ? <div data-keyboard-cleaning-notice className="absolute flex items-center justify-center gap-[8px]" style={{right: 0, top: 94, width: 248, height: 40, borderRadius: 8, background: '#28282e', fontSize: 11}}><span>Keyboard input blocked</span><span style={{color: color.blue}}>End cleaning</span><TourPointer frame={cleaningFrame} at={104} x={218} y={20} /></div> : cleaningFrame < 32 ? <TourPointer frame={cleaningFrame} at={26} x={370} y={68} /> : cleaningFrame < 86 ? <TourPointer frame={cleaningFrame} at={80} x={626} y={68} /> : null}</NativeModuleSurface>;
+    const cleaningFrame = state.frame;
+    if (cleaningFrame >= 32 && cleaningFrame < 74) return <ScreenCleaningCover frame={cleaningFrame} />;
+    const cleaning = cleaningFrame >= 116 && cleaningFrame < 190;
+    return <NativeModuleSurface title={state.step.title} caption={cleaning ? 'Keyboard input blocked · Includes F1–F12' : cleaningFrame >= 190 ? 'Screen restored · Keyboard input resumed' : state.step.caption} module="toolbox" height={136}><FocusTourModule frame={239} />{cleaning ? <div data-keyboard-cleaning-notice className="absolute flex items-center justify-center gap-[8px]" style={{right: 0, top: 94, width: 248, height: 40, borderRadius: 8, background: '#28282e', fontSize: 11}}><span>Keyboard input blocked</span><span style={{color: color.blue}}>End cleaning</span><TourPointer frame={cleaningFrame} at={184} x={218} y={20} /></div> : cleaningFrame < 32 ? <TourPointer frame={cleaningFrame} at={26} x={370} y={68} /> : cleaningFrame < 116 ? <TourPointer frame={cleaningFrame} at={110} x={626} y={68} /> : null}</NativeModuleSurface>;
   }
   if (state.step.id === 'system') {
     const system = systemHistoryTourAt(state.frame);

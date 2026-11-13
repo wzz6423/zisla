@@ -99,14 +99,14 @@ test('system previews stay deterministic and within their displayed units', () =
   }
 });
 
-test('each version credits only its own music and continuous excerpt', () => {
+test('each version credits only its selected soundtrack', () => {
   const ui = load('src/scenes/Scene5Outro.tsx');
   for (const [music, title, artist, site] of [['funk', 'Funkorama', 'Kevin MacLeod', 'incompetech.com'], ['cinematic', 'The Miracle of Flight', 'Scott Buckley', 'scottbuckley.com.au']]) {
-    const html = ui.render(ui.exports.Scene5Outro, {music}, 210);
+    const html = ui.render(ui.exports.Scene5Outro, {music}, SCENES.outro.duration / 2);
     assert.ok(html.includes(`Music: ${title} by ${artist}`));
     assert.ok(html.includes(site));
     assert.match(html, /CC BY 4\.0/);
-    assert.ok(html.includes(`${TOTAL_FRAMES / FPS}s continuous edit`));
+    assert.ok(!html.includes(music === 'funk' ? 'Scott Buckley' : 'Kevin MacLeod'));
     assert.ok(!html.includes('Origami'));
   }
 });

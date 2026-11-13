@@ -31,6 +31,7 @@ const inside = (x, y, width, height) => assert.ok(x >= 0 && x <= width && y >= 0
 const ui = load('src/modules/tour/SettingsTourModule.tsx');
 const scene = load('src/scenes/SceneSettings.tsx');
 const recommended = load('src/modules/tour/RecommendedDesktopTour.tsx');
+const lid = load('src/modules/tour/LidCloseDesktopPreview.tsx');
 const moduleFrame = (name, frame) => ui.render(ui.exports[name], {frame, globalFrame: 8220 + frame});
 const recommendedFrame = (frame) => recommended.render(recommended.exports.RecommendedDesktopTour, {frame});
 
@@ -166,10 +167,13 @@ test('Recommended tools transition from the native list through Applications to 
   assert.doesNotMatch(textOf(snapshot), /opened as a separate app/);
   assert.equal(ui.exports.recommendedTourAt(33).opened, false);
   assert.equal(ui.exports.recommendedTourAt(34).opened, true);
-  assert.equal(ui.exports.recommendedTourAt(77).features, false);
-  assert.equal(ui.exports.recommendedTourAt(78).features, true);
-  assert.equal(ui.exports.recommendedTourAt(165).restored, false);
-  assert.equal(ui.exports.recommendedTourAt(166).restored, true);
+  assert.deepEqual(ui.exports.recommendedTourAt(209), {opened: true});
+  for (const frame of [34, 77, 107]) {
+    const opened = recommendedFrame(frame);
+    assert.equal(textOf(find(opened, 'data-recommended-app')), textOf(find(snapshot, 'data-recommended-app')));
+    assert.equal(find(opened, 'data-recommended-section'), undefined);
+    assert.equal(cursor(opened).length, 0);
+  }
 });
 
 test('isolated ablations expose delayed actions, notch width, frozen playback and desktop ownership', () => {
@@ -456,7 +460,7 @@ test('Settings outcomes remain readable for at least 42 actual frames after the 
     if (state.step.id === 'permissions' && ui.exports.permissionsTourAt(local).granted) counts.permission++;
     if (state.step.id === 'lockScreen' && local >= 38) counts.paused++;
     if (state.step.id === 'management') {const cli = ui.exports.managementTourAt(local); if (cli.installed && !cli.skills) counts.installed++; if (cli.synchronized) counts.synced++;}
-    if (state.step.id === 'recommended') {const apps = ui.exports.recommendedTourAt(local); if (apps.opened && !apps.features) counts.opened++;}
+    if (state.step.id === 'recommended') {const apps = ui.exports.recommendedTourAt(local); if (apps.opened && local < lid.exports.LID_PREVIEW_TIMING.start) counts.opened++;}
   }
   for (const [name, frames] of Object.entries(counts)) assert.ok(frames >= 42, `${name} result lasts only ${frames} actual frames`);
   assert.match(textOf(moduleFrame('LockScreenTourModule', 60)), /Playback paused/);

@@ -157,23 +157,7 @@ export const BackgroundSoundsTourModule = ({frame}: {frame: number}) => (
   </div>
 );
 
-export const CleaningTourModule = ({frame}: {frame: number}) => {
-  const screen = frame >= 26 && frame < 87;
-  const keyboard = frame >= 94 && frame < 150;
-  return (
-    <div className="absolute inset-0 flex flex-col gap-[20px]" style={{padding: 27}}>
-      <TourHeading title="Screen and keyboard cleaning" />
-      <div className="flex gap-[13px]"><TourAction label="Clean screen" active={screen} /><TourAction label={keyboard ? 'End cleaning' : 'Clean keyboard'} active={keyboard} /><TourAction label="Trash" /></div>
-      <div className="flex min-h-0 flex-1 items-center justify-center"><Keyboard size={58} color={keyboard ? color.blue : color.secondary} /></div>
-      {frame >= 150 ? <TourResult>Screen restored · Keyboard input resumed</TourResult> : <div style={{fontSize: 16, color: color.secondary}}>{keyboard ? 'Click End cleaning to resume keyboard input.' : 'Click to exit the full-screen black cover.'}</div>}
-      <TourPointer frame={frame} at={26} x={111} y={104} />
-      <TourPointer frame={frame} at={94} x={253} y={104} />
-      <TourPointer frame={frame} at={150} x={253} y={104} />
-    </div>
-  );
-};
-
-export const ScreenCleaningCover = ({frame}: {frame: number}) => <div data-screen-cleaning-cover className="absolute inset-0 flex items-center justify-center" style={{background: '#000'}}><div data-screen-cleaning-exit className="flex items-center justify-center" style={{width: 184, height: 52, borderRadius: 12, background: '#474747', fontSize: 16, fontWeight: 600}}>Exit screen cleaning</div><TourPointer frame={frame} at={64} x={640} y={360} /></div>;
+export const ScreenCleaningCover = ({frame}: {frame: number}) => <div data-screen-cleaning-cover className="absolute inset-0 flex items-center justify-center" style={{background: '#000'}}><div data-screen-cleaning-exit className="flex items-center justify-center" style={{width: 184, height: 52, borderRadius: 12, background: '#474747', fontSize: 16, fontWeight: 600}}>Exit screen cleaning</div><TourPointer frame={frame} at={68} x={640} y={360} /></div>;
 
 export const PresenterTourModule = ({frame}: {frame: number}) => {
   const playing = frame >= 38 && frame < 112;

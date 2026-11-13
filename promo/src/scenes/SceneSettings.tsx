@@ -2,7 +2,7 @@ import {useCurrentFrame, useVideoConfig} from 'remotion';
 import {InformationTourModule, LockScreenTourModule, ManagementTourModule, PermissionsTourModule, QuickActionsTourModule, WindowsTourModule} from '../modules/tour/SettingsTourModule';
 import {TourSurface, tourAt} from '../modules/tour/TourSurface';
 import {RecommendedDesktopTour} from '../modules/tour/RecommendedDesktopTour';
-import {LidCloseDesktopPreview} from '../modules/tour/LidCloseDesktopPreview';
+import {LidCloseDesktopPreview, LID_PREVIEW_TIMING} from '../modules/tour/LidCloseDesktopPreview';
 
 export const SETTINGS_TOUR_DURATION = 1140;
 export const SETTINGS_TOUR_STEPS = [
@@ -12,7 +12,7 @@ export const SETTINGS_TOUR_STEPS = [
   {id: 'permissions', title: 'System permissions, in one place.', caption: 'Review access. Request it when you need it.', from: 560, duration: 140, features: ['permissions']},
   {id: 'lockScreen', title: 'Useful information on the lock screen.', caption: 'Date · Status · Playback', from: 700, duration: 80, features: ['lockScreen']},
   {id: 'management', title: 'Manage the tools behind your AI work.', caption: 'Install a CLI · Scroll to Skills and sync', from: 780, duration: 150, features: ['aiManagement']},
-  {id: 'recommended', title: 'Discover more tools. Keep control.', caption: 'Separate apps · Features → Lid-close animation', from: 930, duration: 210, features: ['recommendedTools', 'lidClose']},
+  {id: 'recommended', title: 'Discover more tools. Keep control.', caption: 'Open Zshell · Close and reopen the lid', from: 930, duration: 210, features: ['recommendedTools', 'lidClose']},
 ] as const;
 
 export const settingsTourAt = (frame: number, duration = SETTINGS_TOUR_DURATION) => tourAt(SETTINGS_TOUR_STEPS, frame, duration, SETTINGS_TOUR_DURATION);
@@ -24,7 +24,7 @@ export const SceneSettings = ({duration = SETTINGS_TOUR_DURATION, globalFrom = 0
   if (state.step.id === 'lockScreen') return <LockScreenTourModule frame={state.frame} globalFrame={globalFrom + frame} clockAnchor={globalFrom + state.step.from * (duration - 1) / (SETTINGS_TOUR_DURATION - 1)} />;
   if (state.step.id === 'windows') return <WindowsTourModule frame={state.frame} />;
   if (state.step.id === 'quickActions') return <QuickActionsTourModule frame={state.frame} />;
-  if (state.step.id === 'recommended') return state.frame < 78 ? <RecommendedDesktopTour frame={state.frame} /> : <LidCloseDesktopPreview frame={state.frame} />;
+  if (state.step.id === 'recommended') return state.frame < LID_PREVIEW_TIMING.start ? <RecommendedDesktopTour frame={state.frame} /> : <LidCloseDesktopPreview frame={state.frame} />;
   return (
     <TourSurface title={state.step.title} caption={state.step.caption} frame={state.frame} fps={fps}>
       {state.step.id === 'information' ? <InformationTourModule frame={state.frame} /> : null}

@@ -258,9 +258,10 @@ test('battery preserves the charge request before showing the native fully charg
   assert.match(textOf(unplugged), /On battery|Battery supply/);
   assert.deepEqual(at(-1), at(0));
   assert.deepEqual(at(400), at(209));
-  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 1290 + 60)), /Charge to 100% requested/);
-  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 1290 + 115)), /Fully charged snapshot/);
-  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 1290 + 172)), /Low power mode applied/);
+  const batteryFrom = scenes.exports.DESKTOP_TOUR_STEPS.find((step) => step.id === 'battery').from;
+  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, batteryFrom + 60)), /Charge to 100% requested/);
+  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, batteryFrom + 115)), /Fully charged snapshot/);
+  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, batteryFrom + 172)), /Low power mode applied/);
 });
 
 test('mixer native rows mute one app and presenter uses in-stage hover controls with released camera', () => {
@@ -299,14 +300,45 @@ test('screen cleaning covers the desktop in black and keyboard cleaning keeps it
   assert.equal(number(exit, 'width'), 184);
   assert.equal(number(exit, 'height'), 52);
   assert.doesNotMatch(textOf(screen), /Finder|F1–F12|Keep display awake/);
-  const keys = ui.render(ui.exports.SceneDesktopTools, {}, 720 + 80);
+  const keys = ui.render(ui.exports.SceneDesktopTools, {}, 720 + 150);
   assert.equal(find(keys, 'data-screen-cleaning-cover'), undefined);
   const notice = find(keys, 'data-keyboard-cleaning-notice');
   assert.match(content(notice), /Keyboard input blockedEnd cleaning/);
   assert.ok(number(notice, 'top') + number(notice, 'height') <= 136);
-  const ended = ui.render(ui.exports.SceneDesktopTools, {}, 720 + 140);
+  const ended = ui.render(ui.exports.SceneDesktopTools, {}, 720 + 220);
   assert.equal(find(ended, 'data-keyboard-cleaning-notice'), undefined);
   assert.match(textOf(ended), /Keyboard input resumed/);
+});
+
+test('cleaning pauses on blocked input before the end cursor arrives and preserves a readable recovery', () => {
+  const duration = 1476;
+  const states = [];
+  for (let frame = 0; frame < duration; frame++) {
+    const state = scenes.exports.desktopTourAt(frame, duration);
+    if (state.step.id !== 'cleaning') continue;
+    const html = scenes.render(scenes.exports.SceneDesktopTools, {duration}, frame);
+    const notice = find(html, 'data-keyboard-cleaning-notice');
+    const cursors = visibleCursors(html);
+    states.push({frame, local: state.frame, blocked: !!notice, recovered: !notice && textOf(html).includes('Keyboard input resumed'), cursors});
+  }
+  const blocked = states.filter((state) => state.blocked);
+  assert.ok(blocked.length >= 60, `Keyboard cleaning only blocks input for ${blocked.length} actual frames`);
+  const firstCursor = blocked.find((state) => state.cursors.length > 0);
+  assert.ok(firstCursor, 'The End cleaning action never gets a visible cursor');
+  assert.ok(firstCursor.frame - blocked[0].frame >= 32, 'The End cleaning cursor arrives before the blocked state can be read');
+  const firstApproach = blocked.find((state) => state.cursors.some((cursor) => number(cursor, 'left') < 259));
+  assert.ok(firstApproach, 'The End cleaning cursor never approaches its target');
+  assert.ok(firstApproach.frame - blocked[0].frame >= 38, 'The End cleaning cursor approaches immediately after blocking input');
+  const recovered = states.filter((state) => state.recovered);
+  assert.ok(recovered.length >= 42, `Keyboard recovery disappears after only ${recovered.length} actual frames`);
+  assert.ok(recovered.every((state) => state.cursors.length === 0), 'The recovery should stay clear after the end action');
+  assert.equal(states.at(-1).recovered, true);
+  for (const local of [109.99, 110, 115.99]) {
+    const html = scenes.render(scenes.exports.SceneDesktopTools, {}, 720 + local);
+    assert.equal(find(html, 'data-keyboard-cleaning-notice'), undefined, `Input blocks before the start click releases at ${local}`);
+  }
+  for (const local of [116, 150, 184, 189.99]) assert.ok(find(scenes.render(scenes.exports.SceneDesktopTools, {}, 720 + local), 'data-keyboard-cleaning-notice'));
+  for (const local of [190, 220, 239]) assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 720 + local)), /Keyboard input resumed/);
 });
 
 test('cleanup uses a 560 by 430 source-grouped list and keeps the review item after one confirmation', () => {
@@ -332,11 +364,11 @@ test('cleanup uses a 560 by 430 source-grouped list and keeps the review item af
   assert.ok(number(footer, 'top') + number(footer, 'height') <= 430);
 });
 
-test('desktop timeline keeps the 1620-frame budget and all final results under actual film duration', () => {
+test('desktop timeline keeps the 1710-frame budget and all final results under actual film duration', () => {
   const ui = scenes;
-  assert.equal(ui.exports.DESKTOP_TOUR_DURATION, 1620);
-  assert.equal(ui.exports.DESKTOP_TOUR_STEPS.reduce((sum, item) => sum + item.duration, 0), 1620);
-  for (const duration of [1380, 1396, 1620, 1636]) {
+  assert.equal(ui.exports.DESKTOP_TOUR_DURATION, 1710);
+  assert.equal(ui.exports.DESKTOP_TOUR_STEPS.reduce((sum, item) => sum + item.duration, 0), 1710);
+  for (const duration of [1460, 1476, 1710, 1726]) {
     const at = ui.exports.desktopTourAt(duration - 1, duration);
     assert.equal(at.step.id, 'cleanup');
     assert.equal(at.frame, 149);
@@ -346,7 +378,7 @@ test('desktop timeline keeps the 1620-frame budget and all final results under a
 });
 
 test('headline caption and history controls fit the 1280 by 720 film stage', () => {
-  for (const frame of [270, 340, 398, 455, 560, 1045, 1070, 1215, 1250, 1350, 1450, 1530, 1580]) {
+  for (const frame of [270, 340, 398, 455, 560, 1135, 1160, 1305, 1340, 1440, 1540, 1620, 1670]) {
     const html = scenes.render(scenes.exports.SceneDesktopTools, {}, frame);
     const tree = nodes(html);
     const headline = tree.find((node) => (attr(node, 'class') ?? '').includes('absolute inset-x-0 flex flex-col') && node.childNodes?.some((child) => (attr(child, 'class') ?? '').includes('font-semibold')) && number(node, 'top') > 0);
@@ -421,10 +453,13 @@ test('memory mutations are rejected by rendered layout and causal state checks',
   }
   check('compact controls removed', sceneSource, 'state.compact ? 0 : 1', '1', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 455), 'data-compact-focus-controls')));
   check('focus status moved behind clipping', sceneSource, '97 : 324', '0 : 0', (ui) => assert.ok(number(find(ui.render(ui.exports.SceneDesktopTools, {}, 455), 'data-focus-status'), 'top') > 34));
-  check('full-screen cleaning missing', sceneSource, 'cleaningFrame >= 32 && cleaningFrame < 70', 'false', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 760), 'data-screen-cleaning-cover')));
+  check('full-screen cleaning missing', sceneSource, 'cleaningFrame >= 32 && cleaningFrame < 74', 'false', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 760), 'data-screen-cleaning-cover')));
   check('focus closes during awake press', sceneSource, 'position >= 68', 'position >= 64', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 425), 'data-feature', 'toolbox')));
-  check('screen exits before press ends', sceneSource, 'cleaningFrame < 70', 'cleaningFrame < 64', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 720 + 67.25 * 150 / 180), 'data-screen-cleaning-exit')));
-  check('keyboard exits before press ends', sceneSource, 'cleaningFrame < 110', 'cleaningFrame < 104', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 720 + 107.25 * 150 / 180), 'data-keyboard-cleaning-notice')));
+  check('screen exits before press ends', sceneSource, 'cleaningFrame < 74', 'cleaningFrame < 68', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 720 + 71.25), 'data-screen-cleaning-exit')));
+  check('keyboard exits before press ends', sceneSource, 'cleaningFrame < 190', 'cleaningFrame < 184', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 720 + 187.25), 'data-keyboard-cleaning-notice')));
+  check('keyboard ends too quickly', sceneSource, 'cleaningFrame < 190', 'cleaningFrame < 150', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {duration: 1476}, 780), 'data-keyboard-cleaning-notice')));
+  check('keyboard end cursor approaches too soon', sceneSource, 'at: 184', 'at: 154', (ui) => assert.equal(visibleCursors(ui.render(ui.exports.SceneDesktopTools, {}, 720 + 150)).length, 0));
+  check('keyboard recovery has no time to read', sceneSource, 'cleaningFrame < 190', 'cleaningFrame < 200', (ui) => assert.equal(find(ui.render(ui.exports.SceneDesktopTools, {duration: 1476}, 787), 'data-keyboard-cleaning-notice'), undefined));
 });
 
 const visibleCursors = (html) => nodes(html).filter((node) => node.tagName === 'svg' && attr(node, 'viewBox') === '0 0 20 26' && walk(node).some((child) => attr(child, 'd') === 'M2 2 L2 20.4 L6.5 16.3 L9.5 23.5 L12.6 22.2 L9.7 15.2 L15.9 15.2 Z')).filter((node) => {
@@ -435,7 +470,7 @@ const visibleCursors = (html) => nodes(html).filter((node) => node.tagName === '
 
 test('every Desktop frame has at most one nontransparent cursor and dialogs replace the underlying cursor', () => {
   const violations = [];
-  for (const duration of [1396, 1620]) for (let frame = 0; frame < duration; frame++) {
+  for (const duration of [1476, 1710]) for (let frame = 0; frame < duration; frame++) {
     const html = scenes.render(scenes.exports.SceneDesktopTools, {duration}, frame);
     const cursors = visibleCursors(html);
     if (cursors.length > 1) violations.push({duration, frame, cursors: cursors.length});
@@ -480,11 +515,27 @@ test('every Desktop press keeps its target present throughout the six-frame clic
     assert.ok(find(html, 'data-cleanup-footer'));
   }
   for (const {html} of pressedFrames(ui.CleanupTourModule, 74, 80)) assert.ok(find(html, 'data-cleanup-confirmation'));
-  for (const [start, end, selector] of [[26, 32, 'data-feature'], [64, 70, 'data-screen-cleaning-exit'], [80, 86, 'data-feature'], [104, 110, 'data-keyboard-cleaning-notice']]) {
+  for (const [start, end, selector, x, y] of [[26, 32, 'data-feature', 370, 68], [68, 74, 'data-screen-cleaning-exit', 640, 360], [110, 116, 'data-feature', 626, 68], [184, 190, 'data-keyboard-cleaning-notice', 218, 20]]) {
     for (let local = start; local < end; local++) {
-      const html = scenes.render(scenes.exports.SceneDesktopTools, {}, 720 + (local + 0.25) * 150 / 180);
-      assert.equal(visibleCursors(html).filter((cursor) => style(cursor).transform !== 'scale(1)').length, 1);
+      const html = scenes.render(scenes.exports.SceneDesktopTools, {}, 720 + local + 0.25);
+      const pressed = visibleCursors(html).filter((cursor) => style(cursor).transform !== 'scale(1)');
+      assert.equal(pressed.length, 1);
+      assert.equal(number(pressed[0], 'left') + 2, x, `Cleaning cursor moves horizontally during press ${local}`);
+      assert.equal(number(pressed[0], 'top') + 2, y, `Cleaning cursor moves vertically during press ${local}`);
       assert.ok(find(html, selector), `Cleaning target ${selector} disappears during press ${local}`);
     }
+    let count = 0;
+    for (let frame = 0; frame < 1476; frame++) {
+      const state = scenes.exports.desktopTourAt(frame, 1476);
+      if (state.step.id !== 'cleaning' || state.frame < start || state.frame >= end) continue;
+      const html = scenes.render(scenes.exports.SceneDesktopTools, {duration: 1476}, frame);
+      const pressed = visibleCursors(html).filter((cursor) => style(cursor).transform !== 'scale(1)');
+      assert.equal(pressed.length, 1);
+      assert.equal(number(pressed[0], 'left') + 2, x);
+      assert.equal(number(pressed[0], 'top') + 2, y);
+      assert.ok(find(html, selector));
+      count++;
+    }
+    assert.ok(count >= 5, `Cleaning press at ${start} is only visible for ${count} actual frames`);
   }
 });

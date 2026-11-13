@@ -1,11 +1,9 @@
-import {Laptop, Play} from 'lucide-react';
-import {Caption} from '../../components/Caption';
-import {clamp01, color, STAGE, white} from '../../theme';
-import {linear} from '../../motion';
+import {Caption, Headline} from '../../components/Caption';
+import {clamp01, STAGE} from '../../theme';
+import {ease, easeOutAt} from '../../motion';
 import {ZshellTourDesktop} from './RecommendedDesktopTour';
-import {TourHeading, TourPointer, TourResult, TourSurface, TourToggle} from './TourSurface';
 
-export const LID_PREVIEW_TIMING = {click: 86, start: 92, closed: 138, opening: 144, release: 156, restored: 166} as const;
+export const LID_PREVIEW_TIMING = {start: 108, closed: 140, opening: 150, restored: 182} as const;
 
 // Match DepthGeometry's bottom hinge and fixed eye; CSS coordinates grow downwards.
 export const lidDepthAt = (angle: number) => {
@@ -25,34 +23,23 @@ export const lidDepthAt = (angle: number) => {
 export const lidPreviewAt = (frame: number) => {
   const timing = LID_PREVIEW_TIMING;
   const angle = frame < timing.closed
-    ? linear(frame, [timing.start, timing.closed], [125, 21])
-    : frame < timing.opening ? 21 : linear(frame, [timing.opening, timing.release], [21, 125]);
+    ? easeOutAt(frame, [timing.start, timing.closed], [125, 55])
+    : frame < timing.opening ? 55 : ease(frame, [timing.opening, timing.restored], [55, 125]);
   const progress = clamp01((90 - angle) / 60);
-  return {angle, progress, active: frame >= timing.start && frame < timing.restored, restored: frame >= timing.restored, opacity: linear(frame, [timing.release, timing.restored], [1, 0]), ...lidDepthAt(angle)};
+  return {angle, progress, active: frame >= timing.start && frame < timing.restored, restored: frame >= timing.restored, ...lidDepthAt(angle)};
 };
-
-const LidFeatureSettings = ({restored}: {restored: boolean}) => <div className="absolute inset-0" data-recommended-section="features" style={{padding: '17px 40px'}}>
-  <TourHeading title="Settings → Features" />
-  <div style={{fontSize: 19, fontWeight: 600, margin: '18px 0'}}>Tools and monitoring</div>
-  <div style={{padding: '14px 16px', borderRadius: 10, background: color.fillControl}}>
-    <div className="flex items-center gap-[14px]"><Laptop size={21} color={color.secondary} /><div className="flex-1"><TourToggle label="Lid-close animation" on /><div style={{fontSize: 13, marginTop: 7, color: color.secondary}}>Depth transition when closing a compatible MacBook</div></div></div>
-    <div style={{height: 1, margin: '14px 0', background: color.divider}} />
-    <div className="flex items-center justify-between" style={{fontSize: 15}}><span>Preview animation</span><div data-lid-preview-action className="flex items-center justify-center gap-[5px]" style={{height: 24, padding: '0 10px', borderRadius: 6, background: white(0.08), border: `1px solid ${white(0.12)}`, fontSize: 10, fontWeight: 600}}><Play size={8} fill="currentColor" />Preview animation</div></div>
-  </div>
-  {restored ? <div style={{marginTop: 24}}><TourResult>Preview ended · Desktop restored</TourResult></div> : null}
-</div>;
 
 export const LidCloseDesktopPreview = ({frame}: {frame: number}) => {
   const state = lidPreviewAt(frame);
-  const title = 'Watch the screen fold into depth.';
-  const caption = 'Features · Lid-close animation · Full-screen preview';
-  return <>
-    <TourSurface title={title} caption={caption} frame={frame - 78} fps={60}><LidFeatureSettings restored={state.restored} />{!state.active && !state.restored ? <TourPointer frame={frame} at={LID_PREVIEW_TIMING.click} x={920} y={226} /> : null}</TourSurface>
-    {state.active ? <><div data-lid-fullscreen-overlay className="absolute inset-0" style={{background: '#000', opacity: state.opacity, overflow: 'hidden'}}>
+  const captionOpacity = ease(frame, [LID_PREVIEW_TIMING.start, LID_PREVIEW_TIMING.start + 12], [0, 1]);
+  return <div className="absolute inset-0" data-feature="lidClose">
+    <div data-lid-fullscreen-overlay className="absolute inset-0" style={{background: '#000', overflow: 'hidden'}}>
       <div data-lid-depth-sheet className="absolute left-0 top-0" style={{width: STAGE.width, height: STAGE.height, transform: state.matrix, transformOrigin: '0 0'}}>
         <ZshellTourDesktop />
         <div className="absolute inset-0" style={{background: 'linear-gradient(to top, rgba(0,0,0,0.08), rgba(0,0,0,0.4))', opacity: Math.pow(state.progress, 0.7)}} />
       </div>
-    </div><Caption text={caption} size={17} bottom={35} /></> : null}
-  </>;
+    </div>
+    <Headline lines={['Close the lid. Open it again.']} top={85} size={34} opacity={captionOpacity} />
+    <Caption text="Lid-close animation · A smooth return to your desktop" size={17} bottom={35} opacity={captionOpacity} />
+  </div>;
 };

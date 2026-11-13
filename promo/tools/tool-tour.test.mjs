@@ -133,8 +133,8 @@ test('screen and keyboard cleaning, mirror and teleprompter show their stop stat
   const ui = load('src/modules/tour/DesktopTourModule.tsx');
   assert.match(textOf(ui.render(ui.exports.ScreenCleaningCover, {frame: 40})), /Exit screen cleaning/);
   const scene = load('src/scenes/SceneDesktopTools.tsx');
-  assert.match(textOf(scene.render(scene.exports.SceneDesktopTools, {}, 800)), /Keyboard input blocked/);
-  assert.match(textOf(ui.render(ui.exports.CleaningTourModule, {frame: 170})), /Keyboard input resumed/);
+  assert.match(textOf(scene.render(scene.exports.SceneDesktopTools, {}, 720 + 150)), /Keyboard input blocked/);
+  assert.match(textOf(scene.render(scene.exports.SceneDesktopTools, {}, 720 + 220)), /Keyboard input resumed/);
   const presenter = textOf(ui.render(ui.exports.PresenterTourModule, {frame: 150}));
   assert.match(presenter, /Script paused at your place/);
   assert.match(presenter, /Camera stopped/);
@@ -179,7 +179,7 @@ test('permissions, separate lock-screen playback and management update their sta
   assert.doesNotMatch(synced, /Gemini CLI installed/);
 });
 
-test('recommended apps remain separate and lid preview restores the desktop', () => {
+test('recommended apps remain separate and the lid animation keeps the Zshell desktop', () => {
   const ui = load('src/modules/tour/RecommendedDesktopTour.tsx');
   const lid = load('src/modules/tour/LidCloseDesktopPreview.tsx');
   const browsing = textOf(ui.render(ui.exports.RecommendedDesktopTour, {frame: 10}));
@@ -188,7 +188,10 @@ test('recommended apps remain separate and lid preview restores the desktop', ()
   const opened = textOf(ui.render(ui.exports.RecommendedDesktopTour, {frame: 50}));
   assert.match(opened, /Zshell opened as a separate app/);
   assert.doesNotMatch(opened, /Lid-close animation|Preview ended/);
-  const result = textOf(lid.render(lid.exports.LidCloseDesktopPreview, {frame: 209}));
-  assert.match(result, /Preview ended · Desktop restored/);
+  const completed = lid.render(lid.exports.LidCloseDesktopPreview, {frame: 209});
+  const result = textOf(completed);
+  assert.match(result, /Zshell.*launch-project.*Lid-close animation/s);
+  assert.doesNotMatch(result, /Settings → Features|Preview animation|Preview ended/);
+  assert.equal(lid.exports.lidPreviewAt(209).angle, 125);
   assert.doesNotMatch(result, /Zshell opened as a separate app/);
 });
