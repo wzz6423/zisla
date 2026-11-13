@@ -177,7 +177,7 @@ test('the actual film entries render every native module and advertised feature'
     browserDownloads: ['flow', 'Open Folder'], copyAssistant: ['settings', '€18.40 copied'],
     aiManagement: ['settings', 'Skills synced to enabled CLIs'], pdf: ['creative', 'Launch brief-protected.pdf'],
     permissions: ['settings', 'Microphone permission granted'], lockScreen: ['settings', 'Playback paused'],
-    recommendedTools: ['settings', 'Quiet.md opened as a separate app'],
+    recommendedTools: ['settings', 'Zshell opened as a separate app'],
     imageTools: ['creative', 'Subject.png'], audioTools: ['creative', 'Interview-normalize.wav'],
   };
   const website = readFileSync(new URL('../../web/src/content.ts', import.meta.url), 'utf8');
@@ -190,7 +190,7 @@ test('the actual film entries render every native module and advertised feature'
     assert.ok(rendered.get('layouts').includes(feature), `${feature}: missing from the actual film`);
   }
   for (const outcome of ['Subject.png', 'Interview-normalize.wav', 'Test-tone.wav']) assert.ok(rendered.get('creative').includes(outcome));
-  for (const outcome of ['Keyboard input resumed', 'Camera stopped', 'Review item kept', 'Low power mode applied', 'macOS background sounds', 'Charge to 100% requested']) assert.ok(rendered.get('desktop').includes(outcome));
+  for (const outcome of ['Keyboard input resumed', 'Camera stopped', 'Review item kept', 'Low power mode applied', 'macOS background sounds', 'Charge to 100% requested']) assert.ok(rendered.get('desktop').includes(outcome), `${outcome}: the Desktop tour does not show its result`);
 });
 
 test('native link downloading chooses source format and reaches a saved audio file', () => {
@@ -199,6 +199,11 @@ test('native link downloading chooses source format and reaches a saved audio fi
   assert.equal(nativeDownloadAt(0).phase, 'ready');
   assert.equal(nativeDownloadAt(55).mode, 'video');
   assert.equal(nativeDownloadAt(75).mode, 'audio');
+  for (const frame of [60, 65.99]) assert.equal(nativeDownloadAt(frame).mode, 'video', 'The audio tab switches only after the six-frame click');
+  for (const frame of [86, 91.99]) assert.equal(nativeDownloadAt(frame).phase, 'ready', 'Download remains the visible target until the click ends');
+  assert.equal(nativeDownloadAt(92).phase, 'downloading');
+  assert.equal(nativeDownloadAt(92).progress, 0);
+  assert.equal(nativeDownloadAt(152).phase, 'completed');
   assert.equal(nativeDownloadAt(120).phase, 'downloading');
   const pending = ui.render(DownloadTourModule, {frame: 120});
   assert.match(pending, /Downloading audio/);
@@ -210,6 +215,23 @@ test('native link downloading chooses source format and reaches a saved audio fi
   const native = readFileSync(new URL('../../mac/Sources/ZislaKit/VideoDownloadPlatform.swift', import.meta.url), 'utf8').split('public var displayName')[0];
   assert.deepEqual(downloadPlatforms.map(([id]) => id), [...native.matchAll(/^\s*case (\w+)$/gm)].map((match) => match[1]));
   for (const [id, label] of downloadPlatforms) assert.ok(completed.includes(`data-platform="${id}">${label}`));
+});
+
+test('the compressed download tour clicks the audio tab and keeps the Download button through release', () => {
+  const ui = load('src/scenes/Scene3Flow.tsx');
+  const duration = SCENES.flow.duration + CROSSFADE;
+  for (const [at, x, y, marker] of [[60, 306, 371, 'data-download-mode="audio"'], [86, 1073, 441, 'data-download-action']]) {
+    for (const offset of [0, 2.5, 5.99]) {
+      const frame = (780 + at + offset) * duration / ui.exports.FLOW_DURATION;
+      const html = ui.render(ui.exports.Scene3Flow, {duration}, frame);
+      const pointers = [...html.matchAll(/<svg[^>]*viewBox="0 0 20 26"[^>]*style="([^"]*)"/g)];
+      assert.equal(pointers.length, 1, `Download click ${at}: duplicate pointers`);
+      assert.ok(pointers[0][1].includes(`left:${x - 2}px;top:${y - 2}px`), `Download click ${at}: pointer moved off the measured target`);
+      assert.match(pointers[0][1], /scale\(0\.9\)/);
+      assert.ok(html.includes(marker), `Download click ${at}: target missing`);
+      if (at === 86) assert.match(html, /data-download-action[^>]*>Download<\/div>/);
+    }
+  }
 });
 
 test('the creative tour keeps its final result when compressed and through the crossfade', () => {

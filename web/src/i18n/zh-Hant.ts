@@ -255,7 +255,7 @@ export const zhHant: SiteContent = {
       recommendedTools: {
         title: '推薦應用程式',
         description:
-          '探索 OpenScreen（螢幕錄製與影片編輯）、DockDoor（視窗預覽與應用程式切換）和 Quiet.md（本機筆記）等桌面工具，皆為另行安裝的第三方應用程式。',
+          '探索 OpenScreen（螢幕錄製與影片編輯）、DockDoor（視窗預覽與應用程式切換）和 Zshell（原生 macOS 終端工作區）等桌面工具，皆為另行安裝的第三方應用程式。',
         detail: '探索桌面工具 · 第三方應用程式 · 另行安裝',
       },
     },

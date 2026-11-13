@@ -9,9 +9,9 @@ import {MenuBar, Notch, Wallpaper} from '../../components/Desktop';
 import {GlassPanel} from '../../components/Glass';
 import {Island} from '../../components/Island';
 import {waveLevels} from '../../components/Glass';
-import {clamp01, color} from '../../theme';
+import {color} from '../../theme';
 import {ease, linear} from '../../motion';
-import {NativeModuleSurface, TourAction, TourField, TourHeading, TourPointer, TourSelect, TourToggle} from './TourSurface';
+import {NativeModuleSurface, TourAction, TourField, TourHeading, TourPointer, TourPointerTrack, TourSelect, TourToggle} from './TourSurface';
 
 export const briefingTemplates = [
   {id: 'minimal', title: 'Minimal', background: '#ffffff', accent: '#e35729'},
@@ -34,40 +34,38 @@ export const everydayDemo = {
 
 export const NotesTourModule = ({frame}: {frame: number}) => (
   <div className="absolute inset-0" data-feature="quickNotes">
-    <NotesModule checked={1.4 + 2.6 * clamp01((frame - 40) / 58)} />
+    <NotesModule checked={frame >= 71 ? 3 : 2} />
     <div className="absolute" style={{left: 178, bottom: 14, fontSize: 11, color: frame >= 118 ? color.green : color.secondary}}>{frame >= 118 ? 'Saved to Apple Notes' : 'Saving to Notes…'}</div>
-    <TourPointer frame={frame} at={65} x={207} y={184} />
+    <TourPointer frame={frame} at={65} x={196.5} y={234} />
   </div>
 );
 
 export const ClipboardTourModule = ({frame}: {frame: number}) => {
-  const filter = frame >= 36 ? 4 : 0;
+  const filter = frame >= 42 ? 4 : 0;
   return (
     <div className="absolute inset-0" data-feature="clipboard">
-      <ClipboardModule filter={filter} query={frame >= 85 ? 'brew' : ''} />
-      {frame >= 137 ? <div className="absolute bottom-[14px] left-[18px]" style={{fontSize: 11, color: color.green}}>Copied to clipboard</div> : null}
-      <TourPointer frame={frame} at={36} x={337} y={72} />
-      <TourPointer frame={frame} at={85} x={102} y={102} />
-      <TourPointer frame={frame} at={128} x={210} y={142} />
+      <ClipboardModule filter={filter} query={frame >= 91 ? 'brew' : ''} />
+      {frame >= 130 ? <div className="absolute bottom-[14px] left-[18px]" style={{fontSize: 11, color: color.green}}>Copied to clipboard</div> : null}
+      <TourPointerTrack frame={frame} actions={[{at: 36, x: 337, y: 72}, {at: 85, x: 102, y: 102}, {at: 124, x: 210, y: 142}]} />
     </div>
   );
 };
 
 export const AgendaTourModule = ({frame}: {frame: number}) => (
   <div className="absolute inset-0" data-feature="agenda">
-    <AgendaModule done={ease(frame, [54, 76], [0, 1])} />
-    <TourPointer frame={frame} at={54} x={710} y={104} />
+    <AgendaModule done={ease(frame, [60, 76], [0, 1])} />
+    <TourPointer frame={frame} at={54} x={729.5} y={137} />
     {frame >= 88 ? <div className="absolute bottom-[4px] right-[20px]" style={{fontSize: 10, color: color.green}}>Reminder completed</div> : null}
   </div>
 );
 
 export const meetingTourAt = (frame: number) => ({
   compact: frame < 80,
-  joined: frame >= 72,
-  noteOpen: frame >= 124 && frame < 219,
-  noteSaved: frame >= 199,
-  noteLinked: frame >= 290,
-  menu: frame >= 86 && frame < 124 || frame >= 247 && frame < 290,
+  joined: frame >= 78,
+  noteOpen: frame >= 130 && frame < 219,
+  noteSaved: frame >= 205,
+  noteLinked: frame >= 296,
+  menu: frame >= 92 && frame < 130 || frame >= 253 && frame < 296,
   remaining: Math.max(0, 2 - Math.floor(frame / 60)),
 });
 
@@ -91,6 +89,7 @@ const NoteDetail = ({text, location, saved, reminder = false, scroll = 0}: {text
 export const MeetingTourModule = ({frame, title = 'Your meeting. Your notes. Together.', caption = 'Countdown · Join · Create or link a meeting note'}: {frame: number; title?: string; caption?: string}) => {
   const state = meetingTourAt(frame);
   const note = '1. Review the island layout.\n2. Confirm the launch date.';
+  const pointer = <TourPointerTrack frame={frame} actions={[{at: 72, x: 786, y: 17}, {at: 86, x: 993.5, y: 210}, {at: 124, x: 845, y: 235}, {at: 199, x: 969, y: 253}, {at: 247, x: 993.5, y: 210}, {at: 290, x: 835, y: 259}]} />;
   if (state.compact) return <>
     <Wallpaper dim={.22} /><MenuBar />
     <Island reveal={0} height={34} wing={112} left={<Video size={13} />} right={<span data-feature="meetingCountdown" className="font-rounded tabular" style={{fontSize: 12}}>00:{String(state.remaining).padStart(2, '0')}</span>} />
@@ -98,28 +97,28 @@ export const MeetingTourModule = ({frame, title = 'Your meeting. Your notes. Tog
     <Headline lines={[title]} top={260} size={34} />
     <div className="absolute inset-x-0 text-center" style={{top: 319, fontSize: 16, color: color.secondary}}>Design review · {state.joined ? 'Meeting link opened' : 'Starts in 00:02'}</div>
     <Caption text={caption} size={17} bottom={35} />
-    <TourPointer frame={frame} at={72} x={786} y={17} />
+    {pointer}
   </>;
-  return <NativeModuleSurface title={title} caption={caption} module={state.noteOpen ? 'shelf' : 'agenda'} height={state.noteOpen ? 355 : 160}>
+  return <><NativeModuleSurface title={title} caption={caption} module={state.noteOpen ? 'shelf' : 'agenda'} height={state.noteOpen ? 355 : 160}>
     <div className="absolute inset-0" data-feature="meetingWorkflow">
       {state.noteOpen ? <div data-feature="meetingNotes"><ShelfModule items={state.noteSaved ? [{name: 'Design review note', kind: 'note', tint: color.yellow}] : []} enter={1} selectedCategory={1} detail={!state.noteSaved ? <NoteDetail text={note.slice(0, Math.floor(ease(frame, [130, 178], [0, note.length])))} location="Calendar · Design review · example.com/meet/review" saved={false} /> : undefined} /></div> : <AgendaModule done={1} meeting />}
-      {state.menu ? <div role="menu" aria-label="Meeting note actions" className="absolute" style={{right: 22, top: 76, padding: 6, width: 242, borderRadius: 7, background: '#29292e', fontSize: 11, lineHeight: '24px', boxShadow: '0 14px 35px #0008'}}>{frame < 124 ? <><div role="menuitem" style={{background: color.blue, padding: '0 6px', borderRadius: 4}}>New meeting note</div><div role="menuitem" style={{padding: '0 6px'}}>Link existing note ›</div></> : <><div role="menuitem" style={{padding: '0 6px'}}>Design review note</div><div role="menuitem" style={{background: color.blue, padding: '0 6px', borderRadius: 4}}>Link existing note · Review checklist</div><div role="menuitem" style={{padding: '0 6px'}}>Unlink note ›</div></>}</div> : null}
+      {state.menu ? <div role="menu" aria-label="Meeting note actions" className="absolute" style={{right: 22, top: 76, padding: 6, width: 242, borderRadius: 7, background: '#29292e', fontSize: 11, lineHeight: '24px', boxShadow: '0 14px 35px #0008'}}>{frame < 130 ? <><div role="menuitem" data-meeting-note-option="new" style={{background: color.blue, padding: '0 6px', borderRadius: 4}}>New meeting note</div><div role="menuitem" style={{padding: '0 6px'}}>Link existing note ›</div></> : <><div role="menuitem" style={{padding: '0 6px'}}>Design review note</div><div role="menuitem" data-meeting-note-option="link" style={{background: color.blue, padding: '0 6px', borderRadius: 4}}>Link existing note · Review checklist</div><div role="menuitem" style={{padding: '0 6px'}}>Unlink note ›</div></>}</div> : null}
+      {state.joined && frame < 130 ? <div className="absolute" data-feature="meetingJoin.result" style={{left: 14, bottom: 6, fontSize: 10, color: color.green}}>Meeting link opened</div> : null}
       {state.noteSaved && !state.menu ? <div className="absolute" data-feature="meetingNote.result" style={{left: 14, bottom: 6, fontSize: 10, color: color.green}}>{state.noteLinked ? 'Existing note linked · Open from Calendar' : 'Meeting note saved · Linked to Design review'}</div> : null}
-      {frame < 219 ? <><TourPointer frame={frame} at={86} x={721} y={69} /><TourPointer frame={frame} at={124} x={581} y={94} /><TourPointer frame={frame} at={199} x={705} y={112} /></> : <><TourPointer frame={frame} at={247} x={721} y={69} /><TourPointer frame={frame} at={290} x={571} y={118} /></>}
     </div>
-  </NativeModuleSurface>;
+  </NativeModuleSurface>{pointer}</>;
 };
 
 export const ContextNotesTourModule = ({frame}: {frame: number}) => {
   const text = everydayDemo.context.text.slice(0, Math.floor(ease(frame, [16, 85], [0, everydayDemo.context.text.length])));
   return <div className="absolute inset-0" data-feature="contextNotes">
-    <ShelfModule items={[{name: 'Launch review note', kind: 'note', tint: color.yellow}]} enter={1} selectedCategory={1} detail={<NoteDetail text={text} location={everydayDemo.context.location} saved={frame >= 109} reminder scroll={ease(frame, [125, 169], [0, 132])} />} />
-    {frame >= 109 ? <div className="absolute" data-feature="contextNote.saved" style={{left: 24, bottom: 6, color: color.green, fontSize: 10}}>Saved · Shown when you return</div> : null}
+    <ShelfModule items={[{name: 'Launch review note', kind: 'note', tint: color.yellow}]} enter={1} selectedCategory={1} detail={<NoteDetail text={text} location={everydayDemo.context.location} saved={frame >= 115} reminder scroll={ease(frame, [125, 169], [0, 132])} />} />
+    {frame >= 115 ? <div className="absolute" data-feature="contextNote.saved" style={{left: 24, bottom: 6, color: color.green, fontSize: 10}}>Saved · Shown when you return</div> : null}
     <TourPointer frame={frame} at={109} x={705} y={112} />
   </div>;
 };
 
-export const briefingTourAt = (frame: number) => ({selected: frame < 38 ? 0 : 4, preview: frame >= 75, exporting: frame >= 112 && frame < 144, saved: frame >= 144});
+export const briefingTourAt = (frame: number) => ({selected: frame < 44 ? 0 : 4, preview: frame >= 81, exporting: frame >= 118 && frame < 144, saved: frame >= 144});
 
 const BriefingPreview = ({template}: {template: typeof briefingTemplates[number]}) => (
   <div className="h-full" style={{background: template.background, color: '#25343a', padding: '28px 25px'}}>
@@ -150,13 +149,13 @@ export const BriefingTourModule = ({frame}: {frame: number}) => {
         <div className="grid grid-cols-4 gap-[8px]">
           {briefingTemplates.map((item, index) => <div key={item.id} data-template={item.id} style={{padding: 5, borderRadius: 8, border: `1px solid ${state.selected === index ? color.blue : color.strokeCard}`}}><div className="flex flex-col gap-[4px]" style={{height: 34, padding: '5px 9px', borderRadius: 4, background: item.background}}><div style={{height: 4, width: '65%', background: item.accent}} /><div style={{height: 3, width: '86%', background: item.accent, opacity: .35}} /><div style={{height: 3, width: '73%', background: item.accent, opacity: .35}} /></div><div className="flex items-center justify-between" style={{fontSize: 12, lineHeight: '18px', marginTop: 3}}>{item.title}{state.selected === index ? <Check size={13} color={color.blue} /> : null}</div></div>)}
         </div>
-        <div className="flex items-center gap-[10px]"><TourAction label="Preview" active={state.preview} /><div className="flex-1" /><TourAction label="Export today’s PNG" active={state.exporting} busy={state.exporting} /></div>
+        <div className="flex items-center gap-[10px]"><div className="shrink-0" data-briefing-action="preview"><TourAction label="Preview" active={state.preview} /></div><div className="flex-1" /><div className="shrink-0" data-briefing-action="export"><TourAction label="Export today’s PNG" active={state.exporting} busy={state.exporting} /></div></div>
         <div data-feature="briefing.result" style={{fontSize: 14, color: state.saved ? color.green : color.secondary}}>{state.saved ? `Saved: ${everydayDemo.briefing.file}` : state.exporting ? 'Exporting PNG…' : '8 templates · Choose the content you want'}</div>
       </div>
     </GlassPanel>
     {state.preview ? <GlassPanel style={{left: 849, top: 175, width: 305, height: 445}}><div className="flex items-center gap-[6px]" style={{height: 28, padding: '0 10px', background: '#242429', fontSize: 10}}>{['#ff5f57', '#febc2e', '#28c840'].map((tint) => <span key={tint} style={{width: 8, height: 8, borderRadius: 4, background: tint}} />)}<span style={{marginLeft: 9}}>Daily briefing · {template.title}</span></div><BriefingPreview template={template} /></GlassPanel> : null}
     <Caption text="Eight templates · Choose metrics and quotas · Scheduled exports" size={17} bottom={35} />
-    {frame < 75 ? <TourPointer frame={frame} at={38} x={235} y={479} /> : <><TourPointer frame={frame} at={75} x={184} y={551} /><TourPointer frame={frame} at={112} x={728} y={551} /></>}
+    <TourPointerTrack frame={frame} actions={[{at: 38, x: 235, y: 509}, {at: 75, x: 186, y: 573}, {at: 112, x: 746, y: 573}]} />
   </>;
 };
 

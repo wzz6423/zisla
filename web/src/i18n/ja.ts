@@ -258,7 +258,7 @@ export const ja: SiteContent = {
       recommendedTools: {
         title: 'おすすめアプリ',
         description:
-          '画面収録と動画編集の OpenScreen、ウィンドウプレビューとアプリ切り替えの DockDoor、ローカルメモの Quiet.md などを紹介します。いずれも別途インストールするサードパーティ製アプリです。',
+          '画面収録と動画編集の OpenScreen、ウィンドウプレビューとアプリ切り替えの DockDoor、ネイティブ macOS ターミナルワークスペースの Zshell などを紹介します。いずれも別途インストールするサードパーティ製アプリです。',
         detail: 'デスクトップツールを探す · サードパーティ製 · 個別にインストール',
       },
     },

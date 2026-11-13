@@ -121,6 +121,7 @@ export const NotesModule = ({checked = 3}: {checked?: number}) => {
               return (
                 <div key={block.text} className="flex items-center" style={{margin: '2px 0'}}>
                   <div
+                    data-note-check={block.text}
                     className="flex shrink-0 items-center justify-center"
                     style={{
                       width: 13,

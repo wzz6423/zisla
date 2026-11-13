@@ -279,7 +279,7 @@ export const fr: SiteContent = {
       recommendedTools: {
         title: 'Apps recommandées',
         description:
-          'Découvrez OpenScreen pour la capture vidéo et le montage, DockDoor pour les aperçus de fenêtres et le changement d’app, et Quiet.md pour les notes locales. Ces applications tierces s’installent séparément.',
+          'Découvrez OpenScreen pour la capture vidéo et le montage, DockDoor pour les aperçus de fenêtres et le changement d’app, et Zshell pour un espace de travail de terminal natif macOS. Ces applications tierces s’installent séparément.',
         detail: 'Découvrir des outils de bureau · Apps tierces · Installation séparée',
       },
     },

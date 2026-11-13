@@ -255,7 +255,7 @@ export const zhHans: SiteContent = {
       recommendedTools: {
         title: '推荐应用',
         description:
-          '发现 OpenScreen（录屏与视频编辑）、DockDoor（窗口预览与应用切换）和 Quiet.md（本地笔记）等桌面工具，均为单独安装的第三方应用。',
+          '发现 OpenScreen（录屏与视频编辑）、DockDoor（窗口预览与应用切换）和 Zshell（原生 macOS 终端工作区）等桌面工具，均为单独安装的第三方应用。',
         detail: '发现桌面工具 · 第三方应用 · 单独安装',
       },
     },

@@ -274,7 +274,7 @@ export const de: SiteContent = {
       recommendedTools: {
         title: 'Empfohlene Apps',
         description:
-          'Entdecke OpenScreen für Bildschirmaufnahmen und Videoschnitt, DockDoor für Fenstervorschauen und App-Wechsel sowie Quiet.md für lokale Notizen. Diese Drittanbieter-Apps werden separat installiert.',
+          'Entdecke OpenScreen für Bildschirmaufnahmen und Videoschnitt, DockDoor für Fenstervorschauen und App-Wechsel sowie Zshell als nativen macOS-Terminal-Arbeitsbereich. Diese Drittanbieter-Apps werden separat installiert.',
         detail: 'Desktop-Werkzeuge entdecken · Drittanbieter-Apps · Separate Installation',
       },
     },

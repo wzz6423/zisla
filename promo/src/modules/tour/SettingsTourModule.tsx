@@ -1,18 +1,19 @@
 import type {ReactNode} from 'react';
-import {BatteryFull, Check, Folder, GripVertical, Music, Pause, Play, Sun, Terminal} from 'lucide-react';
-import {AlbumArt, BrowserGlyph, formatTime} from '../../components/IslandChrome';
+import {BatteryFull, Check, Cloud, FastForward, Folder, GripVertical, Heart, Music, Pause, Play, Repeat, Rewind, Terminal} from 'lucide-react';
+import {AlbumArt, BrowserGlyph, formatTime, lyricAt} from '../../components/IslandChrome';
 import {MenuBar, Notch, Wallpaper} from '../../components/Desktop';
 import {Cursor} from '../../components/Cursor';
 import {QuickActionToast} from '../../components/Overlays';
 import {Caption, Headline} from '../../components/Caption';
 import {ProgressTrack} from '../../components/Glass';
 import {track} from '../../content';
-import {ease, linear} from '../../motion';
+import {linear} from '../../motion';
 import {color, white} from '../../theme';
-import {TourAction, TourCard, TourHeading, TourPointer, TourResult, TourSelect, TourToggle} from './TourSurface';
+import {TourAction, TourCard, TourHeading, TourPointer, TourPointerTrack, TourResult, TourSelect, TourToggle} from './TourSurface';
+export {recommendedDemo, recommendedTourAt} from './RecommendedDesktopTour';
 
 export const quickActionExamples = [
-  {kind: 'Currency amount', input: 'US$20 → EUR', detail: 'Example rate: 1 USD = 0.9200 EUR', action: 'Copy result', result: '€18.40 copied', options: ['Copy result', 'Copy full expression'], from: 0, duration: 120, at: 60},
+  {kind: 'Currency amount', input: 'US$20 → EUR', detail: 'Example rate: 1 USD = 0.9200 EUR', action: 'Copy result', result: '€18.40 copied', options: ['Copy result', 'Copy full expression'], from: 0, duration: 120, at: 66},
   {kind: 'App repair', input: 'Studio.app can’t be opened', detail: 'App can’t be opened', action: 'Repair and open', result: 'Studio.app opened after checks', options: ['Repair and open'], from: 120, duration: 180, at: 120},
 ] as const;
 
@@ -36,7 +37,7 @@ export const permissionDemo = [
   {id: 'full_disk_access', name: 'Full Disk Access', body: 'Used to read system Screen Time, local mail indexes, or browser cookies. Enable in System Settings as needed.', manual: true},
 ] as const;
 
-const WindowContent = ({app, title}: {app: 'Notes' | 'Safari' | 'Quiet.md' | 'Studio'; title: string}) => (
+const WindowContent = ({app, title}: {app: 'Notes' | 'Safari' | 'Studio'; title: string}) => (
   <div style={{height: '100%', padding: 25, background: app === 'Safari' ? '#1c2430' : '#232327'}}>
     <div style={{fontSize: 23, fontWeight: 600}}>{title}</div>
     {app === 'Studio' ? <div style={{height: 133, marginTop: 24, borderRadius: 8, background: '#121419'}}><div style={{padding: 22, fontSize: 16, color: color.secondary}}>Media library · Timeline</div></div> :
@@ -44,7 +45,7 @@ const WindowContent = ({app, title}: {app: 'Notes' | 'Safari' | 'Quiet.md' | 'St
   </div>
 );
 
-const DemoWindow = ({app, title, children}: {app: 'Notes' | 'Safari' | 'Quiet.md' | 'Studio' | 'Finder'; title: string; children?: ReactNode}) => (
+const DemoWindow = ({app, title, children}: {app: 'Notes' | 'Safari' | 'Studio' | 'Finder'; title: string; children?: ReactNode}) => (
   <div style={{borderRadius: 12, overflow: 'hidden', background: '#242428', border: `1px solid ${color.strokeCard}`, boxShadow: '0 20px 64px rgba(0,0,0,.4)'}}>
     <div className="flex items-center gap-[7px]" style={{height: 36, padding: '0 14px', background: '#303035'}}>
       {['#ff5f57', '#febc2e', '#28c840'].map((dot) => <span key={dot} style={{width: 10, height: 10, borderRadius: 5, background: dot}} />)}
@@ -56,7 +57,7 @@ const DemoWindow = ({app, title, children}: {app: 'Notes' | 'Safari' | 'Quiet.md
 
 export const windowsTourAt = (frame: number) => {
   const commandTab = frame >= 33;
-  return {commandTab, app: commandTab ? 'Notes' as const : 'Safari' as const, activated: frame >= 55};
+  return {commandTab, app: commandTab ? 'Notes' as const : 'Safari' as const, activated: frame >= 58};
 };
 
 const previewNames = {Safari: ['Launch review', 'Documentation'], Notes: ['Launch checklist', 'Review notes']} as const;
@@ -81,7 +82,7 @@ export const WindowsTourModule = ({frame}: {frame: number}) => {
       {!state.commandTab || state.activated ? <div className="absolute flex items-center justify-center gap-[21px]" data-dock style={{left: 495, top: 570, width: 290, height: 63, borderRadius: 15, background: white(0.16)}}><BrowserGlyph size={35} /><Folder size={35} color="#f2cf57" /><Music size={35} color="#eb6a77" /></div> : null}
       {state.activated ? <div className="absolute" style={{left: 490, top: 174}}><TourResult>Notes window activated</TourResult></div> : null}
       {!state.commandTab ? <Cursor x={544} y={596} opacity={1} /> : null}
-      {state.commandTab && !state.activated ? <TourPointer frame={frame} at={55} x={532} y={416} /> : null}
+      {state.commandTab && !state.activated ? <TourPointer frame={frame} at={52} x={532} y={416} /> : null}
       <Caption text="Dock previews · Command-Tab selects an app · Click its window" size={17} bottom={35} />
     </div>
   );
@@ -92,9 +93,9 @@ export const quickActionsTourAt = (frame: number) => {
   const example = quickActionExamples.find((item) => position >= item.from && position < item.from + item.duration)!;
   const localFrame = position - example.from;
   const repair = example.kind === 'App repair';
-  const copied = localFrame >= (repair ? 28 : 18);
-  const started = repair && localFrame >= 64;
-  return {example, frame: localFrame, repair, copied, started, done: localFrame >= example.at, menu: !repair && localFrame >= 34 && localFrame < example.at};
+  const copied = localFrame >= (repair ? 34 : 24);
+  const started = repair && localFrame >= 70;
+  return {example, frame: localFrame, repair, copied, started, done: localFrame >= example.at, menu: !repair && localFrame >= 40 && localFrame < example.at};
 };
 
 export const QuickActionsTourModule = ({frame}: {frame: number}) => {
@@ -105,16 +106,15 @@ export const QuickActionsTourModule = ({frame}: {frame: number}) => {
       <Headline lines={[state.repair ? 'Inspect the app. Then open it.' : 'Copy something. Choose the next step.']} top={85} size={34} />
       <div className="absolute" data-quick-action-source={state.repair ? 'Studio.app' : 'currency'} style={{left: 284, top: 213, width: 712}}>
         {state.repair ? state.done ? <DemoWindow app="Studio" title="Launch project" /> :
-          <DemoWindow app="Finder" title="Applications"><div className="flex flex-col items-center gap-[16px]" style={{paddingTop: 40}}><div style={{width: 76, height: 76, borderRadius: 16, background: '#647bcc', padding: 17}}><Play size={42} fill="white" /></div><span style={{fontSize: 20, padding: '4px 12px', borderRadius: 6, background: state.copied ? color.blue : white(0.1)}}>Studio.app</span></div></DemoWindow> :
+          <DemoWindow app="Finder" title="Applications"><div className="flex flex-col items-center gap-[16px]" style={{paddingTop: 40}}><div style={{width: 76, height: 76, borderRadius: 16, background: '#647bcc', padding: 17}}><Play size={42} fill="white" /></div><span data-repair-app-source style={{fontSize: 20, padding: '4px 12px', borderRadius: 6, background: state.copied ? color.blue : white(0.1)}}>Studio.app</span></div></DemoWindow> :
           <DemoWindow app="Notes" title="Travel budget"><div style={{padding: 34, fontSize: 23}}><div style={{fontSize: 29, fontWeight: 600}}>Travel budget</div><div style={{marginTop: 24}}>Convert to euros</div><div data-copied-currency style={{display: 'inline-block', marginTop: 19, padding: '8px 13px', borderRadius: 4, background: state.copied ? '#2969b6' : 'transparent'}}>{state.example.input}</div><div style={{marginTop: 24, fontSize: 19, color: color.secondary}}>{state.done ? '€18.40' : 'EUR —'}</div></div></DemoWindow>}
       </div>
-      {state.repair && state.frame < 20 ? <div className="absolute" role="alertdialog" aria-label="macOS application opening alert" style={{left: 444, top: 265, width: 392, padding: 24, borderRadius: 12, background: '#343439', boxShadow: '0 20px 90px #0008'}}><div style={{fontSize: 20, fontWeight: 600}}>{state.example.input}</div><div style={{fontSize: 15, color: color.secondary, marginTop: 16}}>macOS could not open this application.</div><div className="flex justify-end" style={{marginTop: 22}}><TourAction label="OK" active /></div></div> : null}
-      {state.copied && !state.started && !state.done ? <div data-quick-action-toast><QuickActionToast title={state.repair ? 'Studio.app' : 'US$20 → EUR'} detail={state.repair ? state.example.detail : '€18.40 · USD to EUR'} action={state.example.action} countdown={1 - state.frame / state.example.duration} actionGlow={state.menu ? 1 : 0} /></div> : null}
+      {state.repair && state.frame < 18 ? <div className="absolute" role="alertdialog" aria-label="macOS application opening alert" style={{left: 444, top: 265, width: 392, padding: 24, borderRadius: 12, background: '#343439', boxShadow: '0 20px 90px #0008'}}><div style={{fontSize: 20, fontWeight: 600}}>{state.example.input}</div><div style={{fontSize: 15, color: color.secondary, marginTop: 16}}>macOS could not open this application.</div><div className="flex justify-end" style={{marginTop: 22}}><div data-repair-alert-ok><TourAction label="OK" active /></div></div></div> : null}
+      {state.copied && !state.started && !state.done ? <div data-quick-action-toast><QuickActionToast title={state.repair ? 'Studio.app' : 'US$20 → EUR'} detail={state.repair ? state.example.detail : '€18.40 · USD to EUR'} action={state.example.action} width={state.repair ? 620 : 560} countdown={1 - state.frame / state.example.duration} actionGlow={state.menu ? 1 : 0} /></div> : null}
       {state.menu ? <div role="menu" aria-label="Currency Quick Actions" data-quick-action-menu style={{position: 'absolute', left: 713, top: 44, width: 228, padding: 6, borderRadius: 8, background: '#303035', boxShadow: '0 10px 32px #0008'}}>
         {state.example.options.map((option) => <div role="menuitem" key={option} style={{padding: '8px 11px', borderRadius: 5, fontSize: 14, background: option === 'Copy result' ? color.blue : 'transparent'}}>{option}</div>)}
       </div> : null}
-      {!state.repair ? <TourPointer frame={state.frame} at={18} x={465} y={398} /> : <TourPointer frame={state.frame} at={28} x={640} y={408} />}
-      {state.menu ? <TourPointer frame={state.frame} at={state.example.at} x={789} y={65} /> : state.repair && state.copied && !state.started ? <TourPointer frame={state.frame} at={64} x={801} y={17} /> : null}
+      <TourPointerTrack frame={state.frame} actions={state.repair ? [{at: 12, x: 791, y: 389}, {at: 28, x: 640, y: 400}, {at: 64, x: 819, y: 17}] : [{at: 18, x: 405, y: 430}, {at: 34, x: 872.5, y: 17}, {at: 60, x: 789, y: 65}]} />
       <div className="absolute" data-quick-action-outcome style={{left: 372, top: 555, width: 536, textAlign: 'center'}}>
         {state.done ? <TourResult>{state.example.result}</TourResult> : state.started ? <TourResult pending>Checking integrity, signature and macOS assessment…</TourResult> : <span style={{fontSize: 16, color: color.secondary}}>{state.repair ? 'Copy the local .app to inspect it.' : state.example.detail}</span>}
       </div>
@@ -196,32 +196,39 @@ export const PermissionsTourModule = ({frame}: {frame: number}) => {
         <div data-permission-scrollbar style={{position: 'absolute', right: 1, top: 4, width: 3, height: 57, borderRadius: 3, background: white(0.42), transform: `translateY(${state.scroll / 2250 * 297}px)`}} />
       </div>
       {state.granted ? <div style={{height: 28, paddingTop: 5}}><TourResult>Microphone permission granted</TourResult></div> : null}
-      {frame >= 32 && !state.granted ? <TourPointer frame={frame} at={44} x={936} y={218} /> : null}
+      {frame >= 32 && !state.granted ? <TourPointer frame={frame} at={44} x={936} y={200} /> : null}
     </div>
   );
 };
 
-export const LockScreenTourModule = ({frame, globalFrame}: {frame: number; globalFrame: number}) => {
-  const playing = frame < 38;
-  const elapsed = track.elapsed + globalFrame / 60;
+export const lockScreenTourAt = (frame: number, clockAnchor: number) => {
+  const playbackFrame = Math.min(frame, 38);
+  return {playing: frame < 38, elapsed: track.elapsed + (clockAnchor + playbackFrame) / 60, lyric: lyricAt(clockAnchor + playbackFrame).text};
+};
+
+export const LockScreenTourModule = ({frame, globalFrame, clockAnchor = globalFrame - frame}: {frame: number; globalFrame: number; clockAnchor?: number}) => {
+  const {playing, elapsed, lyric} = lockScreenTourAt(frame, clockAnchor);
   return (
     <>
       <Wallpaper dim={0.16} />
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{top: 108}}><div style={{fontSize: 25, fontWeight: 500}}>Wednesday, November 11</div><div className="font-rounded tabular" style={{fontSize: 113, lineHeight: '135px', fontWeight: 600}}>9:41</div><div style={{fontSize: 18, color: white(0.76)}}>Make room for the next idea.</div></div>
-      <div className="absolute inset-x-0 flex items-center justify-center gap-[31px]" style={{top: 336, fontSize: 18}}><BatteryFull size={22} /><span>76% · On battery</span><Sun size={22} /><span>17° · Cloudy</span></div>
-      <div className="absolute flex flex-col gap-[15px]" style={{left: 369, top: 395, width: 542, padding: '20px 24px', borderRadius: 18, background: white(0.07), border: `1px solid ${white(0.16)}`}}>
-        <div className="flex items-center gap-[15px]"><AlbumArt size={66} radius={10} /><div className="min-w-0 flex-1"><div style={{fontSize: 21, fontWeight: 600}}>{track.title}</div><div style={{fontSize: 16, color: color.secondary, marginTop: 6}}>{track.artist}</div></div></div>
-        <ProgressTrack value={elapsed / track.duration} tint={white(0.86)} width="100%" height={3} />
-        <div className="flex items-center justify-center gap-[31px]" style={{height: 33}}><span style={{fontSize: 25}}>◀</span>{playing ? <Pause size={27} fill="white" /> : <Play size={27} fill="white" />}<span style={{fontSize: 25}}>▶</span></div>
-        <div style={{textAlign: 'center', fontSize: 15, color: color.secondary}}>{playing ? `${formatTime(elapsed)} · Now playing` : 'Playback paused'}</div>
+      <div className="absolute inset-x-0 flex flex-col items-center" data-lock-system-clock style={{top: 55}}><div style={{fontSize: 17, fontWeight: 500}}>Wednesday, November 11</div><div className="font-rounded tabular" style={{fontSize: 72, lineHeight: '86px', fontWeight: 600}}>9:41</div></div>
+      <div data-lock-overlay="header" className="absolute flex flex-col items-center justify-end gap-[5px]" style={{left: 360, top: 158.4, width: 560, height: 72}}><div style={{fontSize: 17, fontWeight: 500}}>Make room for the next idea.</div><div style={{fontSize: 14, fontWeight: 500, color: white(0.78)}}>Lunar · Tenth month, third day</div></div>
+      <div data-lock-overlay="status" className="absolute flex items-center justify-center gap-[22px]" style={{left: 360, top: 235.4, width: 560, height: 46, fontSize: 14, fontWeight: 500, color: white(0.92)}}><div className="flex items-center gap-[7px]"><BatteryFull size={15} /><span>76% On battery</span></div><div className="flex items-center gap-[7px]"><Cloud size={15} /><span>17° Cloudy</span></div></div>
+      <div data-lock-overlay="player" className="absolute flex flex-col justify-center gap-[11px]" style={{left: 430, top: 387.2, width: 420, height: 176, padding: '16px 18px', borderRadius: 18, background: white(0.07), backdropFilter: 'blur(24px)', border: `1px solid ${white(0.16)}`}}>
+        <div className="flex items-center gap-[14px]"><div data-lock-artwork style={{width: 56, height: 56}}><AlbumArt size={56} radius={10} /></div><div className="min-w-0 flex-1"><div data-lock-track style={{fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap'}}>{track.title} · {track.artist}</div><div data-lock-lyrics style={{fontSize: 11, fontWeight: 500, color: white(0.6), marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden'}}>{lyric}</div></div></div>
+        <div data-lock-playback-progress data-elapsed={elapsed} className="flex items-center gap-[8px]" style={{height: 9, fontSize: 10, color: white(0.55)}}><span className="font-mono tabular">{formatTime(elapsed)}</span><div className="relative flex-1"><ProgressTrack value={elapsed / track.duration} tint={white(0.88)} width="100%" height={3} /><div style={{position: 'absolute', left: `calc(${elapsed / track.duration * 100}% - 4.5px)`, top: -3, width: 9, height: 9, borderRadius: 5, background: white(0.96)}} /></div><span className="font-mono tabular">{formatTime(track.duration)}</span></div>
+        <div className="flex items-center justify-center gap-[18px]" style={{height: 30}}>{[['mode', 'Playback mode', Repeat], ['previous', 'Previous track', Rewind], ['toggle', playing ? 'Pause' : 'Play', playing ? Pause : Play], ['next', 'Next track', FastForward], ['favorite', 'Favorite', Heart]].map(([action, label, Glyph]) => {
+          const Icon = Glyph as typeof Play;
+          return <div key={String(action)} data-lock-action={String(action)} aria-label={String(label)} className="flex items-center justify-center" style={{width: 30, height: 30}}><Icon size={13} fill={action === 'mode' || action === 'favorite' ? 'none' : 'white'} /></div>;
+        })}</div>
       </div>
-      <div className="absolute inset-x-0 flex justify-center" style={{bottom: 31, fontSize: 17, color: color.secondary}}>Lock screen information · Separate overlay</div>
-      <TourPointer frame={frame} at={38} x={640} y={561} />
+      {!playing ? <div className="absolute inset-x-0 flex justify-center" style={{top: 587}}><TourResult>Playback paused</TourResult></div> : null}
+      <TourPointer frame={frame} at={38} x={640} y={525.2} />
     </>
   );
 };
 
-export const managementTourAt = (frame: number) => ({confirmation: frame >= 12 && frame < 31, installing: frame >= 31 && frame < 42, installed: frame >= 42, skills: frame >= 84, synchronized: frame >= 108});
+export const managementTourAt = (frame: number) => ({confirmation: frame >= 18 && frame < 31, installing: frame >= 31 && frame < 42, installed: frame >= 42, skills: frame >= 84, synchronized: frame >= 108});
 
 export const ManagementTourModule = ({frame}: {frame: number}) => {
   const state = managementTourAt(frame);
@@ -229,46 +236,19 @@ export const ManagementTourModule = ({frame}: {frame: number}) => {
     <div className="absolute inset-0" style={{padding: '17px 40px'}}>
       <TourHeading title="AI" />
       {state.skills ? <div data-management-section="skills" className="flex flex-col gap-[10px]">
-        <TourHeading title="Skills"><TourAction label="Sync now" active={frame < 108} /></TourHeading>
+        <TourHeading title="Skills"><div data-skills-sync><TourAction label="Sync now" active={frame < 108} /></div></TourHeading>
         <TourCard style={{padding: '10px 15px'}}><div className="flex items-center gap-[10px]"><Folder size={19} color={color.secondary} /><span style={{fontSize: 16}}>Managed library</span><span style={{fontSize: 13, color: color.secondary}}>~/.zisla/skills</span></div></TourCard>
         <div className="flex items-center gap-[16px]" style={{fontSize: 16}}>Sync mode<div className="flex gap-[6px]"><TourAction label="Symbolic links" active /><TourAction label="File copies" /></div></div>
         <div className="flex flex-col" style={{padding: '10px 16px', borderRadius: 10, background: color.fillControl}}><div style={{fontSize: 16, fontWeight: 600, marginBottom: 12}}>Sync targets</div>{['Codex', 'Claude', 'Agents'].map((target) => <div key={target} style={{height: 35}}><TourToggle label={target} on /></div>)}</div>
         {state.synchronized ? <TourResult>Skills synced to enabled CLIs</TourResult> : <div style={{fontSize: 14, color: color.secondary}}>Code review · Research · Documentation</div>}
-        {frame < 108 ? <TourPointer frame={frame} at={108} x={947} y={87} /> : null}
+        <TourPointer frame={frame} at={102} x={956} y={80} />
       </div> : <div data-management-section="cli">
-        <TourHeading title="CLI"><TourAction label="Detect" /><TourAction label="Install missing" /><TourAction label="Update installed" /><TourAction label="Uninstall" /></TourHeading>
-        <div className="flex flex-col" style={{gap: 8}}>{[['Claude Code', 'Installed'], ['Codex', 'Installed'], ['Gemini', state.installed ? 'Installed' : state.installing ? 'Installing…' : 'Not installed']].map(([name,status]) => <TourCard key={name} style={{padding: '11px 15px'}}><div className="flex items-center gap-[12px]" style={{fontSize: 17}}><Terminal size={19} color={color.secondary} /><span style={{width: 140}}>{name}</span><span style={{fontSize: 14, color: status === 'Installed' ? color.green : color.secondary}}>{status}</span><div className="flex-1" /><TourAction label={name === 'Gemini' && !state.installed ? 'Install' : 'Update'} busy={name === 'Gemini' && state.installing} active={name === 'Gemini' && !state.installing && !state.installed} />{status === 'Installed' ? <TourAction label="Uninstall" /> : null}</div></TourCard>)}</div>
+        <TourHeading title="CLI"><TourAction label="Detect" /><TourAction label="Install missing" /><TourAction label="Update installed" /></TourHeading>
+        <div className="flex flex-col" style={{gap: 8}}>{[['Claude Code', 'Installed'], ['Codex', 'Installed'], ['Gemini', state.installed ? 'Installed' : state.installing ? 'Installing…' : 'Not installed']].map(([name,status]) => <TourCard key={name} style={{padding: '11px 15px'}}><div className="flex items-center gap-[12px]" style={{fontSize: 17}}><Terminal size={19} color={color.secondary} /><span style={{width: 140}}>{name}</span><span style={{fontSize: 14, color: status === 'Installed' ? color.green : color.secondary}}>{status}</span><div className="flex-1" /><div data-cli-action={name}><TourAction label={name === 'Gemini' && !state.installed ? 'Install' : 'Update'} busy={name === 'Gemini' && state.installing} active={name === 'Gemini' && !state.installing && !state.installed} /></div></div></TourCard>)}</div>
         {state.installed ? <div style={{marginTop: 14}}><TourResult>Gemini CLI installed</TourResult></div> : null}
-        {frame < 12 ? <TourPointer frame={frame} at={12} x={949} y={283} /> : null}
+        {frame < 18 ? <TourPointer frame={frame} at={12} x={952} y={262} /> : null}
       </div>}
-      {state.confirmation ? <div role="alertdialog" aria-label="CLI installation confirmation" style={{position: 'absolute', left: 312, top: 112, width: 416, padding: 22, borderRadius: 12, background: '#34343a', boxShadow: '0 18px 55px #0008'}}><div style={{fontSize: 21, fontWeight: 600}}>Install Gemini?</div><div style={{fontSize: 16, color: color.secondary, marginTop: 12}}>Download and install Gemini CLI.</div><div className="flex justify-end gap-[8px]" style={{marginTop: 20}}><TourAction label="Cancel" /><TourAction label="Continue" active /></div><TourPointer frame={frame} at={31} x={354} y={126} /></div> : null}
+      {state.confirmation ? <div role="alertdialog" aria-label="CLI installation confirmation" style={{position: 'absolute', left: 312, top: 112, width: 416, padding: 22, borderRadius: 12, background: '#34343a', boxShadow: '0 18px 55px #0008'}}><div style={{fontSize: 21, fontWeight: 600}}>Install Gemini?</div><div style={{fontSize: 16, color: color.secondary, marginTop: 12}}>Download and install Gemini CLI.</div><div className="flex justify-end gap-[8px]" style={{marginTop: 20}}><TourAction label="Cancel" /><div data-cli-confirm-submit><TourAction label="Continue" active /></div></div><TourPointer frame={frame} at={25} x={354} y={126} /></div> : null}
     </div>
   );
-};
-
-export const recommendedDemo = [{name: 'OpenScreen', purpose: 'Screen recording and video editing'}, {name: 'DockDoor', purpose: 'Dock previews and app switching'}, {name: 'Quiet.md', purpose: 'Local notes'}] as const;
-export const recommendedTourAt = (frame: number) => ({opened: frame >= 24, features: frame >= 68, preview: frame >= 78 && frame < 106, restored: frame >= 106});
-
-export const RecommendedTourModule = ({frame}: {frame: number}) => {
-  const state = recommendedTourAt(frame);
-  const tilt = state.preview ? ease(frame, [79, 100], [0, 48]) : 0;
-  return <div className="absolute inset-0">
-    {state.opened && !state.features ? <div style={{padding: '37px 132px'}} data-recommended-app="Quiet.md"><DemoWindow app="Quiet.md" title="Launch checklist" /><div style={{marginTop: 18}}><TourResult>Quiet.md opened as a separate app</TourResult></div></div> : <div style={{padding: '17px 40px'}}>
-      <TourHeading title={state.features ? 'Features' : 'Recommended tools'} />
-      {state.features ? <div data-recommended-section="features" className="flex flex-col gap-[16px]">
-        <div style={{fontSize: 19, fontWeight: 600}}>Tools and monitoring</div>
-        <TourToggle label="Lid-close animation" on /><div style={{fontSize: 15, color: color.secondary}}>Depth transition on a compatible MacBook</div>
-        <div className="flex items-center justify-between" style={{height: 42, fontSize: 16}}>Preview animation<TourAction label="Preview" active={state.preview} /></div>
-        <div className="relative" style={{height: 140, overflow: 'hidden', borderRadius: 10, background: '#10141b', perspective: 500}}><div data-lid-preview style={{position: 'absolute', left: 230, top: 10, width: 460, height: 116, borderRadius: 7, background: 'linear-gradient(135deg,#38547a,#263045)', transform: `rotateX(${tilt}deg)`, transformOrigin: '50% 100%', opacity: state.preview ? 1 - ease(frame, [84, 102], [0, 0.7]) : 1}}><div style={{padding: 20, fontSize: 22}}>zisla</div></div></div>
-        {state.restored ? <TourResult>Preview ended · Desktop restored</TourResult> : null}
-        {frame < 106 ? <TourPointer frame={frame} at={78} x={945} y={196} /> : null}
-      </div> : <div data-recommended-section="tools">
-        <TourHeading title="Desktop applications"><TourAction label="Detect" /><TourAction label="Install missing" /><TourAction label="Update installed" /></TourHeading>
-        {recommendedDemo.map((app) => <div key={app.name} style={{display: 'flex', alignItems: 'center', gap: 16, padding: '17px 16px', background: color.fillControl, borderBottom: `1px solid ${color.divider}`}}><div className="flex-1"><div style={{fontSize: 19, fontWeight: 600}}>{app.name}</div><div style={{fontSize: 14, color: color.secondary, marginTop: 7}}>{app.purpose}</div></div><Check size={17} color={color.green} /><span style={{fontSize: 14}}>Installed</span><TourAction label="Update" /></div>)}
-        <div style={{marginTop: 20, fontSize: 15, color: color.secondary}}>Third-party apps · Installed separately</div>
-        <div className="flex items-center gap-[12px]" data-recommended-dock style={{position: 'absolute', left: 420, bottom: 20, padding: '10px 18px', borderRadius: 12, background: white(0.16)}}><BrowserGlyph size={31} /><div data-open-quiet-md style={{width: 36, height: 36, borderRadius: 8, background: '#ece8d7', color: '#403c31', fontSize: 22, textAlign: 'center'}}>Q</div><Music size={31} /></div>
-        <TourPointer frame={frame} at={24} x={514} y={398} />
-      </div>}
-    </div>}
-  </div>;
 };

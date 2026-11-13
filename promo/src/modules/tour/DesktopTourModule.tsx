@@ -1,11 +1,11 @@
 import type {ReactNode} from 'react';
-import {BatteryFull, Camera, Check, ChartLine, ChevronDown, ClipboardPaste, Folder, HardDrive, Keyboard, Laptop, Music, Pause, Play, Power, RotateCcw, Settings, Sun, Trash2, Volume2, VolumeX, X} from 'lucide-react';
+import {BatteryFull, Camera, Check, ChartLine, ChevronDown, ClipboardPaste, Folder, HardDrive, Keyboard, Laptop, Music, Pause, Play, Plug, Power, RotateCcw, Settings, Sun, Trash2, Volume2, VolumeX, X} from 'lucide-react';
 import {IconButton, ProgressTrack} from '../../components/Glass';
 import {BrowserGlyph, formatTime} from '../../components/IslandChrome';
 import {ease, linear} from '../../motion';
-import {color, white} from '../../theme';
+import {alpha, color, white} from '../../theme';
 import {SystemModule} from '../SystemModule';
-import {TourAction, TourCard, TourHeading, TourPointer, TourResult, TourSelect, TourToggle} from './TourSurface';
+import {TourAction, TourCard, TourHeading, TourPointer, TourPointerTrack, TourResult, TourSelect, TourToggle} from './TourSurface';
 
 export const desktopDemo = {
   mixer: [{name: 'Safari', volume: 0.3}, {name: 'Music', volume: 0.8}],
@@ -32,8 +32,7 @@ export const MixerTourModule = ({frame}: {frame: number}) => {
         </div>;
       })}
       <div className="flex-1" />
-      <TourPointer frame={frame} at={78} x={417} y={42} />
-      <TourPointer frame={frame} at={112} x={712} y={106} />
+      <TourPointerTrack frame={frame} actions={[{at: 78, x: 417, y: 42}, {at: 112, x: 712, y: 106}]} />
     </div>
   );
 };
@@ -60,7 +59,7 @@ export const keyboardTourAt = (frame: number) => {
   const position = Math.min(179, Math.max(0, frame));
   return {
     phase: position < 78 ? 'settings' : 'dashboard',
-    profileMenu: position >= 10 && position < 29,
+    profileMenu: position >= 10 && position < 35,
     profile: position < 29 ? 'Holy Panda' : position < 51 ? 'Cherry MX Brown' : 'BCP (Suit80)',
     preview: position >= 35 && position < 49 || position >= 60 && position < 72,
     characters: desktopDemo.typing.characters + Math.floor(linear(position, [92, 126], [0, 14])),
@@ -90,8 +89,7 @@ export const KeyboardTourModule = ({frame}: {frame: number}) => {
     <TourCard style={{padding: 12}}><TourToggle label="Record local typing stats" on /><div style={{fontSize: 10, lineHeight: '16px', marginTop: 6, color: color.secondary}}>Character counts, key presses, apps and time aggregates.</div></TourCard>
     <div style={{fontSize: 11, color: color.secondary}}>20 voices · Installed custom pack: BCP (Suit80)</div>
     {state.profileMenu ? <div data-keyboard-profile-menu className="absolute" style={{right: 63, top: 95, width: 259, padding: '6px 0', borderRadius: 7, border: `1px solid ${color.strokeCard}`, background: '#343438', boxShadow: '0 12px 35px #0008'}}>{[...keyboardVoices, 'BCP (Suit80)'].map((name) => <div key={name} className="flex items-center gap-[7px]" style={{height: 22, padding: '0 10px', fontSize: 11, color: name === state.profile ? color.blue : color.label}}><span style={{width: 12}}>{name === state.profile ? '✓' : ''}</span>{name}</div>)}</div> : null}
-    <TourPointer frame={frame} at={29} x={530} y={146} />
-    <TourPointer frame={frame} at={60} x={640} y={101} />
+    <TourPointerTrack frame={frame} actions={[{at: 29, x: 530, y: 135}, {at: 60, x: 656, y: 147}]} />
   </div></DesktopSettingsPage>;
   return <div className="absolute inset-0" data-keyboard-dashboard style={{padding: 12}}>
     <div data-keyboard-scroll className="relative" style={{height: 396, overflow: 'hidden'}}>
@@ -112,7 +110,7 @@ export const focusTourAt = (frame: number) => {
   const running = position >= 38 && position < 80 || position >= 112 && position < 190;
   const paused = position >= 80 && position < 112;
   const activeFrames = position < 38 ? 0 : Math.min(position - 38, 42) + Math.max(0, position - 112);
-  return {phase: running ? 'running' : paused ? 'paused' : 'idle', mode: finished ? 'rest' : 'focus', running, paused, finished, completed: position >= 190 && position < 224, compact: position >= 64 && position < 190, remaining: finished ? 300 : Math.max(0, 2 - activeFrames / 60)} as const;
+  return {phase: running ? 'running' : paused ? 'paused' : 'idle', mode: finished ? 'rest' : 'focus', running, paused, finished, completed: position >= 190 && position < 224, compact: position >= 68 && position < 190, remaining: finished ? 300 : Math.max(0, 2 - activeFrames / 60)} as const;
 };
 
 export const CompactFocusControls = ({frame}: {frame: number}) => {
@@ -134,7 +132,7 @@ export const FocusTourModule = ({frame}: {frame: number}) => {
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-[8px]" data-toolbox-actions="2/2/3">
         {[
-          [[Sun, 'Keep display awake', frame >= 57], [Laptop, 'Prevent idle sleep', frame >= 60]],
+          [[Sun, 'Keep display awake', frame >= 50], [Laptop, 'Prevent idle sleep', frame >= 62]],
           [[Sun, 'Clean screen', false], [Keyboard, 'Clean keyboard', false]],
           [[HardDrive, 'Teleprompter', false], [Camera, 'Mirror', false], [Trash2, 'Trash', false]],
         ].map((row, index) => <div key={index} className="flex gap-[8px]" style={{height: 40}}>{row.map(([Icon, label, active]) => {
@@ -142,9 +140,7 @@ export const FocusTourModule = ({frame}: {frame: number}) => {
           return <div key={String(label)} className="flex min-w-0 flex-1 items-center justify-center gap-[5px]" style={{borderRadius: 8, background: color.fillCard, color: active ? color.blue : color.label, fontSize: 11, fontWeight: 600}}><Glyph size={13} />{String(label)}</div>;
         })}</div>)}
       </div>
-      <TourPointer frame={frame} at={38} x={64} y={105} />
-      <TourPointer frame={frame} at={57} x={370} y={20} />
-      <TourPointer frame={frame} at={60} x={627} y={20} />
+      <TourPointerTrack frame={frame} actions={[{at: 38, x: 64, y: 105}, {at: 50, x: 370, y: 20}, {at: 62, x: 627, y: 20}]} />
     </div>
   );
 };
@@ -157,8 +153,7 @@ export const BackgroundSoundsTourModule = ({frame}: {frame: number}) => (
     <TourToggle label="Stop on lock, screen saver or sleep" on />
     <div style={{fontSize: 14, lineHeight: '24px', color: color.secondary}}>Rain · Ocean · Stream · Night · Noise · Transport</div>
     {frame >= 93 ? <TourResult>Ocean playing · Stops when unused</TourResult> : <div style={{fontSize: 15, color: color.secondary}}>Choose a background sound.</div>}
-    <TourPointer frame={frame} at={36} x={952} y={87} />
-    <TourPointer frame={frame} at={72} x={816} y={133} />
+    <TourPointerTrack frame={frame} actions={[{at: 36, x: 995, y: 102}, {at: 72, x: 900, y: 151}]} />
   </div>
 );
 
@@ -178,11 +173,11 @@ export const CleaningTourModule = ({frame}: {frame: number}) => {
   );
 };
 
-export const ScreenCleaningCover = ({frame}: {frame: number}) => <div data-screen-cleaning-cover className="absolute inset-0 flex items-center justify-center" style={{background: '#000'}}><div data-screen-cleaning-exit className="flex items-center justify-center" style={{width: 184, height: 52, borderRadius: 12, background: '#474747', fontSize: 16, fontWeight: 600}}>Exit screen cleaning</div><TourPointer frame={frame} at={87} x={640} y={360} /></div>;
+export const ScreenCleaningCover = ({frame}: {frame: number}) => <div data-screen-cleaning-cover className="absolute inset-0 flex items-center justify-center" style={{background: '#000'}}><div data-screen-cleaning-exit className="flex items-center justify-center" style={{width: 184, height: 52, borderRadius: 12, background: '#474747', fontSize: 16, fontWeight: 600}}>Exit screen cleaning</div><TourPointer frame={frame} at={64} x={640} y={360} /></div>;
 
 export const PresenterTourModule = ({frame}: {frame: number}) => {
   const playing = frame >= 38 && frame < 112;
-  const closed = frame >= 136;
+  const closed = frame >= 142;
   const scriptHover = frame < 64 || frame >= 101 && frame < 126;
   return (
     <div className="absolute inset-0 flex gap-[23px]" style={{padding: 24}}>
@@ -207,9 +202,7 @@ export const PresenterTourModule = ({frame}: {frame: number}) => {
         </div>
         <div style={{fontSize: 15, color: color.secondary}}>{closed ? 'Closed · Camera session released' : 'Mirrored camera preview'}</div>
       </div>
-      <TourPointer frame={frame} at={38} x={62} y={362} />
-      <TourPointer frame={frame} at={112} x={62} y={362} />
-      <TourPointer frame={frame} at={136} x={996} y={99} />
+      <TourPointerTrack frame={frame} actions={[{at: 38, x: 62, y: 362}, {at: 112, x: 62, y: 362}, {at: 136, x: 996, y: 99}]} />
     </div>
   );
 };
@@ -226,7 +219,7 @@ const historyCategories = [
 export const systemHistoryTourAt = (frame: number) => {
   const position = Math.min(269, Math.max(0, frame));
   const scroll = position < 120 ? ease(position, [84, 105], [0, 380]) : ease(position, [133, 154], [380, 724]);
-  return {phase: position < 18 ? 'live' : position < 36 ? 'settings' : 'history', range: position >= 68 ? '24 hours' : '7 days', scroll, save: position >= 188 && position < 206, exported: position >= 206} as const;
+  return {phase: position < 18 ? 'live' : position < 42 ? 'settings' : 'history', range: position >= 68 ? '24 hours' : '7 days', scroll, save: position >= 194 && position < 212, exported: position >= 212} as const;
 };
 
 const HistoryChart = ({category, index, range}: {category: typeof historyCategories[number]; index: number; range: string}) => <div data-history-category={category.name} className="shrink-0" style={{height: 178, padding: 12, borderRadius: 10, background: color.fillCard, border: `1px solid ${color.strokeCard}`}}>
@@ -242,7 +235,7 @@ const HistoryChart = ({category, index, range}: {category: typeof historyCategor
 export const SystemHistoryTourModule = ({frame, globalFrame}: {frame: number; globalFrame: number}) => {
   const state = systemHistoryTourAt(frame);
   if (state.phase === 'live') return <SystemModule frame={globalFrame} />;
-  if (state.phase === 'settings') return <DesktopSettingsPage title="System status and cleanup"><div data-system-history-settings><div style={{fontSize: 12, fontWeight: 600, color: color.secondary, marginBottom: 14}}>System monitor</div><TourCard><TourToggle label="Record history" on /><div style={{fontSize: 10, lineHeight: '16px', color: color.secondary, marginTop: 7}}>Minute readings for CPU, GPU, memory, disk, fans and network.</div><div className="flex items-center gap-[12px]" style={{marginTop: 17}}><NativeAction label="View history" active /><div style={{fontSize: 10, color: color.secondary}}>1,440 readings · 24 hours</div></div></TourCard><TourPointer frame={frame} at={36} x={363} y={174} /></div></DesktopSettingsPage>;
+  if (state.phase === 'settings') return <DesktopSettingsPage title="System status and cleanup"><div data-system-history-settings><div style={{fontSize: 12, fontWeight: 600, color: color.secondary, marginBottom: 14}}>System monitor</div><TourCard><TourToggle label="Record history" on /><div style={{fontSize: 10, lineHeight: '16px', color: color.secondary, marginTop: 7}}>Minute readings for CPU, GPU, memory, disk, fans and network.</div><div className="flex items-center gap-[12px]" style={{marginTop: 17}}><NativeAction label="View history" active /><div style={{fontSize: 10, color: color.secondary}}>1,440 readings · 24 hours</div></div></TourCard><TourPointer frame={frame} at={36} x={70} y={203} /></div></DesktopSettingsPage>;
   return <div data-system-history-window className="relative" style={{width: 720, height: 560, padding: 18, background: '#27272b', borderRadius: 12, border: `1px solid ${color.strokeCard}`, boxShadow: '0 22px 60px #0009'}}>
     <div data-system-history-header className="flex flex-col gap-[10px]" style={{height: 76}}>
       <div className="flex items-center gap-[8px]" style={{height: 34}}><div><div style={{fontSize: 16, fontWeight: 600}}>System history</div><div style={{fontSize: 10, color: color.secondary, marginTop: 3}}>10,080 readings · Nov 5–12</div></div><div className="flex-1" /><NativeAction label="Clear" /><NativeAction label="Export" active /></div>
@@ -253,52 +246,64 @@ export const SystemHistoryTourModule = ({frame, globalFrame}: {frame: number; gl
       <div className="absolute right-0" style={{top: state.scroll / 724 * 261, height: 143, width: 4, borderRadius: 2, background: white(0.22)}} />
     </div>
     <div data-system-history-footer className="flex items-center gap-[6px]" style={{height: 16, marginTop: 14, fontSize: 10, color: state.exported ? color.green : color.secondary}}>{state.exported ? <Check size={12} /> : null}{state.exported ? 'Saved: System history.xlsx' : state.save ? 'Exporting all recorded readings…' : 'Minute-level readings · All history included in export'}</div>
-    {state.save ? <div data-system-history-save className="absolute flex flex-col gap-[14px]" style={{left: 145, top: 133, width: 430, padding: 20, borderRadius: 12, background: '#353539', border: `1px solid ${color.strokeCard}`, boxShadow: '0 16px 50px #000b'}}><div style={{fontSize: 14, fontWeight: 600}}>Export system history</div><div className="flex items-center gap-[12px]" style={{fontSize: 12}}><span>Save As:</span><div className="flex-1" style={{padding: '7px 9px', background: color.fillControl, borderRadius: 5}}>System history.xlsx</div></div><div className="flex items-center gap-[13px]" style={{fontSize: 12}}><span>Where:</span><span>Documents</span></div><div className="flex justify-end gap-[8px]"><NativeAction label="Cancel" /><NativeAction label="Save" active /></div><TourPointer frame={frame} at={206} x={369} y={160} /></div> : null}
-    <TourPointer frame={frame} at={68} x={132} y={76} />
-    <TourPointer frame={frame} at={188} x={669} y={36} />
+    {state.save ? <div data-system-history-save className="absolute flex flex-col gap-[14px]" style={{left: 145, top: 133, width: 430, padding: 20, borderRadius: 12, background: '#353539', border: `1px solid ${color.strokeCard}`, boxShadow: '0 16px 50px #000b'}}><div style={{fontSize: 14, fontWeight: 600}}>Export system history</div><div className="flex items-center gap-[12px]" style={{fontSize: 12}}><span>Save As:</span><div className="flex-1" style={{padding: '7px 9px', background: color.fillControl, borderRadius: 5}}>System history.xlsx</div></div><div className="flex items-center gap-[13px]" style={{fontSize: 12}}><span>Where:</span><span>Documents</span></div><div className="flex justify-end gap-[8px]"><NativeAction label="Cancel" /><NativeAction label="Save" active /></div><TourPointer frame={frame} at={206} x={391} y={145} /></div> : null}
+    {!state.save ? <TourPointerTrack frame={frame} actions={[{at: 68, x: 132, y: 76}, {at: 188, x: 669, y: 36}]} /> : null}
   </div>;
 };
 
 export const batteryTourAt = (frame: number) => {
   const position = Math.min(209, Math.max(0, frame));
-  const onBattery = position >= 110;
-  return {...desktopDemo.battery, onBattery, chargingRequested: position >= 38, lowPower: position >= 145, chargingWatts: onBattery ? 0 : desktopDemo.battery.chargingWatts, inputWatts: onBattery ? 0 : desktopDemo.battery.inputWatts};
+  const onBattery = position >= 170;
+  const fullyCharged = position >= 110 && !onBattery;
+  const charging = position >= 44 && position < 110;
+  return {...desktopDemo.battery, onBattery, fullyCharged, charging, chargingRequested: position >= 38, lowPower: position >= 151, level: position >= 110 ? 1 : desktopDemo.battery.level, chargingWatts: charging ? desktopDemo.battery.chargingWatts : 0, inputWatts: onBattery ? 0 : fullyCharged ? 12.7 : charging ? desktopDemo.battery.inputWatts : desktopDemo.battery.systemWatts, systemWatts: fullyCharged ? 12.7 : desktopDemo.battery.systemWatts};
 };
 
 const BatteryTrend = ({title, value, tint}: {title: string; value: string; tint: string}) => <TourCard style={{padding: 10, height: 77}}><div className="flex items-center" style={{fontSize: 12, fontWeight: 600}}>{title}<div className="flex-1" /><span className="tabular" style={{fontSize: 11, color: tint}}>{value}</span></div><svg width="100%" height="40" viewBox="0 0 425 40" preserveAspectRatio="xMidYMid meet" style={{marginTop: 7}}><polyline points="0,31 20,30 40,31 60,28 80,29 100,27 120,26 140,27 160,25 180,24 200,23 220,22 240,23 260,20 280,20 300,21 320,18 340,18 360,17 380,15 400,16 425,15" stroke={tint} strokeWidth={1.5} fill="none" /></svg></TourCard>;
 
+const PowerEndpoint = ({icon, value, caption}: {icon: ReactNode; value?: string; caption: string}) => <div className="flex h-full w-full flex-col items-center justify-center gap-[5px]" style={{padding: '0 6px', borderRadius: 8, background: color.fillCard, border: `0.5px solid ${color.strokeCard}`}}>{icon}{value ? <span className="font-rounded tabular" style={{fontSize: 12, fontWeight: 600}}>{value}</span> : null}<span style={{fontSize: 9, fontWeight: 500, color: color.secondary}}>{caption}</span></div>;
+
 export const BatteryTourModule = ({frame}: {frame: number}) => {
   const state = batteryTourAt(frame);
+  const percent = `${Math.round(state.level * 100)}%`;
+  const split = state.charging;
   return <div data-battery-detail className="absolute inset-0 flex flex-col gap-[12px]" style={{padding: 12}}>
-    <div data-battery-section="header" className="flex shrink-0 items-center gap-[8px]" style={{height: 30}}><Laptop size={13} /><span style={{fontSize: 12, fontWeight: 600}}>Local battery</span><div className="flex gap-[4px]">{['Automatic', 'Low power', 'High power'].map((mode) => <div key={mode} style={{padding: '2px 8px', borderRadius: 5, fontSize: 10, background: mode === (state.lowPower ? 'Low power' : state.onBattery ? 'Automatic' : 'High power') ? color.blue : color.fillControl}}>{mode}</div>)}</div><div className="flex-1" />{!state.onBattery ? <div data-feature="chargeToFull"><NativeAction label="Charge to 100%" icon={<Power size={11} />} /></div> : null}<span style={{fontSize: 9, color: color.secondary}}>{state.onBattery ? 'On battery' : state.chargingRequested ? 'Charging' : 'Optimised charging'}</span><BatteryFull size={13} color={color.green} /><span className="font-rounded tabular" style={{fontSize: 10, fontWeight: 600}}>76%</span></div>
-    <div data-battery-section="flow" className="relative shrink-0" style={{height: 176}}>
-      <svg width="100%" height="176" viewBox="0 0 704 176" preserveAspectRatio="xMidYMid meet">
-        {state.onBattery ? <path data-power-route="system" d="M87 88H615" stroke={color.green} strokeWidth={4} fill="none" /> : <><path data-power-route="battery" d="M87 88H290Q330 88 360 52H615" stroke={color.orange} strokeWidth={4} fill="none" /><path data-power-route="system" d="M87 88H290Q330 88 360 140H615" stroke={color.cyan} strokeWidth={4} fill="none" /></>}
-      </svg>
-      <div className="absolute flex flex-col items-center justify-center gap-[6px]" style={{left: 0, top: 36, width: 84, height: 104, borderRadius: 9, background: color.fillCard}}>{state.onBattery ? <BatteryFull size={22} color={color.green} /> : <Power size={22} color={color.orange} />}<div className="tabular" style={{fontSize: 12, fontWeight: 600}}>{state.onBattery ? '76%' : '60 W'}</div><div style={{fontSize: 9, color: color.secondary}}>{state.onBattery ? 'Battery' : 'Adapter input'}</div></div>
-      {!state.onBattery ? <><div className="absolute flex flex-col items-center" style={{left: 294, top: 21}}><div className="tabular" style={{fontSize: 15, fontWeight: 700}}>36 W</div><div style={{fontSize: 9, color: color.secondary}}>Charging</div></div><div className="absolute flex flex-col items-center justify-center gap-[5px]" style={{right: 0, top: 0, width: 88, height: 101, borderRadius: 9, background: color.fillCard}}><BatteryFull size={22} color={color.green} /><span style={{fontSize: 12, fontWeight: 600}}>76%</span><span style={{fontSize: 9, color: color.secondary}}>Charging</span></div></> : null}
-      <div className="absolute flex flex-col items-center" style={{left: 294, top: state.onBattery ? 48 : 110}}><div className="tabular" style={{fontSize: 15, fontWeight: 700}}>24 W</div><div style={{fontSize: 9, color: color.secondary}}>System use</div></div>
-      <div className="absolute flex flex-col items-center justify-center gap-[5px]" style={{right: 0, top: state.onBattery ? 36 : 109, width: 88, height: state.onBattery ? 104 : 67, borderRadius: 9, background: color.fillCard}}><Laptop size={22} color={color.cyan} /><span style={{fontSize: 9, color: color.secondary}}>This Mac</span></div>
+    <div data-battery-section="header" className="flex shrink-0 items-center gap-[8px]" style={{height: 30}}><Laptop size={13} /><span style={{fontSize: 12, fontWeight: 600}}>Local battery</span><div className="flex gap-[4px]">{['Automatic', 'Low power', 'High power'].map((mode) => <div key={mode} style={{padding: '2px 8px', borderRadius: 5, fontSize: 10, background: mode === (state.lowPower ? 'Low power' : state.onBattery || state.fullyCharged ? 'Automatic' : 'High power') ? color.blue : color.fillControl}}>{mode}</div>)}</div><div className="flex-1" />{!state.onBattery && !state.fullyCharged && !state.charging ? <div data-feature="chargeToFull"><NativeAction label="Charge to 100%" icon={<Power size={11} />} /></div> : null}<span style={{fontSize: 9, color: color.secondary}}>{state.onBattery ? 'On battery' : state.fullyCharged ? 'Fully charged' : state.charging ? 'Charging' : 'Optimised charging'}</span><BatteryFull size={13} color={state.lowPower ? color.yellow : color.green} /><span className="font-rounded tabular" style={{fontSize: 10, fontWeight: 600}}>{percent}</span></div>
+    <div data-battery-section="flow" className="flex shrink-0 gap-[8px]" style={{height: split ? 176 : 96}}>
+      <div className="shrink-0" style={{width: 84}}><PowerEndpoint icon={state.onBattery ? <BatteryFull size={22} color={color.green} /> : <Plug size={22} color={color.orange} />} value={state.onBattery ? percent : `${state.inputWatts} W`} caption={state.onBattery ? 'Battery supply' : 'Adapter input'} /></div>
+      {split ? <>
+        <div className="relative min-w-0 flex-1">
+          <svg width="100%" height="176" viewBox="0 0 540 176" preserveAspectRatio="none">
+            <defs><linearGradient id="battery-charge-route" x1="0" y1="0" x2="1" y2="0"><stop stopColor={color.orange} stopOpacity={0.30} /><stop offset="1" stopColor={color.green} stopOpacity={0.16} /></linearGradient><linearGradient id="battery-system-route" x1="0" y1="0" x2="1" y2="0"><stop stopColor={color.orange} stopOpacity={0.30} /><stop offset="1" stopColor={color.cyan} stopOpacity={0.16} /></linearGradient></defs>
+            <path data-power-route="battery" d="M0 0H532Q540 0 540 8V83.6Q540 91.6 532 91.6C334.8 91.6 194.4 105.6 97.2 105.6H0Z" fill="url(#battery-charge-route)" stroke={color.strokeCard} strokeWidth={0.5} />
+            <path data-power-route="system" d="M0 105.6H97.2C194.4 105.6 334.8 119.6 532 119.6Q540 119.6 540 127.6V168Q540 176 532 176H0Z" fill="url(#battery-system-route)" stroke={color.strokeCard} strokeWidth={0.5} />
+          </svg>
+          {[['Charging', state.chargingWatts, 52.8], ['System use', state.systemWatts, 140.8]].map(([title, watts, y]) => <div key={title} className="absolute inset-x-0 flex flex-col items-center gap-[2px]" style={{top: Number(y), transform: 'translateY(-50%)'}}><span className="font-rounded tabular" style={{fontSize: 15, fontWeight: 700}}>{watts} W</span><span style={{fontSize: 9, fontWeight: 500, color: color.secondary}}>{title}</span></div>)}
+        </div>
+        <div className="flex shrink-0 flex-col gap-[8px]" style={{width: 88}}><div style={{height: 100.8}}><PowerEndpoint icon={<BatteryFull size={22} color={color.green} />} value={percent} caption="Charging" /></div><div className="flex-1"><PowerEndpoint icon={<Laptop size={22} color={color.cyan} />} caption="This Mac" /></div></div>
+      </> : <>
+        <div data-power-route="system" className="flex min-w-0 flex-1 flex-col items-center justify-center gap-[2px]" style={{borderRadius: 8, border: `0.5px solid ${color.strokeCard}`, background: `linear-gradient(90deg, ${alpha(color.orange, 0.28)}, ${alpha(color.cyan, 0.14)})`}}><span className="font-rounded tabular" style={{fontSize: 15, fontWeight: 700}}>{state.systemWatts.toFixed(1)} W</span><span style={{fontSize: 9, fontWeight: 500, color: color.secondary}}>{state.onBattery ? 'Battery supply' : 'System use'}</span></div>
+        <div className="shrink-0" style={{width: 84}}><PowerEndpoint icon={<Laptop size={22} color={color.cyan} />} caption="This Mac" /></div>
+      </>}
     </div>
-    <div data-battery-section="readings" className="flex gap-[12px]" style={{height: 164}}><div className="flex min-w-0 flex-1 flex-col gap-[10px]"><BatteryTrend title="Battery level" value="76%" tint={color.green} /><BatteryTrend title="System power" value="24.0 W" tint={color.orange} /></div><div data-battery-metrics className="flex shrink-0 flex-col gap-[4px]" style={{width: 250, padding: 8, borderRadius: 6, background: white(0.06), border: `1px solid ${color.strokeCard}`}}>{[['Health', '96%'], ['Cycles', '124'], ['Temperature', '31°C'], ['Max capacity', '4,800 mAh'], ['Design capacity', '5,000 mAh'], ['Current charge', '3,648 mAh'], ['Current', state.onBattery ? '−1.60 A' : '+2.40 A'], ['Voltage', '15.00 V'], ['Adapter rated', '96 W']].map(([label, value]) => <div key={label} className="flex items-center" style={{height: 12, fontSize: 9}}><span style={{color: color.secondary}}>{label}</span><div className="flex-1" /><span className="tabular">{value}</span></div>)}</div></div>
+    <div data-battery-section="readings" className="flex gap-[12px]" style={{height: 164}}><div className="flex min-w-0 flex-1 flex-col gap-[10px]"><BatteryTrend title="Battery level" value={percent} tint={state.lowPower ? color.yellow : color.green} /><BatteryTrend title="System power" value={`${state.systemWatts.toFixed(1)} W`} tint={color.orange} /></div><div data-battery-metrics className="flex shrink-0 flex-col gap-[4px]" style={{width: 250, padding: 8, borderRadius: 6, background: white(0.06), border: `1px solid ${color.strokeCard}`}}>{[['Health', '96%'], ['Cycles', '124'], ['Temperature', '31°C'], ['Max capacity', '4,800 mAh'], ['Design capacity', '5,000 mAh'], ['Current charge', `${Math.round(4800 * state.level).toLocaleString('en-US')} mAh`], ['Current', state.onBattery ? '−1.60 A' : state.charging ? '+2.40 A' : '0.00 A'], ['Voltage', '15.00 V'], ['Adapter rated', '96 W']].map(([label, value]) => <div key={label} className="flex items-center" style={{height: 12, fontSize: 9}}><span style={{color: color.secondary}}>{label}</span><div className="flex-1" /><span className="tabular">{value}</span></div>)}</div></div>
     <div data-battery-section="devices" className="flex items-center gap-[14px]" style={{height: 30, fontSize: 11}}><span style={{fontSize: 12, fontWeight: 600}}>Nearby devices</span><Keyboard size={16} color={color.secondary} /><span>Keyboard 82%</span><Music size={16} color={color.secondary} /><span>Headphones 64%</span></div>
-    <TourPointer frame={frame} at={38} x={525} y={27} />
-    <TourPointer frame={frame} at={145} x={245} y={27} />
+    <TourPointerTrack frame={frame} actions={[{at: 38, x: 570, y: 27}, {at: 145, x: 245, y: 27}]} />
   </div>;
 };
 
 export const CleanupTourModule = ({frame}: {frame: number}) => {
   const review = frame >= 20;
-  const confirmation = frame >= 49 && frame < 74;
-  const done = frame >= 74;
+  const confirmation = frame >= 55 && frame < 80;
+  const done = frame >= 80;
   return (
     <div data-cleanup-window className="relative" style={{width: 560, height: 430, padding: 18, borderRadius: 12, background: '#27272b', border: `1px solid ${color.strokeCard}`, boxShadow: '0 22px 60px #0009'}}>
       <div className="flex items-center gap-[7px]" style={{height: 47}}><div className="min-w-0 flex-1"><div style={{fontSize: 16, fontWeight: 600}}>Cleanup candidates</div><div style={{fontSize: 10, color: color.secondary, marginTop: 4}}>Grouped by source · Move selected items to Trash</div></div><NativeAction label="Select all" /><NativeAction label="Invert" /><div aria-label="Rescan"><IconButton compact icon={RotateCcw} /></div></div>
       <div data-cleanup-list style={{height: 276, marginTop: 14, padding: '6px 10px', borderRadius: 6, background: white(0.035), overflow: 'hidden'}}>{desktopDemo.cleanup.map((item, index) => !done || index === 2 ? <div key={item.name} style={{marginBottom: 8}}><div className="flex items-center gap-[6px]" style={{height: 18, fontSize: 10, color: color.secondary}}><ChevronDown size={9} /><span>{item.source}</span><span style={{fontSize: 9}}>· {review && index < 2 ? 1 : 0}/1</span><div className="flex-1" /><span className="tabular" style={{fontSize: 9}}>{item.sizeMB} MB</span></div><div data-cleanup-candidate={item.name} className="flex items-start gap-[10px]" style={{padding: '8px 5px', height: 65}}><div className="flex shrink-0 items-center justify-center" style={{width: 13, height: 13, marginTop: 3, borderRadius: 3, background: review && index < 2 ? color.blue : 'transparent', border: `1px solid ${review && index < 2 ? color.blue : color.secondary}`}}>{review && index < 2 ? <Check size={10} /> : null}</div><Folder size={17} color={color.secondary} style={{marginTop: 2, flexShrink: 0}} /><div className="min-w-0 flex-1"><div className="flex items-center gap-[7px]" style={{fontSize: 11}}><span>{item.name}</span><span style={{fontSize: 9, color: index < 2 ? color.green : color.orange}}>{item.safety}</span></div><div style={{fontSize: 9, color: color.secondary, marginTop: 3}}>{item.detail}</div><div style={{fontSize: 9, color: color.secondary, marginTop: 3}}>{item.reason}</div></div><span className="tabular" style={{fontSize: 10, color: color.secondary}}>{item.sizeMB} MB</span></div></div> : null)}</div>
       {done ? <div data-cleanup-result className="flex items-center gap-[5px]" style={{fontSize: 10, color: color.green, marginTop: 10}}><Check size={12} />2 items moved to Trash · 344 MB · Review item kept</div> : null}
       <div data-cleanup-footer className="absolute flex items-center gap-[8px]" style={{left: 18, right: 18, top: 383, height: 29, fontSize: 10}}><span style={{color: color.secondary}}>{done ? 'Selected 0 / 1 · 0 MB' : `Selected ${review ? 2 : 0} / 3 · ${review ? 344 : 0} MB`}</span><div className="flex-1" /><NativeAction label={done ? 'Done' : 'Cancel'} /><NativeAction label="Move to Trash" active={review && !done} /></div>
-      {confirmation ? <div data-cleanup-confirmation className="absolute" style={{left: 95, top: 127, width: 370, padding: 18, borderRadius: 13, border: `1px solid ${color.strokeCard}`, background: '#343438', boxShadow: '0 15px 60px rgba(0,0,0,0.75)'}}><div style={{fontSize: 15, fontWeight: 600}}>Move 2 items to Trash?</div><div style={{fontSize: 11, lineHeight: '17px', marginTop: 10, color: color.secondary}}>Application and package manager caches · 344 MB</div><div className="flex justify-end gap-[8px]" style={{marginTop: 18}}><NativeAction label="Cancel" /><NativeAction label="Move to Trash" active /></div><TourPointer frame={frame} at={74} x={294} y={110} /></div> : null}
-      <TourPointer frame={frame} at={49} x={480} y={397} />
+      {confirmation ? <div data-cleanup-confirmation className="absolute" style={{left: 95, top: 127, width: 370, padding: 18, borderRadius: 13, border: `1px solid ${color.strokeCard}`, background: '#343438', boxShadow: '0 15px 60px rgba(0,0,0,0.75)'}}><div style={{fontSize: 15, fontWeight: 600}}>Move 2 items to Trash?</div><div style={{fontSize: 11, lineHeight: '17px', marginTop: 10, color: color.secondary}}>Application and package manager caches · 344 MB</div><div className="flex justify-end gap-[8px]" style={{marginTop: 18}}><NativeAction label="Cancel" /><NativeAction label="Move to Trash" active /></div><TourPointer frame={frame} at={74} x={294} y={100} /></div> : null}
+      {!confirmation ? <TourPointer frame={frame} at={49} x={480} y={397} /> : null}
     </div>
   );
 };

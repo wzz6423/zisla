@@ -259,7 +259,7 @@ export const en: SiteContent = {
       recommendedTools: {
         title: 'Recommended apps',
         description:
-          'Discover OpenScreen for screen recording and video editing, DockDoor for window previews and app switching, and Quiet.md for local notes. These third-party apps are installed separately.',
+          'Discover OpenScreen for screen recording and video editing, DockDoor for window previews and app switching, and Zshell for a native macOS terminal workspace. These third-party apps are installed separately.',
         detail: 'Discover desktop tools · Third-party apps · Separate installation',
       },
     },

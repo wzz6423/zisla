@@ -7,7 +7,7 @@ import {GlassPanel} from '../components/Glass';
 import {Island} from '../components/Island';
 import {IslandBody, StatusHeader, TABS, formatTime} from '../components/IslandChrome';
 import {BackgroundSoundsTourModule, BatteryTourModule, CleanupTourModule, CompactFocusControls, FocusTourModule, KeyboardTourModule, MixerTourModule, PresenterTourModule, ScreenCleaningCover, SystemHistoryTourModule, batteryTourAt, focusTourAt, keyboardTourAt, systemHistoryTourAt} from '../modules/tour/DesktopTourModule';
-import {NativeModuleSurface, TourPointer, TourSurface, tourAt} from '../modules/tour/TourSurface';
+import {NativeModuleSurface, TourPointer, TourSurface, TourPointerTrack, tourAt} from '../modules/tour/TourSurface';
 import {color, islandHeightFor} from '../theme';
 
 export const DESKTOP_TOUR_DURATION = 1620;
@@ -36,7 +36,7 @@ const DesktopWindowSurface = ({title, caption, width, height, scale = 1, childre
 
 const FocusSurface = ({frame, title, caption}: {frame: number; title: string; caption: string}) => {
   const state = focusTourAt(frame);
-  const status = state.completed ? 'Focus completed · One alert and notification' : state.finished ? 'Rest ready · 5 minutes' : state.paused ? 'Focus paused · Remaining time retained' : frame < 38 ? 'Ready for a two-second focus countdown' : frame < 57 ? 'Focus running' : frame < 60 ? 'Display awake' : 'Display awake · Idle sleep prevented';
+  const status = state.completed ? 'Focus completed · One alert and notification' : state.finished ? 'Rest ready · 5 minutes' : state.paused ? 'Focus paused · Remaining time retained' : frame < 38 ? 'Ready for a two-second focus countdown' : frame < 50 ? 'Focus running' : frame < 62 ? 'Display awake' : 'Display awake · Idle sleep prevented';
   return <>
     <Wallpaper dim={0.22} />
     <MenuBar />
@@ -44,7 +44,7 @@ const FocusSurface = ({frame, title, caption}: {frame: number; title: string; ca
       {!state.compact ? <IslandBody header={<StatusHeader />} active={TABS.toolbox}><FocusTourModule frame={frame} /></IslandBody> : null}
     </Island>
     <Notch />
-    {state.compact ? <><TourPointer frame={frame} at={80} x={761} y={17} /><TourPointer frame={frame} at={112} x={761} y={17} /></> : null}
+    {state.compact ? <TourPointerTrack frame={frame} actions={[{at: 80, x: 761, y: 17}, {at: 112, x: 761, y: 17}]} /> : null}
     <div data-focus-status className="absolute inset-x-0" style={{top: state.compact ? 97 : 324, textAlign: 'center', color: state.completed ? color.green : color.secondary, fontSize: 13}}>{status}</div>
     <Headline lines={[title]} top={400} size={34} />
     <Caption text={caption} size={17} bottom={35} />
@@ -64,9 +64,9 @@ export const SceneDesktopTools = ({duration = DESKTOP_TOUR_DURATION, globalFrom 
   if (state.step.id === 'focus') return <FocusSurface frame={state.frame} title={state.step.title} caption={state.step.caption} />;
   if (state.step.id === 'cleaning') {
     const cleaningFrame = state.frame * 180 / 150;
-    if (cleaningFrame >= 26 && cleaningFrame < 87) return <ScreenCleaningCover frame={cleaningFrame} />;
-    const cleaning = cleaningFrame >= 94 && cleaningFrame < 150;
-    return <NativeModuleSurface title={state.step.title} caption={cleaning ? 'Keyboard input blocked · Includes F1–F12' : cleaningFrame >= 150 ? 'Screen restored · Keyboard input resumed' : state.step.caption} module="toolbox" height={136}><FocusTourModule frame={239} />{cleaning ? <div data-keyboard-cleaning-notice className="absolute flex items-center justify-center gap-[8px]" style={{right: 0, top: 94, width: 248, height: 40, borderRadius: 8, background: '#28282e', fontSize: 11}}><span>Keyboard input blocked</span><span style={{color: color.blue}}>End cleaning</span><TourPointer frame={cleaningFrame} at={150} x={218} y={20} /></div> : <TourPointer frame={cleaningFrame} at={94} x={626} y={68} />}</NativeModuleSurface>;
+    if (cleaningFrame >= 32 && cleaningFrame < 70) return <ScreenCleaningCover frame={cleaningFrame} />;
+    const cleaning = cleaningFrame >= 86 && cleaningFrame < 110;
+    return <NativeModuleSurface title={state.step.title} caption={cleaning ? 'Keyboard input blocked · Includes F1–F12' : cleaningFrame >= 110 ? 'Screen restored · Keyboard input resumed' : state.step.caption} module="toolbox" height={136}><FocusTourModule frame={239} />{cleaning ? <div data-keyboard-cleaning-notice className="absolute flex items-center justify-center gap-[8px]" style={{right: 0, top: 94, width: 248, height: 40, borderRadius: 8, background: '#28282e', fontSize: 11}}><span>Keyboard input blocked</span><span style={{color: color.blue}}>End cleaning</span><TourPointer frame={cleaningFrame} at={104} x={218} y={20} /></div> : cleaningFrame < 32 ? <TourPointer frame={cleaningFrame} at={26} x={370} y={68} /> : cleaningFrame < 86 ? <TourPointer frame={cleaningFrame} at={80} x={626} y={68} /> : null}</NativeModuleSurface>;
   }
   if (state.step.id === 'system') {
     const system = systemHistoryTourAt(state.frame);
@@ -77,7 +77,7 @@ export const SceneDesktopTools = ({duration = DESKTOP_TOUR_DURATION, globalFrom 
   if (state.step.id === 'battery') {
     const batteryFrame = state.frame * 210 / 180;
     const battery = batteryTourAt(batteryFrame);
-    return <><Wallpaper dim={0.22} /><MenuBar /><Island reveal={1} height={islandHeightFor(460)}><IslandBody header={<StatusHeader />} active={TABS.cpu}><BatteryTourModule frame={batteryFrame} /></IslandBody></Island><Notch /><Headline lines={[state.step.title]} top={625} size={26} /><Caption text={battery.lowPower ? 'Low power mode applied' : battery.onBattery ? 'Battery supplies the Mac · Automatic power mode' : battery.chargingRequested ? 'Charge to 100% requested' : state.step.caption} size={15} bottom={18} /></>;
+    return <><Wallpaper dim={0.22} /><MenuBar /><Island reveal={1} height={islandHeightFor(460)}><IslandBody header={<StatusHeader />} active={TABS.cpu}><BatteryTourModule frame={batteryFrame} /></IslandBody></Island><Notch /><Headline lines={[state.step.title]} top={625} size={26} /><Caption text={battery.onBattery ? battery.lowPower ? 'Battery supplies the Mac · Low power mode applied' : 'Battery supplies the Mac · Automatic power mode' : battery.fullyCharged ? battery.lowPower ? 'Fully charged snapshot · Low power mode applied' : 'Fully charged snapshot · Adapter powers this Mac' : battery.chargingRequested ? 'Charge to 100% requested' : state.step.caption} size={15} bottom={18} /></>;
   }
   if (state.step.id === 'cleanup') return <DesktopWindowSurface title={state.step.title} caption={state.step.caption} width={560} height={430} scale={1.15}><CleanupTourModule frame={state.frame} /></DesktopWindowSurface>;
   return (

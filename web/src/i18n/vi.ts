@@ -162,7 +162,7 @@ export const vi = createCatalog({
       recommendedTools: {
         title: 'Ứng dụng đề xuất',
         description:
-          'Khám phá OpenScreen để ghi và biên tập video, DockDoor để xem trước cửa sổ và đổi ứng dụng, cùng Quiet.md cho ghi chú cục bộ. Đây là ứng dụng bên thứ ba được cài riêng.',
+          'Khám phá OpenScreen để ghi và biên tập video, DockDoor để xem trước cửa sổ và đổi ứng dụng, cùng Zshell làm không gian làm việc terminal gốc cho macOS. Đây là ứng dụng bên thứ ba được cài riêng.',
         detail: 'Khám phá công cụ máy tính · Ứng dụng bên thứ ba · Cài đặt riêng',
       },
     },

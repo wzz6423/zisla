@@ -257,7 +257,7 @@ export const ko: SiteContent = {
       recommendedTools: {
         title: '추천 앱',
         description:
-          '화면 녹화와 영상 편집용 OpenScreen, 창 미리보기와 앱 전환용 DockDoor, 로컬 메모용 Quiet.md 등의 도구를 알아보세요. 별도로 설치하는 타사 앱입니다.',
+          '화면 녹화와 영상 편집용 OpenScreen, 창 미리보기와 앱 전환용 DockDoor, 네이티브 macOS 터미널 작업 공간인 Zshell 등의 도구를 알아보세요. 별도로 설치하는 타사 앱입니다.',
         detail: '데스크톱 도구 탐색 · 타사 앱 · 별도 설치',
       },
     },

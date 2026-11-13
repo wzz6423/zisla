@@ -60,9 +60,9 @@ npm test
 | `SceneEveryday` | 1920×1080 | 1440 | 58–82s，随记、剪贴板、会议、位置便签、简报和语音 |
 | `SceneCreativeTools` | 1920×1080 | 1920 | 82–114s，截图、录屏、图片、音频和 PDF |
 | `SceneDesktopTools` | 1920×1080 | 1380 | 114–137s，混音、键盘、专注、清洁、系统历史和电池 |
-| `SceneSettings` | 1920×1080 | 1080 | 137–155s，窗口、快捷动作、顺序、权限、CLI／Skills |
+| `SceneSettings` | 1920×1080 | 1140 | 137–156s，窗口、快捷动作、权限、CLI／Skills、Zshell 和整屏合盖 |
 | `Scene4Bento` | 1920×1080 | 600 | 独立工具快览预览 |
-| `Scene5Outro` | 1920×1080 | 300 | 155–160s，品牌、安装命令和对应音乐署名 |
+| `Scene5Outro` | 1920×1080 | 240 | 156–160s，品牌、安装命令和对应音乐署名 |
 
 相邻两幕有 16 帧叠化：后一幕提前 16 帧在仍不透明的前一幕之上淡入，到名义起点时完全显现。歌曲进度和番茄钟用 `filmFrame()` 换算成全片帧号。分幕合成按名义长度注册，用于无声预览；全片中的布局与工具导览按含叠化的幕长缩放，并保留各幕末态。
 
@@ -70,7 +70,7 @@ npm test
 
 两个版本均使用一首完整作品的连续前 160 秒，保留原曲编排，只在首尾淡入淡出。MP3 为 44.1 kHz 立体声、320 kbps，整体降低 2 dB，开头淡入 0.4 秒，155.8–159.6 秒淡出。
 
-- 放克版：[Kevin MacLeod《Funkorama》](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474)。官网播放器暂用此版。
+- 放克版：[Kevin MacLeod《Funkorama》](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474)。官网播放器采用此版。
 - 电影配乐版：[Scott Buckley《The Miracle of Flight》](https://www.scottbuckley.com.au/library/the-miracle-of-flight/)。
 
 两首作品均以 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 发布。片尾、音频元数据与官网保留作者和来源；再分发影片时使用对应署名：

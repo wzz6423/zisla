@@ -306,6 +306,8 @@ for (const locale of siteLocales) {
     const content = site.getSiteContent(locale);
     assert.deepEqual(Object.keys(content.showcase.modules).sort(), [...site.showcaseModuleIds].sort());
     assert.deepEqual(Object.keys(content.extensions.features).sort(), [...site.crossModuleFeatureIds].sort());
+    assert.match(content.extensions.features.recommendedTools.description, /Zshell/);
+    assert.doesNotMatch(content.extensions.features.recommendedTools.description, /Quiet\.md/);
     const authored = new Map(strings(authoredCatalogs.get(locale), '').map(([path, value]) => [path.slice(1), value]));
     const baseline = new Map(updatedStrings(english));
     for (const [path, value] of updatedStrings(content)) {

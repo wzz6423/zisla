@@ -77,18 +77,18 @@ export const AgendaModule = ({done = 0, meeting = false}: {done?: number; meetin
             if (isReminder) reminderIndex += 1;
             const checked = isReminder ? clamp01(done - reminderIndex) : 0;
             return (
-              <div key={item.title} className="flex h-[34px] shrink-0 items-center gap-[7px]">
+              <div key={item.title} data-agenda-row={item.title} className="flex h-[34px] shrink-0 items-center gap-[7px]">
                 <div style={{width: 3, height: 25, borderRadius: 1.5, background: KIND_TINT[item.kind]}} />
                 <div className="min-w-0 flex-1" style={{opacity: 1 - 0.5 * checked}}>
                   <div className="truncate text-[10px] leading-[13px] font-semibold">{item.title}</div>
                   <div className="text-[9px] leading-[12px] text-label-2">{isReminder ? `Reminder · ${item.time || 'Today'}` : meeting && item.title === 'Design review' ? '9:41' : item.time}</div>
                 </div>
-                {meeting && item.title === 'Design review' ? <><Video size={11} color={color.blue} /><StickyNote size={11} color={color.secondary} /></> : null}
+                {meeting && item.title === 'Design review' ? <><Video size={11} color={color.blue} /><StickyNote data-meeting-note-action size={11} color={color.secondary} /></> : null}
                 {isReminder ? (
                   checked > 0.5 ? (
-                    <CircleCheck size={11} strokeWidth={2.4} color={color.green} />
+                    <CircleCheck data-reminder-toggle={item.title} size={11} strokeWidth={2.4} color={color.green} />
                   ) : (
-                    <Circle size={11} strokeWidth={2.4} color={color.green} />
+                    <Circle data-reminder-toggle={item.title} size={11} strokeWidth={2.4} color={color.green} />
                   )
                 ) : null}
                 <Trash2 size={10} strokeWidth={2.2} color={color.secondary} />

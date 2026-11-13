@@ -128,7 +128,7 @@ export const ShelfModule = ({
         <div className="flex items-center gap-[6px]">
           <TextButton icon={SquarePen} label="Take a note" />
           <TextButton icon={ClipboardPaste} label="Paste" />
-          <TextButton icon={CircleCheck} label={selection ? 'Done' : 'Select'} />
+          <div data-shelf-select><TextButton icon={CircleCheck} label={selection ? 'Done' : 'Select'} /></div>
           <div className="flex items-center gap-[6px]" style={{opacity: selection ? 0 : moreButtons}}>
             <TextButton icon={FileText} label="Quick Notes" />
             <TextButton icon={Copy} label="Copy" />
@@ -165,7 +165,7 @@ export const ShelfModule = ({
         <span className="text-[11px] text-label-3">Search Shelf Content</span>
       </div>
       <div style={{height: 1, background: color.divider}} />
-      {selection ? <div className="flex shrink-0 items-center gap-[10px] px-[10px]" data-feature="shelf.selection" style={{height: 27, fontSize: 10}}><span>{selection.length} items selected</span><div className="flex-1" /><span>Select all</span><span>Clear selection</span><span>Actions ⌄</span></div> : null}
+      {selection ? <div className="flex shrink-0 items-center gap-[10px] px-[10px]" data-feature="shelf.selection" style={{height: 27, fontSize: 10}}><span>{selection.length} items selected</span><div className="flex-1" /><span>Select all</span><span>Clear selection</span><span data-shelf-actions>Actions ⌄</span></div> : null}
       {detail ? <div className="relative min-h-0 flex-1">{detail}</div> : <div className="relative min-h-0 flex-1" style={{padding: '7px 8px 7px 4px'}}>
         {items.length === 0 ? (
           <div
@@ -186,6 +186,7 @@ export const ShelfModule = ({
           return (
             <div
               key={item.name}
+              data-shelf-item={item.name}
               className="absolute"
               style={{
                 ...shelfItemLayout(index),

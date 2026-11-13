@@ -86,6 +86,7 @@ export const ClipboardModule = ({filter = 0, query = ''}: ClipboardModuleProps) 
           return (
             <div
               key={name}
+              data-clipboard-kind={name}
               className="flex items-center gap-[4px] rounded-full px-[8px] py-[4px]"
               style={{background: white(0.12 * selected), color: white(lerp(0.6, 1, selected))}}
             >
@@ -98,7 +99,7 @@ export const ClipboardModule = ({filter = 0, query = ''}: ClipboardModuleProps) 
           );
         })}
       </div>
-      <div className="flex shrink-0 items-center gap-[6px]" style={{padding: '8px 20px 6px'}}>
+      <div data-clipboard-search className="flex shrink-0 items-center gap-[6px]" style={{padding: '8px 20px 6px'}}>
         <Search size={11} strokeWidth={2.3} color={color.secondary} />
         <span className="text-[11px] leading-[14px]" style={{color: query ? color.label : color.tertiary}}>
           {query || 'Search'}
@@ -109,6 +110,7 @@ export const ClipboardModule = ({filter = 0, query = ''}: ClipboardModuleProps) 
         {rows.map(({item, index}) => (
           <div
             key={item.preview}
+            data-clipboard-row={item.preview}
             className="flex shrink-0 items-center gap-[8px]"
             style={{padding: '6px 8px', background: white(0.1), borderRadius: 6}}
           >

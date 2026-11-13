@@ -162,7 +162,7 @@ export const id = createCatalog({
       recommendedTools: {
         title: 'Aplikasi rekomendasi',
         description:
-          'Temukan OpenScreen untuk rekaman dan edit video, DockDoor untuk pratinjau jendela dan pergantian aplikasi, serta Quiet.md untuk catatan lokal. Aplikasi pihak ketiga ini dipasang terpisah.',
+          'Temukan OpenScreen untuk rekaman dan edit video, DockDoor untuk pratinjau jendela dan pergantian aplikasi, serta Zshell sebagai ruang kerja terminal native macOS. Aplikasi pihak ketiga ini dipasang terpisah.',
         detail: 'Temukan alat desktop · Aplikasi pihak ketiga · Instalasi terpisah',
       },
     },

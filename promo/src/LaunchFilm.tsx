@@ -1,6 +1,7 @@
 import type {FC} from 'react';
 import {Audio, Sequence, staticFile, useCurrentFrame} from 'remotion';
 import {Stage} from './components/Stage';
+import {CursorOpacityContext} from './components/Cursor';
 import {Scene1Awakening} from './scenes/Scene1Awakening';
 import {SceneLayouts} from './scenes/SceneLayouts';
 import {Scene2AICenter} from './scenes/Scene2AICenter';
@@ -37,12 +38,14 @@ export const ENTRIES: readonly Entry[] = [
   {id: 'outro', Scene: Scene5Outro, ...SCENES.outro},
 ];
 
-const SceneLayer: FC<{entry: Entry; lead: number; music: SoundtrackVariant}> = ({entry, lead, music}) => {
+export const SceneLayer: FC<{entry: Entry; lead: number; music: SoundtrackVariant}> = ({entry, lead, music}) => {
   const frame = useCurrentFrame();
   return (
-    <Stage opacity={clamp01((frame + 1) / (lead + 1))}>
+    <CursorOpacityContext.Provider value={frame < lead ? 0 : 1}>
+      <Stage opacity={clamp01((frame + 1) / (lead + 1))}>
       <entry.Scene duration={lead + entry.duration} globalFrom={entry.from - lead} music={music} />
-    </Stage>
+      </Stage>
+    </CursorOpacityContext.Provider>
   );
 };
 

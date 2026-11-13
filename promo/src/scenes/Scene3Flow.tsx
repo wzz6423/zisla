@@ -28,7 +28,7 @@ import {shelfItemPoint, shelfMenuPlacement} from '../modules/shelfLayout';
 import {FilmMotion, ZislaMotion, ease, easeOutAt, fadeWindow, linear, springAt} from '../motion';
 import {filmFrame} from '../timeline';
 import {ShelfSelectionTour} from '../modules/tour/ShelfSelectionTour';
-import {NativeModuleSurface} from '../modules/tour/TourSurface';
+import {NativeModuleSurface, TourPointerTrack} from '../modules/tour/TourSurface';
 import {ISLAND, MODULE_HEIGHT, STAGE, clamp01, color, islandHeightFor, lerp, white} from '../theme';
 
 const CENTER = STAGE.width / 2;
@@ -148,7 +148,7 @@ export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
       <Wallpaper dim={0.25} /><MenuBar /><Notch />
       <Headline lines={['Bring the video. Keep the audio.']} top={104} size={38} align="left" opacity={clamp01((localFrame - 780) / 12)} />
       <GlassPanel style={{left: 120, top: 185, width: 1040, height: 452}}><DownloadTourModule frame={localFrame - 780} /></GlassPanel>
-      <Cursor x={localFrame < 846 ? 195 : localFrame < 866 ? 316 : 1073} y={localFrame < 846 ? 287 : localFrame < 866 ? 367 : 425} pressed={localFrame >= 866 && localFrame < 872 ? 1 : 0} opacity={Math.min(clamp01((localFrame - 788) / 12), linear(localFrame, [955, 979], [1, 0]))} />
+      <TourPointerTrack frame={localFrame - 780} actions={[{at: 60, x: 306, y: 371}, {at: 86, x: 1073, y: 441}]} />
     </>
   );
 

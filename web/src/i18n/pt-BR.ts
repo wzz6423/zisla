@@ -260,7 +260,7 @@ export const ptBR = createCatalog({
       recommendedTools: {
         title: 'Apps recomendados',
         description:
-          'Conheça OpenScreen para gravação e edição de vídeo, DockDoor para prévias de janelas e alternância de apps, e Quiet.md para notas locais. São apps de terceiros instalados separadamente.',
+          'Conheça OpenScreen para gravação e edição de vídeo, DockDoor para prévias de janelas e alternância de apps, e Zshell como espaço de trabalho de terminal nativo do macOS. São apps de terceiros instalados separadamente.',
         detail: 'Descubra ferramentas para o desktop · Apps de terceiros · Instalação separada',
       },
     },

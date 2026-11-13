@@ -163,7 +163,7 @@ export const tr = createCatalog({
       recommendedTools: {
         title: 'Önerilen uygulamalar',
         description:
-          'Kayıt ve video düzenleme için OpenScreen, pencere önizleme ve uygulama geçişi için DockDoor, yerel notlar için Quiet.md uygulamalarını keşfedin. Bunlar ayrı kurulan üçüncü taraf uygulamalardır.',
+          'Kayıt ve video düzenleme için OpenScreen, pencere önizleme ve uygulama geçişi için DockDoor, macOS için yerel terminal çalışma alanı olarak Zshell uygulamalarını keşfedin. Bunlar ayrı kurulan üçüncü taraf uygulamalardır.',
         detail: 'Masaüstü araçları keşfedin · Üçüncü taraf uygulamalar · Ayrı kurulum',
       },
     },

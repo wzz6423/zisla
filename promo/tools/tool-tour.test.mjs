@@ -133,7 +133,7 @@ test('screen and keyboard cleaning, mirror and teleprompter show their stop stat
   const ui = load('src/modules/tour/DesktopTourModule.tsx');
   assert.match(textOf(ui.render(ui.exports.ScreenCleaningCover, {frame: 40})), /Exit screen cleaning/);
   const scene = load('src/scenes/SceneDesktopTools.tsx');
-  assert.match(textOf(scene.render(scene.exports.SceneDesktopTools, {}, 820)), /Keyboard input blocked/);
+  assert.match(textOf(scene.render(scene.exports.SceneDesktopTools, {}, 800)), /Keyboard input blocked/);
   assert.match(textOf(ui.render(ui.exports.CleaningTourModule, {frame: 170})), /Keyboard input resumed/);
   const presenter = textOf(ui.render(ui.exports.PresenterTourModule, {frame: 150}));
   assert.match(presenter, /Script paused at your place/);
@@ -168,7 +168,7 @@ test('permissions, separate lock-screen playback and management update their sta
   for (const item of ui.exports.permissionDemo) assert.ok(permissions.includes(item.name));
   assert.match(permissions, /Microphone permission granted/);
   const locked = textOf(ui.render(ui.exports.LockScreenTourModule, {frame: 130, globalFrame: 10500}));
-  assert.match(locked, /Separate overlay/);
+  assert.match(locked, /Paper Lanterns · Mira Solen/);
   assert.match(locked, /Playback paused/);
   assert.ok(!locked.includes('MenuBar') && !locked.includes('System permissions'));
   const installed = textOf(ui.render(ui.exports.ManagementTourModule, {frame: 60}));
@@ -180,14 +180,15 @@ test('permissions, separate lock-screen playback and management update their sta
 });
 
 test('recommended apps remain separate and lid preview restores the desktop', () => {
-  const ui = load('src/modules/tour/SettingsTourModule.tsx');
-  const browsing = textOf(ui.render(ui.exports.RecommendedTourModule, {frame: 10}));
+  const ui = load('src/modules/tour/RecommendedDesktopTour.tsx');
+  const lid = load('src/modules/tour/LidCloseDesktopPreview.tsx');
+  const browsing = textOf(ui.render(ui.exports.RecommendedDesktopTour, {frame: 10}));
   for (const app of ui.exports.recommendedDemo) assert.ok(browsing.includes(app.name));
-  assert.doesNotMatch(browsing, /Quiet.md opened as a separate app/);
-  const opened = textOf(ui.render(ui.exports.RecommendedTourModule, {frame: 50}));
-  assert.match(opened, /Quiet.md opened as a separate app/);
+  assert.doesNotMatch(browsing, /Zshell opened as a separate app/);
+  const opened = textOf(ui.render(ui.exports.RecommendedDesktopTour, {frame: 50}));
+  assert.match(opened, /Zshell opened as a separate app/);
   assert.doesNotMatch(opened, /Lid-close animation|Preview ended/);
-  const result = textOf(ui.render(ui.exports.RecommendedTourModule, {frame: 149}));
+  const result = textOf(lid.render(lid.exports.LidCloseDesktopPreview, {frame: 209}));
   assert.match(result, /Preview ended · Desktop restored/);
-  assert.doesNotMatch(result, /Quiet.md opened as a separate app/);
+  assert.doesNotMatch(result, /Zshell opened as a separate app/);
 });

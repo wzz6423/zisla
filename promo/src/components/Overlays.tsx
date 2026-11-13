@@ -40,25 +40,28 @@ export const ShelfContextMenu = ({anchor, opacity, highlight}: {anchor: {x: numb
 
 // Completed downloads use the application's top-edge quick-action bar.
 const TOAST = {width: 560, height: 34};
-const TOAST_SIDE = (TOAST.width - NOTCH_WIDTH) / 2;
 
 type QuickActionToastProps = {
   title: string;
   detail: string;
   action: string;
+  width?: number;
   opacity?: number;
   // Remaining lifetime shown along the bottom edge.
   countdown?: number;
   actionGlow?: number;
 };
 
-export const QuickActionToast = ({title, detail, action, opacity = 1, countdown = 1, actionGlow = 0}: QuickActionToastProps) => (
+export const QuickActionToast = ({title, detail, action, width = TOAST.width, opacity = 1, countdown = 1, actionGlow = 0}: QuickActionToastProps) => {
+  const sideWidth = (width - NOTCH_WIDTH) / 2;
+  return (
   <div
+    data-quick-action-bar
     className="absolute flex items-center overflow-hidden"
     style={{
-      left: CENTER - TOAST.width / 2,
+      left: CENTER - width / 2,
       top: 0,
-      width: TOAST.width,
+      width,
       height: TOAST.height,
       borderRadius: '0 0 14px 14px',
       background: '#000',
@@ -67,7 +70,7 @@ export const QuickActionToast = ({title, detail, action, opacity = 1, countdown 
       boxShadow: `0 14px 34px ${black(0.55 * clamp01(opacity))}`,
     }}
   >
-    <div className="flex shrink-0 items-center gap-[10px] overflow-hidden" style={{width: TOAST_SIDE, padding: '0 8px 0 14px'}}>
+    <div className="flex shrink-0 items-center gap-[10px] overflow-hidden" style={{width: sideWidth, padding: '0 8px 0 14px'}}>
       <div className="flex shrink-0 items-center justify-center" style={{width: 26, height: 26}}>
         <FileArchive size={13} strokeWidth={2.2} color={white(0.75)} />
       </div>
@@ -81,17 +84,18 @@ export const QuickActionToast = ({title, detail, action, opacity = 1, countdown 
       </div>
     </div>
     <div className="h-full shrink-0" style={{width: NOTCH_WIDTH}} />
-    <div className="flex shrink-0 items-center justify-end gap-[8px]" style={{width: TOAST_SIDE, padding: '0 14px 0 8px'}}>
+    <div className="flex shrink-0 items-center justify-end gap-[8px]" style={{width: sideWidth, padding: '0 14px 0 8px'}}>
       <div
-        className="rounded-full px-3 py-[6px] text-[11px] leading-[13px] font-medium"
+        data-quick-action-primary
+        className="shrink-0 whitespace-nowrap rounded-full px-3 py-[6px] text-[11px] leading-[13px] font-medium"
         style={{background: white(0.14 + 0.1 * actionGlow), color: white(0.95)}}
       >
         {action}
       </div>
-      <div className="flex items-center justify-center" style={{width: 19, height: 24}}>
+      <div data-quick-action-more className="flex shrink-0 items-center justify-center" style={{width: 19, height: 24}}>
         <CircleChevronDown size={13} strokeWidth={2.4} color={white(0.92)} />
       </div>
-      <div className="flex items-center justify-center" style={{width: 20, height: 20}}>
+      <div data-quick-action-dismiss className="flex shrink-0 items-center justify-center" style={{width: 20, height: 20}}>
         <X size={9} strokeWidth={3} color={white(0.45)} />
       </div>
     </div>
@@ -99,7 +103,8 @@ export const QuickActionToast = ({title, detail, action, opacity = 1, countdown 
       <div style={{width: `${clamp01(countdown) * 100}%`, height: 2, background: white(0.45)}} />
     </div>
   </div>
-);
+  );
+};
 
 type DragGhostProps = {
   x: number;

@@ -260,7 +260,7 @@ export const nl = createCatalog({
       recommendedTools: {
         title: 'Aanbevolen apps',
         description:
-          'Ontdek OpenScreen voor schermopnamen en videobewerking, DockDoor voor venstervoorbeelden en appwissels en Quiet.md voor lokale notities. Deze apps van andere ontwikkelaars installeer je apart.',
+          'Ontdek OpenScreen voor schermopnamen en videobewerking, DockDoor voor venstervoorbeelden en appwissels en Zshell als native macOS-terminalwerkruimte. Deze apps van andere ontwikkelaars installeer je apart.',
         detail: 'Ontdek bureaubladtools · Apps van derden · Aparte installatie',
       },
     },

@@ -1,12 +1,17 @@
+import {createContext, useContext} from 'react';
 import type {FC} from 'react';
 
-// 箭头尖端位于 (x, y)
+export const CursorOpacityContext = createContext(1);
+
+// The arrow tip is anchored at (x, y).
 export const Cursor: FC<{x: number; y: number; pressed?: number; opacity?: number}> = ({
   x,
   y,
   pressed = 0,
   opacity = 1,
-}) => (
+}) => {
+  const sceneOpacity = useContext(CursorOpacityContext);
+  return (
   <svg
     width={20}
     height={26}
@@ -15,7 +20,7 @@ export const Cursor: FC<{x: number; y: number; pressed?: number; opacity?: numbe
     style={{
       left: x - 2,
       top: y - 2,
-      opacity,
+      opacity: opacity * sceneOpacity,
       transform: `scale(${1 - pressed * 0.1})`,
       transformOrigin: '2px 2px',
       filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.45))',
@@ -29,9 +34,10 @@ export const Cursor: FC<{x: number; y: number; pressed?: number; opacity?: numbe
       strokeLinejoin="round"
     />
   </svg>
-);
+  );
+};
 
-// 点击时从光标尖端扩散的一圈提示，progress 为 0→1
+// Click feedback expands from the pointer tip as progress moves from 0 to 1.
 export const ClickRipple: FC<{x: number; y: number; progress: number}> = ({x, y, progress}) => {
   if (progress <= 0 || progress >= 1) {
     return null;

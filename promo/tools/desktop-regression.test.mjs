@@ -204,36 +204,63 @@ test('system history uses its native independent 720 by 560 window and scrolls s
   assert.equal(find(final, 'data-system-history-save'), undefined);
   assert.match(textOf(final), /Saved: System history.xlsx/);
   assert.ok(number(find(final, 'data-system-history-footer'), 'height') === 16);
-  for (let frame = 206; frame <= 269; frame += 9) assert.match(textOf(ui.render(ui.exports.SystemHistoryTourModule, {frame, globalFrame: 8000 + frame})), /Saved: System history.xlsx/);
+  for (let frame = 212; frame <= 269; frame += 9) assert.match(textOf(ui.render(ui.exports.SystemHistoryTourModule, {frame, globalFrame: 8000 + frame})), /Saved: System history.xlsx/);
 });
 
-test('battery header flow trends and metric column match native order without completing the charge request', () => {
+test('battery preserves the charge request before showing the native fully charged snapshot and battery supply', () => {
   const ui = modules;
   const at = ui.exports.batteryTourAt;
-  assert.ok(at);
-  for (const frame of [0, 45, 120, 190, 300]) {
+  for (const frame of [0, 38, 45, 65, 109]) {
     const state = at(frame);
-    assert.equal(state.level, 0.76);
-    if (!state.onBattery) assert.equal(state.inputWatts, state.chargingWatts + state.systemWatts);
-    else assert.equal(state.chargingWatts, 0);
+    assert.equal(state.level, 0.76, 'The charge request must not fill the battery instantly');
+    assert.equal(state.inputWatts, state.chargingWatts + state.systemWatts);
     const html = ui.render(ui.exports.BatteryTourModule, {frame});
+    assert.equal(number(find(html, 'data-battery-section', 'flow'), 'height'), frame >= 44 ? 176 : 96);
+    assert.match(textOf(html), /76%/);
+    assert.doesNotMatch(textOf(html), /Fully charged/);
+  }
+  assert.equal(at(37).chargingWatts, 0);
+  assert.equal(at(37).inputWatts, at(37).systemWatts);
+  assert.equal(at(44).charging, true);
+  assert.equal(at(44).chargingWatts, 36);
+  assert.equal(find(ui.render(ui.exports.BatteryTourModule, {frame: 44}), 'data-feature', 'chargeToFull'), undefined);
+  const charging = ui.render(ui.exports.BatteryTourModule, {frame: 65});
+  const charged = ui.render(ui.exports.BatteryTourModule, {frame: 130});
+  const unplugged = ui.render(ui.exports.BatteryTourModule, {frame: 180});
+  for (const html of [charging, charged, unplugged]) {
     const rootNode = find(html, 'data-battery-detail');
     const order = rootNode.childNodes.filter((node) => node.tagName).map((node) => attr(node, 'data-battery-section')).filter(Boolean);
     assert.deepEqual(order, ['header', 'flow', 'readings', 'devices']);
-    assert.equal(number(find(html, 'data-battery-section', 'flow'), 'height'), 176);
     assert.equal(number(find(html, 'data-battery-metrics'), 'width'), 250);
-    assert.match(textOf(html), /76%/);
-    assert.doesNotMatch(textOf(html), /Fully charged|100% charged/);
+    for (const route of nodes(html).filter((node) => attr(node, 'data-power-route'))) {
+      assert.notEqual(attr(route, 'fill'), 'none', 'Native power routes are filled gradient panels, not Sankey strokes');
+    }
   }
-  const charging = ui.render(ui.exports.BatteryTourModule, {frame: 65});
-  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 1290 + 60)), /Charge to 100% requested/);
-  const paths = nodes(charging).filter((node) => attr(node, 'data-power-route'));
-  assert.deepEqual(paths.map((node) => attr(node, 'data-power-route')), ['battery', 'system']);
-  assert.match(textOf(charging), /60 W|36 W|24 W/);
-  const unplugged = ui.render(ui.exports.BatteryTourModule, {frame: 135});
+  assert.equal(at(130).level, 1);
+  assert.equal(at(130).chargingWatts, 0);
+  assert.equal(at(130).inputWatts, 12.7);
+  assert.equal(at(130).systemWatts, 12.7);
+  assert.equal(at(130).onBattery, false);
+  assert.equal(number(find(charged, 'data-battery-section', 'flow'), 'height'), 96);
+  assert.equal(find(charged, 'data-power-route', 'battery'), undefined);
+  assert.match(textOf(charged), /Fully charged|100%/);
+  assert.match(textOf(charged), /12.7 W/);
+  assert.ok(find(charged, 'data-power-route', 'system'));
+  assert.equal(find(charged, 'data-feature', 'chargeToFull'), undefined);
+  assert.equal(at(150).lowPower, false);
+  assert.equal(at(151).lowPower, true);
+  assert.equal(at(180).onBattery, true);
+  assert.equal(at(180).level, 1);
+  assert.equal(at(180).inputWatts, 0);
+  assert.equal(at(180).chargingWatts, 0);
+  assert.equal(number(find(unplugged, 'data-battery-section', 'flow'), 'height'), 96);
   assert.equal(find(unplugged, 'data-power-route', 'battery'), undefined);
-  assert.match(textOf(unplugged), /On battery|Automatic/);
-  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 1290 + 160)), /Low power mode applied/);
+  assert.match(textOf(unplugged), /On battery|Battery supply/);
+  assert.deepEqual(at(-1), at(0));
+  assert.deepEqual(at(400), at(209));
+  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 1290 + 60)), /Charge to 100% requested/);
+  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 1290 + 115)), /Fully charged snapshot/);
+  assert.match(textOf(scenes.render(scenes.exports.SceneDesktopTools, {}, 1290 + 172)), /Low power mode applied/);
 });
 
 test('mixer native rows mute one app and presenter uses in-stage hover controls with released camera', () => {
@@ -272,7 +299,7 @@ test('screen cleaning covers the desktop in black and keyboard cleaning keeps it
   assert.equal(number(exit, 'width'), 184);
   assert.equal(number(exit, 'height'), 52);
   assert.doesNotMatch(textOf(screen), /Finder|F1–F12|Keep display awake/);
-  const keys = ui.render(ui.exports.SceneDesktopTools, {}, 720 + 100);
+  const keys = ui.render(ui.exports.SceneDesktopTools, {}, 720 + 80);
   assert.equal(find(keys, 'data-screen-cleaning-cover'), undefined);
   const notice = find(keys, 'data-keyboard-cleaning-notice');
   assert.match(content(notice), /Keyboard input blockedEnd cleaning/);
@@ -322,7 +349,7 @@ test('headline caption and history controls fit the 1280 by 720 film stage', () 
   for (const frame of [270, 340, 398, 455, 560, 1045, 1070, 1215, 1250, 1350, 1450, 1530, 1580]) {
     const html = scenes.render(scenes.exports.SceneDesktopTools, {}, frame);
     const tree = nodes(html);
-    const headline = tree.find((node) => (attr(node, 'class') ?? '').includes('absolute inset-x-0 flex flex-col') && number(node, 'top') > 0);
+    const headline = tree.find((node) => (attr(node, 'class') ?? '').includes('absolute inset-x-0 flex flex-col') && node.childNodes?.some((child) => (attr(child, 'class') ?? '').includes('font-semibold')) && number(node, 'top') > 0);
     const caption = tree.find((node) => (attr(node, 'class') ?? '').includes('absolute inset-x-0 flex justify-center') && number(node, 'bottom') > 0);
     if (!headline || !caption) continue;
     const line = headline.childNodes.find((node) => node.tagName);
@@ -359,17 +386,34 @@ test('memory mutations are rejected by rendered layout and causal state checks',
     ['pause loses retained seconds', 'Math.min(position - 38, 42)', 'Math.min(position - 38, 0)', (ui) => assert.equal(ui.exports.focusTourAt(95).remaining, 1.3)],
     ['completion leaves zero timer', 'finished ? 300', 'finished ? 0', (ui) => assert.equal(ui.exports.focusTourAt(200).remaining, 300)],
     ['completion keeps focus mode', 'finished ? "rest" : "focus"', '"focus"', (ui) => assert.equal(ui.exports.focusTourAt(200).mode, 'rest')],
-    ['history exported early', 'position >= 206', 'position >= 0', (ui) => assert.equal(ui.exports.systemHistoryTourAt(70).exported, false)],
-    ['history missing save dialog', 'position >= 188 && position < 206', 'false', (ui) => assert.ok(find(renderModule(ui, 'SystemHistoryTourModule', 195), 'data-system-history-save'))],
+    ['history exported early', 'position >= 212', 'position >= 0', (ui) => assert.equal(ui.exports.systemHistoryTourAt(70).exported, false)],
+    ['history missing save dialog', 'position >= 194 && position < 212', 'false', (ui) => assert.ok(find(renderModule(ui, 'SystemHistoryTourModule', 195), 'data-system-history-save'))],
     ['history fails to reach network', '[380, 724]', '[380, 380]', (ui) => assert.ok(ui.exports.systemHistoryTourAt(170).scroll >= 724)],
     ['history data restarts', 'position < 120', 'position < 240', (ui) => assert.equal(ui.exports.systemHistoryTourAt(170).scroll, 724)],
     ['battery immediately full', 'level: 0.76', 'level: 1', (ui) => assert.equal(ui.exports.batteryTourAt(65).level, 0.76)],
     ['battery violates power balance', 'chargingWatts: 36', 'chargingWatts: 60', (ui) => {const state = ui.exports.batteryTourAt(65); assert.equal(state.inputWatts, state.chargingWatts + state.systemWatts);}],
-    ['battery charges when unplugged', 'onBattery ? 0 : desktopDemo.battery.chargingWatts', 'desktopDemo.battery.chargingWatts', (ui) => assert.equal(ui.exports.batteryTourAt(150).chargingWatts, 0)],
+    ['battery charges when unplugged', 'charging ? desktopDemo.battery.chargingWatts : 0', 'desktopDemo.battery.chargingWatts', (ui) => assert.equal(ui.exports.batteryTourAt(180).chargingWatts, 0)],
     ['mutes every app', 'index === 1 && muted', 'muted', (ui) => assert.equal(attr(find(renderModule(ui, 'MixerTourModule', 150), 'data-mixer-app', 'Safari'), 'data-muted'), 'false')],
-    ['camera remains live', 'frame >= 136', 'frame >= 500', (ui) => assert.equal(find(renderModule(ui, 'PresenterTourModule', 155), 'data-camera-preview'), undefined)],
+    ['camera remains live', 'frame >= 142', 'frame >= 500', (ui) => assert.equal(find(renderModule(ui, 'PresenterTourModule', 155), 'data-camera-preview'), undefined)],
     ['cleanup removes review item', '!done || index === 2', '!done', (ui) => assert.ok(find(renderModule(ui, 'CleanupTourModule', 110), 'data-cleanup-candidate', 'Old preferences'))],
-    ['cleanup skips confirmation', 'frame >= 49 && frame < 74', 'false', (ui) => assert.ok(find(renderModule(ui, 'CleanupTourModule', 60), 'data-cleanup-confirmation'))],
+    ['cleanup skips confirmation', 'frame >= 55 && frame < 80', 'false', (ui) => assert.ok(find(renderModule(ui, 'CleanupTourModule', 60), 'data-cleanup-confirmation'))],
+    ['keyboard target closes during press', 'position < 35', 'position < 29', (ui) => assert.ok(find(renderModule(ui, 'KeyboardTourModule', 32), 'data-keyboard-profile-menu'))],
+    ['history target closes during press', 'position < 42', 'position < 36', (ui) => assert.ok(find(renderModule(ui, 'SystemHistoryTourModule', 38), 'data-system-history-settings'))],
+    ['history export opens before press ends', 'position >= 194', 'position >= 188', (ui) => assert.equal(find(renderModule(ui, 'SystemHistoryTourModule', 190), 'data-system-history-save'), undefined)],
+    ['history save closes during press', 'position < 212', 'position < 206', (ui) => assert.ok(find(renderModule(ui, 'SystemHistoryTourModule', 209), 'data-system-history-save'))],
+    ['charge starts before request press ends', 'position >= 44', 'position >= 38', (ui) => assert.ok(find(renderModule(ui, 'BatteryTourModule', 40), 'data-feature', 'chargeToFull'))],
+    ['fully charged snapshot missing', 'position >= 110 && !onBattery', 'false', (ui) => {const state = ui.exports.batteryTourAt(130); assert.equal(state.inputWatts, 12.7); assert.equal(state.chargingWatts, 0);}],
+    ['battery drops on unplug', 'position >= 110 ? 1', 'fullyCharged ? 1', (ui) => assert.equal(ui.exports.batteryTourAt(180).level, 1)],
+    ['battery charges after full snapshot', 'position < 110', 'position < 170', (ui) => assert.equal(ui.exports.batteryTourAt(130).chargingWatts, 0)],
+    ['battery keeps adapter when unplugged', 'position >= 170', 'position >= 210', (ui) => assert.equal(ui.exports.batteryTourAt(180).onBattery, true)],
+    ['low power applies too early', 'position >= 151', 'position >= 145', (ui) => assert.equal(ui.exports.batteryTourAt(150).lowPower, false)],
+    ['low power never applies', 'position >= 151', 'position >= 210', (ui) => assert.equal(ui.exports.batteryTourAt(160).lowPower, true)],
+    ['battery routes regress to strokes', 'fill: "url(#battery-charge-route)"', 'fill: "none"', (ui) => assert.notEqual(attr(find(renderModule(ui, 'BatteryTourModule', 65), 'data-power-route', 'battery'), 'fill'), 'none')],
+    ['single route gradient missing', 'linear-gradient(90deg,', 'solid(', (ui) => assert.match(style(find(renderModule(ui, 'BatteryTourModule', 130), 'data-power-route', 'system')).background, /linear-gradient/)],
+    ['battery endpoint missing', '  icon,\n', '  null,\n', (ui) => assert.ok(find(renderModule(ui, 'BatteryTourModule', 130), 'class', 'lucide lucide-plug'))],
+    ['cleanup underlying cursor survives dialog', '!confirmation ? /* @__PURE__ */', 'true ? /* @__PURE__ */', (ui) => assert.equal(visibleCursors(renderModule(ui, 'CleanupTourModule', 60)).length, 1)],
+    ['cleanup confirmation closes during press', 'frame < 80', 'frame < 74', (ui) => assert.ok(find(renderModule(ui, 'CleanupTourModule', 77), 'data-cleanup-confirmation'))],
+
   ]) check(name, moduleSource, needle, replacement, verify);
   for (const [name, marker] of [['history window missing', 'data-system-history-window'], ['keyboard sound menu missing', 'data-keyboard-profile-menu'], ['native battery flow missing', 'data-power-route'], ['prompter controls missing', 'data-teleprompter-controls'], ['review confirmation missing', 'data-cleanup-confirmation']]) {
     const [component, frame] = marker === 'data-system-history-window' ? ['SystemHistoryTourModule', 80] : marker === 'data-keyboard-profile-menu' ? ['KeyboardTourModule', 18] : marker === 'data-power-route' ? ['BatteryTourModule', 65] : marker === 'data-teleprompter-controls' ? ['PresenterTourModule', 40] : ['CleanupTourModule', 60];
@@ -377,5 +421,70 @@ test('memory mutations are rejected by rendered layout and causal state checks',
   }
   check('compact controls removed', sceneSource, 'state.compact ? 0 : 1', '1', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 455), 'data-compact-focus-controls')));
   check('focus status moved behind clipping', sceneSource, '97 : 324', '0 : 0', (ui) => assert.ok(number(find(ui.render(ui.exports.SceneDesktopTools, {}, 455), 'data-focus-status'), 'top') > 34));
-  check('full-screen cleaning missing', sceneSource, 'cleaningFrame >= 26 && cleaningFrame < 87', 'false', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 760), 'data-screen-cleaning-cover')));
+  check('full-screen cleaning missing', sceneSource, 'cleaningFrame >= 32 && cleaningFrame < 70', 'false', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 760), 'data-screen-cleaning-cover')));
+  check('focus closes during awake press', sceneSource, 'position >= 68', 'position >= 64', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 425), 'data-feature', 'toolbox')));
+  check('screen exits before press ends', sceneSource, 'cleaningFrame < 70', 'cleaningFrame < 64', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 720 + 67.25 * 150 / 180), 'data-screen-cleaning-exit')));
+  check('keyboard exits before press ends', sceneSource, 'cleaningFrame < 110', 'cleaningFrame < 104', (ui) => assert.ok(find(ui.render(ui.exports.SceneDesktopTools, {}, 720 + 107.25 * 150 / 180), 'data-keyboard-cleaning-notice')));
+});
+
+const visibleCursors = (html) => nodes(html).filter((node) => node.tagName === 'svg' && attr(node, 'viewBox') === '0 0 20 26' && walk(node).some((child) => attr(child, 'd') === 'M2 2 L2 20.4 L6.5 16.3 L9.5 23.5 L12.6 22.2 L9.7 15.2 L15.9 15.2 Z')).filter((node) => {
+  let opacity = 1;
+  for (let current = node; current; current = current.parentNode) opacity *= Number(style(current).opacity ?? 1);
+  return opacity > 0;
+});
+
+test('every Desktop frame has at most one nontransparent cursor and dialogs replace the underlying cursor', () => {
+  const violations = [];
+  for (const duration of [1396, 1620]) for (let frame = 0; frame < duration; frame++) {
+    const html = scenes.render(scenes.exports.SceneDesktopTools, {duration}, frame);
+    const cursors = visibleCursors(html);
+    if (cursors.length > 1) violations.push({duration, frame, cursors: cursors.length});
+    const confirmation = find(html, 'data-cleanup-confirmation');
+    if (confirmation && cursors.some((cursor) => !(() => {for (let node = cursor; node; node = node.parentNode) if (attr(node, 'data-cleanup-confirmation') !== undefined) return true; return false;})())) violations.push({duration, frame, underlyingConfirmationCursor: true});
+  }
+  assert.deepEqual(violations.slice(0, 12), [], `${violations.length} Desktop frames have conflicting cursors`);
+});
+
+const pressedFrames = (component, start, end, props = {}) => {
+  const frames = [];
+  for (let frame = start; frame < end; frame++) {
+    const html = modules.render(component, {...props, frame});
+    if (visibleCursors(html).some((cursor) => style(cursor).transform !== 'scale(1)')) frames.push({frame, html});
+  }
+  assert.ok(frames.length > 0, 'The action has no visible press frames');
+  return frames;
+};
+
+test('every Desktop press keeps its target present throughout the six-frame click', () => {
+  const ui = modules.exports;
+  for (const {html} of pressedFrames(ui.KeyboardTourModule, 29, 35)) assert.match(content(find(html, 'data-keyboard-profile-menu')), /Cherry MX Brown/);
+  for (const {html} of pressedFrames(ui.KeyboardTourModule, 60, 66)) assert.ok(find(html, 'aria-label', 'Preview'));
+  for (const frame of [62, 63, 64, 65, 66, 67]) {
+    const html = scenes.render(scenes.exports.SceneDesktopTools, {}, 360 + frame);
+    assert.ok(find(html, 'data-feature', 'toolbox'));
+    assert.match(textOf(html), /Prevent idle sleep/);
+  }
+  for (const {html} of pressedFrames(ui.BackgroundSoundsTourModule, 36, 42)) assert.ok(find(html, 'data-feature', 'backgroundSounds'));
+  for (const {html} of pressedFrames(ui.BackgroundSoundsTourModule, 72, 78)) assert.match(textOf(html), /Ocean/);
+  for (const {html} of pressedFrames(ui.SystemHistoryTourModule, 36, 42, {globalFrame: 9000})) assert.ok(find(html, 'data-system-history-settings'));
+  for (const {html} of pressedFrames(ui.SystemHistoryTourModule, 188, 194, {globalFrame: 9000})) {
+    assert.equal(find(html, 'data-system-history-save'), undefined);
+    assert.ok(find(html, 'data-system-history-header'));
+  }
+  for (const {html} of pressedFrames(ui.SystemHistoryTourModule, 206, 212, {globalFrame: 9000})) assert.ok(find(html, 'data-system-history-save'));
+  for (const {html} of pressedFrames(ui.BatteryTourModule, 38, 44)) assert.ok(find(html, 'data-feature', 'chargeToFull'));
+  for (const {html} of pressedFrames(ui.BatteryTourModule, 145, 151)) assert.match(content(find(html, 'data-battery-section', 'header')), /Low power/);
+  for (const {html} of pressedFrames(ui.PresenterTourModule, 136, 142)) assert.ok(find(html, 'data-camera-close'));
+  for (const {html} of pressedFrames(ui.CleanupTourModule, 49, 55)) {
+    assert.equal(find(html, 'data-cleanup-confirmation'), undefined);
+    assert.ok(find(html, 'data-cleanup-footer'));
+  }
+  for (const {html} of pressedFrames(ui.CleanupTourModule, 74, 80)) assert.ok(find(html, 'data-cleanup-confirmation'));
+  for (const [start, end, selector] of [[26, 32, 'data-feature'], [64, 70, 'data-screen-cleaning-exit'], [80, 86, 'data-feature'], [104, 110, 'data-keyboard-cleaning-notice']]) {
+    for (let local = start; local < end; local++) {
+      const html = scenes.render(scenes.exports.SceneDesktopTools, {}, 720 + (local + 0.25) * 150 / 180);
+      assert.equal(visibleCursors(html).filter((cursor) => style(cursor).transform !== 'scale(1)').length, 1);
+      assert.ok(find(html, selector), `Cleaning target ${selector} disappears during press ${local}`);
+    }
+  }
 });
