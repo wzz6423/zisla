@@ -644,6 +644,24 @@ final class SideNoticePresenter {
         return !statusIcons.isEmpty && !showsControls
     }
 
+    func containsCompactPomodoroControl(at point: CGPoint) -> Bool {
+        panelsByDisplayID.values.contains { panels in
+            guard let panel = panels.compactBar, panel.isVisible, !panel.ignoresMouseEvents,
+                  let content = panel.contentView else { return false }
+            @MainActor func containsControl(in view: NSView) -> Bool {
+                if let region = view as? CompactPomodoroControlRegionView {
+                    // SwiftUI snaps representable frames to pixels, leaving half-pixel seams at trigger boundaries.
+                    let frame = panel.convertToScreen(view.convert(view.bounds, to: nil))
+                        .insetBy(dx: -region.pixelAlignmentInset, dy: -region.pixelAlignmentInset)
+                    return point.x >= frame.minX && point.x <= frame.maxX
+                        && point.y >= frame.minY && point.y <= frame.maxY
+                }
+                return view.subviews.contains(where: containsControl)
+            }
+            return containsControl(in: content)
+        }
+    }
+
     /// Keeps both quota forms on the compact panel path and shares transient classification with its sizing engine.
     static func isCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("ai-active-")

@@ -147,6 +147,34 @@ struct OverlayCoordinatorPlacementTests {
     }
 
     @Test(arguments: IslandEdge.allCases)
+    func collapsedControlsDoNotKeepAnotherDisplayExpanded(edge: IslandEdge) throws {
+        let other = ScreenSnapshot(displayID: 8,
+            frame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
+            visibleFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1056))
+        let coordinator = OverlayCoordinator(contentView: NSView(),
+            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                placement: IslandPlacement(mode: .custom, edge: edge))), collapseDelay: .zero)
+        coordinator.screenSnapshotProvider = { [screen, other] }
+        coordinator.start()
+        defer { coordinator.stop() }
+        let first = try #require(coordinator.layouts.first { $0.displayID == screen.displayID }).collapsedFrame
+        let second = try #require(coordinator.layouts.first { $0.displayID == other.displayID }).collapsedFrame
+        let firstPoint = CGPoint(x: first.midX, y: first.midY)
+        let controlPoint = CGPoint(x: second.midX, y: second.midY)
+        coordinator.collapsedControlContainsPoint = { $0 == controlPoint }
+        var expanded = false
+        coordinator.onVisibilityChanged = { expanded = $0 }
+        coordinator.handlePointer(at: firstPoint)
+        #expect(expanded && coordinator.activeDisplayID == screen.displayID)
+        coordinator.handlePointer(at: controlPoint)
+        #expect(!expanded, "Entering another display's quick controls must release the first island")
+        #expect(coordinator.activeDisplayID == screen.displayID,
+            "Quick controls must not activate or move the expanded island")
+        coordinator.handlePointer(at: controlPoint)
+        #expect(!expanded, "Repeated pointer samples over a control must stay collapsed")
+    }
+
+    @Test(arguments: IslandEdge.allCases)
     func statusIconHoverRespectsInteractionSuspensionAndStop(edge: IslandEdge) throws {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content,

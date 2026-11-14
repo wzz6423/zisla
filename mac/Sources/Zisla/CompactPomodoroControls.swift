@@ -22,3 +22,17 @@ struct CompactPomodoroControls: View {
         }
     }
 }
+
+struct CompactPomodoroControlRegion: NSViewRepresentable {
+    func makeNSView(context: Context) -> CompactPomodoroControlRegionView {
+        CompactPomodoroControlRegionView()
+    }
+
+    func updateNSView(_ view: CompactPomodoroControlRegionView, context: Context) {
+        view.pixelAlignmentInset = 0.5 / context.environment.displayScale
+    }
+}
+
+final class CompactPomodoroControlRegionView: NSView {
+    var pixelAlignmentInset: CGFloat = 0
+}
