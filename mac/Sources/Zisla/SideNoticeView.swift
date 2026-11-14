@@ -289,6 +289,15 @@ struct CompactStatusBarView: View {
                             && !(selectedCompactStatusPriority == .transient
                                 && (transientNotice?.style == .headphone
                                     || transientNotice.map(AIAccountBalance.isLowBalanceNotice) == true)) ? 10 : 0)
+                        .background {
+                            if selectedCompactStatusPriority == .focusCountdown {
+                                HStack(spacing: 0) {
+                                    CompactPomodoroControlRegion()
+                                    Color.clear.frame(width: displayState.compactBarCenterInset)
+                                    CompactPomodoroControlRegion()
+                                }
+                            }
+                        }
                 }
             }
         }

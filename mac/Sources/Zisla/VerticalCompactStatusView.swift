@@ -121,6 +121,11 @@ struct CompactPillStatusContent: View {
                 content
             }
         }
+        .background {
+            if presentation.priority == .focusCountdown {
+                CompactPomodoroControlRegion()
+            }
+        }
     }
 
     private var content: some View {

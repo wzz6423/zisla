@@ -83,26 +83,49 @@ struct CompactPomodoroControlsTests {
             as? any NSAccessibilityElementProtocol).accessibilityFrame()
         let gap = edge.isVertical ? CGPoint(x: first.midX, y: (first.minY + second.maxY) / 2)
             : CGPoint(x: (first.maxX + second.minX) / 2, y: first.midY)
-        #expect(!base.presenter.containsCompactPomodoroControl(at: gap))
+        #expect(base.presenter.containsCompactPomodoroControl(at: gap))
         coordinator.handlePointer(at: gap)
-        #expect(expanded, "The space between the buttons must retain hover expansion")
-        #expect(!base.presenter.containsCompactPomodoroControl(at: CGPoint(x: first.midX, y: first.midY)),
-            "Hidden countdown buttons must not suppress an expanded island")
+        #expect(!expanded, "The space between the buttons belongs to the protected countdown region")
+        let besideButton = edge.isVertical ? CGPoint(x: first.midX, y: first.maxY + 0.5)
+            : CGPoint(x: first.minX - 0.5, y: first.midY)
+        #expect(base.presenter.containsCompactPomodoroControl(at: besideButton))
+        coordinator.handlePointer(at: besideButton)
+        #expect(!expanded, "Approaching the buttons through neighboring countdown content must not expand")
+        let pill = try #require(coordinator.activeLayout).collapsedFrame
+        let outerEdge = edge.isVertical ? CGPoint(x: first.midX, y: pill.minY)
+            : CGPoint(x: pill.maxX, y: first.midY)
+        #expect(base.presenter.containsCompactPomodoroControl(at: outerEdge))
+        coordinator.handlePointer(at: outerEdge)
+        #expect(!expanded, "The outer edge and trailing padding must be protected before reaching a button")
+        if iconCount == 0 {
+            for point in [CGPoint(x: pill.minX, y: pill.midY), CGPoint(x: pill.midX, y: pill.maxY),
+                          CGPoint(x: pill.midX, y: pill.minY)] {
+                coordinator.handlePointer(at: point)
+                #expect(!expanded, "The complete standalone countdown pill must stay collapsed")
+            }
+        } else {
+            let icon = try #require(Self.element("cpu-0", in: host) as? any NSAccessibilityElementProtocol)
+            let frame = icon.accessibilityFrame()
+            coordinator.handlePointer(at: CGPoint(x: frame.midX, y: frame.midY))
+            #expect(expanded, "Other status icons must retain hover expansion")
+            #expect(!base.presenter.containsCompactPomodoroControl(at: gap),
+                "Hidden countdown regions must not suppress an expanded island")
+        }
         coordinator.handlePointer(at: outside)
+        #expect(!expanded && window.isVisible)
+        #expect(base.queue.right == [notice], "Quick controls must not consume the countdown notice")
+        base.queue.removeAll()
+        base.queue.enqueue(IslandNotice(id: "ai-active-hover-scope", title: "AI"), expiresAfter: nil)
+        base.presenter.setStatusIcons(icons)
         for _ in 0..<3 {
             host.layoutSubtreeIfNeeded()
             await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
         }
-        let currentFirst = try #require(Self.element("pomodoro.toggleStartPause", in: host)
-            as? any NSAccessibilityElementProtocol).accessibilityFrame()
-        let besideButton = edge.isVertical ? CGPoint(x: currentFirst.midX, y: currentFirst.maxY + 0.5)
-            : CGPoint(x: currentFirst.minX - 0.5, y: currentFirst.midY)
-        #expect(!base.presenter.containsCompactPomodoroControl(at: besideButton))
-        coordinator.handlePointer(at: besideButton)
-        #expect(expanded, "Space beside the button must retain hover expansion")
+        let status = try #require(host.rootView.content.displayState.compactLayout).frame
+        let statusPoint = CGPoint(x: status.midX, y: status.midY)
+        coordinator.handlePointer(at: statusPoint)
+        #expect(expanded, "Replacing the countdown with another status must restore hover expansion")
         coordinator.handlePointer(at: outside)
-        #expect(!expanded && window.isVisible)
-        #expect(base.queue.right == [notice], "Quick controls must not consume the countdown notice")
     }
 
     @Test(arguments: IslandEdge.allCases)
@@ -143,6 +166,67 @@ struct CompactPomodoroControlsTests {
             "Removing the countdown must release its former button area")
         fixture.base.presenter.stop()
         #expect(!fixture.base.presenter.containsCompactPomodoroControl(at: moved))
+    }
+
+    @Test(arguments: IslandLayoutStyle.allCases)
+    func cameraCountdownWingsStayCollapsedWhileTheCenterExpands(style: IslandLayoutStyle) async throws {
+        let fixture = try Fixture(edge: .top, moreInformation: false, camera: true, style: style)
+        defer { fixture.close() }
+        fixture.base.reducesMotion = true
+        let presenter = SideNoticePresenter(queue: fixture.base.queue, resultSweep: fixture.base.sweep,
+            media: fixture.base.media, pomodoro: fixture.service, browserDownloads: fixture.base.downloads,
+            settingsStore: fixture.base.settings, languageStore: fixture.base.language, isScreenLocked: true,
+            reduceMotion: { true }, screenSnapshotProvider: { [fixture] in [fixture.screen] })
+        defer { presenter.stop() }
+        let notice = try #require(fixture.base.queue.right.first)
+        let coordinator = OverlayCoordinator(contentView: NSView(),
+            layoutEngine: ScreenLayoutEngine(configuration: presenter.compactConfiguration(
+                for: [notice], at: Date(timeIntervalSince1970: 100))))
+        coordinator.screenSnapshotProvider = { [fixture] in [fixture.screen] }
+        let outside = CGPoint(x: fixture.screen.frame.minX - 100, y: fixture.screen.frame.minY - 100)
+        coordinator.pointerLocationProvider = { outside }
+        coordinator.collapsedControlContainsPoint = { presenter.containsCompactPomodoroControl(at: $0) }
+        coordinator.start()
+        defer { coordinator.stop() }
+        var expanded = false
+        coordinator.onVisibilityChanged = {
+            expanded = $0
+            presenter.setIslandExpanded($0)
+        }
+        presenter.setScreenLocked(false)
+        let host = try #require(NSApplication.shared.windows.compactMap {
+            $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
+        }.first { $0.rootView.content.settingsStore === fixture.base.settings })
+        let window = try #require(host.window)
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let frame = try #require(host.rootView.content.displayState.compactLayout).frame
+        for point in [CGPoint(x: frame.minX, y: frame.midY), CGPoint(x: frame.minX + 1, y: frame.minY),
+                      CGPoint(x: frame.maxX, y: frame.midY), CGPoint(x: frame.maxX - 1, y: frame.maxY)] {
+            #expect(presenter.containsCompactPomodoroControl(at: point),
+                "Countdown wings must protect their complete outer padding")
+            coordinator.handlePointer(at: point)
+            #expect(!expanded)
+        }
+        let center = CGPoint(x: frame.midX, y: frame.midY)
+        #expect(!presenter.containsCompactPomodoroControl(at: center),
+            "The camera gap must remain available for normal hover expansion")
+        coordinator.handlePointer(at: center)
+        #expect(expanded)
+        coordinator.handlePointer(at: outside)
+        #expect(!expanded && window.isVisible)
+        fixture.base.queue.removeAll()
+        fixture.base.queue.enqueue(IslandNotice(id: "ai-active-camera-scope", title: "AI"), expiresAfter: nil)
+        presenter.setStatusIcons([])
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let status = try #require(host.rootView.content.displayState.compactLayout).frame
+        #expect(!presenter.containsCompactPomodoroControl(at: CGPoint(x: status.minX + 1, y: status.midY)),
+            "Camera wings showing another status must not retain a countdown exclusion")
     }
 
     @Test(arguments: IslandEdge.allCases, [false, true])
@@ -276,6 +360,7 @@ struct CompactPomodoroControlsTests {
     @MainActor
     private final class Fixture {
         let base: StatusIconDestinationIntegrationTests.IconFixture
+        let screen: ScreenSnapshot
         let window: NSPanel
         let host: NSView
         let releaseAccessibility: @MainActor () -> Void
@@ -311,14 +396,15 @@ struct CompactPomodoroControlsTests {
             state.compactBarCenterInset = camera ? 185 : 0
             let notice = IslandNotice(id: "focus-countdown-controls", title: "Focus", detail: countdown, progress: 0)
             base.queue.enqueue(notice, expiresAfter: nil)
-            var screen = base.screen
+            var snapshot = base.screen
             if camera {
-                screen.safeAreaInsets = ScreenInsets(top: 32)
-                screen.auxiliaryTopLeftArea = CGRect(x: screen.frame.minX, y: screen.frame.maxY - 32,
-                    width: (screen.frame.width - 185) / 2, height: 32)
-                screen.auxiliaryTopRightArea = CGRect(x: screen.frame.midX + 185 / 2, y: screen.frame.maxY - 32,
-                    width: (screen.frame.width - 185) / 2, height: 32)
+                snapshot.safeAreaInsets = ScreenInsets(top: 32)
+                snapshot.auxiliaryTopLeftArea = CGRect(x: snapshot.frame.minX, y: snapshot.frame.maxY - 32,
+                    width: (snapshot.frame.width - 185) / 2, height: 32)
+                snapshot.auxiliaryTopRightArea = CGRect(x: snapshot.frame.midX + 185 / 2, y: snapshot.frame.maxY - 32,
+                    width: (snapshot.frame.width - 185) / 2, height: 32)
             }
+            screen = snapshot
             let size = try #require(SideNoticeLayoutEngine().compactBarFrame(
                 for: screen, notices: [notice], settings: base.settings.settings)).size
             window = NSPanel(contentRect: CGRect(origin: CGPoint(x: -100_000, y: -100_000), size: size),

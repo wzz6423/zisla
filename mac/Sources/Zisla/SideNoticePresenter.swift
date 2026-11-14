@@ -651,7 +651,8 @@ final class SideNoticePresenter {
             @MainActor func containsControl(in view: NSView) -> Bool {
                 if view is CompactPomodoroControlRegionView {
                     let frame = panel.convertToScreen(view.convert(view.bounds, to: nil))
-                    return frame.contains(point)
+                    return point.x >= frame.minX && point.x <= frame.maxX
+                        && point.y >= frame.minY && point.y <= frame.maxY
                 }
                 return view.subviews.contains(where: containsControl)
             }
