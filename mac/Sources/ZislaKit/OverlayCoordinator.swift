@@ -31,6 +31,7 @@ public final class OverlayCoordinator: NSObject {
     public var onCollapsedSizeChanged: (@MainActor (CGSize) -> Void)?
     public var onActiveDisplayHasPhysicalNotchChanged: (@MainActor (Bool) -> Void)?
     public var onActiveLayoutChanged: (@MainActor (ScreenOverlayLayout?) -> Void)?
+    public var collapsedControlContainsPoint: (@MainActor (CGPoint) -> Bool)?
     public private(set) var persistentPanelDisplayIDs: Set<CGDirectDisplayID> = []
 
     public var isVisible: Bool {
@@ -351,7 +352,8 @@ public final class OverlayCoordinator: NSObject {
               !isScreenshotCaptureInProgress
         else { return }
         lastPointerLocation = point
-        if let triggerLayout = layoutEngine.layout(containing: point, in: layouts) {
+        if let triggerLayout = layoutEngine.layout(containing: point, in: layouts),
+           collapsedControlContainsPoint?(point) != true {
             let changedDisplay = activeDisplayID != triggerLayout.displayID
             activeDisplayID = triggerLayout.displayID
             if changedDisplay, isVisible {

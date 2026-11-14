@@ -16,9 +16,23 @@ struct CompactPomodoroControls: View {
                 help: toggleTitle, size: .compact, action: pomodoro.toggleStartPause)
                 .accessibilityLabel(toggleTitle)
                 .accessibilityIdentifier("pomodoro.toggleStartPause")
+                .frame(maxWidth: edge.isVertical ? .infinity : nil, maxHeight: edge.isVertical ? nil : .infinity)
+                .background(CompactPomodoroControlRegion())
             IconButton(symbol: "arrow.counterclockwise", help: resetTitle, size: .compact, action: pomodoro.reset)
                 .accessibilityLabel(resetTitle)
                 .accessibilityIdentifier("pomodoro.reset")
+                .frame(maxWidth: edge.isVertical ? .infinity : nil, maxHeight: edge.isVertical ? nil : .infinity)
+                .background(CompactPomodoroControlRegion())
         }
     }
 }
+
+private struct CompactPomodoroControlRegion: NSViewRepresentable {
+    func makeNSView(context: Context) -> CompactPomodoroControlRegionView {
+        CompactPomodoroControlRegionView()
+    }
+
+    func updateNSView(_ view: CompactPomodoroControlRegionView, context: Context) {}
+}
+
+final class CompactPomodoroControlRegionView: NSView {}

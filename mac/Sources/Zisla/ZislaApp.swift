@@ -664,6 +664,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
         noticePresenter?.onJoinMeeting = { model.joinMeetingNotice($0) }
+        coordinator.collapsedControlContainsPoint = { [weak self] point in
+            self?.noticePresenter?.containsCompactPomodoroControl(at: point) == true
+        }
         model.userCarePresentationAllowed = { [weak self, weak coordinator] in
             guard let self else { return false }
             return coordinator?.isRunning == true
