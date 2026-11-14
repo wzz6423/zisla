@@ -109,6 +109,8 @@ enum SettingsSearchIndex {
               keywords: ["按所选周期删除过期历史，常用项目继续保留"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
         entry(.scheduledCleanup, "定时倾倒废纸篓", anchor: .row("定时倾倒废纸篓"),
               keywords: ["按所选间隔永久删除废纸篓中的所有项目，无法恢复"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
+        entry(.scheduledCleanup, "自动清理录音", anchor: .row("自动清理录音"),
+              keywords: ["按所选周期删除过期音频，文字记录继续保留"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
 
         for operation in PDFToolOperation.allCases {
             entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])
@@ -190,7 +192,7 @@ enum SettingsSearchIndex {
 
         entry(.ai, "AI 用量历史", anchor: .group("AI 用量历史"), keywords: ["Token 消耗趋势", "每日模型用量", "查看历史记录", "导出", "清空"])
         entry(.ai, "CLI 与 Skills", anchor: .group("CLI 与 Skills"), keywords: ["自动更新 CLI", "下载命令", "更新命令"])
-        rows(.voice, ["录音模式", "使用模型", "格式化整理", "保留原始录音", "自动清理录音", "记录目录", "自定义热词"])
+        rows(.voice, ["录音模式", "使用模型", "格式化整理", "保留原始录音", "记录目录", "自定义热词"])
         entry(.voice, "快捷键", anchor: .row("快捷键"), keywords: ["输入监控"])
         entry(.voice, "本地模型", anchor: .group("本地模型"), keywords: ["添加本地模型", "URL / IP:端口", "模型名"])
         entry(.voice, "远端模型与凭据", anchor: .group("远端模型与凭据"), keywords: ["添加远端模型", "协议", "模型名"])

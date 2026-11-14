@@ -41,6 +41,38 @@ struct ScheduledCleanupSettingsTests {
         #expect(pageMatches.contains { $0.section == .features && $0.title == "系统状态与清理" })
     }
 
+    @Test(arguments: AppLanguage.allCases, [false, true])
+    func voiceRecordingCleanupSearchReachesTheCleanupPageRegardlessOfVoiceInput(language: AppLanguage, voiceEnabled: Bool) {
+        var settings = FeatureSettings(systemMonitorEnabled: false, clipboardHistoryEnabled: false)
+        settings.voiceInputEnabled = voiceEnabled
+        let title = "自动清理录音"
+        let items = SettingsSearchIndex.items(settings: settings)
+        #expect(items.filter { $0.title == title }.map(\.section) == [.scheduledCleanup])
+        for key in [title, "按所选周期删除过期音频，文字记录继续保留"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle) {
+            let matches = SettingsSearchIndex.results(for: AppLocalization.string(key, locale: language.locale),
+                settings: settings, locale: language.locale)
+            #expect(matches.contains { $0.section == .scheduledCleanup && $0.title == title && $0.anchor == .row(title) })
+        }
+    }
+
+    @Test
+    func voiceRecordingCleanupOnlyAppearsOnTheCleanupPageWhileVoiceKeepsLocalRecordingControls() throws {
+        let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
+        let cleanupStart = try #require(source.range(of: "private var scheduledCleanupContent:"))
+        let cleanupEnd = try #require(source.range(of: "private var workflowContent:", range: cleanupStart.upperBound..<source.endIndex))
+        let cleanup = String(source[cleanupStart.lowerBound..<cleanupEnd.lowerBound])
+        let title = #"title: "自动清理录音""#
+        #expect(cleanup.components(separatedBy: title).count == 2)
+        #expect(source.components(separatedBy: title).count == 2)
+        #expect(cleanup.contains("settings.voiceRecordingCleanupPolicy"))
+        let voiceStart = try #require(source.range(of: "private var voiceSettingsContent:"))
+        let voiceEnd = try #require(source.range(of: "private func voiceLocalModelRecommendation", range: voiceStart.upperBound..<source.endIndex))
+        let voice = String(source[voiceStart.lowerBound..<voiceEnd.lowerBound])
+        #expect(!voice.contains(title))
+        #expect(voice.contains(#"title: "保留原始录音""#))
+        #expect(voice.contains(#"title: "记录目录""#))
+    }
+
     @Test
     func clipboardHistoryToggleOnlyAppearsInFeaturesWhileCleanupKeepsTheInterval() throws {
         let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
@@ -135,7 +167,8 @@ struct ScheduledCleanupSettingsTests {
             }
         }
         let newKeys: Set<String> = ["系统状态与清理", "管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。", "定时倾倒废纸篓",
-            "按所选间隔永久删除废纸篓中的所有项目，无法恢复", "启用定时倾倒废纸篓？"]
+            "按所选间隔永久删除废纸篓中的所有项目，无法恢复", "启用定时倾倒废纸篓？",
+            "自动清理录音", "按所选周期删除过期音频，文字记录继续保留"]
         #expect(newKeys.isSubset(of: keys))
         keys.formUnion(VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
         keys.formUnion(BatteryPowerMode.allCases.map(\.menuTitle))

@@ -425,6 +425,27 @@ struct SettingsView: View {
                     .keepsIntrinsicWidth()
                 }
                 .disabled(!model.settingsStore.settings.clipboardHistoryEnabled)
+                rowDivider
+                settingRow(
+                    symbol: "calendar.badge.clock",
+                    title: "自动清理录音",
+                    detail: "按所选周期删除过期音频，文字记录继续保留"
+                ) {
+                    Picker(
+                        AppLocalization.string("自动清理录音", locale: locale),
+                        selection: Binding(
+                            get: { model.settingsStore.settings.voiceRecordingCleanupPolicy },
+                            set: { model.settingsStore.settings.voiceRecordingCleanupPolicy = $0 }
+                        )
+                    ) {
+                        ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                            AppLocalizedText(policy.menuTitle).tag(policy)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .keepsIntrinsicWidth()
+                }
             }
         }
         .alert(AppLocalization.string("启用定时倾倒废纸篓？", locale: locale), isPresented: Binding(
@@ -1894,27 +1915,6 @@ struct SettingsView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                }
-                rowDivider
-                settingRow(
-                    symbol: "calendar.badge.clock",
-                    title: "自动清理录音",
-                    detail: "按所选周期删除过期音频，文字记录继续保留"
-                ) {
-                    Picker(
-                        "",
-                        selection: Binding(
-                            get: { model.settingsStore.settings.voiceRecordingCleanupPolicy },
-                            set: { model.settingsStore.settings.voiceRecordingCleanupPolicy = $0 }
-                        )
-                    ) {
-                        ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
-                            Text(AppLocalization.text(policy.menuTitle)).tag(policy)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .keepsIntrinsicWidth()
                 }
                 rowDivider
                 settingRow(
