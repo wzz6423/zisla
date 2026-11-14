@@ -1,5 +1,7 @@
 # Third-Party Notices
 
+**English** | [简体中文](README.zh-CN.md)
+
 Zed token usage decoding uses zstd.swift v1.0.2 and Zstandard:
 
 https://github.com/awxkee/zstd.swift
