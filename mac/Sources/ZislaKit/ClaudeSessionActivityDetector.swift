@@ -45,6 +45,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     private let fileManager: FileManager
     private let jsonlReader: IncrementalJSONLReader
     private var cache: [URL: CachedTranscript] = [:]
+    public private(set) var activityFileURLs: [URL] = []
 
     public init(
         projectsDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
@@ -69,6 +70,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
         let processIdentifiersBySessionID = sessionProcessIdentifiers()
         let candidates = recentTranscripts(liveSessionIDs: Set(processIdentifiersBySessionID.keys))
         let selectedURLs = Set(candidates.map(\.url))
+        activityFileURLs = Array(selectedURLs.union(selectedURLs.map { $0.deletingLastPathComponent() }))
         cache = cache.filter { selectedURLs.contains($0.key) }
         var tasksBySession: [String: AIProgressTask] = [:]
 

@@ -7,9 +7,8 @@ Source: https://github.com/lobehub/lobe-icons
 
 Product names and logos remain trademarks of their respective owners. The Grok and OpenAI
 monochrome SVG fills were set to white for legibility on the black compact island surface.
-Intrinsic SVG dimensions were normalized to 24 points. Gemini's layered color fills were
-combined into one four-color gradient because AppKit CoreSVG does not render the upstream
-layer stack reliably; its source path is unchanged.
+Intrinsic SVG dimensions were normalized to 24 points. Gemini's SVG arc flags were spaced
+explicitly for AppKit CoreSVG compatibility; its source path and layered color fills are unchanged.
 
 `doubao.png` is the 192px official app favicon published at https://www.doubao.com/.
 `qoder.icns`, `trae.icns`, and `workbuddy.icns` are official application icons retained as

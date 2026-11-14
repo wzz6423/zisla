@@ -34,7 +34,6 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         var samples: [AIUsageSample]
         var readerState: IncrementalJSONLReader.State?
         var parserState: ParserState?
-        var contentHash: UInt64?
         var edgeHash: UInt64?
     }
 
@@ -48,6 +47,10 @@ public final class AIUsageLogDetector: AIUsageDetecting {
 
     private struct LogData {
         var data: Data
+    }
+
+    private struct RecordHeader: Decodable {
+        var type: String?
     }
 
     public let codexSessionsDirectory: URL
@@ -347,7 +350,6 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             samples: samples,
             readerState: nil,
             parserState: nil,
-            contentHash: nil,
             edgeHash: nil
         )
     }
@@ -361,7 +363,6 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 samples: [],
                 readerState: nil,
                 parserState: nil,
-                contentHash: nil,
                 edgeHash: nil
             )
         }
@@ -375,10 +376,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             let lineEnd = data[lineStart...].firstIndex(of: 0x0A) ?? data.endIndex
             let line = data[lineStart..<lineEnd]
             lineStart = lineEnd + 1
-            guard line.count <= maxBytesPerFile,
-                  let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
-                continue
-            }
+            guard line.count <= maxBytesPerFile, let header = try? JSONDecoder().decode(RecordHeader.self, from: line),
+                  mayContainUsage(header, provider: candidate.provider),
+                  let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
             samples.append(contentsOf: parseRoot(
                 from: root,
                 candidate: candidate,
@@ -393,7 +393,6 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             samples: Array(samples.suffix(maxSamplesPerFile)),
             readerState: nil,
             parserState: nil,
-            contentHash: nil,
             edgeHash: nil
         )
     }
@@ -442,23 +441,19 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         var readerState: IncrementalJSONLReader.State
         var parserState: ParserState
         var samples: [AIUsageSample]
-        var contentHash: UInt64
 
         if canContinue,
            let cached,
            let cachedReaderState = cached.readerState,
-           let cachedParserState = cached.parserState,
-           let cachedContentHash = cached.contentHash {
+           let cachedParserState = cached.parserState {
             readerState = cachedReaderState
             parserState = cachedParserState
             samples = cached.samples
-            contentHash = cachedContentHash
         } else {
             readerState = IncrementalJSONLReader(initialTailBytes: .max)
                 .initialState(fileSize: candidate.size)
             parserState = ParserState()
             samples = []
-            contentHash = Self.contentHashOffset
         }
 
         let reader = IncrementalJSONLReader(
@@ -467,6 +462,10 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         )
         do {
             let parseLine: (Data) -> Bool = { line in
+                if candidate.provider == .codex || candidate.provider == .claude {
+                    guard let header = try? JSONDecoder().decode(RecordHeader.self, from: line) else { return false }
+                    guard self.mayContainUsage(header, provider: candidate.provider) else { return true }
+                }
                 guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
                     return false
                 }
@@ -480,10 +479,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             try reader.readLines(
                 from: candidate.url,
                 fileSize: candidate.size,
-                state: &readerState,
-                onChunk: { chunk in
-                    contentHash = Self.updateContentHash(contentHash, with: chunk)
-                }
+                state: &readerState
             ) { line in
                 _ = parseLine(line)
             }
@@ -496,7 +492,6 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 samples: [],
                 readerState: nil,
                 parserState: nil,
-                contentHash: nil,
                 edgeHash: nil
             )
         }
@@ -512,9 +507,16 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             samples: Array(samples.suffix(maxSamplesPerFile)),
             readerState: readerState,
             parserState: parserState,
-            contentHash: contentHash,
             edgeHash: edgeHash(of: candidate.url, byteCount: readerState.offset)
         )
+    }
+
+    private func mayContainUsage(_ header: RecordHeader, provider: AIProvider) -> Bool {
+        switch provider {
+        case .codex: header.type == "event_msg" || header.type == "turn_context"
+        case .claude: header.type == "assistant"
+        default: true
+        }
     }
 
     /// Carries explicit Codex turn context between JSONL events and stable ordinals between generic roots.

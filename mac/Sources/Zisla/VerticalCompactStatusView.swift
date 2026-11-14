@@ -78,6 +78,7 @@ struct CompactPillStatusContent: View {
     let item: NowPlayingSnapshot?
     let date: Date
     var leadingInset: CGFloat = CompactPillStatusPresentation.trailingInset
+    var controlRegionThickness: CGFloat? = nil
     var onJoinMeeting: (String) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -124,6 +125,8 @@ struct CompactPillStatusContent: View {
         .background {
             if presentation.priority == .focusCountdown {
                 CompactPomodoroControlRegion()
+                    .frame(width: edge.isVertical ? controlRegionThickness : nil,
+                           height: edge.isVertical ? nil : controlRegionThickness)
             }
         }
     }
@@ -249,7 +252,8 @@ struct CompactPillStatusContent: View {
                 isActive: item?.isPlaying ?? true
             )
         } else if presentation.priority == .aiActivity {
-            AIMascotView(identity: AIMascotIdentity(noticeID: presentation.notice.id), size: size)
+            AIMascotStack(notices: presentation.aiNotices.isEmpty ? [presentation.notice] : presentation.aiNotices,
+                size: size, edge: edge)
         } else if presentation.notice.style == .headphone {
             HeadphoneGlyph(
                 productID: presentation.notice.headphoneProductID,

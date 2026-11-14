@@ -595,7 +595,7 @@ struct CodexSessionActivityDetectorTests {
                 200: startedAt.addingTimeInterval(-120),
             ] },
             clientProvidersForProcessIdentifiers: { identifiers in
-                CodexSessionActivityDetector.parseClientProviders(fromProcessList: processes, matching: identifiers)
+                clientProviders(fromProcessList: processes, matching: identifiers)
             },
             now: { startedAt.addingTimeInterval(90) }
         )
@@ -671,6 +671,99 @@ struct CodexSessionActivityDetectorTests {
         )
 
         #expect(output == nil)
+        #expect(Date().timeIntervalSince(startedAt) < 0.75)
+    }
+
+    @Test
+    func processLookupCapturesOutputWithoutARegularFile() {
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "if [ -f /dev/stdout ]; then printf disk; else printf memory; fi"],
+            timeout: 2
+        )
+
+        #expect(output == Data("memory".utf8), "Read-only process lookup must not spool output to disk")
+    }
+
+    @Test
+    func processLookupDrainsOutputLargerThanAPipeBuffer() {
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/dd"),
+            arguments: ["if=/dev/zero", "bs=65536", "count=4"],
+            timeout: 2
+        )
+
+        #expect(output == Data(repeating: 0, count: 256 * 1024))
+    }
+
+    @Test
+    func processLookupRecoversAfterLaunchFailureAndTimeout() {
+        let missing = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-missing-process-\(UUID().uuidString)")
+        #expect(CodexSessionActivityDetector.runProcessOutput(
+            executableURL: missing, arguments: [], timeout: 0.05
+        ) == nil)
+        #expect(CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sleep"), arguments: ["1"], timeout: 0.05
+        ) == nil)
+        #expect(CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/usr/bin/printf"), arguments: ["recovered"], timeout: 2
+        ) == Data("recovered".utf8))
+    }
+
+    @Test(arguments: [0, 65_536, 65_537])
+    func processLookupRejectsOversizedOutputWithoutTruncatingIt(byteCount: Int) {
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/dd"),
+            arguments: ["if=/dev/zero", "bs=\(max(1, byteCount))", "count=\(byteCount == 0 ? 0 : 1)"],
+            timeout: 2,
+            maximumOutputBytes: 65_536
+        )
+
+        #expect(output == (byteCount > 65_536 ? nil : Data(repeating: 0, count: byteCount)))
+    }
+
+    @Test
+    func processLookupStillTimesOutAfterStandardOutputCloses() {
+        let startedAt = Date()
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "exec 1>&-; exec /bin/sleep 1"],
+            timeout: 0.05
+        )
+
+        #expect(output == nil)
+        #expect(Date().timeIntervalSince(startedAt) < 0.75)
+    }
+
+    @Test
+    func processLookupStopsAChildThatIgnoresTermination() throws {
+        let root = makeSessionsRoot()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pidURL = root.appendingPathComponent("lookup.pid")
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "trap '' TERM; printf '%s' $$ > \"$1\"; while :; do :; done", "lookup", pidURL.path],
+            timeout: 0.1
+        )
+
+        #expect(output == nil)
+        let pid = try #require(Int32(String(contentsOf: pidURL, encoding: .utf8)))
+        #expect(kill(pid, 0) == -1)
+        #expect(errno == ESRCH, "Timed-out process lookup must not leave its child running")
+    }
+
+    @Test
+    func processLookupDoesNotWaitForAnInheritedOutputHandle() {
+        let startedAt = Date()
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "printf complete; /bin/sleep 0.2 &"],
+            timeout: 0.1
+        )
+
+        #expect(output == Data("complete".utf8))
         #expect(Date().timeIntervalSince(startedAt) < 0.75)
     }
 
@@ -2150,7 +2243,7 @@ struct CodexRolloutIntegrityTests {
         300 1 /usr/local/bin/codex app-server
         """.utf8)
 
-        let providers = CodexSessionActivityDetector.parseClientProviders(
+        let providers = clientProviders(
             fromProcessList: data,
             matching: Set([Int32(101), 201, 300])
         )
@@ -2161,19 +2254,290 @@ struct CodexRolloutIntegrityTests {
     }
 
     @Test
-    func parsesProcessStartDatesForRequestedProcesses() {
-        let data = Data("""
-        2468 Sun Sep  6 17:08:21 2026
-        9753 Mon Sep  7 08:15:42 2026
-        """.utf8)
+    func fileEventsReconcileChangedRolloutsAndKeepOtherRunningSessions() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let at = Date(timeIntervalSince1970: 1_800_000_100)
+        let first = root.appendingPathComponent("rollout-first.jsonl")
+        let second = root.appendingPathComponent("rollout-second.jsonl")
+        for (name, turn) in [("rollout-first.jsonl", "first"), ("rollout-second.jsonl", "second")] {
+            try writeRollout(under: root, relativePath: name,
+                lines: [eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: turn)],
+                modifiedAt: at)
+        }
+        var writerIsRunning = true
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { urls in
+                writerIsRunning ? Dictionary(uniqueKeysWithValues: urls.map { ($0, 123) }) : [:]
+            },
+            processStartDatesForProcessIdentifiers: { _ in [123: .distantPast] },
+            clientProvidersForProcessIdentifiers: { _ in [:] }, now: { at })
+        #expect(try detector.taskUpdates().count == 2)
+        try appendLine(eventLine(timestamp: "2026-07-19T01:00:01.000Z",
+                                 payloadType: "task_complete", turnID: "first"), to: first)
+        try FileManager.default.setAttributes([.modificationDate: at], ofItemAtPath: first.path)
+        let updates = try detector.taskUpdates(changedFileURLs: [first])
+        #expect(updates.first { $0.id == "codex-turn-first" }?.status == .succeeded)
+        #expect(updates.first { $0.id == "codex-turn-second" }?.status == .running)
+        #expect(try detector.taskUpdates(changedFileURLs: [first]).map(\.id) == ["codex-turn-second"])
+        writerIsRunning = false
+        #expect(try detector.taskUpdates(changedFileURLs: [second]).isEmpty,
+                "Incremental file refreshes must still verify that the session writer is alive")
+    }
 
-        let startDates = CodexSessionActivityDetector.parseProcessStartDates(
-            fromProcessList: data,
-            matching: [2468]
-        )
+    @Test
+    func directoryEventsAndPeriodicScansDiscoverNewRolloutsAfterIncrementalRefreshes() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let at = Date(timeIntervalSince1970: 1_800_000_100)
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { at })
+        #expect(try detector.taskUpdates(changedFileURLs: []).isEmpty)
+        for index in 0..<3 {
+            let relative = "2026/07/19/rollout-\(index).jsonl"
+            try writeRollout(under: root, relativePath: relative,
+                lines: [eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "t\(index)")],
+                modifiedAt: at)
+            let paths: Set<URL>? = index == 0 ? [root.appendingPathComponent(relative)] : index == 1 ? [root] : nil
+            #expect(try detector.taskUpdates(changedFileURLs: paths).count == index + 1)
+        }
+    }
 
-        #expect(startDates.count == 1)
-        #expect(startDates[2468] != nil)
+    @Test(arguments: [false, true], [false, true])
+    func targetedRefreshCannotHideShortTurnsInOtherRollouts(newDirectory: Bool, directoryEvent: Bool) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var now = iso8601Date("2026-07-19T01:00:00.000Z")
+        let known = root.appendingPathComponent("rollout-known.jsonl")
+        let relative = newDirectory ? "2026/07/20/rollout-short.jsonl" : "rollout-short.jsonl"
+        let short = root.appendingPathComponent(relative)
+        try writeRollout(under: root, relativePath: known.lastPathComponent,
+            lines: [eventLine(timestamp: "2026-07-19T00:59:59.000Z", payloadType: "task_started", turnID: "known")],
+            modifiedAt: now)
+        if !newDirectory {
+            try writeRollout(under: root, relativePath: relative, lines: [], modifiedAt: now)
+        }
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
+        #expect(try detector.taskUpdates().map(\.id) == ["codex-turn-known"])
+
+        let lines = [
+            eventLine(timestamp: "2026-07-19T01:00:01.000Z", payloadType: "task_started", turnID: "short"),
+            eventLine(timestamp: "2026-07-19T01:00:02.000Z", payloadType: "task_complete", turnID: "short"),
+        ]
+        now = now.addingTimeInterval(3)
+        if newDirectory {
+            try writeRollout(under: root, relativePath: relative, lines: lines, modifiedAt: now)
+        } else {
+            for line in lines { try appendLine(line, to: short) }
+        }
+        try writeRollout(under: root, relativePath: "2026/07/18/rollout-old.jsonl", lines: [
+            eventLine(timestamp: "2026-07-18T01:00:00.000Z", payloadType: "task_started", turnID: "old"),
+            eventLine(timestamp: "2026-07-18T01:00:01.000Z", payloadType: "task_complete", turnID: "old"),
+        ], modifiedAt: now)
+        try appendLine("{\"type\":\"ignored\"}", to: known)
+        #expect(try detector.taskUpdates(changedFileURLs: [known]).map(\.id) == ["codex-turn-known"])
+
+        now = now.addingTimeInterval(1)
+        let updates = try detector.taskUpdates(changedFileURLs: directoryEvent ? [short.deletingLastPathComponent()] : nil)
+        #expect(updates.first { $0.id == "codex-turn-short" }?.status == .succeeded,
+            "A targeted refresh cannot advance the completion cutoff for another rollout")
+        #expect(updates.first { $0.id == "codex-turn-short" }?.startedAt == iso8601Date("2026-07-19T01:00:01.000Z"))
+        #expect(!updates.contains { $0.id == "codex-turn-old" }, "Newly discovered historical completions stay silent")
+        #expect(try detector.taskUpdates().map(\.id) == ["codex-turn-known"], "Completions are emitted only once")
+    }
+
+    @Test
+    func targetedRolloutRewritesDoNotReplayAlreadyObservedCompletions() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var now = iso8601Date("2026-07-19T01:00:00.000Z")
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
+        #expect(try detector.taskUpdates().isEmpty)
+        let file = root.appendingPathComponent("rollout-short.jsonl")
+        let lines = [
+            eventLine(timestamp: "2026-07-19T01:00:01.000Z", payloadType: "task_started", turnID: "short"),
+            eventLine(timestamp: "2026-07-19T01:00:02.000Z", payloadType: "task_complete", turnID: "short"),
+        ]
+        now = now.addingTimeInterval(3)
+        try writeRollout(under: root, relativePath: file.lastPathComponent, lines: lines, modifiedAt: now)
+        #expect(try detector.taskUpdates(changedFileURLs: [file]).first?.status == .succeeded)
+
+        now = now.addingTimeInterval(1)
+        try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: file, options: .atomic)
+        #expect(try detector.taskUpdates(changedFileURLs: [file]).isEmpty,
+            "Replacing a file with already observed lifecycle events must not replay completion")
+        #expect(try detector.taskUpdates().isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func deniedReadPreservesTheCompletionCutoffUntilRecovery(newDirectory: Bool) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var now = iso8601Date("2026-07-19T01:00:00.000Z")
+        let file = root.appendingPathComponent("rollout-denied-short.jsonl")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        if !newDirectory {
+            try writeRollout(under: root, relativePath: file.lastPathComponent, lines: [], modifiedAt: now)
+        }
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
+        #expect(try detector.taskUpdates().isEmpty)
+        if newDirectory {
+            try writeRollout(under: root, relativePath: file.lastPathComponent, lines: [], modifiedAt: now)
+        }
+        for (timestamp, kind) in [("01", "task_started"), ("02", "task_complete")] {
+            try appendLine(eventLine(timestamp: "2026-07-19T01:00:\(timestamp).000Z",
+                payloadType: kind, turnID: "short"), to: file)
+        }
+        now = now.addingTimeInterval(3)
+        try withDeniedRolloutRead(at: file) { () throws in
+            #expect(try detector.taskUpdates().isEmpty)
+            now = now.addingTimeInterval(1)
+            #expect(try detector.taskUpdates().isEmpty)
+        }
+        now = now.addingTimeInterval(1)
+        #expect(try detector.taskUpdates().first?.status == .succeeded,
+            "Unreadable scans must preserve the cutoff for existing and newly discovered rollouts")
+        #expect(try detector.taskUpdates().isEmpty)
+    }
+
+    @Test
+    func fullDiscoveryReleasesObservationStateForDeletedRollouts() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var now = iso8601Date("2026-07-19T01:00:00.000Z")
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
+        #expect(try detector.taskUpdates().isEmpty)
+        for index in 0..<8 {
+            let file = root.appendingPathComponent("rollout-\(index).jsonl")
+            now = now.addingTimeInterval(1)
+            try writeRollout(under: root, relativePath: file.lastPathComponent,
+                lines: [eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "t\(index)")],
+                modifiedAt: now)
+            #expect(try detector.taskUpdates(changedFileURLs: [file]).count == 1)
+            #expect(detector.lastObservedAtByRolloutURL.count == 1,
+                "Observation state must remain bounded to files seen since the last discovery")
+            try FileManager.default.removeItem(at: file)
+            #expect(try detector.taskUpdates().isEmpty)
+            #expect(detector.lastObservedAtByRolloutURL.isEmpty,
+                "Full discovery must release observation state for deleted rollouts")
+        }
+    }
+
+    @Test
+    func coalescedProviderEventsCannotImportRolloutsFromAnotherRoot() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sessions = root.appendingPathComponent("sessions")
+        let otherSessions = root.appendingPathComponent("sessions-other")
+        let at = Date(timeIntervalSince1970: 1_800_000_100)
+        for (directory, turn) in [(sessions, "own"), (otherSessions, "foreign")] {
+            try writeRollout(under: directory, relativePath: "rollout-\(turn).jsonl",
+                lines: [eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: turn)],
+                modifiedAt: at)
+        }
+        let detector = CodexSessionActivityDetector(sessionsDirectory: sessions,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { at })
+        #expect(try detector.taskUpdates().map(\.id) == ["codex-turn-own"])
+        #expect(try detector.taskUpdates(changedFileURLs: [otherSessions.appendingPathComponent("rollout-foreign.jsonl")])
+            .map(\.id) == ["codex-turn-own"])
+    }
+
+    @Test
+    func repeatedFileEventsKeepTheirCacheBoundedToTheDiscoveredFiles() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let at = Date(timeIntervalSince1970: 1_800_000_100)
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root, maxRolloutFiles: 1,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { at })
+        let files = ["first", "second"].map { root.appendingPathComponent("rollout-\($0).jsonl") }
+        for (index, file) in files.enumerated() {
+            try writeRollout(under: root, relativePath: file.lastPathComponent,
+                lines: [eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "t\(index)")],
+                modifiedAt: at.addingTimeInterval(Double(index)))
+        }
+        #expect(try detector.taskUpdates().map(\.id) == ["codex-turn-t1"])
+        try FileManager.default.setAttributes([.modificationDate: at.addingTimeInterval(2)], ofItemAtPath: files[0].path)
+        #expect(try detector.taskUpdates(changedFileURLs: [files[0]]).map(\.id) == ["codex-turn-t0"])
+        try FileManager.default.removeItem(at: files[0])
+        #expect(try detector.taskUpdates(changedFileURLs: [files[0]]).map(\.id) == ["codex-turn-t1"])
+    }
+
+    @Test
+    func fileEventRewritesRemovalsAndAgeLimitsInvalidateCachedCandidates() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var at = Date(timeIntervalSince1970: 1_800_000_100)
+        let name = "rollout-replaced.jsonl"
+        let file = root.appendingPathComponent(name)
+        try writeRollout(under: root, relativePath: name,
+            lines: [eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "old")],
+            modifiedAt: at)
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root, maximumRolloutAge: 10,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { at })
+        #expect(try detector.taskUpdates().map(\.id) == ["codex-turn-old"])
+        let replacement = eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "new")
+        try Data((replacement + "\n").utf8).write(to: file, options: .atomic)
+        try FileManager.default.setAttributes([.modificationDate: at], ofItemAtPath: file.path)
+        #expect(try detector.taskUpdates(changedFileURLs: [file]).map(\.id) == ["codex-turn-new"])
+        try FileManager.default.removeItem(at: file)
+        #expect(try detector.taskUpdates(changedFileURLs: [file]).isEmpty)
+        try writeRollout(under: root, relativePath: name, lines: [replacement], modifiedAt: at)
+        #expect(try detector.taskUpdates(changedFileURLs: [file]).count == 1)
+        at = at.addingTimeInterval(11)
+        #expect(try detector.taskUpdates(changedFileURLs: []).isEmpty)
+    }
+
+    @Test
+    func readsPreciseProcessStartTimeAndDropsExitedProcesses() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        process.arguments = ["10"]
+        let before = Date()
+        try process.run()
+        let after = Date()
+        defer { if process.isRunning { process.terminate(); process.waitUntilExit() } }
+        let identifier = process.processIdentifier
+        let dates = CodexSessionActivityDetector.defaultProcessStartDatesForProcessIdentifiers([identifier])
+        let startedAt = try #require(dates[identifier])
+        #expect(startedAt >= before && startedAt <= after,
+                "PID reuse checks need the actual start time, including subsecond precision")
+
+        process.terminate()
+        process.waitUntilExit()
+        #expect(CodexSessionActivityDetector.defaultProcessStartDatesForProcessIdentifiers([identifier]).isEmpty)
+        #expect(CodexSessionActivityDetector.defaultClientProvidersForProcessIdentifiers([identifier]).isEmpty)
+    }
+
+    @Test
+    func processIdentityLookupsIgnoreMissingAndInvalidIdentifiers() {
+        for identifiers: Set<Int32> in [[], [-1, 0, Int32.max]] {
+            #expect(CodexSessionActivityDetector.defaultProcessStartDatesForProcessIdentifiers(identifiers).isEmpty)
+            #expect(CodexSessionActivityDetector.defaultClientProvidersForProcessIdentifiers(identifiers).isEmpty)
+        }
+        #expect(CodexSessionActivityDetector.clientProviders(for: [123]) { _ in nil }.isEmpty)
+    }
+
+    @Test
+    func clientIdentityOnlyVisitsRequestedProcessAncestry() {
+        var visited = Set<Int32>()
+        let providers = CodexSessionActivityDetector.clientProviders(for: [101, 201]) { identifier in
+            visited.insert(identifier)
+            switch identifier {
+            case 101: return (100, "/usr/local/bin/codex")
+            case 100: return (1, "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT")
+            case 201: return (200, "/usr/local/bin/codex")
+            case 200: return (1, "/Applications/Codex.app/Contents/MacOS/Codex")
+            default: return nil
+            }
+        }
+        #expect(providers == [101: .gpt, 201: .codex])
+        #expect(visited == [100, 101, 200, 201], "Unrelated processes must not be scanned")
     }
 
     @Test
@@ -2183,7 +2547,7 @@ struct CodexRolloutIntegrityTests {
         200 100 /usr/local/bin/worker
         """.utf8)
 
-        let providers = CodexSessionActivityDetector.parseClientProviders(
+        let providers = clientProviders(
             fromProcessList: data,
             matching: Set([Int32(100)])
         )
@@ -2296,4 +2660,14 @@ private func iso8601Date(_ value: String) -> Date {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return formatter.date(from: value) ?? .distantPast
+}
+
+private func clientProviders(fromProcessList data: Data, matching identifiers: Set<Int32>) -> [Int32: AIProvider] {
+    let entries: [Int32: (parentIdentifier: Int32, path: String)] = Dictionary(uniqueKeysWithValues:
+        String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline).compactMap { line in
+            let fields = line.split(maxSplits: 2, whereSeparator: \.isWhitespace)
+            guard fields.count == 3, let identifier = Int32(fields[0]), let parent = Int32(fields[1]) else { return nil }
+            return (identifier, (parent, String(fields[2])))
+        })
+    return CodexSessionActivityDetector.clientProviders(for: identifiers) { entries[$0] }
 }

@@ -1,14 +1,23 @@
+import AppKit
 import Foundation
+import QuartzCore
 import SwiftUI
 
 struct IslandParticleLogo: View {
     var side: CGFloat
-    var time: TimeInterval
+    var time: TimeInterval? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Self.rendering(side: side, time: time, reduceMotion: reduceMotion)
-            .accessibilityHidden(true)
+        Group {
+            if let time {
+                Self.rendering(side: side, time: time, reduceMotion: reduceMotion)
+            } else {
+                AnimatedParticleLogo(reduceMotion: reduceMotion)
+                    .frame(width: side, height: side)
+            }
+        }
+        .accessibilityHidden(true)
     }
 
     static func rendering(side: CGFloat, time: TimeInterval, reduceMotion: Bool) -> some View {
@@ -23,6 +32,91 @@ struct IslandParticleLogo: View {
             }
         }
         .frame(width: side, height: side)
+    }
+}
+
+private struct AnimatedParticleLogo: NSViewRepresentable {
+    var reduceMotion: Bool
+
+    func makeNSView(context: Context) -> ParticleLogoView {
+        ParticleLogoView(reduceMotion: reduceMotion)
+    }
+
+    func updateNSView(_ view: ParticleLogoView, context: Context) {
+        view.reduceMotion = reduceMotion
+    }
+
+    static func dismantleNSView(_ view: ParticleLogoView, coordinator: ()) {
+        view.stopAnimation()
+    }
+}
+
+@MainActor
+final class ParticleLogoView: NSView {
+    var reduceMotion: Bool {
+        didSet {
+            guard oldValue != reduceMotion else { return }
+            updateAnimation()
+            drawFrame()
+        }
+    }
+    private var displayLink: CADisplayLink?
+
+    init(reduceMotion: Bool) {
+        self.reduceMotion = reduceMotion
+        super.init(frame: .zero)
+        wantsLayer = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateAnimation()
+        drawFrame()
+    }
+
+    override func layout() {
+        super.layout()
+        drawFrame()
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        drawFrame()
+    }
+
+    private func updateAnimation() {
+        stopAnimation()
+        guard let window, !reduceMotion else { return }
+        let link = window.displayLink(target: self, selector: #selector(step(_:)))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+    }
+
+    func stopAnimation() {
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+
+    @objc private func step(_ link: CADisplayLink) { drawFrame() }
+
+    func drawFrame(at time: TimeInterval = Date.timeIntervalSinceReferenceDate) {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let renderer = ImageRenderer(content: IslandParticleLogo.rendering(
+            side: min(bounds.width, bounds.height), time: time, reduceMotion: reduceMotion
+        ).frame(width: bounds.width, height: bounds.height))
+        renderer.scale = window?.backingScaleFactor ?? 2
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.contentsScale = renderer.scale
+        layer?.contents = renderer.cgImage
+        CATransaction.commit()
     }
 }
 

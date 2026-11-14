@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 import Testing
 import ZislaKit
 
@@ -100,6 +101,32 @@ struct AIMascotIdentityTests {
             noticeID: "ai-active-gemini-gemini-desktop-chat-c1"
         ) == .geminiDesktop)
         #expect(AIMascotIdentity(noticeID: "ai-active-gemini-gemini-session-s1") == .gemini)
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark])
+    func geminiCLIUsesItsFourColorBrandMark(colorScheme: ColorScheme) throws {
+        let renderer = ImageRenderer(content: AIMascotView(
+            identity: .gemini, size: 24, imageCache: AIMascotImageCache()
+        ).environment(\.colorScheme, colorScheme))
+        renderer.scale = 2
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        func color(x: Int, y: Int) throws -> NSColor {
+            let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+            try #require(color.alphaComponent > 0.9, "The Gemini mark must remain visible")
+            return color
+        }
+        let left = try color(x: 10, y: 24)
+        let top = try color(x: 24, y: 10)
+        let right = try color(x: 37, y: 24)
+        let bottom = try color(x: 24, y: 37)
+        #expect(left.redComponent > left.blueComponent && left.greenComponent > left.blueComponent,
+                "The left tip must keep Gemini's yellow accent")
+        #expect(top.redComponent > top.greenComponent && top.redComponent > top.blueComponent,
+                "The top tip must keep Gemini's red accent")
+        #expect(right.blueComponent > right.greenComponent && right.blueComponent > right.redComponent,
+                "The right tip must stay blue instead of using a yellow-green diagonal gradient")
+        #expect(bottom.greenComponent > bottom.redComponent && bottom.greenComponent > bottom.blueComponent,
+                "The bottom tip must keep Gemini's green accent")
     }
 }
 

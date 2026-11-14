@@ -179,9 +179,22 @@ public struct SystemMetricsHistoryStats: Equatable, Sendable {
 public protocol SystemMetricsHistoryPersisting: Sendable {
     /// Every stored sample, oldest first.
     func loadRecords() -> [SystemMetricsRecord]
+    func loadStats(capacity: Int?) -> SystemMetricsHistoryStats?
     /// Stores one sample; a `nil` capacity keeps all samples.
     func appendRecord(_ record: SystemMetricsRecord, capacity: Int?)
     func removeAll()
+}
+
+extension SystemMetricsHistoryPersisting {
+    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats? {
+        let records = loadRecords().sorted { $0.timestamp < $1.timestamp }
+        let retained = records.suffix(capacity.map { max(1, $0) } ?? records.count)
+        return SystemMetricsHistoryStats(
+            count: retained.count,
+            oldest: retained.first?.timestamp,
+            newest: retained.last?.timestamp
+        )
+    }
 }
 
 private struct SystemMetricsHistoryDatabaseError: LocalizedError {
@@ -225,6 +238,13 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
         queue.sync {
             guard let database = connectionOrNil() else { return [] }
             return (try? readRecords(from: database)) ?? []
+        }
+    }
+
+    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats? {
+        queue.sync {
+            guard let database = connectionOrNil() else { return nil }
+            return try? readStats(capacity: capacity, from: database)
         }
     }
 
@@ -421,6 +441,34 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
     }
 
     // MARK: Reading
+
+    private func readStats(capacity: Int?, from database: OpaquePointer) throws -> SystemMetricsHistoryStats {
+        let sql: String
+        if capacity == nil {
+            // Separate aggregates let SQLite count index pages and seek the two endpoints.
+            sql = """
+                SELECT (SELECT COUNT(*) FROM metrics),
+                       (SELECT MIN(timestamp) FROM metrics),
+                       (SELECT MAX(timestamp) FROM metrics)
+                """
+        } else {
+            sql = """
+                SELECT COUNT(*), MIN(timestamp), MAX(timestamp)
+                FROM (SELECT timestamp FROM metrics ORDER BY timestamp DESC LIMIT ?)
+                """
+        }
+        let statement = try prepare(sql, on: database)
+        defer { sqlite3_finalize(statement) }
+        if let capacity {
+            try check(sqlite3_bind_int64(statement, 1, sqlite3_int64(max(1, capacity))), database: database)
+        }
+        try check(sqlite3_step(statement), expected: SQLITE_ROW, database: database)
+        return SystemMetricsHistoryStats(
+            count: Int(sqlite3_column_int64(statement, 0)),
+            oldest: optionalDouble(statement, index: 1).map { Date(timeIntervalSince1970: $0) },
+            newest: optionalDouble(statement, index: 2).map { Date(timeIntervalSince1970: $0) }
+        )
+    }
 
     private func readRecords(from database: OpaquePointer) throws -> [SystemMetricsRecord] {
         let fans = try readFans(from: database)
@@ -729,6 +777,10 @@ public final class LazySystemMetricsHistoryPersistence: SystemMetricsHistoryPers
         database().loadRecords()
     }
 
+    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats? {
+        database().loadStats(capacity: capacity)
+    }
+
     public func appendRecord(_ record: SystemMetricsRecord, capacity: Int?) {
         database().appendRecord(record, capacity: capacity)
     }
@@ -756,8 +808,7 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
     public let capacity: Int?
     private let persistence: any SystemMetricsHistoryPersisting
     private let lock = NSLock()
-    private var stored: [SystemMetricsRecord] = []
-    private var isLoaded = false
+    private var storedStats: SystemMetricsHistoryStats?
 
     public init(
         persistence: any SystemMetricsHistoryPersisting,
@@ -770,19 +821,17 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
     public var records: [SystemMetricsRecord] {
         lock.lock()
         defer { lock.unlock() }
-        loadIfNeededLocked()
-        return stored
+        let loaded = persistence.loadRecords().sorted { $0.timestamp < $1.timestamp }
+        if let capacity {
+            return Array(loaded.suffix(capacity))
+        }
+        return loaded
     }
 
     public var stats: SystemMetricsHistoryStats {
         lock.lock()
         defer { lock.unlock() }
-        loadIfNeededLocked()
-        return SystemMetricsHistoryStats(
-            count: stored.count,
-            oldest: stored.first?.timestamp,
-            newest: stored.last?.timestamp
-        )
+        return loadStatsIfNeededLocked()
     }
 
     public func append(_ record: SystemMetricsRecord) {
@@ -795,40 +844,25 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
     ) -> SystemMetricsHistoryStats? {
         lock.lock()
         defer { lock.unlock() }
-        loadIfNeededLocked()
+        _ = loadStatsIfNeededLocked()
         guard !isCancelled() else { return nil }
-        stored.append(record)
-        if let capacity {
-            let overflow = stored.count - capacity
-            if overflow > 0 {
-                stored.removeFirst(overflow)
-            }
-        }
         persistence.appendRecord(record, capacity: capacity)
-        return SystemMetricsHistoryStats(
-            count: stored.count,
-            oldest: stored.first?.timestamp,
-            newest: stored.last?.timestamp
-        )
+        if let stats = persistence.loadStats(capacity: capacity) { storedStats = stats }
+        return storedStats ?? .empty
     }
 
     public func removeAll() {
         lock.lock()
         defer { lock.unlock() }
-        isLoaded = true
-        stored = []
         persistence.removeAll()
+        storedStats = nil
     }
 
-    private func loadIfNeededLocked() {
-        guard !isLoaded else { return }
-        isLoaded = true
-        let loaded = persistence.loadRecords().sorted { $0.timestamp < $1.timestamp }
-        if let capacity, loaded.count > capacity {
-            stored = Array(loaded.suffix(capacity))
-        } else {
-            stored = loaded
-        }
+    private func loadStatsIfNeededLocked() -> SystemMetricsHistoryStats {
+        if let storedStats { return storedStats }
+        let stats = persistence.loadStats(capacity: capacity)
+        storedStats = stats
+        return stats ?? .empty
     }
 }
 

@@ -105,6 +105,14 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    static func stackIdentities(for notices: [IslandNotice]) -> [AIMascotIdentity] {
+        Array(notices.reduce(into: [AIMascotIdentity]()) { result, notice in
+            guard let provider = AIMascotLibrary.provider(fromNoticeID: notice.id) else { return }
+            let identity = AIMascotIdentity(provider: provider, taskID: notice.id, title: notice.title)
+            if !result.contains(identity) { result.append(identity) }
+        }.prefix(3))
+    }
+
     init(provider: AIProvider, taskID: String, title: String? = nil) {
         if provider == .harness, title == "DeepSeek Harness" {
             self = .deepseekHarness
@@ -237,6 +245,36 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         self == .grok || self == .grokBot || self == .cursor || self == .gpt || self == .copilot || self == .opencode || self == .pi
     }
 
+}
+
+struct AIMascotStack: View {
+    let notices: [IslandNotice]
+    let size: CGFloat
+    let edge: IslandEdge
+
+    var body: some View {
+        let identities = AIMascotIdentity.stackIdentities(for: notices)
+        Group {
+            if identities.count == 1 {
+                AIMascotView(identity: identities[0], size: size)
+            } else {
+                let tileSize = size * 0.75
+                let step = (size - tileSize) / CGFloat(identities.count - 1)
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(identities.enumerated()), id: \.element) { index, identity in
+                        AIMascotView(identity: identity, size: tileSize - 2)
+                            .padding(1)
+                            .background(Color.black, in: Circle())
+                            .offset(x: edge.isVertical ? (size - tileSize) / 2 : CGFloat(index) * step,
+                                    y: edge.isVertical ? CGFloat(index) * step : (size - tileSize) / 2)
+                    }
+                }
+                .frame(width: size, height: size, alignment: .topLeading)
+                .environment(\.layoutDirection, .leftToRight)
+            }
+        }
+        .frame(width: size, height: size)
+    }
 }
 
 struct AIMascotView: View {
