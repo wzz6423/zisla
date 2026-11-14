@@ -95,7 +95,7 @@ export const it = createCatalog({
       aiMonitor: {
         name: 'Monitor IA',
         caption:
-          'Raccoglie attività e stato di CLI IA, app desktop e IDE. I dati numerici affidabili alimentano le tendenze dei token e la mappa dei contributi; scegli una data per vedere token di input, output e totali per fornitore e modello. Nelle impostazioni puoi consultare lo storico, esportarlo interamente in .xlsx o cancellarlo. Mostra quote reali, orari di ripristino e avvisi di quota bassa, incluse finestre 5h/7d e budget Cursor in dollari quando disponibili. Non legge il testo di prompt o risposte.',
+          'Raccoglie attività e stato di CLI IA, app desktop e IDE. I dati numerici affidabili alimentano le tendenze dei token e la mappa dei contributi; scegli una data per vedere token di input, output e totali per fornitore e modello. Nelle impostazioni puoi consultare lo storico, esportarlo interamente in .xlsx o cancellarlo. Mostra quote reali, orari di ripristino e avvisi di quota bassa, incluse finestre 5h/7d e budget Cursor in dollari quando disponibili. Non legge il testo di prompt o risposte. Anche i layout compatti mostrano le quote rimanenti con anelli.',
         points: ['Attività di più strumenti IA', 'Storico dei modelli ed export .xlsx', 'Quote e orari di ripristino'],
       },
       keyboardSound: {
@@ -107,7 +107,7 @@ export const it = createCatalog({
       download: {
         name: 'Downloader',
         caption:
-          'Incolla un link o lascia che zisla lo riconosca dagli appunti quando è attivo. Scegli video o audio e scarica nella cartella predefinita o in una tua. I link supportati mostrano origine, progresso in tempo reale e stato finale. Scegli la cartella dei download in Impostazioni → Posizione di salvataggio, separata da schermate e registrazioni. I link Bilibili scaricano la parte scelta.',
+          'Incolla un link o lascia che zisla lo riconosca dagli appunti quando è attivo. Scegli video o audio e scarica nella cartella predefinita o in una tua. I link supportati mostrano origine, progresso in tempo reale e stato finale. Scegli la cartella dei download in Impostazioni → Posizione di salvataggio, separata da schermate e registrazioni. I link Bilibili scaricano la parte scelta. Gestisci i componenti in Impostazioni → Componenti necessari e scegli se aggiornare ogni giorno quelli già installati.',
         points: ['Modalità video / audio', 'Cartella predefinita o personalizzata', 'Origine e progresso in tempo reale'],
       },
       agenda: {
@@ -160,7 +160,7 @@ export const it = createCatalog({
     features: {
       floatingIsland: {
         title: 'Un’isola fluttuante che si adatta',
-        description: 'Usa la posizione della fotocamera o scegli un punto sul bordo dello schermo. La posizione personalizzata viene ricordata tra le modalità. I layout compatti orizzontali e verticali adattano la lunghezza a icone, attività IA, download e contenuti multimediali, con un’opzione per mostrare più informazioni. Riordina i moduli trascinandoli in Impostazioni → Info o ripristina l’ordine predefinito.',
+        description: 'Usa la posizione della fotocamera o scegli un punto sul bordo dello schermo. La posizione personalizzata viene ricordata tra le modalità. I layout compatti orizzontali e verticali adattano la lunghezza a icone, attività IA, download e contenuti multimediali, con un’opzione per mostrare più informazioni. Riordina i moduli trascinandoli in Impostazioni → Layout di Dynamic Island o ripristina l’ordine predefinito. Nella stessa pagina puoi impostare la priorità delle informazioni di stato compatte.',
         detail: 'Posizione personalizzata · Icone persistenti · Informazioni adattive',
       },
       dailyBriefing: {
@@ -219,7 +219,7 @@ export const it = createCatalog({
       voice: {
         title: 'Input vocale e pulizia',
         description:
-          'Attiva con un tasto o tienilo premuto per parlare usando il riconoscimento di sistema, con vocabolari specialistici e parole personalizzate. Se vuoi, usa Ollama, LM Studio o un modello remoto per correggere la trascrizione mantenendone il senso e formattare gli elementi elencati esplicitamente.',
+          'Attiva con un tasto o tienilo premuto per parlare usando il riconoscimento di sistema, con vocabolari specialistici e parole personalizzate. Se vuoi, usa Ollama, LM Studio o un modello remoto per correggere la trascrizione mantenendone il senso e formattare gli elementi elencati esplicitamente. Impostazioni → Monitor Sistema e Pulizia può eliminare l’audio più vecchio di 7, 15 o 30 giorni mantenendo le trascrizioni; la pulizia automatica è disattivata per impostazione predefinita.',
         detail: 'Due modalità di registrazione · Vocabolari e parole chiave · Pulizia opzionale',
       },
       media: {
@@ -231,13 +231,13 @@ export const it = createCatalog({
       browserDownloads: {
         title: 'Progresso dei download del browser',
         description:
-          'Rileva i download di Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera e Arc, mostrando origine e progresso in tempo reale in alto.',
+          'Rileva i download di Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera e Arc, mostrando origine e progresso in tempo reale in alto. L’avanzamento mostra il vero nome del file di destinazione quando il browser lo fornisce.',
         detail: '8 browser · Rilevamento origine · Avviso di completamento',
       },
       copyAssistant: {
         title: 'Azioni rapide e passi successivi',
         description:
-          'Quando è attivo, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Apri la cartella del file con le azioni rapide dopo un download del browser o un trasferimento AirDrop. Supporta le cartelle predefinite e scelte in Chrome, con un interruttore indipendente dall’avanzamento dei download. Gli IP hanno azioni separate per la ricerca e l’apertura dei link. Le conversioni riconoscono le unità monetarie minori e il catalogo include Emoji 18.0. Testo e immagini salvati usano la cartella indipendente delle azioni rapide in Impostazioni → Posizione di salvataggio. Se un’app non si apre, le Azioni rapide verificano integrità, firma e criteri di sicurezza di macOS. Superati i controlli, possono rimuovere gli attributi di quarantena e aprirla.',
+          'Quando è attivo, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Apri la cartella del file con le azioni rapide dopo un download del browser o un trasferimento AirDrop. Supporta le cartelle predefinite e scelte in Chrome, con un interruttore indipendente dall’avanzamento dei download. Gli IP hanno azioni separate per la ricerca e l’apertura dei link. Le conversioni riconoscono le unità monetarie minori e il catalogo include Emoji 18.0. Testo e immagini salvati usano la cartella indipendente delle azioni rapide in Impostazioni → Posizione di salvataggio. Se un’app non si apre, le Azioni rapide verificano integrità, firma e criteri di sicurezza di macOS. Superati i controlli, possono rimuovere gli attributi di quarantena e aprirla. Riordina le azioni di ogni tipo riconosciuto in Impostazioni → Azioni rapide. Gli importi supportano simboli regionali e codici valuta con prefisso.',
         detail: 'Attivazione opzionale · Riconoscimento locale · Command+N predefinito',
       },
       aiManagement: {
@@ -336,6 +336,21 @@ export const it = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.23': [
+        'Gli strumenti immagine aggiungono nove operazioni locali: compressione, conversione tra cinque formati, ridimensionamento e ritaglio, confronto del formato più piccolo, rotazione e specchio, filigrane, mosaico e sfocatura, riconoscimento di testo e tabelle e rimozione dello sfondo. Sono disponibili esportazione in blocco e ZIP e cartelle separate per PDF e immagini.',
+        'Gli strumenti audio aggiungono 27 operazioni locali per conversione, montaggio, divisione, unione, mix, estrazione, normalizzazione LUFS, effetti, canali e tag. Servono FFmpeg e ffprobe; scegli il file o la cartella di esportazione.',
+        'Il monitoraggio degli account IA aggiunge anelli delle quote rimanenti, orari di ripristino e avvisi di quota bassa nei layout dell’isola, comprese finestre 5h/7d e budget Cursor in USD quando disponibili. I riepiloghi giornalieri possono includere le quote reali e l’ora di rilevazione.',
+        'Seleziona una data nelle tendenze IA o nella mappa di calore per vedere token in ingresso, in uscita e totali per fornitore e modello. Consulta, esporta tutta la cronologia in .xlsx o cancellala in Impostazioni. La pagina iniziale raggruppa i lavori IA per app e mostra nell’isola i risultati dell’esportazione dei riepiloghi.',
+        'Gli eventi con un link riunione mostrano un conto alla rovescia da 10 minuti prima e un’azione per partecipare con un clic. Crea note di riunione o collega e scollega note contestuali. Mail può segnare tutta la posta in arrivo come letta.',
+        'La raccolta aggiunge ricerca, filtri e selezione multipla per copiare, condividere o inviare alle note rapide. Converti immagini in PDF, riconoscine il testo per le note e apri i video selezionati nello studio di registrazione.',
+        'Scegli modalità energetiche automatiche per alimentatore e batteria, mantenendo facoltativamente il risparmio energetico al 20% o meno. Carica subito al 100% quando macOS lo consente. Impostazioni offre cronologia di sistema, esportazione .xlsx e cancellazione.',
+        'I layout Pomodoro compatti orizzontali e verticali aggiungono avanzamento, pausa, ripresa e azzeramento. Il passaggio del puntatore sui comandi mantiene l’isola chiusa, anche nei layout verticali con più informazioni.',
+        'Le schermate lunghe aggiungono lo scorrimento automatico lento della finestra selezionata. La cattura HDR è disponibile sui dispositivi compatibili; l’editor mantiene le impostazioni di rendering ed esportazione delle immagini.',
+        'Le azioni rapide possono riparare un’app che non si apre dopo aver verificato integrità, firma e politiche di sicurezza macOS. Riordina le azioni per tipo, usa nuovi esempi, simboli monetari regionali e codici con prefisso. Le ricerche di voli, treni e pacchi hanno priorità.',
+        'Impostazioni divide layout di Dynamic Island, riepilogo giornaliero, notifiche e cura e flusso di lavoro in pagine separate. Riordina le priorità compatte e aggiorna facoltativamente ogni giorno i componenti installati. La pulizia delle registrazioni passa a Monitor Sistema e Pulizia mantenendo le trascrizioni.',
+        'Gli avanzamenti dei download mostrano i nomi reali dei file di destinazione quando disponibili. Rendering a riposo, scansioni IA, caricamento della cronologia e riproduzione in studio usano meno risorse. Sono stati affinati loghi IA compatti, schede delle quote e animazioni e corretti scorrimento meteo, trascinamenti nella raccolta, scritture Mail e conservazione della cronologia degli appunti.',
+        'La home aggiunge una presentazione di 160 secondi avviata al clic e un link al video originale. Il sito resta utilizzabile senza WebGL e le app consigliate includono l’ambiente terminale Zshell.',
+      ],
       'v0.1.22': [
         'Lo studio aggiunge levigatura della pelle, luminosità, snellimento di viso e corpo, preset vocali regolabili e monitoraggio opzionale del microfono. Gli effetti si regolano prima di registrare e durante il montaggio.',
         'Le scie fluide del cursore consentono di scegliere il colore. La riproduzione nello studio mostra il montaggio con tracce, effetti e audio.',
@@ -413,7 +428,7 @@ export const it = createCatalog({
       },
       network: {
         question: 'zisla va online?',
-        answer: 'Meteo, aggiornamenti firmati, download avviati da te e pulizia vocale remota opzionale usano la rete quando serve. Il rilevamento dei link è locale. Il modello locale corregge il testo dopo la trascrizione; il riconoscimento vocale Apple può ancora usare la rete, a seconda della lingua e del supporto del sistema.',
+        answer: 'Meteo, aggiornamenti firmati, download avviati da te e pulizia vocale remota opzionale usano la rete quando serve. Il rilevamento dei link è locale. Il modello locale corregge il testo dopo la trascrizione; il riconoscimento vocale Apple può ancora usare la rete, a seconda della lingua e del supporto del sistema. Il monitoraggio attivo delle quote IA consulta anche i servizi dei fornitori selezionati.',
       },
       multiDisplay: {
         question: 'zisla supporta più schermi?',
@@ -425,7 +440,7 @@ export const it = createCatalog({
       },
       storage: {
         question: 'Dove salva i dati zisla?',
-        answer: 'I dati locali sono in ~/Library/Application Support/zisla/. Le statistiche di digitazione sono in ~/Library/Application Support/zisla/typing-stats.sqlite3. Note rapide usa l’app Note. Impostazioni → Posizione di salvataggio offre cartelle indipendenti per download, schermate, registrazioni, azioni rapide e resoconti giornalieri. L’aggiornamento conserva la precedente cartella condivisa, poi ciascuna può essere cambiata separatamente.',
+        answer: 'I dati locali si trovano in ~/Library/Application Support/zisla/. Le statistiche di digitazione sono separate in ~/Library/Application Support/zisla/typing-stats.sqlite3. Le note rapide usano l’app Note di sistema. Impostazioni → Posizione di salvataggio offre cartelle indipendenti per download, strumenti PDF e immagine, schermate, registrazioni, azioni rapide e riepiloghi giornalieri. L’aggiornamento mantiene le posizioni già scelte; ogni cartella può poi essere modificata separatamente.',
       },
     },
   },

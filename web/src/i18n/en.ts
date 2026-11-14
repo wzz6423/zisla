@@ -94,7 +94,7 @@ export const en: SiteContent = {
       aiMonitor: {
         name: 'AI monitor',
         caption:
-          'Aggregates AI tasks and status from CLIs, desktop apps and IDEs. Numeric usage powers token trends and a contribution heatmap; select a date for input, output and total tokens by provider and model. View, export all history as .xlsx or clear it in Settings. Check real account allowances, reset times and low-quota notices, including 5h/7d windows and Cursor USD budgets when available. Prompt and reply text is not read.',
+          'Aggregates AI tasks and status from CLIs, desktop apps and IDEs. Numeric usage powers token trends and a contribution heatmap; select a date for input, output and total tokens by provider and model. View, export all history as .xlsx or clear it in Settings. Check real account allowances, reset times and low-quota notices, including 5h/7d windows and Cursor USD budgets when available. Prompt and reply text is not read. Remaining-quota rings also appear across compact island layouts.',
         points: ['Tasks across AI tools', 'Model history and .xlsx export', 'Account allowances and reset times'],
       },
       keyboardSound: {
@@ -106,7 +106,7 @@ export const en: SiteContent = {
       download: {
         name: 'Downloader',
         caption:
-          'Paste a link, or let zisla pick links up from the clipboard once enabled. Choose an available video or audio format, and use Cookies from an installed browser when a Douyin download needs them. Download to the default or a folder of your choice, with a source icon, live progress and a completion state. Set the download folder in Settings → Save Location independently of screenshots and recordings. Bilibili links download the selected part.',
+          'Paste a link, or let zisla pick links up from the clipboard once enabled. Choose an available video or audio format, and use Cookies from an installed browser when a Douyin download needs them. Download to the default or a folder of your choice, with a source icon, live progress and a completion state. Set the download folder in Settings → Save Location independently of screenshots and recordings. Bilibili links download the selected part. Manage required components in Settings → Dependency Components, with optional daily updates for installed components.',
         points: ['Choose video or audio formats', 'Douyin browser Cookies', 'Source icon and live progress'],
       },
       agenda: {
@@ -158,7 +158,7 @@ export const en: SiteContent = {
     features: {
       floatingIsland: {
         title: 'A floating island that follows your layout',
-        description: 'Use the camera position or choose a custom position along a screen edge. Your custom placement is remembered when switching modes. Compact horizontal and vertical layouts adapt their length to status icons, AI tasks, downloads and media, with an option to show more information. Reorder island modules or restore the default order in Settings → Info.',
+        description: 'Use the camera position or choose a custom position along a screen edge. Your custom placement is remembered when switching modes. Compact horizontal and vertical layouts adapt their length to status icons, AI tasks, downloads and media, with an option to show more information. Reorder island modules or restore the default order in Settings → Dynamic Island Layout. Set the priority of compact status information on the same page.',
         detail: 'Custom placement · Persistent status icons · Adaptive information',
       },
       dailyBriefing: {
@@ -217,7 +217,7 @@ export const en: SiteContent = {
       voice: {
         title: 'Voice input and cleanup',
         description:
-          'Toggle with a key or hold to talk using system speech recognition, with domain vocabularies and custom hot words. Optionally use Ollama, LM Studio or a remote model to correct the transcript while preserving your meaning, and format explicitly listed items.',
+          'Toggle with a key or hold to talk using system speech recognition, with domain vocabularies and custom hot words. Optionally use Ollama, LM Studio or a remote model to correct the transcript while preserving your meaning, and format explicitly listed items. Settings → System Monitor and Cleanup can delete saved audio older than 7, 15 or 30 days while preserving transcripts; automatic cleanup is off by default.',
         detail: 'Two recording modes · Vocabularies and hot words · Optional model cleanup',
       },
       media: {
@@ -229,13 +229,13 @@ export const en: SiteContent = {
       browserDownloads: {
         title: 'Browser download progress',
         description:
-          'Detects downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera and Arc, and shows their source and live progress at the top of the screen.',
+          'Detects downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera and Arc, and shows their source and live progress at the top of the screen. Progress shows the actual target filename when the browser makes it available.',
         detail: '8 browsers · Source detection · Completion notice',
       },
       copyAssistant: {
         title: 'Quick Actions and smart next steps',
         description:
-          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0. Saved text and images use the separate Quick Actions folder in Settings → Save Location. When an app will not open, Quick Actions can check its integrity, signature and macOS security policy, then remove quarantine flags and open it after the checks pass.',
+          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0. Saved text and images use the separate Quick Actions folder in Settings → Save Location. When an app will not open, Quick Actions can check its integrity, signature and macOS security policy, then remove quarantine flags and open it after the checks pass. Reorder actions for each recognised type in Settings → Quick Actions. Currency amounts support regional symbols and prefixed currency codes.',
         detail: 'On-device recognition · Live currency conversion · Command+N by default',
       },
       aiManagement: {
@@ -340,6 +340,21 @@ export const en: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.23': [
+        'Image tools add nine local operations: compression, five-format conversion, resize and crop, smallest-format comparison, rotation and mirroring, watermarks, mosaic and blur, text and table recognition, and background removal. Batch and ZIP export plus separate PDF and image-tool save folders are available.',
+        'Audio tools add 27 local operations for conversion, editing, splitting, joining, mixing, audio extraction, LUFS normalisation, effects, channels and tags. Processing requires FFmpeg and ffprobe; choose an export file or folder.',
+        'AI account monitoring adds remaining-quota rings, reset times and low-quota notices across island layouts, including 5h/7d windows and Cursor USD budgets when available. Daily briefings can include real allowances and their sampling times.',
+        'Select a date in AI usage trends or the heatmap to inspect input, output and total tokens by provider and model. View, export all history as .xlsx or clear it in Settings. Home groups running AI work by application, and briefing export results appear in the island.',
+        'Calendar events with meeting links show a countdown from 10 minutes before the start and a one-click join action. Create meeting notes or link and unlink context notes. Mail adds marking all inbox messages as read.',
+        'The shelf adds search, filters and multiple selection for copying, sharing and sending items to Quick Notes. Convert images to PDF, recognise image text into Quick Notes, and open selected videos in the recording studio.',
+        'Choose automatic power modes for plugged-in and battery use, optionally keeping Low Power Mode at 20% or below. Charge to 100% immediately when macOS offers it. System-history viewing, .xlsx export and clearing are accessible in Settings.',
+        'Compact horizontal and vertical Pomodoro layouts add progress and pause, resume and reset controls. Hovering over their controls keeps the island collapsed, including vertical layouts with more information.',
+        'Long screenshots add slow automatic scrolling for the selected window. HDR capture is available on supported devices, and screenshot edits retain their image-rendering and export settings.',
+        'Quick Actions can repair an application that will not open after checking its integrity, signature and macOS security policy. Reorder actions for each recognised type, use expanded examples and regional currency symbols or prefixed codes, with flight, train and package lookups prioritised.',
+        'Settings split Dynamic Island Layout, Daily Briefing, Notifications and Care, and Workflow into separate pages. Reorder compact status priorities, optionally update installed dependency components daily, and manage voice-recording cleanup under System Monitor and Cleanup while retaining transcripts.',
+        'Browser download progress uses real target filenames when available. Idle rendering, AI scans, system-history loading and studio playback use fewer resources. Compact AI branding, quota cards and result animations are refined, with fixes for weather scrolling, shelf drops, mail writes and clipboard-history preservation.',
+        'The homepage adds a 160-second feature tour with explicit playback and an original-video fallback. The site remains usable when WebGL is unavailable, and recommended apps now include the Zshell terminal workspace.',
+      ],
       'v0.1.22': [
         'Recording Studio adds portrait smoothing, brightening, face and body slimming, adjustable voice presets and optional microphone monitoring. Effects can be adjusted during setup and editing.',
         'Smooth cursor trails have a selectable colour. Studio playback shows the edited result, including its tracks, effects and audio.',
@@ -421,7 +436,7 @@ export const en: SiteContent = {
       network: {
         question: 'Does zisla go online?',
         answer:
-          'Weather, signed update checks, downloads you start and the optional remote voice cleanup use the network on demand. Clipboard link detection runs entirely on your Mac and never starts a download on its own. A local model handles the text cleanup after transcription; Apple speech recognition may still use the network, depending on the language and system support.',
+          'Weather, signed update checks, downloads you start and the optional remote voice cleanup use the network on demand. Clipboard link detection runs entirely on your Mac and never starts a download on its own. A local model handles the text cleanup after transcription; Apple speech recognition may still use the network, depending on the language and system support. Enabled AI account quota checks also contact the selected providers’ services.',
       },
       multiDisplay: {
         question: 'Does zisla support multiple displays?',
@@ -436,7 +451,7 @@ export const en: SiteContent = {
       storage: {
         question: 'Where does zisla store its data?',
         answer:
-          'Local data lives in ~/Library/Application Support/zisla/. Typing stats are kept separately in ~/Library/Application Support/zisla/typing-stats.sqlite3. Quick Notes uses the system Notes app. Settings → Save Location provides independent folders for downloads, screenshots, recordings, Quick Actions and daily briefings. On upgrade, each inherits the previous shared folder and can then be changed separately.',
+          'Local data lives in ~/Library/Application Support/zisla/. Typing stats are kept separately in ~/Library/Application Support/zisla/typing-stats.sqlite3. Quick Notes uses the system Notes app. Settings → Save Location provides independent folders for downloads, PDF tools, image tools, screenshots, recordings, Quick Actions and daily briefings. Existing chosen locations are preserved on upgrade; each folder can then be changed independently.',
       },
     },
   },

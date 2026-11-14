@@ -103,7 +103,7 @@ const updatedStrings = (content) => [
   ...['windowPreviews', 'capture', 'pet'].flatMap((id) =>
     ['description', 'detail'].map((field) =>
       [`extensions.features.${id}.${field}`, content.extensions.features[id][field]])),
-  ...['copyAssistant', 'media', 'recommendedTools'].map((id) =>
+  ...['copyAssistant', 'media', 'recommendedTools', 'voice', 'browserDownloads'].map((id) =>
     [`extensions.features.${id}.description`, content.extensions.features[id].description]),
   ['meta.description', content.meta.description],
   ['meta.ogDescription', content.meta.ogDescription],
@@ -113,9 +113,11 @@ const updatedStrings = (content) => [
   ['download.copy', content.download.copy],
   ['faq.items.permissions.answer', content.faq.items.permissions.answer],
   ['faq.items.storage.answer', content.faq.items.storage.answer],
+  ['faq.items.network.answer', content.faq.items.network.answer],
   ...strings(content.changelog.releaseNotes['v0.1.20'], 'changelog.releaseNotes.v0.1.20'),
   ...strings(content.changelog.releaseNotes['v0.1.21'], 'changelog.releaseNotes.v0.1.21'),
   ...strings(content.changelog.releaseNotes['v0.1.22'], 'changelog.releaseNotes.v0.1.22'),
+  ...strings(content.changelog.releaseNotes['v0.1.23'], 'changelog.releaseNotes.v0.1.23'),
   ...strings(content.film, 'film'),
 ];
 
@@ -288,10 +290,19 @@ test('current feature descriptions keep meeting, power and application-repair co
   assert.match(content.showcase.modules.system.caption, /100% immediately when macOS offers it/);
   assert.match(content.extensions.features.copyAssistant.description, /integrity, signature and macOS security policy.*after the checks pass/);
   assert.match(content.extensions.features.capture.description, /slow automatic scrolling.*HDR screenshots on supported devices/);
-  assert.match(content.extensions.features.floatingIsland.description, /Reorder.*Settings → Info/);
+  assert.match(content.extensions.features.floatingIsland.description, /Reorder.*Settings → Dynamic Island Layout/);
   assert.match(content.extensions.features.dailyBriefing.description, /real account allowances and their sampling times/);
   assert.match(content.ai.usageNote, /separate data sources.*credits are not converted into tokens or USD cost/);
   assert.doesNotMatch(content.showcase.modules.aiMonitor.caption, /remaining allowances hidden/);
+  assert.match(content.showcase.modules.aiMonitor.caption, /Remaining-quota rings.*compact island layouts/);
+  assert.match(content.showcase.modules.download.caption, /Settings → Dependency Components.*daily updates for installed components/);
+  assert.match(content.extensions.features.floatingIsland.description, /priority of compact status information/);
+  assert.match(content.extensions.features.voice.description, /System Monitor and Cleanup.*7, 15 or 30 days.*preserving transcripts.*off by default/);
+  assert.match(content.extensions.features.browserDownloads.description, /actual target filename.*browser makes it available/);
+  assert.match(content.extensions.features.copyAssistant.description, /Reorder actions for each recognised type.*Settings → Quick Actions/);
+  assert.match(content.extensions.features.copyAssistant.description, /regional symbols and prefixed currency codes/);
+  assert.match(content.faq.items.storage.answer, /independent folders for downloads, PDF tools, image tools, screenshots, recordings, Quick Actions and daily briefings/);
+  assert.match(content.faq.items.network.answer, /AI account quota checks.*selected providers’ services/);
 });
 
 test('supported AI tools retain Cursor and Muse Code identities', () => {
@@ -323,6 +334,7 @@ for (const locale of siteLocales) {
     assert.equal(content.changelog.releaseNotes['v0.1.20'].length, 8);
     assert.equal(content.changelog.releaseNotes['v0.1.21'].length, 4);
     assert.equal(content.changelog.releaseNotes['v0.1.22'].length, 9);
+    assert.equal(content.changelog.releaseNotes['v0.1.23'].length, 13);
     const rendered = renderInMemory(locale);
     for (const [path, value] of updatedStrings(content)) {
       if (path.startsWith('meta.')) continue;
@@ -352,27 +364,27 @@ for (const locale of siteLocales) {
 }
 
 test('release notes render by version while historical wording remains available', () => {
-  const prepared = { version: 'v0.1.22', date: '2026-11-07', notes: ['ENGLISH FALLBACK SENTINEL'] };
+  const prepared = { version: 'v0.1.23', date: '2026-11-14', notes: ['ENGLISH FALLBACK SENTINEL'] };
   const historical = { version: 'v0.1.19', date: '2026-10-15', notes: ['HISTORICAL NOTE SENTINEL'] };
   const rendered = renderInMemory('zh-Hans', [prepared, historical]);
-  for (const note of site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.22']) {
+  for (const note of site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.23']) {
     assert.ok(rendered.html.includes(note), 'prepared Chinese release note is rendered');
   }
   assert.ok(!rendered.html.includes('ENGLISH FALLBACK SENTINEL'));
   assert.ok(rendered.html.includes('HISTORICAL NOTE SENTINEL'), 'historical notes retain their original wording');
   const current = renderInMemory('zh-Hans', [historical]);
-  assert.ok(!current.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.22'][0]),
+  assert.ok(!current.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.23'][0]),
     'prepared notes do not replace the currently published release');
   const metadataOnly = renderInMemory('zh-Hans', [{ ...prepared, notes: [] }]);
-  assert.ok(metadataOnly.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.22'][0]),
+  assert.ok(metadataOnly.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.23'][0]),
     'a release entry can use its catalog notes without duplicating English source notes');
 });
 
 
 test('latest release downloads and README match the newest changelog entry', () => {
   const latest = site.changelogEntries[0];
-  assert.equal(latest.version, 'v0.1.22');
-  assert.equal(latest.date, '2026-11-07');
+  assert.equal(latest.version, 'v0.1.23');
+  assert.equal(latest.date, '2026-11-14');
   assert.equal(site.latestRelease.version, latest.version);
   assert.equal(site.latestRelease.date, latest.date);
   const releasePage = `https://github.com/wzz6423/zisla/releases/tag/${latest.version}`;
@@ -385,12 +397,14 @@ test('latest release downloads and README match the newest changelog entry', () 
     const extension = key === 'checksum' ? 'zip.sha256' : key.toLowerCase().endsWith('zip') ? 'zip' : 'dmg';
     assert.equal(url, `${downloadRoot}zisla-${latest.version}-macOS-${architecture}.${extension}`, key);
   }
-  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-  assert.ok(readme.includes(releasePage));
-  for (const key of ['dmg', 'zip', 'universalDmg', 'universalZip', 'intelDmg', 'intelZip']) {
-    assert.ok(readme.includes(site.latestRelease[key]), `README includes ${key}`);
-  }
-  for (const url of readme.match(/https:\/\/github\.com\/wzz6423\/zisla\/releases\/(?:tag|download)\/v[^\s]+/g)) {
-    assert.ok(url.startsWith(releasePage) || url.startsWith(downloadRoot), url);
+  for (const filename of ['README.md', 'README.zh-CN.md']) {
+    const readme = readFileSync(new URL(`../${filename}`, import.meta.url), 'utf8');
+    assert.ok(readme.includes(releasePage), `${filename} includes the release page`);
+    for (const key of ['dmg', 'zip', 'universalDmg', 'universalZip', 'intelDmg', 'intelZip']) {
+      assert.ok(readme.includes(site.latestRelease[key]), `${filename} includes ${key}`);
+    }
+    for (const url of readme.match(/https:\/\/github\.com\/wzz6423\/zisla\/releases\/(?:tag|download)\/v[^\s]+/g)) {
+      assert.ok(url.startsWith(releasePage) || url.startsWith(downloadRoot), `${filename}: ${url}`);
+    }
   }
 });

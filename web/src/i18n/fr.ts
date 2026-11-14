@@ -94,7 +94,7 @@ export const fr: SiteContent = {
       aiMonitor: {
         name: 'Suivi IA',
         caption:
-          'Rassemble les tâches et l’état des CLI IA, apps de bureau et IDE. Les données chiffrées fiables alimentent les tendances de tokens et la carte des contributions ; choisissez une date pour voir les tokens d’entrée, de sortie et totaux par fournisseur et modèle. Consultez l’historique dans les réglages, exportez-le entièrement en .xlsx ou effacez-le. Affiche les quotas réels, leur réinitialisation et les alertes de quota faible, dont les fenêtres 5h/7d et les budgets Cursor en dollars lorsqu’ils sont disponibles. Ne lit pas le texte des invites ni des réponses.',
+          'Rassemble les tâches et l’état des CLI IA, apps de bureau et IDE. Les données chiffrées fiables alimentent les tendances de tokens et la carte des contributions ; choisissez une date pour voir les tokens d’entrée, de sortie et totaux par fournisseur et modèle. Consultez l’historique dans les réglages, exportez-le entièrement en .xlsx ou effacez-le. Affiche les quotas réels, leur réinitialisation et les alertes de quota faible, dont les fenêtres 5h/7d et les budgets Cursor en dollars lorsqu’ils sont disponibles. Ne lit pas le texte des invites ni des réponses. Les présentations compactes affichent aussi les quotas restants sous forme d’anneaux.',
         points: ['Tâches de plusieurs outils IA', 'Historique par modèle et export .xlsx', 'Quotas et dates de réinitialisation'],
       },
       keyboardSound: {
@@ -110,7 +110,7 @@ export const fr: SiteContent = {
       download: {
         name: 'Téléchargeur',
         caption:
-          'Collez un lien ou laissez zisla repérer les liens du presse-papiers une fois l’option activée. Choisissez un format vidéo ou audio disponible et utilisez les Cookies d’un navigateur installé lorsqu’un téléchargement Douyin les nécessite. Enregistrez dans le dossier par défaut ou celui de votre choix, avec l’icône de la source, la progression en temps réel et l’état final. Choisissez le dossier de téléchargement dans Réglages → Emplacement de sauvegarde, indépendamment des captures et enregistrements. Les liens Bilibili téléchargent la partie choisie.',
+          'Collez un lien ou laissez zisla repérer les liens du presse-papiers une fois l’option activée. Choisissez un format vidéo ou audio disponible et utilisez les Cookies d’un navigateur installé lorsqu’un téléchargement Douyin les nécessite. Enregistrez dans le dossier par défaut ou celui de votre choix, avec l’icône de la source, la progression en temps réel et l’état final. Choisissez le dossier de téléchargement dans Réglages → Emplacement de sauvegarde, indépendamment des captures et enregistrements. Les liens Bilibili téléchargent la partie choisie. Gérez les composants dans Réglages → Composants requis, avec la possibilité de mettre à jour chaque jour ceux déjà installés.',
         points: [
           'Choisir les formats vidéo ou audio disponibles',
           'Cookies de navigateur pour Douyin',
@@ -178,7 +178,7 @@ export const fr: SiteContent = {
     features: {
       floatingIsland: {
         title: 'Une île flottante adaptée à votre disposition',
-        description: 'Utilisez la position de la caméra ou choisissez un emplacement sur un bord de l’écran. La position personnalisée est conservée entre les modes. Les présentations compactes horizontales et verticales adaptent leur longueur aux icônes, tâches IA, téléchargements et médias, avec une option pour afficher plus d’informations. Réorganisez les modules par glisser-déposer dans Réglages → Infos, ou rétablissez l’ordre par défaut.',
+        description: 'Utilisez la position de la caméra ou choisissez un emplacement sur un bord de l’écran. La position personnalisée est conservée entre les modes. Les présentations compactes horizontales et verticales adaptent leur longueur aux icônes, tâches IA, téléchargements et médias, avec une option pour afficher plus d’informations. Réorganisez les modules par glisser-déposer dans Réglages → Disposition de Dynamic Island, ou rétablissez l’ordre par défaut. La même page permet de définir la priorité des informations d’état compactes.',
         detail: 'Position personnalisée · Icônes persistantes · Informations adaptatives',
       },
       dailyBriefing: {
@@ -237,7 +237,7 @@ export const fr: SiteContent = {
       voice: {
         title: 'Dictée et mise en forme',
         description:
-          'Basculez avec une touche ou maintenez-la pour parler, avec la reconnaissance vocale du système, des vocabulaires spécialisés et des mots-clés personnalisés. Utilisez au besoin Ollama, LM Studio ou un modèle distant pour corriger la transcription en préservant le sens et mettre en forme les éléments explicitement énumérés.',
+          'Basculez avec une touche ou maintenez-la pour parler, avec la reconnaissance vocale du système, des vocabulaires spécialisés et des mots-clés personnalisés. Utilisez au besoin Ollama, LM Studio ou un modèle distant pour corriger la transcription en préservant le sens et mettre en forme les éléments explicitement énumérés. Réglages → Moniteur système et nettoyage peut supprimer les fichiers audio de plus de 7, 15 ou 30 jours en conservant les transcriptions ; le nettoyage automatique est désactivé par défaut.',
         detail: 'Deux modes d’enregistrement · Vocabulaires et mots-clés · Modèle facultatif',
       },
       media: {
@@ -249,13 +249,13 @@ export const fr: SiteContent = {
       browserDownloads: {
         title: 'Progression des téléchargements',
         description:
-          'Détecte les téléchargements de Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera et Arc, et affiche leur source et leur progression en haut de l’écran.',
+          'Détecte les téléchargements de Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera et Arc, et affiche leur source et leur progression en haut de l’écran. La progression indique le vrai nom du fichier cible lorsque le navigateur le fournit.',
         detail: '8 navigateurs · Source identifiée · Avis de fin',
       },
       copyAssistant: {
         title: 'Actions rapides et étapes suivantes',
         description:
-          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0. Les textes et images enregistrés utilisent le dossier indépendant des actions rapides dans Réglages → Emplacement de sauvegarde. Si une app ne s’ouvre pas, les actions rapides peuvent vérifier son intégrité, sa signature et la politique de sécurité de macOS, puis retirer les attributs de quarantaine et l’ouvrir après validation.',
+          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0. Les textes et images enregistrés utilisent le dossier indépendant des actions rapides dans Réglages → Emplacement de sauvegarde. Si une app ne s’ouvre pas, les actions rapides peuvent vérifier son intégrité, sa signature et la politique de sécurité de macOS, puis retirer les attributs de quarantaine et l’ouvrir après validation. Réordonnez les actions de chaque type reconnu dans Réglages → Actions rapides. Les montants prennent en charge les symboles régionaux et les codes de devise préfixés.',
         detail: 'Reconnaissance locale · Conversion aux taux en temps réel · Command+N par défaut',
       },
       aiManagement: {
@@ -361,6 +361,21 @@ export const fr: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.23': [
+        'Les outils image ajoutent neuf opérations locales : compression, conversion entre cinq formats, redimensionnement et recadrage, comparaison du format le plus léger, rotation et symétrie, filigranes, mosaïque et flou, reconnaissance de texte et de tableaux, et suppression du fond. Exportez par lots ou en ZIP et choisissez des dossiers distincts pour les outils PDF et image.',
+        'Les outils audio ajoutent 27 opérations locales de conversion, montage, découpage, assemblage, mixage, extraction audio, normalisation LUFS, effets, canaux et métadonnées. FFmpeg et ffprobe sont nécessaires ; choisissez un fichier ou dossier d’export.',
+        'Le suivi des comptes IA affiche les quotas restants en anneaux, les heures de réinitialisation et les alertes de quota faible dans les présentations de l’îlot, y compris les fenêtres 5h/7d et les budgets USD de Cursor lorsqu’ils sont disponibles. Les bilans quotidiens peuvent inclure les quotas réels et leur heure de relevé.',
+        'Sélectionnez une date dans les tendances IA ou la carte thermique pour voir les tokens d’entrée, de sortie et totaux par fournisseur et modèle. Consultez, exportez tout l’historique en .xlsx ou effacez-le dans Réglages. L’accueil regroupe les tâches IA par application et l’îlot affiche les résultats d’export des bilans.',
+        'Les événements avec un lien de réunion affichent un compte à rebours dès 10 minutes avant le début et un bouton pour rejoindre. Créez une note de réunion ou liez et déliez des notes contextuelles. Mail permet de marquer toute la boîte de réception comme lue.',
+        'La zone de dépôt ajoute recherche, filtres et sélection multiple pour copier, partager ou envoyer vers les notes rapides. Convertissez les images en PDF, reconnaissez leur texte pour une note et ouvrez les vidéos sélectionnées dans le studio d’enregistrement.',
+        'Choisissez des modes d’alimentation automatiques distincts sur secteur et sur batterie, avec maintien facultatif du mode économie d’énergie à 20% ou moins. Chargez immédiatement à 100% lorsque macOS le permet. Réglages donne accès à l’historique système, à son export .xlsx et à son effacement.',
+        'Les présentations Pomodoro compactes horizontales et verticales ajoutent progression, pause, reprise et remise à zéro. Survoler les commandes conserve l’îlot replié, y compris en présentation verticale avec davantage d’informations.',
+        'Les captures longues ajoutent le défilement automatique lent de la fenêtre choisie. La capture HDR est disponible sur les appareils compatibles et l’édition conserve les réglages de rendu et d’export des images.',
+        'Les actions rapides peuvent réparer une app qui ne s’ouvre pas après vérification de son intégrité, de sa signature et de la politique de sécurité macOS. Réordonnez les actions par type, consultez davantage d’exemples et utilisez les symboles monétaires régionaux ou codes préfixés. Les recherches de vols, trains et colis sont prioritaires.',
+        'Réglages sépare la disposition de Dynamic Island, le bilan quotidien, les notifications et conseils, et le workflow en pages distinctes. Réordonnez les priorités compactes et activez au besoin la mise à jour quotidienne des composants installés. Le nettoyage des enregistrements rejoint Moniteur système et nettoyage et conserve les transcriptions.',
+        'Les téléchargements affichent le vrai nom du fichier cible lorsqu’il est disponible. Le rendu au repos, les scans IA, le chargement de l’historique système et la lecture en studio consomment moins de ressources. Les logos IA compacts, cartes de quota et animations de résultat sont ajustés ; le défilement météo, les dépôts, les écritures Mail et la conservation du presse-papiers sont corrigés.',
+        'L’accueil ajoute une visite de 160 secondes lancée au clic, avec un lien vers la vidéo originale. Le site reste utilisable sans WebGL et les apps recommandées incluent désormais l’espace de travail terminal Zshell.',
+      ],
       'v0.1.22': [
         'Le studio ajoute lissage de la peau, luminosité, affinement du visage et du corps, préréglages vocaux ajustables et écoute facultative du microphone. Les effets se règlent avant l’enregistrement et pendant le montage.',
         'Les traînées fluides du curseur ont une couleur au choix. La lecture dans le studio restitue le montage avec ses pistes, effets et sons.',
@@ -442,7 +457,7 @@ export const fr: SiteContent = {
       network: {
         question: 'zisla se connecte-t-il à Internet ?',
         answer:
-          'La météo, la vérification signée des mises à jour, les téléchargements que vous lancez et la mise en forme vocale distante facultative utilisent le réseau au besoin. La détection des liens du presse-papiers se fait entièrement sur votre Mac et ne lance jamais de téléchargement d’elle-même. Le modèle local corrige le texte après la transcription ; la reconnaissance vocale Apple peut toujours utiliser le réseau, selon la langue et la prise en charge du système.',
+          'La météo, la vérification signée des mises à jour, les téléchargements que vous lancez et la mise en forme vocale distante facultative utilisent le réseau au besoin. La détection des liens du presse-papiers se fait entièrement sur votre Mac et ne lance jamais de téléchargement d’elle-même. Le modèle local corrige le texte après la transcription ; la reconnaissance vocale Apple peut toujours utiliser le réseau, selon la langue et la prise en charge du système. Le suivi activé des quotas IA interroge aussi les services des fournisseurs sélectionnés.',
       },
       multiDisplay: {
         question: 'zisla prend-il en charge plusieurs écrans ?',
@@ -457,7 +472,7 @@ export const fr: SiteContent = {
       storage: {
         question: 'Où zisla stocke-t-il ses données ?',
         answer:
-          'Les données locales se trouvent dans ~/Library/Application Support/zisla/. Les statistiques de saisie sont conservées à part dans ~/Library/Application Support/zisla/typing-stats.sqlite3. Les notes rapides utilisent l’app Notes du système. Réglages → Emplacement de sauvegarde propose des dossiers indépendants pour téléchargements, captures, enregistrements, actions rapides et bilans quotidiens. À la mise à jour, chacun conserve le dossier partagé précédent, puis peut être changé séparément.',
+          'Les données locales se trouvent dans ~/Library/Application Support/zisla/. Les statistiques de saisie sont conservées à part dans ~/Library/Application Support/zisla/typing-stats.sqlite3. Les notes rapides utilisent l’app Notes du système. Réglages → Emplacement de sauvegarde propose des dossiers indépendants pour les téléchargements, les outils PDF et image, les captures, les enregistrements, les actions rapides et les bilans quotidiens. La mise à jour conserve les emplacements déjà choisis ; chaque dossier peut ensuite être modifié séparément.',
       },
     },
   },

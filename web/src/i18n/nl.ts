@@ -95,7 +95,7 @@ export const nl = createCatalog({
       aiMonitor: {
         name: 'AI-monitor',
         caption:
-          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst.',
+          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst. Ook compacte eilandweergaven tonen het resterende tegoed in ringen.',
         points: ['Taken uit meerdere AI-tools', 'Modelgeschiedenis en .xlsx-export', 'Accountquota en resettijden'],
       },
       keyboardSound: {
@@ -107,7 +107,7 @@ export const nl = createCatalog({
       download: {
         name: 'Downloader',
         caption:
-          'Plak een link of laat zisla links uit het klembord herkennen zodra de functie is ingeschakeld. Kies video of audio en download naar de standaardmap of een map naar keuze. Ondersteunde links tonen bron, live voortgang en voltooiingsstatus. Kies de downloadmap onder Instellingen → Opslaglocatie, los van schermafbeeldingen en opnamen. Bilibili-links downloaden het gekozen videodeel.',
+          'Plak een link of laat zisla links uit het klembord herkennen zodra de functie is ingeschakeld. Kies video of audio en download naar de standaardmap of een map naar keuze. Ondersteunde links tonen bron, live voortgang en voltooiingsstatus. Kies de downloadmap onder Instellingen → Opslaglocatie, los van schermafbeeldingen en opnamen. Bilibili-links downloaden het gekozen videodeel. Beheer onderdelen via Instellingen → Vereiste componenten en kies desgewenst dagelijkse updates voor al geïnstalleerde onderdelen.',
         points: ['Video- / audiomodi', 'Standaard- of eigen map', 'Bron en live voortgang'],
       },
       agenda: {
@@ -160,7 +160,7 @@ export const nl = createCatalog({
     features: {
       floatingIsland: {
         title: 'Een zwevend eiland dat zich aanpast',
-        description: 'Gebruik de camerapositie of kies een plek aan een schermrand. De eigen positie blijft bewaard bij het wisselen van modus. Horizontale en verticale compacte weergaven passen hun lengte aan pictogrammen, AI-taken, downloads en media aan en kunnen meer informatie tonen. Sleep modules in Instellingen → Info naar een andere plek of herstel de standaardvolgorde.',
+        description: 'Gebruik de camerapositie of kies een plek aan een schermrand. De eigen positie blijft bewaard bij het wisselen van modus. Horizontale en verticale compacte weergaven passen hun lengte aan pictogrammen, AI-taken, downloads en media aan en kunnen meer informatie tonen. Sleep modules in Instellingen → Dynamic Island-indeling naar een andere plek of herstel de standaardvolgorde. Op dezelfde pagina kun je de prioriteit van compacte statusinformatie wijzigen.',
         detail: 'Eigen positie · Blijvende statuspictogrammen · Aanpasbare informatie',
       },
       dailyBriefing: {
@@ -219,7 +219,7 @@ export const nl = createCatalog({
       voice: {
         title: 'Spraakinvoer en opschonen',
         description:
-          'Schakel met een toets of houd die ingedrukt om te praten via de spraakherkenning van het systeem, met vakwoordenlijsten en eigen trefwoorden. Gebruik desgewenst Ollama, LM Studio of een extern model om de transcriptie met behoud van betekenis te corrigeren en expliciet opgesomde punten op te maken.',
+          'Schakel met een toets of houd die ingedrukt om te praten via de spraakherkenning van het systeem, met vakwoordenlijsten en eigen trefwoorden. Gebruik desgewenst Ollama, LM Studio of een extern model om de transcriptie met behoud van betekenis te corrigeren en expliciet opgesomde punten op te maken. Instellingen → Systeemmonitor en opschonen kan audio ouder dan 7, 15 of 30 dagen verwijderen en transcripties bewaren; automatisch opschonen staat standaard uit.',
         detail: 'Twee opnamemodi · Woordenlijsten en trefwoorden · Optionele modelbewerking',
       },
       media: {
@@ -231,13 +231,13 @@ export const nl = createCatalog({
       browserDownloads: {
         title: 'Voortgang van browserdownloads',
         description:
-          'Herkent downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera en Arc en toont bron en live voortgang bovenaan.',
+          'Herkent downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera en Arc en toont bron en live voortgang bovenaan. De voortgang toont de echte doelbestandsnaam wanneer de browser die beschikbaar stelt.',
         detail: '8 browsers · Bronherkenning · Melding bij voltooiing',
       },
       copyAssistant: {
         title: 'Snelle acties en volgende stappen',
         description:
-          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0. Opgeslagen tekst en afbeeldingen gebruiken de aparte map voor snelle acties onder Instellingen → Opslaglocatie. Als een app niet opent, kunnen Snelle acties de integriteit, handtekening en het macOS-beveiligingsbeleid controleren. Na geslaagde controles kunnen ze quarantainekenmerken verwijderen en de app openen.',
+          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0. Opgeslagen tekst en afbeeldingen gebruiken de aparte map voor snelle acties onder Instellingen → Opslaglocatie. Als een app niet opent, kunnen Snelle acties de integriteit, handtekening en het macOS-beveiligingsbeleid controleren. Na geslaagde controles kunnen ze quarantainekenmerken verwijderen en de app openen. Wijzig de actievolgorde per herkend type in Instellingen → Snelle acties. Bedragen ondersteunen regionale valutasymbolen en valutacodes met een voorvoegsel.',
         detail: 'Optionele schakelaar · Lokale herkenning · Command+N standaard',
       },
       aiManagement: {
@@ -323,6 +323,21 @@ export const nl = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.23': [
+        'Afbeeldingsgereedschap voegt negen lokale bewerkingen toe: compressie, conversie tussen vijf formaten, schalen en bijsnijden, vergelijking van het kleinste formaat, draaien en spiegelen, watermerken, mozaïek en vervagen, tekst- en tabelherkenning en achtergrond verwijderen. Batch- en ZIP-export en aparte opslagmappen voor PDF- en afbeeldingsgereedschap zijn beschikbaar.',
+        'Audiogereedschap voegt 27 lokale bewerkingen toe voor conversie, montage, splitsen, samenvoegen, mixen, audio-extractie, LUFS-normalisatie, effecten, kanalen en tags. FFmpeg en ffprobe zijn vereist; kies een exportbestand of map.',
+        'AI-accountbewaking toont resterend tegoed met ringen, hersteltijden en waarschuwingen voor laag tegoed in eilandweergaven, inclusief 5h/7d-vensters en Cursor-budgetten in USD wanneer beschikbaar. Dagoverzichten kunnen echte tegoeden met hun meettijd tonen.',
+        'Kies een datum in AI-gebruikstrends of de heatmap om invoer-, uitvoer- en totale tokens per aanbieder en model te zien. Bekijk, exporteer alle geschiedenis naar .xlsx of wis deze in Instellingen. Home groepeert lopend AI-werk per app en toont resultaten van dagoverzichtsexports op het eiland.',
+        'Agenda-afspraken met een vergaderlink tonen vanaf 10 minuten voor de start een afteller en een actie om met één klik deel te nemen. Maak vergadernotities of koppel en ontkoppel contextnotities. Mail kan de hele inbox als gelezen markeren.',
+        'De plank voegt zoeken, filters en meervoudige selectie toe om te kopiëren, delen of naar snelle notities te sturen. Zet afbeeldingen om naar PDF, herken tekst voor notities en open geselecteerde video’s in de opnamestudio.',
+        'Kies automatische energiemodi voor netvoeding en batterij, eventueel met energiebesparing bij 20% of minder. Laad direct tot 100% wanneer macOS dat aanbiedt. Instellingen biedt systeemgeschiedenis, .xlsx-export en wissen.',
+        'Horizontale en verticale compacte Pomodoro-weergaven voegen voortgang, pauze, hervatten en reset toe. Als de aanwijzer boven de knoppen staat, blijft het eiland ingeklapt, ook in verticale weergaven met meer informatie.',
+        'Lange screenshots krijgen langzaam automatisch scrollen voor het gekozen venster. HDR-opnamen zijn beschikbaar op ondersteunde apparaten; bewerken behoudt de instellingen voor beeldweergave en export.',
+        'Snelle acties kunnen een app die niet opent repareren na controle van integriteit, handtekening en macOS-beveiligingsbeleid. Wijzig acties per type, gebruik extra voorbeelden en regionale valutasymbolen of codes met voorvoegsel. Vlucht-, trein- en pakketzoekacties krijgen voorrang.',
+        'Instellingen verdeelt Dynamic Island-indeling, dagoverzicht, meldingen en zorg en workflow over aparte pagina’s. Pas compacte statusprioriteiten aan en werk geïnstalleerde onderdelen desgewenst dagelijks bij. Opnameopschoning staat onder Systeemmonitor en opschonen en behoudt transcripties.',
+        'Browserdownloads tonen echte doelbestandsnamen wanneer beschikbaar. Inactieve beeldweergave, AI-scans, systeemgeschiedenis laden en studioweergave gebruiken minder middelen. Compacte AI-logo’s, tegoedkaarten en resultaatanimaties zijn aangepast; weerscrollen, plankdrops, Mail-schrijfacties en behoud van klembordgeschiedenis zijn hersteld.',
+        'De homepage krijgt een rondleiding van 160 seconden die je met een klik start en een link naar de oorspronkelijke video. De site blijft bruikbaar zonder WebGL en aanbevolen apps bevatten nu de terminalwerkruimte Zshell.',
+      ],
       'v0.1.22': [
         'De studio voegt huidverzachting, helderheid, versmalling van gezicht en lichaam, verstelbare stempresets en optionele microfoonmonitoring toe. Effecten zijn vóór opname en tijdens bewerken aanpasbaar.',
         'Vloeiende cursorsporen hebben een kleur naar keuze. De studio speelt het bewerkte resultaat af met sporen, effecten en audio.',
@@ -389,10 +404,10 @@ export const nl = createCatalog({
       <p>zisla stelt een Gemma 4 QAT-model voor op basis van je chip en het totale werkgeheugen. Het aanbevolen model wordt niet automatisch gedownload of geladen.</p>
     `.trim(),
       },
-      network: { question: 'Gaat zisla online?', answer: 'Weer, ondertekende updatecontroles, downloads die je start en optionele externe spraakbewerking gebruiken indien nodig het netwerk. Linkherkenning gebeurt lokaal. Een lokaal model corrigeert de tekst na de transcriptie; de spraakherkenning van Apple kan nog steeds het netwerk gebruiken, afhankelijk van de taal en de systeemondersteuning.' },
+      network: { question: 'Gaat zisla online?', answer: 'Weer, ondertekende updatecontroles, downloads die je start en optionele externe spraakbewerking gebruiken indien nodig het netwerk. Linkherkenning gebeurt lokaal. Een lokaal model corrigeert de tekst na de transcriptie; de spraakherkenning van Apple kan nog steeds het netwerk gebruiken, afhankelijk van de taal en de systeemondersteuning. Ingeschakelde AI-tegoedcontrole raadpleegt ook de diensten van de geselecteerde aanbieders.' },
       multiDisplay: { question: 'Ondersteunt zisla meerdere schermen?', answer: 'Ja: meerdere schermen, Spaces en gewone apps op volledig scherm; uitklappen neemt nooit de focus.' },
       intel: { question: 'Kan ik zisla op een Intel-Mac gebruiken?', answer: 'Er kan een Intel-build bestaan, maar compatibiliteit is niet gegarandeerd. De huidige ondersteunde configuratie is Apple Silicon.' },
-      storage: { question: 'Waar slaat zisla gegevens op?', answer: 'Lokale gegevens staan in ~/Library/Application Support/zisla/. Typestatistieken staan apart in ~/Library/Application Support/zisla/typing-stats.sqlite3. Snelle notities gebruikt de systeemapp Notities. Instellingen → Opslaglocatie biedt aparte mappen voor downloads, schermafbeeldingen, opnamen, snelle acties en dagoverzichten. Na een update behouden ze de oude gedeelde map; daarna kun je ze afzonderlijk wijzigen.' },
+      storage: { question: 'Waar slaat zisla gegevens op?', answer: 'Lokale gegevens staan in ~/Library/Application Support/zisla/. Typestatistieken staan apart in ~/Library/Application Support/zisla/typing-stats.sqlite3. Snelle notities gebruiken de Notities-app van het systeem. Instellingen → Opslaglocatie biedt aparte mappen voor downloads, PDF- en afbeeldingsgereedschap, screenshots, opnamen, snelle acties en dagoverzichten. Bijwerken behoudt eerder gekozen locaties; daarna kan elke map apart worden gewijzigd.' },
     },
   },
   developers: {

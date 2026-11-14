@@ -93,7 +93,7 @@ export const de: SiteContent = {
       aiMonitor: {
         name: 'KI-Überblick',
         caption:
-          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen.',
+          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen. Auch die kompakten Ansichten zeigen verbleibende Kontingente als Ringe.',
         points: ['Aufgaben aus mehreren KI-Werkzeugen', 'Modellverlauf und .xlsx-Export', 'Kontingente und Rücksetzzeiten'],
       },
       keyboardSound: {
@@ -109,7 +109,7 @@ export const de: SiteContent = {
       download: {
         name: 'Downloader',
         caption:
-          'Füge einen Link ein oder lass zisla nach dem Aktivieren Links aus der Zwischenablage erkennen. Wähle ein verfügbares Video- oder Audioformat und nutze Cookies eines installierten Browsers, wenn ein Douyin-Download sie benötigt. Speichere im Standardordner oder einem eigenen, mit Quellsymbol, Fortschritt in Echtzeit und Abschlussstatus. Wähle den Downloadordner unter Einstellungen → Speicherort unabhängig von Screenshots und Aufnahmen. Bilibili-Links laden den ausgewählten Videoteil.',
+          'Füge einen Link ein oder lass zisla nach dem Aktivieren Links aus der Zwischenablage erkennen. Wähle ein verfügbares Video- oder Audioformat und nutze Cookies eines installierten Browsers, wenn ein Douyin-Download sie benötigt. Speichere im Standardordner oder einem eigenen, mit Quellsymbol, Fortschritt in Echtzeit und Abschlussstatus. Wähle den Downloadordner unter Einstellungen → Speicherort unabhängig von Screenshots und Aufnahmen. Bilibili-Links laden den ausgewählten Videoteil. Verwalte Komponenten unter Einstellungen → Benötigte Komponenten und aktiviere bei Bedarf tägliche Updates für bereits installierte Komponenten.',
         points: [
           'Verfügbare Video- oder Audioformate wählen',
           'Browser-Cookies für Douyin',
@@ -173,7 +173,7 @@ export const de: SiteContent = {
     features: {
       floatingIsland: {
         title: 'Eine schwebende Insel für Ihre Anordnung',
-        description: 'Nutzen Sie die Kameraposition oder wählen Sie eine eigene Position an einem Bildschirmrand. Sie bleibt beim Moduswechsel gespeichert. Horizontale und vertikale Kompaktansichten passen ihre Länge an Statussymbole, KI-Aufgaben, Downloads und Medien an und können weitere Informationen anzeigen. Ordnen Sie die Module unter Einstellungen → Info per Drag-and-drop neu oder stellen Sie die Standardreihenfolge wieder her.',
+        description: 'Nutzen Sie die Kameraposition oder wählen Sie eine eigene Position an einem Bildschirmrand. Sie bleibt beim Moduswechsel gespeichert. Horizontale und vertikale Kompaktansichten passen ihre Länge an Statussymbole, KI-Aufgaben, Downloads und Medien an und können weitere Informationen anzeigen. Ordnen Sie die Module unter Einstellungen → Dynamic Island-Layout per Drag-and-drop neu oder stellen Sie die Standardreihenfolge wieder her. Auf derselben Seite können Sie die Priorität kompakter Statusinformationen ändern.',
         detail: 'Eigene Position · Dauerhafte Statussymbole · Anpassbare Informationen',
       },
       dailyBriefing: {
@@ -232,7 +232,7 @@ export const de: SiteContent = {
       voice: {
         title: 'Spracheingabe und Aufbereitung',
         description:
-          'Mit einer Taste umschalten oder zum Sprechen gedrückt halten: Die Spracherkennung des Systems lässt sich mit Fachwortlisten und eigenen Schlüsselwörtern ergänzen. Optional korrigieren Ollama, LM Studio oder ein entferntes Modell das Transkript unter Beibehaltung des Sinns und formatieren ausdrücklich aufgezählte Punkte.',
+          'Mit einer Taste umschalten oder zum Sprechen gedrückt halten: Die Spracherkennung des Systems lässt sich mit Fachwortlisten und eigenen Schlüsselwörtern ergänzen. Optional korrigieren Ollama, LM Studio oder ein entferntes Modell das Transkript unter Beibehaltung des Sinns und formatieren ausdrücklich aufgezählte Punkte. Einstellungen → Systemmonitor und Bereinigung kann gespeicherte Audiodateien nach 7, 15 oder 30 Tagen löschen und Transkripte behalten; die automatische Bereinigung ist standardmäßig aus.',
         detail: 'Zwei Aufnahmearten · Wortlisten und Schlüsselwörter · Modell optional',
       },
       media: {
@@ -244,13 +244,13 @@ export const de: SiteContent = {
       browserDownloads: {
         title: 'Fortschritt von Browser-Downloads',
         description:
-          'Erkennt Downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera und Arc und zeigt Quelle und Fortschritt in Echtzeit am oberen Bildschirmrand.',
+          'Erkennt Downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera und Arc und zeigt Quelle und Fortschritt in Echtzeit am oberen Bildschirmrand. Der Fortschritt zeigt den tatsächlichen Zieldateinamen, wenn der Browser ihn bereitstellt.',
         detail: '8 Browser · Quelle erkannt · Hinweis bei Abschluss',
       },
       copyAssistant: {
         title: 'Schnellaktionen und nächste Schritte',
         description:
-          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts. IP-Abfragen und das Öffnen von Links sind getrennte Aktionen. Währungsumrechnungen erkennen lokale Untereinheiten; der Emoji-Katalog enthält Emoji 18.0. Gespeicherte Texte und Bilder verwenden den separaten Schnellaktionenordner unter Einstellungen → Speicherort. Wenn sich eine App nicht öffnen lässt, prüfen Schnellaktionen ihre Integrität, Signatur und die macOS-Sicherheitsrichtlinien. Nach bestandener Prüfung können sie Quarantänemerkmale entfernen und die App öffnen.',
+          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts. IP-Abfragen und das Öffnen von Links sind getrennte Aktionen. Währungsumrechnungen erkennen lokale Untereinheiten; der Emoji-Katalog enthält Emoji 18.0. Gespeicherte Texte und Bilder verwenden den separaten Schnellaktionenordner unter Einstellungen → Speicherort. Wenn sich eine App nicht öffnen lässt, prüfen Schnellaktionen ihre Integrität, Signatur und die macOS-Sicherheitsrichtlinien. Nach bestandener Prüfung können sie Quarantänemerkmale entfernen und die App öffnen. Ändere unter Einstellungen → Schnellaktionen die Aktionsreihenfolge je erkanntem Typ. Geldbeträge unterstützen regionale Währungssymbole und vorangestellte Währungscodes.',
         detail: 'Lokale Erkennung · Live-Wechselkursumrechnung · Standard Command+N',
       },
       aiManagement: {
@@ -356,6 +356,21 @@ export const de: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.23': [
+        'Bildwerkzeuge bieten neun lokale Vorgänge: Komprimierung, Konvertierung zwischen fünf Formaten, Skalierung und Zuschnitt, Vergleich des kleinsten Formats, Drehen und Spiegeln, Wasserzeichen, Mosaik und Unschärfe, Text- und Tabellenerkennung sowie Hintergrundentfernung. Stapel- und ZIP-Export sowie eigene Speicherordner für PDF- und Bildwerkzeuge sind verfügbar.',
+        'Audiowerkzeuge bieten 27 lokale Vorgänge für Konvertierung, Bearbeitung, Aufteilen, Verbinden, Mischen, Audioextraktion, LUFS-Normalisierung, Effekte, Kanäle und Tags. FFmpeg und ffprobe sind erforderlich; eine Exportdatei oder ein Ordner lässt sich wählen.',
+        'Die KI-Kontoüberwachung zeigt Kontingentringe, Rücksetzzeiten und Hinweise bei niedrigem Kontingent in den Inselansichten, einschließlich 5h/7d-Fenstern und Cursor-Budgets in USD, sofern verfügbar. Tagesberichte können echte Kontingente und deren Erfassungszeiten enthalten.',
+        'Wähle ein Datum im KI-Nutzungsverlauf oder in der Heatmap, um Eingabe-, Ausgabe- und Gesamttokens je Anbieter und Modell zu sehen. In Einstellungen kannst du den Verlauf anzeigen, vollständig als .xlsx exportieren oder löschen. Home gruppiert laufende KI-Arbeit je Anwendung und zeigt Berichtsexporte auf der Insel.',
+        'Kalendertermine mit Meeting-Link zeigen ab 10 Minuten vor Beginn einen Countdown und einen Beitritt per Klick. Erstelle Meeting-Notizen oder verknüpfe und löse vorhandene Kontextnotizen. Mail kann den gesamten Posteingang als gelesen markieren.',
+        'Die Ablage bietet Suche, Filter und Mehrfachauswahl zum Kopieren, Teilen oder Senden an Schnellnotizen. Wandle Bilder in PDF um, übernimm erkannten Bildtext in Notizen oder öffne ausgewählte Videos im Aufnahmestudio.',
+        'Wähle automatische Energiemodi für Netz- und Akkubetrieb, optional mit Stromsparmodus bei 20% oder weniger. Lade sofort auf 100%, wenn macOS die Aktion anbietet. Systemverlauf, .xlsx-Export und Löschen sind in Einstellungen erreichbar.',
+        'Horizontale und vertikale kompakte Pomodoro-Ansichten bieten Fortschritt, Pause, Fortsetzen und Zurücksetzen. Beim Überfahren der Bedienelemente bleibt die Insel eingeklappt, auch in vertikalen Ansichten mit mehr Informationen.',
+        'Lange Screenshots unterstützen langsames automatisches Scrollen im gewählten Fenster. Auf unterstützten Geräten ist HDR-Aufnahme möglich; die Bearbeitung behält Einstellungen für Bilddarstellung und Export bei.',
+        'Schnellaktionen können eine nicht startende App nach Prüfung von Integrität, Signatur und macOS-Sicherheitsrichtlinien reparieren. Ordne Aktionen je Typ neu, nutze erweiterte Beispiele sowie regionale Währungssymbole oder Codes mit Präfix. Flug-, Zug- und Paketsuchen werden bevorzugt erkannt.',
+        'Einstellungen trennen Dynamic Island-Layout, Tagesbericht, Benachrichtigungen und Fürsorge sowie Workflow in eigene Seiten. Kompakte Statusprioritäten lassen sich ändern und installierte Komponenten optional täglich aktualisieren. Die Aufnahmebereinigung befindet sich unter Systemmonitor und Bereinigung und behält Transkripte.',
+        'Browserdownloads zeigen echte Zieldateinamen, sofern verfügbar. Leerlaufdarstellung, KI-Scans, Laden des Systemverlaufs und Studiowiedergabe benötigen weniger Ressourcen. Kompakte KI-Logos, Kontingentkarten und Ergebnisanimationen wurden angepasst; Wetterscrollen, Ablagedrops, Mail-Schreibvorgänge und Erhalt des Zwischenablageverlaufs wurden korrigiert.',
+        'Die Homepage bietet eine 160-sekündige Funktionstour mit Start per Klick und einem Link zum Originalvideo. Die Seite bleibt ohne WebGL nutzbar; zu den empfohlenen Apps gehört nun der Terminalarbeitsbereich Zshell.',
+      ],
       'v0.1.22': [
         'Das Aufnahmestudio ergänzt Hautglättung, Aufhellung, Gesichts- und Körperkorrektur, einstellbare Stimmvorlagen und optionales Mikrofon-Monitoring. Die Effekte lassen sich vor der Aufnahme und beim Bearbeiten einstellen.',
         'Sanfte Cursorspuren haben eine frei wählbare Farbe. Die Studiowiedergabe zeigt das bearbeitete Ergebnis mit Spuren, Effekten und Audio.',
@@ -437,7 +452,7 @@ export const de: SiteContent = {
       network: {
         question: 'Geht zisla ins Netz?',
         answer:
-          'Wetter, signierte Update-Prüfungen, von dir gestartete Downloads und die optionale entfernte Sprachaufbereitung nutzen das Netz nach Bedarf. Die Linkerkennung in der Zwischenablage läuft rein lokal und startet nie selbst einen Download. Ein lokales Modell bereitet den Text nach der Transkription auf. Die Spracherkennung von Apple kann je nach Sprache und Systemunterstützung weiterhin das Netzwerk nutzen.',
+          'Wetter, signierte Update-Prüfungen, von dir gestartete Downloads und die optionale entfernte Sprachaufbereitung nutzen das Netz nach Bedarf. Die Linkerkennung in der Zwischenablage läuft rein lokal und startet nie selbst einen Download. Ein lokales Modell bereitet den Text nach der Transkription auf. Die Spracherkennung von Apple kann je nach Sprache und Systemunterstützung weiterhin das Netzwerk nutzen. Die aktivierte KI-Kontingentüberwachung fragt auch die Dienste der ausgewählten Anbieter ab.',
       },
       multiDisplay: {
         question: 'Unterstützt zisla mehrere Displays?',
@@ -452,7 +467,7 @@ export const de: SiteContent = {
       storage: {
         question: 'Wo speichert zisla seine Daten?',
         answer:
-          'Lokale Daten liegen in ~/Library/Application Support/zisla/. Die Tippstatistik wird getrennt in ~/Library/Application Support/zisla/typing-stats.sqlite3 gespeichert. Kurznotizen nutzen die System-App Notizen. Einstellungen → Speicherort verwaltet eigene Ordner für Downloads, Screenshots, Aufnahmen, Schnellaktionen und Tagesberichte. Beim Update übernehmen sie den bisherigen gemeinsamen Ordner und lassen sich danach separat ändern.',
+          'Lokale Daten liegen in ~/Library/Application Support/zisla/. Die Tippstatistik wird getrennt in ~/Library/Application Support/zisla/typing-stats.sqlite3 gespeichert. Schnellnotizen verwenden die Notizen-App des Systems. Einstellungen → Speicherort bietet separate Ordner für Downloads, PDF-Werkzeuge, Bildwerkzeuge, Screenshots, Aufnahmen, Schnellaktionen und Tagesberichte. Beim Update bleiben zuvor gewählte Speicherorte erhalten; danach lässt sich jeder Ordner unabhängig ändern.',
       },
     },
   },
