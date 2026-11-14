@@ -22,6 +22,10 @@ final class SideNoticeDisplayState: ObservableObject {
     @Published var statusIcons: [IslandStatusIcon] = []
     @Published var systemMonitorAvailable = false
     @Published var compactLayout: CompactStatusBarLayout?
+
+    func update<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<SideNoticeDisplayState, Value>, to value: Value) {
+        if self[keyPath: keyPath] != value { self[keyPath: keyPath] = value }
+    }
 }
 
 struct CompactStatusBarLayout: Equatable {
@@ -229,28 +233,23 @@ struct CompactStatusBarView: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0,
                                 paused: pausesCompactTimeline)) { context in
-            statusBarContent(at: context.date)
+            statusBarContent(at: context.date, animatesLogo: true)
         }
     }
 
     var pausesCompactTimeline: Bool {
-        let showsIdleLogo = settingsStore.settings.islandAppIconEnabled && resultSweep.current == nil
-            && (displayState.statusIcons.contains { if case .application = $0.content { return true }; return false }
-                || (displayState.statusIcons.isEmpty && usesCustomPill && (displayState.compactStatusHidden
-                    || (selectedCompactStatusPriority == nil && recordingOperationNotice == nil))))
-        return !(showsIdleLogo && !reduceMotion)
-            && (displayState.compactStatusHidden || (!isPlaybackProgressActive && !showsCustomLyrics))
+        displayState.compactStatusHidden || (!isPlaybackProgressActive && !showsCustomLyrics)
     }
 
     @ViewBuilder
-    func statusBarContent(at date: Date) -> some View {
+    func statusBarContent(at date: Date, animatesLogo: Bool = false) -> some View {
         GeometryReader { geometry in
             let layout = displayState.compactLayout ?? CompactStatusBarLayout(
                 frame: CGRect(origin: .zero, size: geometry.size),
                 panelFrame: CGRect(origin: .zero, size: geometry.size), animation: nil
             )
             CompactStatusBarSurface(frame: layout.frame, panelFrame: layout.panelFrame) { size in
-                compactSurfaceContent(size: size, at: date)
+                compactSurfaceContent(size: size, at: date, animatesLogo: animatesLogo)
                     .environmentObject(pomodoro)
                     .environment(\.layoutDirection, layoutDirection)
             }
@@ -259,7 +258,7 @@ struct CompactStatusBarView: View {
         }
     }
 
-    private func compactSurfaceContent(size: CGSize, at date: Date) -> some View {
+    private func compactSurfaceContent(size: CGSize, at date: Date, animatesLogo: Bool) -> some View {
         let information = compactInformation(at: date)
         let progressPriority = compactProgressPriority(for: information)
         let pillCornerRadius: CGFloat? = information?.secondary == nil
@@ -270,18 +269,19 @@ struct CompactStatusBarView: View {
             if let information {
                 FloatingIslandInformationView(layout: information,
                     visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: media.snapshot, date: date,
-                    onJoinMeeting: onJoinMeeting)
+                    animatesLogo: animatesLogo, onJoinMeeting: onJoinMeeting)
                     .onChange(of: information.size, initial: true) { _, size in
                         onCompactLengthChanged(displayState.islandEdge.isVertical ? size.height : size.width)
                     }
             } else if !displayState.statusIcons.isEmpty {
-                IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
+                IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge,
+                                      date: date, animatesLogo: animatesLogo)
             } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil,
                       settingsStore.settings.islandAppIconEnabled {
-                IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
+                IslandParticleLogo(side: min(18, height), time: animatesLogo ? nil : date.timeIntervalSinceReferenceDate)
             } else if !displayState.compactStatusHidden || resultSweep.current != nil {
                 if usesCustomPill {
-                    customStatusContent(at: date)
+                    customStatusContent(at: date, animatesLogo: animatesLogo)
 
                 } else {
                     compactStatusContent
@@ -313,7 +313,8 @@ struct CompactStatusBarView: View {
                     tint: compactProgressTint(for: progressPriority),
                     layoutStyle: settingsStore.settings.islandLayoutStyle,
                     pillCornerRadius: pillCornerRadius,
-                    usesBottomTrack: true
+                    usesBottomTrack: true,
+                    animatesProgress: progressPriority != .media
                 )
             }
         }
@@ -408,7 +409,7 @@ struct CompactStatusBarView: View {
     }
 
     @ViewBuilder
-    private func customStatusContent(at date: Date) -> some View {
+    private func customStatusContent(at date: Date, animatesLogo: Bool) -> some View {
         let sizing = SideNoticeLayoutEngine().compactBarSizing(
             for: presentationNotices,
             settings: settingsStore.settings,
@@ -445,7 +446,7 @@ struct CompactStatusBarView: View {
                    height: displayState.islandEdge.isVertical ? nil : thickness)
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
         } else if resultSweep.current == nil, settingsStore.settings.islandAppIconEnabled {
-            IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
+            IslandParticleLogo(side: min(18, height), time: animatesLogo ? nil : date.timeIntervalSinceReferenceDate)
         }
     }
 
@@ -1665,11 +1666,7 @@ private struct CompactAIWing: View {
 
     @ViewBuilder
     private var mascotStack: some View {
-        let identities = notices.reduce(into: [AIMascotIdentity]()) { result, notice in
-            guard let provider = AIMascotLibrary.provider(fromNoticeID: notice.id) else { return }
-            let identity = AIMascotIdentity(provider: provider, taskID: notice.id, title: notice.title)
-            if !result.contains(identity) { result.append(identity) }
-        }.prefix(3)
+        let identities = AIMascotIdentity.stackIdentities(for: notices)
         if identities.count == 1, let identity = identities.first {
             AIMascotView(identity: identity, size: min(22, height * 0.72))
         } else {

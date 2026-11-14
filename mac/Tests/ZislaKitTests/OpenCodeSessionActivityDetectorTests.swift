@@ -50,6 +50,74 @@ struct OpenCodeSessionActivityDetectorTests {
         #expect(task.processIdentifier == 54_321)
     }
 
+    @Test(arguments: ["empty", "completed", "expired", "archived"])
+    func idleSessionsDoNotInspectProcesses(state: String) throws {
+        let dbURL = makeTempDB()
+        defer { try? FileManager.default.removeItem(at: dbURL) }
+        try createTables(at: dbURL)
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        let updatedAt = state == "expired" ? nowMs - 7_200_000 : nowMs
+        if state != "empty" {
+            try insertSession(
+                at: dbURL, id: "ses-idle", title: "Idle", updatedAt: updatedAt,
+                archivedAt: state == "archived" ? updatedAt : nil
+            )
+            let data = state == "completed"
+                ? #"{"role":"assistant","time":{"created":\#(updatedAt),"completed":\#(updatedAt + 1)},"finish":"stop"}"#
+                : #"{"role":"user","time":{"created":\#(updatedAt)}}"#
+            try insertMessage(
+                at: dbURL, id: "msg-idle", sessionID: "ses-idle",
+                updatedAt: updatedAt, data: data
+            )
+        }
+        let detector = OpenCodeSessionActivityDetector(
+            databaseURL: dbURL,
+            recencyThreshold: 3600,
+            runningProcessIdentifiers: {
+                Issue.record("Idle databases must not start a system-wide process query")
+                return []
+            }
+        )
+
+        for _ in 0..<3 {
+            #expect(try detector.activeTasks().isEmpty)
+        }
+    }
+
+    @Test
+    func processLookupResumesImmediatelyWhenAnIdleSessionBecomesActive() throws {
+        let dbURL = makeTempDB()
+        defer { try? FileManager.default.removeItem(at: dbURL) }
+        try createTables(at: dbURL)
+        var isActive = false
+        var processIdentifiers: [Int32] = []
+        let detector = OpenCodeSessionActivityDetector(
+            databaseURL: dbURL,
+            recencyThreshold: 3600,
+            runningProcessIdentifiers: {
+                #expect(isActive, "Process lookup must remain dormant until a task needs its PID")
+                return processIdentifiers
+            }
+        )
+        #expect(try detector.activeTasks().isEmpty)
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        try insertSession(at: dbURL, id: "ses-resumed", title: "Resumed", updatedAt: nowMs)
+        try insertMessage(
+            at: dbURL, id: "msg-resumed", sessionID: "ses-resumed", updatedAt: nowMs,
+            data: #"{"role":"user","time":{"created":\#(nowMs)}}"#
+        )
+        isActive = true
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.id == OpenCodeSessionActivityDetector.taskID(forSessionID: "ses-resumed"))
+        #expect(task.processIdentifier == nil)
+
+        processIdentifiers = [54_321]
+        #expect(try detector.activeTasks().first?.processIdentifier == 54_321)
+        processIdentifiers = [54_322]
+        #expect(try detector.activeTasks().first?.processIdentifier == 54_322)
+    }
+
     @Test
     func parsesOnlyOpenCodeProcessIdentifiers() {
         let output = Data("""

@@ -17,21 +17,15 @@ public final class AIStateMonitor: ObservableObject {
         let repository: AIStateRepository
         let activityDetectors: [any AIActivityDetecting]
         let usageDetectors: [any AIUsageDetecting]
-        let activeTaskTTL: TimeInterval
-        let now: () -> Date
 
         init(
             repository: AIStateRepository,
             activityDetectors: [any AIActivityDetecting],
-            usageDetectors: [any AIUsageDetecting],
-            activeTaskTTL: TimeInterval,
-            now: @escaping () -> Date
+            usageDetectors: [any AIUsageDetecting]
         ) {
             self.repository = repository
             self.activityDetectors = activityDetectors
             self.usageDetectors = usageDetectors
-            self.activeTaskTTL = activeTaskTTL
-            self.now = now
         }
     }
 
@@ -51,9 +45,14 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    private struct ActivityDetection: Sendable {
+        let tasks: [AIProgressTask]?
+        let fileURLs: [URL]
+    }
+
     private enum DetectorRefreshResult: Sendable {
-        case tasks([AIProgressTask], usageChanged: Bool, activityFileURLs: [URL])
-        case state(AIState, activityFileURLs: [URL])
+        case tasks([Int: ActivityDetection], usageChanged: Bool)
+        case state(AIState, activities: [Int: ActivityDetection])
         case corruptedState
         case failure(String)
     }
@@ -65,8 +64,8 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     public static let defaultActiveTaskTTL: TimeInterval = 30 * 60
-    public static let defaultDetectorRefreshInterval: TimeInterval = 30
-    public static let defaultUsageRefreshInterval: TimeInterval = 3 * 60
+    public static let defaultDetectorRefreshInterval: TimeInterval = 60
+    public static let defaultUsageRefreshInterval: TimeInterval = 5 * 60
     private static let usageHistoryWeeks = 24
 
     @Published public private(set) var state: AIState = .empty
@@ -99,13 +98,20 @@ public final class AIStateMonitor: ObservableObject {
     private var stateFileReloadTask: Task<Void, Never>?
     private var activityFileSources: [URL: DispatchSourceFileSystemObject] = [:]
     private var activityFileReloadTask: Task<Void, Never>?
+    private var activityFileDetectorIndices: [URL: Set<Int>] = [:]
+    private var activityFilePendingDetectorIndices: Set<Int> = []
+    private var activityFilePendingURLs: Set<URL> = []
+    private var detectedTasks: [Int: [AIProgressTask]] = [:]
+    private var detectedActivityFileURLs: [Int: [URL]] = [:]
     private var usageHistoryLoadInFlight = false
     private var usageHistoryLoadPending = false
     private var usageHistoryGeneration: UInt64 = 0
     private var usageHistoryClearGeneration: UInt64 = 0
     private var memoryPressureSource: DispatchSourceMemoryPressure?
     private var descriptor: Int32 = -1
-    private var activityTimer: Timer?
+    private(set) var activityTimer: Timer?
+    private(set) var usageTimer: Timer?
+    private var nextActivityDetectorIndex = 0
     private let activeTaskTTL: TimeInterval
     private let detectorRefreshInterval: TimeInterval
     private let usageRefreshInterval: TimeInterval
@@ -121,7 +127,8 @@ public final class AIStateMonitor: ObservableObject {
     private var persistedReloadInFlight = false
     private var persistedReloadPending = false
     private var detectorRefreshInFlight = false
-    private var detectorRefreshPending = false
+    private var detectorRefreshPendingIndices: Set<Int> = []
+    private var detectorRefreshPendingFileURLs: Set<URL>?
     private var detectorRefreshPendingAllowsUsageScan = false
     private var refreshGeneration: UInt64 = 0
     private var usageHistoryRequested = false
@@ -274,7 +281,7 @@ public final class AIStateMonitor: ObservableObject {
             refreshStateFileWatchers(generation: watcherGeneration)
             // Load persisted tasks first; the completion schedules one activity refresh with the
             // loaded task snapshot, while usage log scans remain on the throttled timer.
-            schedulePersistedReload(refreshDetectorsAfterLoad: true)
+            schedulePersistedReload(refreshDetectorsAfterLoad: true, refreshDetectorsWhenUnchanged: true)
             scheduleSubscriptionUsageRefresh()
             observeAccountBalanceLifecycle()
             scheduleAccountBalanceRefresh()
@@ -290,16 +297,33 @@ public final class AIStateMonitor: ObservableObject {
             memoryPressureSource = memoryPressure
             memoryPressure.resume()
 
-            if !activityDetectors.isEmpty || !usageDetectors.isEmpty || subscriptionUsageDetector != nil || accountBalanceDetector != nil {
-                let timer = Timer(timeInterval: detectorRefreshInterval, repeats: true) { [weak self] _ in
+            if !activityDetectors.isEmpty {
+                let slotInterval = detectorRefreshInterval / Double(activityDetectors.count)
+                let timer = Timer(timeInterval: slotInterval, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
-                        self?.scheduleDetectorRefresh(allowUsageScan: true)
-                        self?.scheduleSubscriptionUsageRefresh()
-                        self?.scheduleAccountBalanceRefresh()
+                        guard let self, self.refreshGeneration == watcherGeneration else { return }
+                        let index = self.nextActivityDetectorIndex
+                        self.nextActivityDetectorIndex = (index + 1) % self.activityDetectors.count
+                        self.scheduleDetectorRefresh(detectorIndices: [index], allowUsageScan: false)
                     }
                 }
-                timer.tolerance = detectorRefreshInterval * 0.1
+                timer.tolerance = slotInterval * 0.1
                 activityTimer = timer
+                RunLoop.main.add(timer, forMode: .common)
+            }
+            if !usageDetectors.isEmpty || subscriptionUsageDetector != nil || accountBalanceDetector != nil {
+                let checkInterval = min(detectorRefreshInterval, usageRefreshInterval)
+                let timer = Timer(fire: Date(timeIntervalSinceNow: checkInterval),
+                    interval: checkInterval, repeats: true) { [weak self] _ in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.refreshGeneration == watcherGeneration else { return }
+                        self.scheduleDetectorRefresh(detectorIndices: [], allowUsageScan: true)
+                        self.scheduleSubscriptionUsageRefresh()
+                        self.scheduleAccountBalanceRefresh()
+                    }
+                }
+                timer.tolerance = checkInterval * 0.1
+                usageTimer = timer
                 RunLoop.main.add(timer, forMode: .common)
             }
         } catch {
@@ -336,8 +360,14 @@ public final class AIStateMonitor: ObservableObject {
         activityFileReloadTask = nil
         activityFileSources.values.forEach { $0.cancel() }
         activityFileSources.removeAll()
+        activityFileDetectorIndices.removeAll()
+        activityFilePendingDetectorIndices.removeAll()
+        activityFilePendingURLs.removeAll()
+        detectedTasks.removeAll()
+        detectedActivityFileURLs.removeAll()
         detectorRefreshInFlight = false
-        detectorRefreshPending = false
+        detectorRefreshPendingIndices.removeAll()
+        detectorRefreshPendingFileURLs = nil
         detectorRefreshPendingAllowsUsageScan = false
         lastUsageRefreshAt = .distantPast
         usageHistoryGeneration &+= 1
@@ -355,6 +385,9 @@ public final class AIStateMonitor: ObservableObject {
         descriptor = -1
         activityTimer?.invalidate()
         activityTimer = nil
+        usageTimer?.invalidate()
+        usageTimer = nil
+        nextActivityDetectorIndex = 0
     }
 
     public func reload(includeUsageSamples: Bool = true) {
@@ -374,11 +407,10 @@ public final class AIStateMonitor: ObservableObject {
             },
             includesUsageSamples: includeUsageSamples
         )
-        let storedTasks = persistedTasks
         applyDetector(refreshQueue.sync {
             Self.detectState(
                 using: dependencies,
-                persistedTasks: storedTasks,
+                detectorIndices: Set(activityDetectors.indices),
                 detectsUsage: !usageDetectors.isEmpty,
                 loadsUsageHistory: includeUsageSamples
             )
@@ -761,9 +793,15 @@ public final class AIStateMonitor: ObservableObject {
         )
     }
 
-    private func refreshActivityFileWatchers(_ urls: [URL]) {
+    private func refreshActivityFileWatchers() {
         guard source != nil else { return }
-        let paths = Set(urls.map(\.standardizedFileURL))
+        activityFileDetectorIndices.removeAll(keepingCapacity: true)
+        for (index, urls) in detectedActivityFileURLs {
+            for url in urls {
+                activityFileDetectorIndices[url.standardizedFileURL, default: []].insert(index)
+            }
+        }
+        let paths = Set(activityFileDetectorIndices.keys)
         for url in Array(activityFileSources.keys) where !paths.contains(url) {
             activityFileSources.removeValue(forKey: url)?.cancel()
         }
@@ -779,7 +817,10 @@ public final class AIStateMonitor: ObservableObject {
                 if let events = self.activityFileSources[url]?.data, !events.intersection([.rename, .delete]).isEmpty {
                     self.activityFileSources.removeValue(forKey: url)?.cancel()
                 }
-                self.activityFileReloadTask?.cancel()
+                self.activityFilePendingDetectorIndices.formUnion(self.activityFileDetectorIndices[url] ?? [])
+                self.activityFilePendingURLs.insert(url)
+                // Flush a burst at a fixed deadline so a continuously growing log cannot starve activity updates.
+                guard self.activityFileReloadTask == nil else { return }
                 self.activityFileReloadTask = Task { [weak self] in
                     do {
                         try await Task.sleep(for: .milliseconds(250))
@@ -788,7 +829,12 @@ public final class AIStateMonitor: ObservableObject {
                     }
                     guard let self, self.refreshGeneration == generation else { return }
                     self.activityFileReloadTask = nil
-                    self.scheduleDetectorRefresh(allowUsageScan: false)
+                    let indices = self.activityFilePendingDetectorIndices
+                    let changedURLs = self.activityFilePendingURLs
+                    self.activityFilePendingDetectorIndices.removeAll()
+                    self.activityFilePendingURLs.removeAll()
+                    self.scheduleDetectorRefresh(detectorIndices: indices, allowUsageScan: false,
+                                                 changedFileURLs: changedURLs)
                 }
             }
             watcher.setCancelHandler { close(descriptor) }
@@ -876,38 +922,53 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
-    private func scheduleDetectorRefresh(allowUsageScan: Bool) {
+    private func scheduleDetectorRefresh(
+        detectorIndices: Set<Int>? = nil, allowUsageScan: Bool, changedFileURLs: Set<URL>? = nil
+    ) {
+        let indices = detectorIndices ?? Set(activityDetectors.indices)
         guard !detectorRefreshInFlight else {
-            detectorRefreshPending = true
+            if detectorRefreshPendingIndices.isEmpty {
+                detectorRefreshPendingFileURLs = changedFileURLs
+            } else if let pending = detectorRefreshPendingFileURLs, let changedFileURLs {
+                detectorRefreshPendingFileURLs = pending.union(changedFileURLs)
+            } else {
+                detectorRefreshPendingFileURLs = nil
+            }
+            detectorRefreshPendingIndices.formUnion(indices)
             detectorRefreshPendingAllowsUsageScan =
                 detectorRefreshPendingAllowsUsageScan || allowUsageScan
             return
         }
+        let detectsUsage = allowUsageScan && !usageDetectors.isEmpty
+            && now().timeIntervalSince(lastUsageRefreshAt) >= usageRefreshInterval
+        guard !indices.isEmpty || detectsUsage else { return }
         detectorRefreshInFlight = true
         let generation = refreshGeneration
         let dependencies = refreshDependencies()
-        let storedTasks = persistedTasks
-        let detectsUsage = allowUsageScan && !usageDetectors.isEmpty
-            && now().timeIntervalSince(lastUsageRefreshAt) >= usageRefreshInterval
         if detectsUsage { lastUsageRefreshAt = now() }
         let completion: @MainActor @Sendable (DetectorRefreshResult) -> Void = { [weak self] result in
             guard let self, self.refreshGeneration == generation else { return }
             self.detectorRefreshInFlight = false
             self.applyDetector(result)
-            if self.detectorRefreshPending {
-                self.detectorRefreshPending = false
+            if !self.detectorRefreshPendingIndices.isEmpty || self.detectorRefreshPendingAllowsUsageScan {
+                let pendingIndices = self.detectorRefreshPendingIndices
+                let pendingFileURLs = self.detectorRefreshPendingFileURLs
+                self.detectorRefreshPendingIndices.removeAll()
+                self.detectorRefreshPendingFileURLs = nil
                 let pendingAllowsUsageScan = self.detectorRefreshPendingAllowsUsageScan
                 self.detectorRefreshPendingAllowsUsageScan = false
-                self.scheduleDetectorRefresh(allowUsageScan: pendingAllowsUsageScan)
+                self.scheduleDetectorRefresh(detectorIndices: pendingIndices, allowUsageScan: pendingAllowsUsageScan,
+                                             changedFileURLs: pendingFileURLs)
             }
         }
 
         refreshQueue.async {
             let result = Self.detectState(
                 using: dependencies,
-                persistedTasks: storedTasks,
+                detectorIndices: indices,
                 detectsUsage: detectsUsage,
-                loadsUsageHistory: false
+                loadsUsageHistory: false,
+                changedFileURLs: changedFileURLs
             )
             // Page-entry refreshes inspect active tasks only; forcing allocator pressure relief
             // there can invalidate the just-composited Liquid Glass surface. Reclaim memory only
@@ -930,9 +991,7 @@ public final class AIStateMonitor: ObservableObject {
         RefreshDependencies(
             repository: repository,
             activityDetectors: activityDetectors,
-            usageDetectors: usageDetectors,
-            activeTaskTTL: activeTaskTTL,
-            now: now
+            usageDetectors: usageDetectors
         )
     }
 
@@ -974,9 +1033,10 @@ public final class AIStateMonitor: ObservableObject {
     /// Persists a complete usage scan and detects metadata writes before deciding whether loaded history is stale.
     private nonisolated static func detectState(
         using dependencies: RefreshDependencies,
-        persistedTasks: [AIProgressTask],
+        detectorIndices: Set<Int>,
         detectsUsage: Bool,
-        loadsUsageHistory: Bool
+        loadsUsageHistory: Bool,
+        changedFileURLs: Set<URL>? = nil
     ) -> DetectorRefreshResult {
         do {
             var automaticUsage: [AIUsageSample] = []
@@ -991,11 +1051,12 @@ public final class AIStateMonitor: ObservableObject {
                     automaticUsage.append(contentsOf: samples)
                 }
             }
-            let tasks = mergedTasks(
-                persistedTasks,
-                using: dependencies
-            )
-            let activityFileURLs = dependencies.activityDetectors.flatMap(\.activityFileURLs)
+            var activities: [Int: ActivityDetection] = [:]
+            for index in detectorIndices.sorted() {
+                let detector = dependencies.activityDetectors[index]
+                activities[index] = ActivityDetection(tasks: try? detector.taskUpdates(changedFileURLs: changedFileURLs),
+                                                      fileURLs: detector.activityFileURLs)
+            }
             var usageChanged = false
             if detectsUsage, usageScanComplete {
                 let previous = dependencies.repository.storageChangeToken()
@@ -1003,13 +1064,12 @@ public final class AIStateMonitor: ObservableObject {
                 usageChanged = count > 0 || previous != dependencies.repository.storageChangeToken()
                 if loadsUsageHistory {
                     if usageChanged {
-                        var next = try dependencies.repository.load(includeUsageSamples: true)
-                        next.tasks = tasks
-                        return .state(next, activityFileURLs: activityFileURLs)
+                        let next = try dependencies.repository.load(includeUsageSamples: true)
+                        return .state(next, activities: activities)
                     }
                 }
             }
-            return .tasks(tasks, usageChanged: usageChanged, activityFileURLs: activityFileURLs)
+            return .tasks(activities, usageChanged: usageChanged)
         } catch AIStateRepositoryError.corruptedState {
             return .corruptedState
         } catch {
@@ -1017,17 +1077,11 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
-    private nonisolated static func mergedTasks(
-        _ persistedTasks: [AIProgressTask],
-        using dependencies: RefreshDependencies
-    ) -> [AIProgressTask] {
+    private func mergedTasks() -> [AIProgressTask] {
         var tasks = persistedTasks
-        var detectedTaskIDs: Set<String> = []
 
-        for detector in dependencies.activityDetectors {
-            guard let automaticTasks = try? detector.taskUpdates() else { continue }
-            for task in automaticTasks {
-                detectedTaskIDs.insert(task.id)
+        for index in activityDetectors.indices {
+            for task in detectedTasks[index] ?? [] {
                 if let index = tasks.firstIndex(where: { $0.id == task.id }) {
                     tasks[index] = task
                 } else {
@@ -1036,16 +1090,10 @@ public final class AIStateMonitor: ObservableObject {
             }
         }
 
-        // Remove active tasks no longer returned by detectors (completed or aborted).
+        let currentTime = now()
         tasks.removeAll { task in
             guard task.status.isActive else { return false }
-            // A task absent from both persistence and detector results has ended.
-            let isPersistedTask = persistedTasks.contains(where: { $0.id == task.id })
-            if !isPersistedTask && !detectedTaskIDs.contains(task.id) {
-                return true
-            }
-            // Check TTL expiry.
-            return dependencies.now().timeIntervalSince(task.updatedAt) > dependencies.activeTaskTTL
+            return currentTime.timeIntervalSince(task.updatedAt) > activeTaskTTL
         }
         return tasks
     }
@@ -1060,6 +1108,7 @@ public final class AIStateMonitor: ObservableObject {
         case let .success(nextState, storageChangeToken):
             var next = nextState
             if updatesPersistedTasks { persistedTasks = nextState.tasks }
+            next.tasks = mergedTasks()
             let keepsExistingUsageSamples = !includesUsageSamples && usageHistoryRequested
             let keepsLoadedUsageSamples = keepsExistingUsageSamples || (includesUsageSamples && usageHistoryRequested)
             if keepsExistingUsageSamples {
@@ -1096,15 +1145,16 @@ public final class AIStateMonitor: ObservableObject {
 
     private func applyDetector(_ result: DetectorRefreshResult) {
         switch result {
-        case let .tasks(tasks, usageChanged, activityFileURLs):
-            refreshActivityFileWatchers(activityFileURLs)
+        case let .tasks(activities, usageChanged):
+            applyActivityDetections(activities)
+            let tasks = mergedTasks()
             if tasks != state.tasks { state.tasks = tasks }
             errorDescription = nil
             if usageChanged, usageHistoryRequested {
                 requestUsageHistoryLoad(force: true)
             }
-        case let .state(next, activityFileURLs):
-            refreshActivityFileWatchers(activityFileURLs)
+        case let .state(next, activities):
+            applyActivityDetections(activities)
             applyPersisted(
                 .success(next, repository.storageChangeToken()),
                 includesUsageSamples: true,
@@ -1115,6 +1165,15 @@ public final class AIStateMonitor: ObservableObject {
         case let .failure(message):
             errorDescription = message
         }
+    }
+
+    private func applyActivityDetections(_ activities: [Int: ActivityDetection]) {
+        for (index, activity) in activities {
+            // A failed read is not a completion signal; keep the last snapshot subject to the normal task TTL.
+            if let tasks = activity.tasks { detectedTasks[index] = tasks }
+            detectedActivityFileURLs[index] = activity.fileURLs
+        }
+        refreshActivityFileWatchers()
     }
 
 }

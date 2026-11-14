@@ -170,15 +170,18 @@ struct CollapsedProgressGlow: View {
     var layoutStyle: IslandLayoutStyle = .notch
     var pillCornerRadius: CGFloat? = nil
     var usesBottomTrack = false
+    var animatesProgress = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
+        let fraction = CollapsedProgress.normalized(progress) ?? 0
         Self.rendering(
             progress: progress, tint: tint, layoutStyle: layoutStyle,
             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
             pillCornerRadius: pillCornerRadius, usesBottomTrack: usesBottomTrack
         )
+        .animation(animatesProgress && !reduceMotion ? .easeOut(duration: 0.18) : nil, value: fraction)
     }
 
     static func rendering(
@@ -212,7 +215,6 @@ struct CollapsedProgressGlow: View {
                 )
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: fraction)
         .transaction { transaction in
             if reduceMotion { transaction.disablesAnimations = true }
         }

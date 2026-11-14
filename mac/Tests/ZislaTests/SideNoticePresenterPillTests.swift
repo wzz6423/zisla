@@ -12,7 +12,7 @@ import ZislaKit
 @Suite(.serialized)
 struct SideNoticePresenterPillTests {
     @Test(arguments: IslandEdge.allCases, [AIProgressStatus.succeeded, .failed, .error])
-    func resultSweepsKeepTheFloatingInformationFrame(edge: IslandEdge, status: AIProgressStatus) throws {
+    func resultSweepsSizeToAIContentAndRestoreFloatingInformation(edge: IslandEdge, status: AIProgressStatus) throws {
         let fixture = try Fixture(edge: edge)
         defer { fixture.close() }
         fixture.settings.settings.islandShowMoreInformation = true
@@ -34,21 +34,29 @@ struct SideNoticePresenterPillTests {
         let sweeping = try #require(fixture.presenter.compactFrame(for: fixture.screen,
             notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date))
 
-        #expect(sweeping == initial, "The floating island must retain its frame during the result sweep; before: \(initial), during: \(sweeping)")
+        let expected = edge.isVertical ? CGSize(width: 32, height: 68) : CGSize(width: 60, height: 32)
+        #expect(sweeping.size == expected, "A result sweep must fit the visible AI icon and count without reserving hidden information")
+        #expect((edge.isVertical ? sweeping.height : sweeping.width) < (edge.isVertical ? initial.height : initial.width))
         fixture.presenter.setStatusIcons(icons)
         #expect(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date) == initial)
-        var publishedSize: CGSize?
-        fixture.presenter.onCompactLayoutChanged = { _, _, _, _, size in publishedSize = size }
+            notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date) == sweeping)
+        var publishedConfiguration = fixture.settings.settings.islandScreenConfiguration
+        fixture.presenter.onCompactLayoutChanged = { _, detailed, length, sideWidth, size in
+            publishedConfiguration.expandsForDetailedStatus = detailed
+            publishedConfiguration.compactStatusLength = length
+            publishedConfiguration.compactStatusSideWidth = sideWidth
+            publishedConfiguration.statusIconSize = size
+        }
         fixture.presenter.publishCompactLayout(on: fixture.screen.displayID)
-        #expect(publishedSize == initial.size, "The main island and status surface must use the same retained dimensions")
+        #expect(ScreenLayoutEngine(configuration: publishedConfiguration).layout(for: fixture.screen).collapsedFrame == sweeping,
+                "The main island and status surface must shrink to the same AI content frame")
         fixture.sweep.finish(id: sweep.id)
         fixture.presenter.setStatusIcons(icons)
         #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: notices, at: fixture.date) == initial)
     }
 
     @Test(arguments: IslandEdge.allCases)
-    func queuedResultsRetainTheFrameAfterClientsExitAndCancellationReleasesIt(edge: IslandEdge) throws {
+    func queuedResultsKeepOnlyAIContentAfterClientsExitAndCancellationRestoresIdle(edge: IslandEdge) throws {
         let fixture = try Fixture(edge: edge)
         defer { fixture.close() }
         fixture.settings.settings.islandShowMoreInformation = true
@@ -67,8 +75,11 @@ struct SideNoticePresenterPillTests {
         let first = try #require(fixture.sweep.current)
         fixture.queue.removeAll()
         fixture.presenter.setStatusIcons([])
-        #expect(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date) == initial)
+        let sweeping = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
+        let expected = edge.isVertical ? CGSize(width: 32, height: 68) : CGSize(width: 60, height: 32)
+        #expect(sweeping.size == expected)
+        #expect(sweeping != initial, "A vanished information row must not leave empty space during a result sweep")
 
         let secondTask = AIProgressTask(id: "failed", provider: .codex, title: "Task",
             progress: nil, status: .failed, updatedAt: fixture.date)
@@ -77,21 +88,54 @@ struct SideNoticePresenterPillTests {
         let second = try #require(fixture.sweep.current)
         fixture.presenter.setStatusIcons([])
         #expect(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date) == initial)
+            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date) == sweeping)
 
         fixture.sweep.cancel()
         fixture.sweep.finish(id: second.id)
         fixture.presenter.setStatusIcons([])
         let idle = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [], at: fixture.date))
-        #expect(idle.size == CGSize(width: 24, height: 24), "Cancelling playback must release the retained dimensions")
+        #expect(idle.size == CGSize(width: 24, height: 24), "Cancelling playback must restore the idle circle")
         fixture.sweep.receive(previous: .running, task: secondTask, observedSince: .distantPast, settings: fixture.settings.settings)
         fixture.presenter.setStatusIcons([])
         let next = try #require(fixture.presenter.compactFrame(for: fixture.screen,
             notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
-        #expect(next != initial, "A fresh sweep must not reuse an earlier information layout")
-        #expect((edge.isVertical ? next.width : next.height) == CompactPillStatusPresentation.minimumThickness)
-        #expect((edge.isVertical ? next.height : next.width) > CompactPillStatusPresentation.minimumThickness,
-                "An idle circle must grow enough to show both the AI icon and task count")
+        #expect(next.size == expected, "A fresh sweep must fit only its current AI icon and task count")
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func hiddenActivityResultsSizeToVisibleAIContentAndRestoreHiddenState(edge: IslandEdge) throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.activityNoticeDisplayDuration = .threeSeconds
+        let task = AIProgressTask(id: "hidden-result", provider: .codex, title: "Task",
+            progress: nil, status: .succeeded, updatedAt: fixture.date)
+        let notice = IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title)
+        let state = SideNoticeDisplayState()
+        _ = SideNoticePresenter.updateCompactVisibility(notices: [notice], settings: fixture.settings.settings, displayState: state)
+        state.compactStatusHidden = true
+        let hidden = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: [notice], at: fixture.date, statusHidden: state.compactStatusHidden))
+        #expect(hidden.size == CGSize(width: 24, height: 24))
+
+        fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
+        let sweep = try #require(fixture.sweep.current)
+        let notices = fixture.sweep.presentationNotices(from: [notice])
+        #expect(!SideNoticePresenter.updateCompactVisibility(notices: notices, settings: fixture.settings.settings, displayState: state))
+        #expect(state.compactStatusHidden)
+        let sweeping = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: notices, at: fixture.date, statusHidden: state.compactStatusHidden))
+        #expect(sweeping.size == (edge.isVertical ? CGSize(width: 32, height: 68) : CGSize(width: 60, height: 32)),
+                "A result sweep must fit its visible AI content even when the same activity was hidden")
+        #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: notices, at: fixture.date) == sweeping)
+        #expect(fixture.presenter.compactConfiguration(for: notices, at: fixture.date,
+            statusHidden: state.compactStatusHidden).statusIconSize == nil)
+
+        fixture.sweep.finish(id: sweep.id)
+        #expect(state.compactStatusHidden)
+        #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice],
+            at: fixture.date, statusHidden: state.compactStatusHidden) == hidden,
+                "Finishing a result sweep must restore the activity's hidden frame")
     }
 
     @Test(arguments: IslandEdge.allCases)
@@ -174,7 +218,7 @@ struct SideNoticePresenterPillTests {
     }
 
     @Test(arguments: IslandEdge.allCases)
-    func retainedResultFramesRenderOnlyAIAtItsExistingIconSize(edge: IslandEdge) async throws {
+    func compactResultFramesRenderOnlyAIAtItsExistingIconSize(edge: IslandEdge) async throws {
         let fixture = try Fixture(edge: edge)
         defer { fixture.close() }
         fixture.screen.frame.origin.x = 20_000
@@ -198,8 +242,10 @@ struct SideNoticePresenterPillTests {
         fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
         fixture.presenter.setStatusIcons(icons)
         let view = host.rootView.content
-        #expect(view.displayState.compactLayout?.frame == initial)
-        #expect(view.displayState.statusIcons.isEmpty, "Retaining the frame must not restore the monitor strip")
+        let sweeping = try #require(view.displayState.compactLayout).frame
+        #expect(sweeping.size == (edge.isVertical ? CGSize(width: 32, height: 68) : CGSize(width: 60, height: 32)))
+        #expect(sweeping != initial, "The AI-only result must not retain the hidden information frame")
+        #expect(view.displayState.statusIcons.isEmpty, "The result sweep must keep the monitor strip hidden")
         #expect(view.selectedCompactStatusPriority == .aiActivity)
         let presentation = try #require(SideNoticeLayoutEngine().compactPillPresentations(
             for: fixture.sweep.presentationNotices(from: fixture.queue.left + fixture.queue.right),
@@ -208,13 +254,13 @@ struct SideNoticePresenterPillTests {
         let expected = CompactPillStatusContent(presentation: presentation, text: presentation.text, edge: edge,
             visualizationStyle: fixture.settings.settings.mediaVisualizationStyle, item: nil, date: fixture.date)
             .frame(width: edge.isVertical ? thickness : nil, height: edge.isVertical ? nil : thickness)
-            .frame(width: initial.width, height: initial.height)
+            .frame(width: sweeping.width, height: sweeping.height)
             .environment(\.colorScheme, .dark)
             .environment(\.layoutDirection, .leftToRight)
         let actualPixels = try await renderOffscreen(view.statusBarContent(at: fixture.date)
-            .environment(\._accessibilityReduceMotion, true), size: initial.size)
+            .environment(\._accessibilityReduceMotion, true), size: sweeping.size)
         let expectedPixels = try await renderOffscreen(expected
-            .environment(\._accessibilityReduceMotion, true), size: initial.size)
+            .environment(\._accessibilityReduceMotion, true), size: sweeping.size)
         var foregroundPixels = 0
         var differingPixels = 0
         for x in 0..<actualPixels.pixelsWide {
@@ -227,8 +273,8 @@ struct SideNoticePresenterPillTests {
                 if isForeground != expectedForeground { differingPixels += 1 }
             }
         }
-        #expect(foregroundPixels > 30, "The retained frame must still render its AI icon and count")
-        #expect(differingPixels == 0, "Only standard-sized AI content may appear within the retained frame")
+        #expect(foregroundPixels > 30, "The compact frame must still render its AI icon and count")
+        #expect(differingPixels == 0, "Only standard-sized AI content may appear within the compact frame")
     }
 
     @Test(arguments: [IslandLayoutStyle.pill, .notch])

@@ -19,6 +19,7 @@ struct FloatingIslandInformationLayout {
     let primary: [Status]
     let secondary: Status?
     let primaryThickness: CGFloat
+    let statusThickness: CGFloat
     let primaryLength: CGFloat
     let size: CGSize
 
@@ -37,6 +38,7 @@ struct FloatingIslandInformationLayout {
         let iconSize = IslandStatusIconLayout.size(icons: icons, edge: edge)
         let thickness = max(CompactPillStatusPresentation.minimumThickness,
                             edge.isVertical ? iconSize?.width ?? 0 : iconSize?.height ?? 0)
+        let statusThickness = edge.isVertical ? CompactPillStatusPresentation.minimumThickness : thickness
         let media = presentations.first { $0.isMedia && settings.mediaCompactStyle == .detailed }
         var primary = presentations.filter { $0.priority == .aiActivity }
             + presentations.filter { $0.priority != .aiActivity && $0 != media }
@@ -53,7 +55,7 @@ struct FloatingIslandInformationLayout {
                     leadingInset: leadingInset), leadingInset: leadingInset)
         }
         let primaryStatuses = primary.enumerated().map { index, presentation in
-            status(presentation, thickness: thickness,
+            status(presentation, thickness: statusThickness,
                 leadingInset: icons.isEmpty && index == 0 ? CompactPillStatusPresentation.trailingInset : 0)
         }
         let secondaryStatus = secondary.map { status($0, thickness: CompactPillStatusPresentation.minimumThickness) }
@@ -67,6 +69,7 @@ struct FloatingIslandInformationLayout {
         self.primary = primaryStatuses
         self.secondary = secondaryStatus
         self.primaryThickness = thickness
+        self.statusThickness = statusThickness
         self.primaryLength = primaryLength
         self.size = edge.isVertical ? CGSize(width: totalThickness, height: length)
             : CGSize(width: length, height: totalThickness)
@@ -78,6 +81,7 @@ struct FloatingIslandInformationView: View {
     let visualizationStyle: MediaVisualizationStyle
     let item: NowPlayingSnapshot?
     let date: Date
+    var animatesLogo = false
     var onJoinMeeting: (String) -> Void = { _ in }
 
     var body: some View {
@@ -113,15 +117,15 @@ struct FloatingIslandInformationView: View {
             ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return row {
             if let size = layout.iconSize {
-                IslandStatusIconStrip(icons: layout.icons, edge: layout.edge, date: date)
+                IslandStatusIconStrip(icons: layout.icons, edge: layout.edge, date: date, animatesLogo: animatesLogo)
                     .frame(width: size.width, height: size.height)
             }
             ForEach(layout.primary) { status in
                 CompactPillStatusContent(presentation: status.presentation, text: status.text, edge: layout.edge,
                     visualizationStyle: visualizationStyle, item: status.presentation.isMedia ? item : nil,
                     date: date, leadingInset: status.leadingInset, onJoinMeeting: onJoinMeeting)
-                    .frame(width: layout.edge.isVertical ? layout.primaryThickness : status.length,
-                           height: layout.edge.isVertical ? status.length : layout.primaryThickness)
+                    .frame(width: layout.edge.isVertical ? layout.statusThickness : status.length,
+                           height: layout.edge.isVertical ? status.length : layout.statusThickness)
             }
         }
         .frame(width: layout.edge.isVertical ? layout.primaryThickness : layout.primaryLength,

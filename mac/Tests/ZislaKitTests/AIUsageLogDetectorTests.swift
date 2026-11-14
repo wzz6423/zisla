@@ -7,6 +7,54 @@ import zstd
 @testable import ZislaKit
 
 struct AIUsageLogDetectorTests {
+    @Test(arguments: [false, true])
+    func usageFilteringPreservesEscapedTypesAndIgnoresPayloadLookalikes(compressed: Bool) throws {
+        let root = temporaryDirectory(named: "usage-record-filter")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sessions = root.appendingPathComponent("sessions")
+        let file = sessions.appendingPathComponent("rollout-filter.jsonl" + (compressed ? ".zst" : ""))
+        let token = codexTokenLine(timestamp: "2026-11-10T00:00:00Z", input: 100, output: 20)
+        let fakeUsage = try String(decoding: JSONSerialization.data(withJSONObject: [
+            "type": "response_item", "payload": ["type": "message", "text": token + String(repeating: "x", count: 8192)],
+        ]), as: UTF8.self)
+        let lines = [
+            fakeUsage, #"{"type":"assistant","message":{"usage":{"input_tokens":999999}}}"#,
+            #"{"payload":{"model":"gpt-6.1-sol"},"t\u0079pe":"turn_\u0063ontext"}"#,
+            #"{"type":"event_msg","payload":BROKEN}"#,
+            token.replacingOccurrences(of: "event_msg", with: #"event_\u006dsg"#),
+        ]
+        if compressed { try writeCompressedJSONL(lines, to: file) }
+        else { try writeJSONL(lines, to: file) }
+        let detector = AIUsageLogDetector(codexSessionsDirectory: sessions, scanInterval: 0, enabledProviders: [.codex])
+        let samples = try detector.usageSamples()
+        #expect(samples.count == 1)
+        #expect(samples.first?.totalTokens == 120)
+        #expect(samples.first?.model == "gpt-6.1-sol")
+        #expect(try detector.usageSamples() == samples, "The filter must keep unchanged event identities stable")
+    }
+
+    @Test(arguments: [1, 7, 31, 64])
+    func usageFilteringRecoversAcrossPartialRecordBoundaries(chunkSize: Int) throws {
+        let root = temporaryDirectory(named: "usage-filter-partitions")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sessions = root.appendingPathComponent("sessions")
+        let file = sessions.appendingPathComponent("rollout-partitions.jsonl")
+        try writeJSONL([#"{"type":"response_item","payload":{"text":"ignored"}}"#], to: file)
+        let detector = AIUsageLogDetector(codexSessionsDirectory: sessions, scanInterval: 0, enabledProviders: [.codex])
+        #expect(try detector.usageSamples().isEmpty)
+        let data = Data(codexTokenLine(timestamp: "2026-11-10T00:00:00Z", input: 100, output: 20).utf8)
+        let handle = try FileHandle(forWritingTo: file)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        for offset in stride(from: 0, to: data.count, by: chunkSize) {
+            let end = min(offset + chunkSize, data.count)
+            try handle.write(contentsOf: data[offset..<end])
+            let samples = try detector.usageSamples()
+            #expect(samples.count == (end == data.count ? 1 : 0))
+        }
+        #expect(try detector.usageSamples().first?.totalTokens == 120)
+    }
+
     @Test
     func codexUsageKeepsRecordedTurnModelsAcrossIncrementalReads() throws {
         let root = temporaryDirectory(named: "usage-codex-model-context")

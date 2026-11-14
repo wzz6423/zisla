@@ -11,6 +11,7 @@ final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked
     private(set) var appendCount = 0
     private(set) var appendedCapacities: [Int?] = []
     private(set) var removeAllCount = 0
+    var allowsRecordLoading = true
 
     init(seed: [SystemMetricsRecord] = []) {
         stored = seed
@@ -19,7 +20,20 @@ final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked
     func loadRecords() -> [SystemMetricsRecord] {
         lock.lock()
         defer { lock.unlock() }
+        #expect(allowsRecordLoading, "Background recording and summaries must not load the full archive")
         return stored
+    }
+
+    func loadStats(capacity: Int?) -> SystemMetricsHistoryStats? {
+        lock.lock()
+        defer { lock.unlock() }
+        let timestamps = stored.map(\.timestamp).sorted()
+        let count = min(timestamps.count, capacity.map { max(1, $0) } ?? timestamps.count)
+        return SystemMetricsHistoryStats(
+            count: count,
+            oldest: count > 0 ? timestamps[timestamps.count - count] : nil,
+            newest: timestamps.last
+        )
     }
 
     func appendRecord(_ record: SystemMetricsRecord, capacity: Int?) {
@@ -159,6 +173,48 @@ private func record(
 }
 
 struct SystemMetricsHistoryStoreTests {
+    @Test
+    func backgroundRecordingKeepsTheArchiveLazyEvenAfterAnExplicitRead() {
+        let seed = (0..<64_000).map { record(at: Double($0) * 60) }
+        let persistence = MemoryHistoryPersistence(seed: seed)
+        persistence.allowsRecordLoading = false
+        let store = SystemMetricsHistoryStore(persistence: persistence)
+
+        #expect(store.stats.count == seed.count)
+        let appended = record(at: Double(seed.count) * 60)
+        store.append(appended)
+        #expect(store.stats.count == seed.count + 1)
+        #expect(store.stats.oldest == seed.first?.timestamp)
+        #expect(store.stats.newest == appended.timestamp)
+
+        persistence.allowsRecordLoading = true
+        #expect(store.records.last == appended)
+        persistence.allowsRecordLoading = false
+        let next = record(at: Double(seed.count + 1) * 60)
+        store.append(next)
+        #expect(store.stats.count == seed.count + 2)
+
+        store.removeAll()
+        #expect(store.stats == .empty)
+        store.append(next)
+        #expect(store.stats == SystemMetricsHistoryStats(count: 1, oldest: next.timestamp, newest: next.timestamp))
+    }
+
+    @Test(arguments: [nil, 0, 1, 2, 8] as [Int?])
+    func existingPersistenceConformersCanDeriveSummaries(capacity: Int?) {
+        let persistence = BlockingHistoryPersistence(seed: [record(at: 180), record(at: 60), record(at: 120)])
+        persistence.release()
+        let expected = [60.0, 120, 180].suffix(capacity.map { max(1, $0) } ?? 3)
+
+        #expect(persistence.loadStats(capacity: capacity) == SystemMetricsHistoryStats(
+            count: expected.count,
+            oldest: expected.first.map { Date(timeIntervalSince1970: $0) },
+            newest: expected.last.map { Date(timeIntervalSince1970: $0) }
+        ))
+        persistence.removeAll()
+        #expect(persistence.loadStats(capacity: capacity) == .empty)
+    }
+
     @Test(arguments: [0, 1, 43_200, 64_000])
     func defaultCapacityKeepsAllSamplesAcrossLoadingAppendingAndReloading(sampleCount: Int) {
         let seed = (0..<sampleCount).map { record(at: Double($0) * 60) }
@@ -689,6 +745,177 @@ struct SystemMetricsHistoryExportTests {
 }
 
 struct SystemMetricsHistoryDatabaseTests {
+    @Test(arguments: [nil, -1, 0, 1, 2, 8] as [Int?])
+    func summariesMatchRetainedRecordsWithoutPruningTheArchive(capacity: Int?) throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        let persistence = LazySystemMetricsHistoryPersistence(makeDatabase: { database })
+        #expect(persistence.loadStats(capacity: capacity) == .empty)
+        for timestamp in [180.0, 60, 120, 120] {
+            database.appendRecord(record(at: timestamp, fanRPMs: [1_200, 1_400]), capacity: nil)
+        }
+        let expected = [60.0, 120, 180].suffix(capacity.map { max(1, $0) } ?? 3)
+
+        #expect(persistence.loadStats(capacity: capacity) == SystemMetricsHistoryStats(
+            count: expected.count,
+            oldest: expected.first.map { Date(timeIntervalSince1970: $0) },
+            newest: expected.last.map { Date(timeIntervalSince1970: $0) }
+        ))
+        #expect(database.loadRecords().count == 3, "Loading a summary must not apply retention to disk")
+
+        persistence.removeAll()
+        #expect(persistence.loadStats(capacity: capacity) == .empty)
+    }
+
+    @Test
+    func summariesStayAvailableWhenFanRecordsCannotBeRead() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        let persistence = LazySystemMetricsHistoryPersistence(makeDatabase: { database })
+        database.appendRecord(record(at: 60, fanRPMs: [1_200]), capacity: nil)
+        var connection: OpaquePointer?
+        #expect(sqlite3_open(url.path, &connection) == SQLITE_OK)
+        let inspection = try #require(connection)
+        defer { sqlite3_close(inspection) }
+        #expect(sqlite3_exec(inspection, "ALTER TABLE metric_fans RENAME TO unavailable_fans", nil, nil, nil) == SQLITE_OK)
+
+        #expect(persistence.loadRecords().isEmpty)
+        #expect(persistence.loadStats(capacity: nil) == SystemMetricsHistoryStats(
+            count: 1,
+            oldest: Date(timeIntervalSince1970: 60),
+            newest: Date(timeIntervalSince1970: 60)
+        ), "A summary must read only the timestamp index, without decoding metric or fan records")
+    }
+
+    @Test
+    func summaryReadsRecoverAfterATransientQueryFailure() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        database.appendRecord(record(at: 60), capacity: nil)
+        var connection: OpaquePointer?
+        #expect(sqlite3_open(url.path, &connection) == SQLITE_OK)
+        let inspection = try #require(connection)
+        defer { sqlite3_close(inspection) }
+        #expect(sqlite3_exec(inspection, "ALTER TABLE metrics RENAME TO unavailable_metrics", nil, nil, nil) == SQLITE_OK)
+        #expect(database.loadStats(capacity: nil) == nil)
+
+        #expect(sqlite3_exec(inspection, "ALTER TABLE unavailable_metrics RENAME TO metrics", nil, nil, nil) == SQLITE_OK)
+        #expect(database.loadStats(capacity: nil)?.count == 1)
+        #expect(database.loadRecords() == [record(at: 60)])
+    }
+
+    @Test
+    func repeatedSummaryReadsKeepTheLastSnapshotWhileStorageIsUnavailable() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        let store = SystemMetricsHistoryStore(persistence: database)
+        store.append(record(at: 60))
+        let expected = store.stats
+        var connection: OpaquePointer?
+        #expect(sqlite3_open(url.path, &connection) == SQLITE_OK)
+        let inspection = try #require(connection)
+        defer { sqlite3_close(inspection) }
+        #expect(sqlite3_exec(inspection, "ALTER TABLE metrics RENAME TO unavailable_metrics", nil, nil, nil) == SQLITE_OK)
+        #expect(database.loadStats(capacity: nil) == nil)
+
+        store.append(record(at: 120))
+        #expect(store.stats == expected,
+                "A failed recording refresh must preserve the last successfully read summary")
+        for _ in 0..<3 {
+            #expect(store.stats == expected, "Reading a displayed snapshot must not require another storage read")
+        }
+        #expect(sqlite3_exec(inspection, "ALTER TABLE unavailable_metrics RENAME TO metrics", nil, nil, nil) == SQLITE_OK)
+        #expect(store.stats == expected)
+        store.append(record(at: 120))
+        #expect(store.stats.count == 2)
+        #expect(store.stats.newest == Date(timeIntervalSince1970: 120))
+        database.removeAll()
+        #expect(store.stats.count == 2)
+        #expect(sqlite3_exec(inspection, """
+            CREATE TRIGGER reject_record BEFORE INSERT ON metrics
+            BEGIN SELECT RAISE(ABORT, 'injected recording failure'); END;
+            """, nil, nil, nil) == SQLITE_OK)
+        store.append(record(at: 180))
+        #expect(store.stats == .empty, "A successfully read empty archive must replace the cached summary")
+    }
+
+    @Test
+    func summariesAndRecordingTolerateAnUnavailableDatabase() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let blockedParent = url.deletingLastPathComponent().appendingPathComponent("not-a-directory")
+        try Data().write(to: blockedParent)
+        let store = SystemMetricsHistoryStore(persistence: SystemMetricsHistoryDatabase(
+            databaseURL: blockedParent.appendingPathComponent("history.sqlite")
+        ))
+
+        #expect(store.stats == .empty)
+        store.append(record(at: 60))
+        #expect(store.stats == .empty)
+        #expect(store.records.isEmpty)
+        #expect(try Data(contentsOf: blockedParent).isEmpty)
+    }
+
+    @Test(arguments: [nil, 2] as [Int?])
+    func storeSummariesTrackReplacedAndOutOfOrderSamples(capacity: Int?) throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        let store = SystemMetricsHistoryStore(persistence: database, capacity: capacity)
+        for timestamp in [180.0, 60, 120, 120, 240] {
+            store.append(record(at: timestamp))
+            let records = database.loadRecords()
+            #expect(store.records == records)
+            #expect(store.stats == SystemMetricsHistoryStats(
+                count: records.count,
+                oldest: records.first?.timestamp,
+                newest: records.last?.timestamp
+            ))
+        }
+    }
+
+    @Test
+    func failedWritesAndClearsKeepTheStoreConsistentWithTheArchive() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        let store = SystemMetricsHistoryStore(persistence: database)
+        let original = record(at: 60, fanRPMs: [900])
+        store.append(original)
+        let originalStats = store.stats
+        var connection: OpaquePointer?
+        #expect(sqlite3_open(url.path, &connection) == SQLITE_OK)
+        let inspection = try #require(connection)
+        defer { sqlite3_close(inspection) }
+        #expect(sqlite3_exec(inspection, """
+            CREATE TRIGGER fail_write BEFORE INSERT ON metric_fans
+            WHEN NEW.rpm = -1 BEGIN SELECT RAISE(ABORT, 'injected write failure'); END;
+            CREATE TRIGGER fail_clear BEFORE DELETE ON metrics
+            BEGIN SELECT RAISE(ABORT, 'injected clear failure'); END;
+            CREATE TRIGGER fail_clear_fans BEFORE DELETE ON metric_fans
+            BEGIN SELECT RAISE(ABORT, 'injected clear failure'); END;
+            """, nil, nil, nil) == SQLITE_OK)
+
+        store.append(record(at: 120, fanRPMs: [-1]))
+        #expect(store.stats == originalStats)
+        #expect(store.records == [original])
+        store.removeAll()
+        #expect(store.stats == originalStats)
+        #expect(store.records == [original])
+
+        #expect(sqlite3_exec(inspection, "DROP TRIGGER fail_write; DROP TRIGGER fail_clear; DROP TRIGGER fail_clear_fans", nil, nil, nil) == SQLITE_OK)
+        store.removeAll()
+        #expect(store.stats == .empty)
+        let recovered = record(at: 180)
+        store.append(recovered)
+        #expect(store.records == [recovered])
+        #expect(store.stats.count == 1)
+    }
+
     @Test
     func unlimitedDatabaseAndLazyPersistenceKeepSamplesUntilExplicitlyCleared() throws {
         let url = try temporaryDatabaseURL()

@@ -5,12 +5,17 @@ import ZislaCore
 public protocol AIActivityDetecting {
     func activeTasks() throws -> [AIProgressTask]
     func taskUpdates() throws -> [AIProgressTask]
+    func taskUpdates(changedFileURLs: Set<URL>?) throws -> [AIProgressTask]
     var activityFileURLs: [URL] { get }
 }
 
 extension AIActivityDetecting {
     public func taskUpdates() throws -> [AIProgressTask] {
         try activeTasks()
+    }
+
+    public func taskUpdates(changedFileURLs: Set<URL>?) throws -> [AIProgressTask] {
+        try taskUpdates()
     }
 
     public var activityFileURLs: [URL] { [] }

@@ -18,6 +18,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     public let notice: IslandNotice
     public let text: String
     public let aiCount: Int
+    public let aiNotices: [IslandNotice]
     public let showsWaveform: Bool
     public let showsMediaIdentity: Bool
     public var isMedia: Bool { priority == .media && notice.id.hasPrefix("media-active-") }
@@ -32,11 +33,12 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     }
 
     public init(priority: CompactStatusPriority?, notice: IslandNotice, text: String,
-         aiCount: Int = 0, showsWaveform: Bool = false, showsMediaIdentity: Bool = false) {
+         aiCount: Int = 0, aiNotices: [IslandNotice] = [], showsWaveform: Bool = false, showsMediaIdentity: Bool = false) {
         self.priority = priority
         self.notice = notice
         self.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         self.aiCount = aiCount
+        self.aiNotices = aiNotices
         self.showsWaveform = showsWaveform
         self.showsMediaIdentity = showsMediaIdentity
     }
