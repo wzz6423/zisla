@@ -259,9 +259,7 @@ public final class OpenCodeSessionActivityDetector: AIActivityDetecting {
         }
 
         let now = Date().timeIntervalSince1970
-        let processIdentifier = runningProcessIdentifiers().first
-
-        return rows.compactMap { row in
+        var tasks = rows.compactMap { row -> AIProgressTask? in
             guard now - Double(row.updatedAt) / 1000 < recencyThreshold else { return nil }
 
             let isActive: Bool
@@ -288,10 +286,15 @@ public final class OpenCodeSessionActivityDetector: AIActivityDetecting {
                 updatedAt: Date(timeIntervalSince1970: Double(row.updatedAt) / 1000),
                 sessionURL: nil,
                 effort: row.latestVariant,
-                startedAt: Date(timeIntervalSince1970: Double(row.createdAt) / 1000),
-                processIdentifier: processIdentifier
+                startedAt: Date(timeIntervalSince1970: Double(row.createdAt) / 1000)
             )
         }
+        guard !tasks.isEmpty else { return [] }
+        let processIdentifier = runningProcessIdentifiers().first
+        for index in tasks.indices {
+            tasks[index].processIdentifier = processIdentifier
+        }
+        return tasks
     }
 
     private func stringColumn(_ stmt: OpaquePointer?, _ index: Int32) -> String? {

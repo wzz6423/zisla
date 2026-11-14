@@ -200,6 +200,7 @@ struct IslandStatusIconStrip: View {
     let icons: [IslandStatusIcon]
     let edge: IslandEdge
     let date: Date
+    var animatesLogo = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -231,7 +232,7 @@ struct IslandStatusIconStrip: View {
     private func iconView(_ icon: IslandStatusIcon) -> some View {
         switch icon.content {
         case .application:
-            IslandParticleLogo(side: 18, time: date.timeIntervalSinceReferenceDate)
+            IslandParticleLogo(side: 18, time: animatesLogo ? nil : date.timeIntervalSinceReferenceDate)
         case let .metric(metric, text, image, style):
             if edge.isVertical {
                 readingView(metric: metric, text: text)

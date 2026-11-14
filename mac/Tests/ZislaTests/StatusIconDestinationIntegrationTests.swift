@@ -1116,7 +1116,7 @@ struct StatusIconDestinationIntegrationTests {
     }
 
     @Test @MainActor
-    func theIslandLogoKeepsAnimatingWhileMonitorOnlyStripsPauseTheirTimeline() throws {
+    func theIslandLogoDoesNotWakeTheMonitorStripTimeline() throws {
         let fixture = try IconFixture(edge: .left)
         defer { fixture.close() }
         let state = SideNoticeDisplayState()
@@ -1128,9 +1128,7 @@ struct StatusIconDestinationIntegrationTests {
         state.statusIcons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
         #expect(view.pausesCompactTimeline)
         state.statusIcons.append(IslandStatusIcon(id: "app", content: .application, tooltip: "zisla"))
-        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            #expect(!view.pausesCompactTimeline, "The application logo must continue to use its existing animation clock")
-        }
+        #expect(view.pausesCompactTimeline, "The application logo must not redraw unrelated monitor readings")
         state.statusIcons.removeAll()
         state.placementMode = .camera
         #expect(view.pausesCompactTimeline)

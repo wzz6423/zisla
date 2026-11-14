@@ -5,6 +5,74 @@ import Testing
 
 struct ClaudeSessionActivityDetectorTests {
     @Test
+    func testWatchesSelectedTranscriptsAndTheirParentForAtomicReplacement() throws {
+        let root = makeTempRoot("claude-watch-candidates")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeJSONL(under: root, relativePath: "project/old.jsonl", lines: [],
+            modifiedAt: Date(timeIntervalSince1970: 1_900_000_100))
+        try writeJSONL(under: root, relativePath: "project/current.jsonl", lines: [
+            claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "current", text: "hi"),
+        ], modifiedAt: Date(timeIntervalSince1970: 1_900_000_200))
+        let detector = ClaudeSessionActivityDetector(projectsDirectory: root, maxTranscriptFiles: 1)
+        _ = try detector.activeTasks()
+        #expect(Set(detector.activityFileURLs.map { $0.resolvingSymlinksInPath() }) == Set([
+            root.appendingPathComponent("project/current.jsonl"),
+            root.appendingPathComponent("project", isDirectory: true),
+        ].map { $0.resolvingSymlinksInPath() }))
+        try FileManager.default.removeItem(at: root.appendingPathComponent("project/current.jsonl"))
+        _ = try detector.activeTasks()
+        #expect(Set(detector.activityFileURLs.map { $0.resolvingSymlinksInPath() }) == Set([
+            root.appendingPathComponent("project/old.jsonl"),
+            root.appendingPathComponent("project", isDirectory: true),
+        ].map { $0.resolvingSymlinksInPath() }))
+        try FileManager.default.removeItem(at: root)
+        _ = try detector.activeTasks()
+        #expect(detector.activityFileURLs.isEmpty)
+    }
+
+    @Test @MainActor
+    func testMonitorFollowsPermissionAnswerAtomicReplacementAndNewSession() async throws {
+        let root = makeTempRoot("claude-monitor-watch")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let projects = root.appendingPathComponent("projects", isDirectory: true)
+        let log = projects.appendingPathComponent("project/current.jsonl")
+        let user = claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "current", text: "hi")
+        let ask = claudeAssistant(timestamp: "2026-07-19T01:00:01.000Z", sessionId: "current",
+            stopReason: "tool_use", model: "claude", toolUses: [("ask-1", "AskUserQuestion")])
+        try writeJSONL(under: projects, relativePath: "project/current.jsonl", lines: [user, ask], modifiedAt: .now)
+        let detector = ClaudeSessionActivityDetector(projectsDirectory: projects,
+            sessionsDirectory: root.appendingPathComponent("sessions"))
+        let monitor = AIStateMonitor(directoryURL: root.appendingPathComponent("state"),
+            activityDetectors: [detector], activeTaskTTL: .greatestFiniteMagnitude,
+            detectorRefreshInterval: 24 * 60 * 60)
+        defer { monitor.stop() }
+        monitor.start()
+        #expect(await waitForClaudeMonitor { monitor.state.tasks.first?.status == .blocked })
+
+        try appendJSONLLine(claudeUserToolResult(timestamp: "2026-07-19T01:00:02.000Z",
+            sessionId: "current", toolUseId: "ask-1", isError: false), to: log)
+        #expect(await waitForClaudeMonitor { monitor.state.tasks.first?.status == .running })
+
+        let completed = claudeAssistant(timestamp: "2026-07-19T01:00:03.000Z", sessionId: "current",
+            stopReason: "end_turn", model: "claude", toolUses: [])
+        try Data(([user, completed].joined(separator: "\n") + "\n").utf8).write(to: log, options: .atomic)
+        #expect(await waitForClaudeMonitor { monitor.state.tasks.isEmpty })
+
+        try appendJSONLLine(claudeUser(timestamp: "2026-07-19T01:00:04.000Z",
+            sessionId: "current", text: "again"), to: log)
+        #expect(await waitForClaudeMonitor { monitor.state.tasks.first?.status == .running })
+
+        try writeJSONL(under: projects, relativePath: "project/new.jsonl", lines: [
+            claudeUser(timestamp: "2026-07-19T01:00:05.000Z", sessionId: "new", text: "hello"),
+        ], modifiedAt: .now)
+        #expect(await waitForClaudeMonitor {
+            Set(monitor.state.tasks.map(\.id)) == ["claude-session-current", "claude-session-new"]
+        })
+        try FileManager.default.removeItem(at: log)
+        #expect(await waitForClaudeMonitor { monitor.state.tasks.map(\.id) == ["claude-session-new"] })
+    }
+
+    @Test
     func testDetectsRunningAssistantToolUseTurn() throws {
         let root = makeTempRoot("claude-running")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -542,6 +610,16 @@ struct ClaudeSessionActivityDetectorTests {
 private func makeTempRoot(_ label: String) -> URL {
     FileManager.default.temporaryDirectory
         .appendingPathComponent("Zisla-\(label)-\(UUID().uuidString)", isDirectory: true)
+}
+
+@MainActor
+private func waitForClaudeMonitor(_ condition: () -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + .seconds(5)
+    while ContinuousClock.now < deadline {
+        if condition() { return true }
+        try? await Task.sleep(for: .milliseconds(25))
+    }
+    return condition()
 }
 
 private func writeJSONL(

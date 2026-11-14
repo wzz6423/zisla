@@ -675,6 +675,99 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
+    func processLookupCapturesOutputWithoutARegularFile() {
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "if [ -f /dev/stdout ]; then printf disk; else printf memory; fi"],
+            timeout: 2
+        )
+
+        #expect(output == Data("memory".utf8), "Read-only process lookup must not spool output to disk")
+    }
+
+    @Test
+    func processLookupDrainsOutputLargerThanAPipeBuffer() {
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/dd"),
+            arguments: ["if=/dev/zero", "bs=65536", "count=4"],
+            timeout: 2
+        )
+
+        #expect(output == Data(repeating: 0, count: 256 * 1024))
+    }
+
+    @Test
+    func processLookupRecoversAfterLaunchFailureAndTimeout() {
+        let missing = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-missing-process-\(UUID().uuidString)")
+        #expect(CodexSessionActivityDetector.runProcessOutput(
+            executableURL: missing, arguments: [], timeout: 0.05
+        ) == nil)
+        #expect(CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sleep"), arguments: ["1"], timeout: 0.05
+        ) == nil)
+        #expect(CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/usr/bin/printf"), arguments: ["recovered"], timeout: 2
+        ) == Data("recovered".utf8))
+    }
+
+    @Test(arguments: [0, 65_536, 65_537])
+    func processLookupRejectsOversizedOutputWithoutTruncatingIt(byteCount: Int) {
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/dd"),
+            arguments: ["if=/dev/zero", "bs=\(max(1, byteCount))", "count=\(byteCount == 0 ? 0 : 1)"],
+            timeout: 2,
+            maximumOutputBytes: 65_536
+        )
+
+        #expect(output == (byteCount > 65_536 ? nil : Data(repeating: 0, count: byteCount)))
+    }
+
+    @Test
+    func processLookupStillTimesOutAfterStandardOutputCloses() {
+        let startedAt = Date()
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "exec 1>&-; exec /bin/sleep 1"],
+            timeout: 0.05
+        )
+
+        #expect(output == nil)
+        #expect(Date().timeIntervalSince(startedAt) < 0.75)
+    }
+
+    @Test
+    func processLookupStopsAChildThatIgnoresTermination() throws {
+        let root = makeSessionsRoot()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let pidURL = root.appendingPathComponent("lookup.pid")
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "trap '' TERM; printf '%s' $$ > \"$1\"; while :; do :; done", "lookup", pidURL.path],
+            timeout: 0.1
+        )
+
+        #expect(output == nil)
+        let pid = try #require(Int32(String(contentsOf: pidURL, encoding: .utf8)))
+        #expect(kill(pid, 0) == -1)
+        #expect(errno == ESRCH, "Timed-out process lookup must not leave its child running")
+    }
+
+    @Test
+    func processLookupDoesNotWaitForAnInheritedOutputHandle() {
+        let startedAt = Date()
+        let output = CodexSessionActivityDetector.runProcessOutput(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "printf complete; /bin/sleep 0.2 &"],
+            timeout: 0.1
+        )
+
+        #expect(output == Data("complete".utf8))
+        #expect(Date().timeIntervalSince(startedAt) < 0.75)
+    }
+
+    @Test
     func blankSessionTitleFallsBackToProviderName() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }

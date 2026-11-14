@@ -78,6 +78,7 @@ struct FloatingIslandInformationView: View {
     let visualizationStyle: MediaVisualizationStyle
     let item: NowPlayingSnapshot?
     let date: Date
+    var animatesLogo = false
     var onJoinMeeting: (String) -> Void = { _ in }
 
     var body: some View {
@@ -113,7 +114,7 @@ struct FloatingIslandInformationView: View {
             ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return row {
             if let size = layout.iconSize {
-                IslandStatusIconStrip(icons: layout.icons, edge: layout.edge, date: date)
+                IslandStatusIconStrip(icons: layout.icons, edge: layout.edge, date: date, animatesLogo: animatesLogo)
                     .frame(width: size.width, height: size.height)
             }
             ForEach(layout.primary) { status in

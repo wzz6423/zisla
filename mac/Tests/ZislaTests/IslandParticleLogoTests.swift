@@ -88,6 +88,53 @@ struct IslandParticleLogoTests {
         #expect(bodyPixels > 280, "The curved Z must stay visible at the pill's actual size")
     }
 
+    @Test(arguments: ["idle", "hidden", "icons", "information"], [false, true]) @MainActor
+    func theLogoAnimatesInsideAPausedStatusBarAndHonorsReduceMotion(
+        presentation: String, reduceMotion: Bool
+    ) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: .top)
+        fixture.settings.settings.islandShowMoreInformation = presentation == "information"
+        fixture.state.placementMode = .custom
+        fixture.state.compactStatusHidden = presentation == "hidden"
+        if presentation == "icons" || presentation == "information" {
+            fixture.state.statusIcons = [IslandStatusIcon(id: "app", content: .application, tooltip: "zisla")]
+        }
+        #expect(fixture.view.pausesCompactTimeline)
+        let host = NSHostingView(rootView: fixture.view
+            .environment(\._accessibilityReduceMotion, reduceMotion)
+            .frame(width: 80, height: 32).background(.black))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 80, height: 32),
+            styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        func frame() throws -> [UInt8] {
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            return try (0..<bitmap.pixelsHigh).flatMap { y in
+                try (0..<bitmap.pixelsWide).map { x in
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    return UInt8((color.redComponent * 255).rounded())
+                }
+            }
+        }
+        let first = try frame()
+        #expect(first.contains { $0 > 0 }, "The paused status bar must still render its logo")
+        var frames: Set<[UInt8]> = [first]
+        let deadline = Date().addingTimeInterval(0.5)
+        repeat {
+            RunLoop.main.run(mode: .default, before: min(deadline, Date().addingTimeInterval(1.0 / 60)))
+            frames.insert(try frame())
+        } while Date() < deadline
+        #expect(reduceMotion ? frames.count == 1 : frames.count > 1,
+                "The logo must advance its own frames unless Reduce Motion is enabled")
+        #expect(!window.isVisible)
+    }
+
     @Test @MainActor
     func onlyIdleCustomPillsRenderTheCenteredUprightParticleMark() throws {
         let fixture = try Fixture()
@@ -102,7 +149,7 @@ struct IslandParticleLogoTests {
             let idle = try pixels(fixture.view.statusBarContent(at: fixture.date)
                 .frame(width: size.width, height: size.height))
             #expect(idle == expected)
-            #expect(!fixture.view.pausesCompactTimeline, "Idle logo frames must use the existing animation clock")
+            #expect(fixture.view.pausesCompactTimeline, "Idle logo frames must not refresh the entire status bar")
             let pixelWidth = Int(size.width * 2)
             let pixelHeight = Int(size.height * 2)
             let lit = idle.indices.filter { idle[$0] > 0 }
@@ -113,7 +160,7 @@ struct IslandParticleLogoTests {
             }, "The 18pt mark must leave at least 3pt of whitespace on every side")
             let later = try pixels(fixture.view.statusBarContent(at: fixture.date.addingTimeInterval(3))
                 .frame(width: size.width, height: size.height))
-            #expect(later != idle, "The shared clock must advance the particles rather than freeze the logo")
+            #expect(later != idle, "Explicit frame times must advance the particles rather than freeze the logo")
             fixture.state.compactWingHeight = 12
             let shortSize = edge.isVertical ? CGSize(width: 12, height: 80) : CGSize(width: 80, height: 12)
             let shortMark = try pixels(IslandParticleLogo(side: 12, time: fixture.date.timeIntervalSinceReferenceDate)
@@ -131,7 +178,7 @@ struct IslandParticleLogoTests {
             let hidden = try pixels(fixture.view.statusBarContent(at: fixture.date)
                 .frame(width: size.width, height: size.height))
             #expect(hidden == expected, "Hiding an activity must restore the idle mark on \(edge)")
-            #expect(!fixture.view.pausesCompactTimeline, "The hidden activity restores the animated idle mark")
+            #expect(fixture.view.pausesCompactTimeline, "The restored idle mark must animate without refreshing the status bar")
             fixture.queue.removeAll()
             fixture.state.compactStatusHidden = false
             fixture.state.placementMode = .camera
@@ -169,7 +216,7 @@ struct IslandParticleLogoTests {
                 "The visible result must be identical whether the preceding activity was hidden or shown")
         fixture.sweep.finish(id: sweep.id)
         #expect(try pixels(fixture.view.statusBarContent(at: fixture.date).frame(width: size.width, height: size.height)) == idle)
-        #expect(!fixture.view.pausesCompactTimeline)
+        #expect(fixture.view.pausesCompactTimeline)
     }
 
     @Test(arguments: IslandEdge.allCases) @MainActor
@@ -226,7 +273,7 @@ struct IslandParticleLogoTests {
         #expect(frames[1] != frames[2] && frames[2] != frames[3], "Percentage, success, and failure must draw different indicators")
         fixture.queue.removeAll()
         #expect(try pixels(fixture.view.statusBarContent(at: fixture.date).frame(width: size.width, height: size.height)) == idle)
-        #expect(!fixture.view.pausesCompactTimeline)
+        #expect(fixture.view.pausesCompactTimeline)
     }
 
     @Test(arguments: IslandEdge.allCases) @MainActor

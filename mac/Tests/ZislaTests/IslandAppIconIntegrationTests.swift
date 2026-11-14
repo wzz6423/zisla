@@ -221,7 +221,7 @@ struct IslandAppIconIntegrationTests {
         let enabled = try pixels(view.statusBarContent(at: date)
             .frame(width: size.width, height: size.height))
         #expect(enabled.contains { $0 > 0 })
-        #expect(!view.pausesCompactTimeline)
+        #expect(view.pausesCompactTimeline, "The idle mark must animate independently of the status bar")
         fixture.settings.settings.islandAppIconEnabled = false
         let disabled = try pixels(view.statusBarContent(at: date)
             .frame(width: size.width, height: size.height))

@@ -507,20 +507,19 @@ public final class CodexSessionActivityDetector {
         executableURL: URL,
         arguments: [String],
         timeout: TimeInterval,
-        fileManager: FileManager = .default
+        maximumOutputBytes: Int = 16 * 1024 * 1024
     ) -> Data? {
-        let outputURL = fileManager.temporaryDirectory
-            .appendingPathComponent("zisla-codex-lsof-\(UUID().uuidString)")
-        guard fileManager.createFile(atPath: outputURL.path, contents: nil),
-              let output = try? FileHandle(forWritingTo: outputURL) else {
-            return nil
-        }
+        let output = Pipe()
+        let descriptor = output.fileHandleForReading.fileDescriptor
         defer {
-            try? output.close()
-            try? fileManager.removeItem(at: outputURL)
+            try? output.fileHandleForReading.close()
+            try? output.fileHandleForWriting.close()
         }
+        guard fcntl(descriptor, F_SETFL, O_NONBLOCK) != -1 else { return nil }
 
         let process = Process()
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
         process.executableURL = executableURL
         process.arguments = arguments
         process.standardOutput = output
@@ -530,29 +529,39 @@ public final class CodexSessionActivityDetector {
         } catch {
             return nil
         }
+        try? output.fileHandleForWriting.close()
+        defer {
+            if process.isRunning {
+                process.terminate()
+                if exited.wait(timeout: .now() + 0.25) == .timedOut, process.isRunning {
+                    Darwin.kill(process.processIdentifier, SIGKILL)
+                    _ = exited.wait(timeout: .now() + 0.25)
+                }
+            }
+        }
 
         let deadline = DispatchTime.now() + max(0, timeout)
-        while process.isRunning, DispatchTime.now() < deadline {
-            Thread.sleep(forTimeInterval: 0.01)
-        }
-        guard process.isRunning else {
-            process.waitUntilExit()
-            try? output.synchronize()
-            try? output.close()
-            return try? Data(contentsOf: outputURL)
-        }
-
-        process.terminate()
-        let terminationDeadline = DispatchTime.now() + 0.25
-        while process.isRunning, DispatchTime.now() < terminationDeadline {
-            Thread.sleep(forTimeInterval: 0.01)
-        }
-        if process.isRunning {
-            Darwin.kill(process.processIdentifier, SIGKILL)
-            let killDeadline = DispatchTime.now() + 0.25
-            while process.isRunning, DispatchTime.now() < killDeadline {
-                Thread.sleep(forTimeInterval: 0.01)
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while DispatchTime.now() < deadline {
+            let isRunning = process.isRunning
+            let count = Darwin.read(descriptor, &buffer, buffer.count)
+            if count > 0 {
+                guard count <= maximumOutputBytes - data.count else { return nil }
+                data.append(buffer, count: count)
+                continue
             }
+            if count == 0 {
+                return exited.wait(timeout: deadline) == .success ? data : nil
+            }
+            guard errno == EAGAIN || errno == EINTR else { return nil }
+            // A descendant may inherit stdout; the lookup ends with the process we launched.
+            guard isRunning else { return data }
+            let now = DispatchTime.now()
+            guard now < deadline else { break }
+            let milliseconds = Int32(min(50, (deadline.uptimeNanoseconds - now.uptimeNanoseconds) / 1_000_000 + 1))
+            var event = pollfd(fd: descriptor, events: Int16(POLLIN | POLLHUP), revents: 0)
+            _ = poll(&event, 1, milliseconds)
         }
         return nil
     }

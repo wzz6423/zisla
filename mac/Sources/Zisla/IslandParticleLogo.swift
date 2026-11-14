@@ -3,12 +3,21 @@ import SwiftUI
 
 struct IslandParticleLogo: View {
     var side: CGFloat
-    var time: TimeInterval
+    var time: TimeInterval? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Self.rendering(side: side, time: time, reduceMotion: reduceMotion)
-            .accessibilityHidden(true)
+        Group {
+            if let time {
+                Self.rendering(side: side, time: time, reduceMotion: reduceMotion)
+            } else {
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+                    Self.rendering(side: side, time: context.date.timeIntervalSinceReferenceDate,
+                                   reduceMotion: reduceMotion)
+                }
+            }
+        }
+        .accessibilityHidden(true)
     }
 
     static func rendering(side: CGFloat, time: TimeInterval, reduceMotion: Bool) -> some View {
