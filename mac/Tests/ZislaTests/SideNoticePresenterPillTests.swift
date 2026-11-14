@@ -11,6 +11,226 @@ import ZislaKit
 // Pixel velocity sampling needs an uncontended AppKit run loop, beyond MainActor isolation.
 @Suite(.serialized)
 struct SideNoticePresenterPillTests {
+    @Test(arguments: IslandEdge.allCases, [AIProgressStatus.succeeded, .failed, .error])
+    func resultSweepsKeepTheFloatingInformationFrame(edge: IslandEdge, status: AIProgressStatus) throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        let task = AIProgressTask(id: "floating-result", provider: .codex, title: "Task",
+            progress: nil, status: status, updatedAt: fixture.date)
+        fixture.queue.enqueue(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title),
+            expiresAfter: nil)
+        fixture.queue.enqueue(IslandNotice(id: "media-active-fixture", title: "Music"), expiresAfter: nil)
+        let icons = [
+            IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU"),
+        ]
+        fixture.presenter.setStatusIcons(icons)
+        let notices = fixture.queue.left + fixture.queue.right
+        let initial = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: notices, at: fixture.date))
+
+        fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
+        let sweep = try #require(fixture.sweep.current)
+        let sweeping = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date))
+
+        #expect(sweeping == initial, "The floating island must retain its frame during the result sweep; before: \(initial), during: \(sweeping)")
+        fixture.presenter.setStatusIcons(icons)
+        #expect(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date) == initial)
+        var publishedSize: CGSize?
+        fixture.presenter.onCompactLayoutChanged = { _, _, _, _, size in publishedSize = size }
+        fixture.presenter.publishCompactLayout(on: fixture.screen.displayID)
+        #expect(publishedSize == initial.size, "The main island and status surface must use the same retained dimensions")
+        fixture.sweep.finish(id: sweep.id)
+        fixture.presenter.setStatusIcons(icons)
+        #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: notices, at: fixture.date) == initial)
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func queuedResultsRetainTheFrameAfterClientsExitAndCancellationReleasesIt(edge: IslandEdge) throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        let firstTask = AIProgressTask(id: "finished", provider: .gpt, title: "Task",
+            progress: nil, status: .succeeded, updatedAt: fixture.date)
+        fixture.queue.enqueue(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: firstTask), title: firstTask.title),
+            expiresAfter: nil)
+        fixture.queue.enqueue(IslandNotice(id: "media-active-fixture", title: "Music"), expiresAfter: nil)
+        fixture.presenter.setStatusIcons([])
+        let initial = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.queue.left + fixture.queue.right, at: fixture.date))
+
+        fixture.queue.remove(id: AIMascotLibrary.activeNoticeID(for: firstTask))
+        fixture.sweep.receive(previous: .running, task: firstTask, observedSince: .distantPast, settings: fixture.settings.settings)
+        let first = try #require(fixture.sweep.current)
+        fixture.queue.removeAll()
+        fixture.presenter.setStatusIcons([])
+        #expect(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date) == initial)
+
+        let secondTask = AIProgressTask(id: "failed", provider: .codex, title: "Task",
+            progress: nil, status: .failed, updatedAt: fixture.date)
+        fixture.sweep.receive(previous: .running, task: secondTask, observedSince: .distantPast, settings: fixture.settings.settings)
+        fixture.sweep.finish(id: first.id)
+        let second = try #require(fixture.sweep.current)
+        fixture.presenter.setStatusIcons([])
+        #expect(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date) == initial)
+
+        fixture.sweep.cancel()
+        fixture.sweep.finish(id: second.id)
+        fixture.presenter.setStatusIcons([])
+        let idle = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [], at: fixture.date))
+        #expect(idle.size == CGSize(width: 24, height: 24), "Cancelling playback must release the retained dimensions")
+        fixture.sweep.receive(previous: .running, task: secondTask, observedSince: .distantPast, settings: fixture.settings.settings)
+        fixture.presenter.setStatusIcons([])
+        let next = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
+        #expect(next != initial, "A fresh sweep must not reuse an earlier information layout")
+        #expect((edge.isVertical ? next.width : next.height) == CompactPillStatusPresentation.minimumThickness)
+        #expect((edge.isVertical ? next.height : next.width) > CompactPillStatusPresentation.minimumThickness,
+                "An idle circle must grow enough to show both the AI icon and task count")
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func aFirstResultWithoutAPreviousLayoutUsesNormalAISizing(edge: IslandEdge) throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        let task = AIProgressTask(id: "first-result", provider: .codex, title: "Task",
+            progress: nil, status: .succeeded, updatedAt: fixture.date)
+        fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
+        let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
+        #expect((edge.isVertical ? frame.width : frame.height) == 32)
+        #expect((edge.isVertical ? frame.height : frame.width) == (edge.isVertical ? 68 : 60))
+    }
+
+    @Test(arguments: [IslandLayoutStyle.pill, .notch])
+    func switchingToCameraOrNotchDoesNotRetainACustomResultFrame(style: IslandLayoutStyle) throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        fixture.settings.settings.mediaShowLyricsAndInfo = true
+        fixture.queue.enqueue(IslandNotice(id: "media-active-fixture", title: "Music"), expiresAfter: nil)
+        fixture.media.publishSnapshot(NowPlayingSnapshot(title: String(repeating: "Long title ", count: 8), artist: "Artist", album: nil,
+            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: false))
+        fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu",
+            content: .metric(.cpu, text: String(repeating: "1234567890", count: 8), image: nil, style: .detailed), tooltip: "CPU")])
+        let initial = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.queue.left + fixture.queue.right, at: fixture.date))
+        #expect(initial.width > ScreenLayoutConfiguration.cameraPillMaximumWidth)
+        let task = AIProgressTask(id: "switched-result", provider: .codex, title: "Task",
+            progress: nil, status: .succeeded, updatedAt: fixture.date)
+        fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
+        fixture.settings.settings.islandLayoutStyle = style
+        fixture.settings.settings.islandPlacement = IslandPlacement(mode: style == .pill ? .camera : .custom)
+        let notices = fixture.sweep.presentationNotices(from: [])
+        let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: notices, at: fixture.date))
+        if style == .pill {
+            #expect(frame.size == CGSize(width: 200, height: 32))
+        } else {
+            let engine = SideNoticeLayoutEngine()
+            #expect(frame == engine.compactBarFrame(for: fixture.screen, notices: notices, settings: fixture.settings.settings))
+        }
+    }
+
+    @Test
+    func changingTheEdgeDuringPlaybackDoesNotRotateTheOldDimensions() throws {
+        let fixture = try Fixture(edge: .left)
+        defer { fixture.close() }
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu",
+            content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")])
+        let task = AIProgressTask(id: "edge-change", provider: .codex, title: "Task",
+            progress: nil, status: .succeeded, updatedAt: fixture.date)
+        fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
+        fixture.settings.settings.islandPlacement.edge = .top
+        let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
+        #expect(frame.size == CGSize(width: 60, height: 32))
+    }
+
+    @Test(arguments: [IslandLayoutStyle.pill, .notch])
+    func startingCustomPlacementDuringPlaybackUsesNormalAISizing(style: IslandLayoutStyle) throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.islandLayoutStyle = style
+        fixture.settings.settings.islandPlacement = IslandPlacement()
+        let task = AIProgressTask(id: "placement-change", provider: .codex, title: "Task",
+            progress: nil, status: .succeeded, updatedAt: fixture.date)
+        let notice = IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title)
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        fixture.presenter.setStatusIcons([])
+        fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
+        fixture.settings.settings.islandLayoutStyle = .pill
+        fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom)
+        let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: fixture.sweep.presentationNotices(from: [notice]), at: fixture.date))
+        #expect(frame.size == CGSize(width: 60, height: 32))
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func retainedResultFramesRenderOnlyAIAtItsExistingIconSize(edge: IslandEdge) async throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        fixture.screen.frame.origin.x = 20_000
+        fixture.screen.visibleFrame.origin.x = 20_000
+        fixture.reducesMotion = true
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.islandNotchBackground = .black
+        fixture.settings.settings.collapsedProgressGlowEnabled = false
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        let host = try activeHost(fixture)
+        let icons = [IslandStatusIcon(id: "cpu",
+            content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
+        let task = AIProgressTask(id: "rendered-result", provider: .gpt, title: "Task",
+            progress: nil, status: .succeeded, updatedAt: fixture.date)
+        fixture.queue.enqueue(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title),
+            expiresAfter: nil)
+        fixture.queue.enqueue(IslandNotice(id: "media-active-fixture", title: "Music"), expiresAfter: nil)
+        fixture.presenter.setStatusIcons(icons)
+        let initial = try #require(host.rootView.content.displayState.compactLayout).frame
+
+        fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
+        fixture.presenter.setStatusIcons(icons)
+        let view = host.rootView.content
+        #expect(view.displayState.compactLayout?.frame == initial)
+        #expect(view.displayState.statusIcons.isEmpty, "Retaining the frame must not restore the monitor strip")
+        #expect(view.selectedCompactStatusPriority == .aiActivity)
+        let presentation = try #require(SideNoticeLayoutEngine().compactPillPresentations(
+            for: fixture.sweep.presentationNotices(from: fixture.queue.left + fixture.queue.right),
+            settings: fixture.settings.settings).first)
+        let thickness = CompactPillStatusPresentation.minimumThickness
+        let expected = CompactPillStatusContent(presentation: presentation, text: presentation.text, edge: edge,
+            visualizationStyle: fixture.settings.settings.mediaVisualizationStyle, item: nil, date: fixture.date)
+            .frame(width: edge.isVertical ? thickness : nil, height: edge.isVertical ? nil : thickness)
+            .frame(width: initial.width, height: initial.height)
+            .environment(\.colorScheme, .dark)
+            .environment(\.layoutDirection, .leftToRight)
+        let actualPixels = try await renderOffscreen(view.statusBarContent(at: fixture.date)
+            .environment(\._accessibilityReduceMotion, true), size: initial.size)
+        let expectedPixels = try await renderOffscreen(expected
+            .environment(\._accessibilityReduceMotion, true), size: initial.size)
+        var foregroundPixels = 0
+        var differingPixels = 0
+        for x in 0..<actualPixels.pixelsWide {
+            for y in 0..<actualPixels.pixelsHigh {
+                let actual = try #require(actualPixels.colorAt(x: x, y: y))
+                let expected = try #require(expectedPixels.colorAt(x: x, y: y))
+                let isForeground = min(actual.redComponent, actual.greenComponent, actual.blueComponent) > 0.5
+                let expectedForeground = min(expected.redComponent, expected.greenComponent, expected.blueComponent) > 0.5
+                if isForeground { foregroundPixels += 1 }
+                if isForeground != expectedForeground { differingPixels += 1 }
+            }
+        }
+        #expect(foregroundPixels > 30, "The retained frame must still render its AI icon and count")
+        #expect(differingPixels == 0, "Only standard-sized AI content may appear within the retained frame")
+    }
+
     @Test(arguments: [IslandLayoutStyle.pill, .notch])
     func cameraAIContentMovesTenPointsInwardWithoutResizingTheIcons(style: IslandLayoutStyle) async throws {
         let fixture = try Fixture(edge: .top)
@@ -1053,7 +1273,7 @@ struct SideNoticePresenterPillTests {
         let media = NowPlayingService()
         let downloads = BrowserDownloadMonitor()
         let queue = SideNoticeQueue()
-        let sweep = AIResultSweepController()
+        let sweep = AIResultSweepController(now: { Date(timeIntervalSince1970: 100) })
         let date = Date(timeIntervalSince1970: 100)
         var reducesMotion = false
         let resizeClock = ResizeClock()

@@ -418,11 +418,13 @@ struct CompactStatusBarView: View {
             .padding(displayState.islandEdge.isVertical ? .vertical : .horizontal,
                      CompactPillStatusPresentation.trailingInset)
         } else if let presentation = sizing?.customPillPresentation {
+            let thickness = resultSweep.current == nil ? height
+                : max(CGFloat(settingsStore.settings.islandPillHeight), CompactPillStatusPresentation.minimumThickness)
             let text = CompactPillStatusContent.displayText(
                 for: presentation, settings: settingsStore.settings, item: media.snapshot, at: date
             )
             let length = presentation.length(
-                thickness: height, edge: displayState.islandEdge, text: text, item: media.snapshot
+                thickness: thickness, edge: displayState.islandEdge, text: text, item: media.snapshot
             )
             CompactPillStatusContent(
                 presentation: presentation, text: text, edge: displayState.islandEdge,
@@ -430,6 +432,8 @@ struct CompactStatusBarView: View {
                 item: presentation.isMedia ? media.snapshot : nil, date: date,
                 onJoinMeeting: onJoinMeeting
             )
+            .frame(width: displayState.islandEdge.isVertical ? thickness : nil,
+                   height: displayState.islandEdge.isVertical ? nil : thickness)
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
         } else if resultSweep.current == nil, settingsStore.settings.islandAppIconEnabled {
             IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
