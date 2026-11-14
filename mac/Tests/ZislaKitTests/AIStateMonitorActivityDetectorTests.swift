@@ -426,6 +426,81 @@ struct AIStateMonitorActivityDetectorTests {
         #expect(monitor.state.usageSamples.isEmpty && monitor.usageHistoryState == .idle)
     }
 
+    @Test(arguments: [false, true]) @MainActor
+    func elapsedTimeExpiresPersistedTasksWithoutAnActivityScan(hasUsageCollector: Bool) async throws {
+        let directory = monitorTempDirectory("persisted-expiry")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var now = Date(timeIntervalSince1970: 1_910_000_000)
+        let active = AIProgressTask(id: "active", provider: .codex, title: "Active", progress: nil,
+            status: .running, updatedAt: now)
+        let finished = AIProgressTask(id: "finished", provider: .claude, title: "Finished", progress: 1,
+            status: .succeeded, updatedAt: now.addingTimeInterval(-60))
+        let repository = AIStateRepository(directoryURL: directory)
+        let database = try AIStateDatabase(url: repository.databaseURL, maximumUsageSamples: 10)
+        try database.upsertTask(active)
+        try database.upsertTask(finished)
+        let usage = CountingUsageDetector()
+        let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [],
+            usageDetectors: hasUsageCollector ? [usage] : [], activeTaskTTL: 30, now: { now })
+        defer { monitor.stop() }
+        monitor.start()
+        #expect(await waitForMonitorState { Set(monitor.state.tasks.map(\.id)) == [active.id, finished.id] })
+        let initialState = monitor.state
+        var publications = 0
+        let observation = monitor.$state.sink { _ in publications += 1 }
+        defer { observation.cancel() }
+
+        now = now.addingTimeInterval(30)
+        monitor.usageTimer?.fire()
+        await Task { @MainActor in }.value
+        _ = try await monitor.readUsageHistory()
+        #expect(monitor.state == initialState, "The exact TTL boundary must retain active tasks")
+        #expect(publications == 1, "An unchanged expiry check must not redraw the status bar")
+
+        now = now.addingTimeInterval(1)
+        monitor.usageTimer?.fire()
+        #expect(await waitForMonitorState { monitor.state.tasks == [finished] },
+            "Elapsed time alone must expire persisted activity even without collectors or another usage scan")
+        #expect(usage.callCount == (hasUsageCollector ? 1 : 0))
+        #expect(Set(try repository.load().tasks.map(\.id)) == [active.id, finished.id],
+            "Expiry only changes the visible snapshot, not persisted task records")
+        #expect(monitor.state.usageSamples.isEmpty && monitor.usageHistoryState == .idle)
+        monitor.usageTimer?.fire()
+        await Task { @MainActor in }.value
+        _ = try await monitor.readUsageHistory()
+        #expect(publications == 2, "Further expiry checks must not republish the same task snapshot")
+        withExtendedLifetime(database) {}
+    }
+
+    @Test @MainActor
+    func queuedExpiryCallbackCannotPublishAfterStopAndRestartResumesExpiry() async throws {
+        let directory = monitorTempDirectory("persisted-expiry-stop")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var now = Date(timeIntervalSince1970: 1_910_000_000)
+        let task = AIProgressTask(id: "active", provider: .codex, title: "Active", progress: nil,
+            status: .running, updatedAt: now)
+        let repository = AIStateRepository(directoryURL: directory)
+        let database = try AIStateDatabase(url: repository.databaseURL, maximumUsageSamples: 10)
+        try database.upsertTask(task)
+        let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [],
+            activeTaskTTL: 30, now: { now })
+        defer { monitor.stop() }
+        monitor.start()
+        #expect(await waitForMonitorState { monitor.state.tasks == [task] })
+        now = now.addingTimeInterval(31)
+        monitor.usageTimer?.fire()
+        monitor.stop()
+        await Task { @MainActor in }.value
+        _ = try await monitor.readUsageHistory()
+        #expect(monitor.state.tasks == [task], "Stopping must invalidate an already queued expiry callback")
+        #expect(monitor.activityTimer == nil && monitor.usageTimer == nil)
+
+        monitor.start()
+        #expect(await waitForMonitorState { monitor.state.tasks.isEmpty },
+            "Restart must reconcile expiry even when the persisted state is unchanged")
+        withExtendedLifetime(database) {}
+    }
+
     @Test @MainActor
     func usageThrottleChecksAgainWithinOneMinuteAfterAnEarlyTick() async throws {
         let directory = monitorTempDirectory("usage-timer-drift")

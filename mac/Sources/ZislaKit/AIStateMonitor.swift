@@ -311,7 +311,8 @@ public final class AIStateMonitor: ObservableObject {
                 activityTimer = timer
                 RunLoop.main.add(timer, forMode: .common)
             }
-            if !usageDetectors.isEmpty || subscriptionUsageDetector != nil || accountBalanceDetector != nil {
+            if activityDetectors.isEmpty || !usageDetectors.isEmpty
+                || subscriptionUsageDetector != nil || accountBalanceDetector != nil {
                 let checkInterval = min(detectorRefreshInterval, usageRefreshInterval)
                 let timer = Timer(fire: Date(timeIntervalSinceNow: checkInterval),
                     interval: checkInterval, repeats: true) { [weak self] _ in
@@ -941,7 +942,11 @@ public final class AIStateMonitor: ObservableObject {
         }
         let detectsUsage = allowUsageScan && !usageDetectors.isEmpty
             && now().timeIntervalSince(lastUsageRefreshAt) >= usageRefreshInterval
-        guard !indices.isEmpty || detectsUsage else { return }
+        guard !indices.isEmpty || detectsUsage else {
+            let tasks = mergedTasks()
+            if tasks != state.tasks { state.tasks = tasks }
+            return
+        }
         detectorRefreshInFlight = true
         let generation = refreshGeneration
         let dependencies = refreshDependencies()

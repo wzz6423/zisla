@@ -2303,6 +2303,124 @@ struct CodexRolloutIntegrityTests {
         }
     }
 
+    @Test(arguments: [false, true], [false, true])
+    func targetedRefreshCannotHideShortTurnsInOtherRollouts(newDirectory: Bool, directoryEvent: Bool) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var now = iso8601Date("2026-07-19T01:00:00.000Z")
+        let known = root.appendingPathComponent("rollout-known.jsonl")
+        let relative = newDirectory ? "2026/07/20/rollout-short.jsonl" : "rollout-short.jsonl"
+        let short = root.appendingPathComponent(relative)
+        try writeRollout(under: root, relativePath: known.lastPathComponent,
+            lines: [eventLine(timestamp: "2026-07-19T00:59:59.000Z", payloadType: "task_started", turnID: "known")],
+            modifiedAt: now)
+        if !newDirectory {
+            try writeRollout(under: root, relativePath: relative, lines: [], modifiedAt: now)
+        }
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
+        #expect(try detector.taskUpdates().map(\.id) == ["codex-turn-known"])
+
+        let lines = [
+            eventLine(timestamp: "2026-07-19T01:00:01.000Z", payloadType: "task_started", turnID: "short"),
+            eventLine(timestamp: "2026-07-19T01:00:02.000Z", payloadType: "task_complete", turnID: "short"),
+        ]
+        now = now.addingTimeInterval(3)
+        if newDirectory {
+            try writeRollout(under: root, relativePath: relative, lines: lines, modifiedAt: now)
+        } else {
+            for line in lines { try appendLine(line, to: short) }
+        }
+        try writeRollout(under: root, relativePath: "2026/07/18/rollout-old.jsonl", lines: [
+            eventLine(timestamp: "2026-07-18T01:00:00.000Z", payloadType: "task_started", turnID: "old"),
+            eventLine(timestamp: "2026-07-18T01:00:01.000Z", payloadType: "task_complete", turnID: "old"),
+        ], modifiedAt: now)
+        try appendLine("{\"type\":\"ignored\"}", to: known)
+        #expect(try detector.taskUpdates(changedFileURLs: [known]).map(\.id) == ["codex-turn-known"])
+
+        now = now.addingTimeInterval(1)
+        let updates = try detector.taskUpdates(changedFileURLs: directoryEvent ? [short.deletingLastPathComponent()] : nil)
+        #expect(updates.first { $0.id == "codex-turn-short" }?.status == .succeeded,
+            "A targeted refresh cannot advance the completion cutoff for another rollout")
+        #expect(updates.first { $0.id == "codex-turn-short" }?.startedAt == iso8601Date("2026-07-19T01:00:01.000Z"))
+        #expect(!updates.contains { $0.id == "codex-turn-old" }, "Newly discovered historical completions stay silent")
+        #expect(try detector.taskUpdates().map(\.id) == ["codex-turn-known"], "Completions are emitted only once")
+    }
+
+    @Test
+    func targetedRolloutRewritesDoNotReplayAlreadyObservedCompletions() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var now = iso8601Date("2026-07-19T01:00:00.000Z")
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
+        #expect(try detector.taskUpdates().isEmpty)
+        let file = root.appendingPathComponent("rollout-short.jsonl")
+        let lines = [
+            eventLine(timestamp: "2026-07-19T01:00:01.000Z", payloadType: "task_started", turnID: "short"),
+            eventLine(timestamp: "2026-07-19T01:00:02.000Z", payloadType: "task_complete", turnID: "short"),
+        ]
+        now = now.addingTimeInterval(3)
+        try writeRollout(under: root, relativePath: file.lastPathComponent, lines: lines, modifiedAt: now)
+        #expect(try detector.taskUpdates(changedFileURLs: [file]).first?.status == .succeeded)
+
+        now = now.addingTimeInterval(1)
+        try Data((lines.joined(separator: "\n") + "\n").utf8).write(to: file, options: .atomic)
+        #expect(try detector.taskUpdates(changedFileURLs: [file]).isEmpty,
+            "Replacing a file with already observed lifecycle events must not replay completion")
+        #expect(try detector.taskUpdates().isEmpty)
+    }
+
+    @Test
+    func deniedReadPreservesTheCompletionCutoffUntilRecovery() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var now = iso8601Date("2026-07-19T01:00:00.000Z")
+        let file = root.appendingPathComponent("rollout-denied-short.jsonl")
+        try writeRollout(under: root, relativePath: file.lastPathComponent, lines: [], modifiedAt: now)
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
+        #expect(try detector.taskUpdates().isEmpty)
+        for (timestamp, kind) in [("01", "task_started"), ("02", "task_complete")] {
+            try appendLine(eventLine(timestamp: "2026-07-19T01:00:\(timestamp).000Z",
+                payloadType: kind, turnID: "short"), to: file)
+        }
+        now = now.addingTimeInterval(3)
+        try withDeniedRolloutRead(at: file) { () throws in
+            #expect(try detector.taskUpdates().isEmpty)
+        }
+        now = now.addingTimeInterval(1)
+        #expect(try detector.taskUpdates().first?.status == .succeeded,
+            "An unreadable scan must not move a previously observed file's completion cutoff")
+        #expect(try detector.taskUpdates().isEmpty)
+    }
+
+    @Test
+    func fullDiscoveryReleasesObservationStateForDeletedRollouts() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var now = iso8601Date("2026-07-19T01:00:00.000Z")
+        let detector = CodexSessionActivityDetector(sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
+        #expect(try detector.taskUpdates().isEmpty)
+        for index in 0..<8 {
+            let file = root.appendingPathComponent("rollout-\(index).jsonl")
+            now = now.addingTimeInterval(1)
+            try writeRollout(under: root, relativePath: file.lastPathComponent,
+                lines: [eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "t\(index)")],
+                modifiedAt: now)
+            #expect(try detector.taskUpdates(changedFileURLs: [file]).count == 1)
+            #expect(detector.lastObservedAtByRolloutURL.count == 1,
+                "Observation state must remain bounded to files seen since the last discovery")
+            try FileManager.default.removeItem(at: file)
+            #expect(try detector.taskUpdates().isEmpty)
+            #expect(detector.lastObservedAtByRolloutURL.isEmpty,
+                "Full discovery must release observation state for deleted rollouts")
+        }
+    }
+
     @Test
     func coalescedProviderEventsCannotImportRolloutsFromAnotherRoot() throws {
         let root = makeSessionsRoot()

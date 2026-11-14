@@ -152,7 +152,8 @@ public final class CodexSessionActivityDetector {
     private var confirmedProvidersByActivityKey: [String: AIProvider] = [:]
     private var previouslyActiveTasks: [String: AIProgressTask] = [:]
     private var completedTasks: [AIProgressTask] = []
-    private var lastScanAt: Date?
+    private var lastDiscoveryAt: Date?
+    private(set) var lastObservedAtByRolloutURL: [URL: Date] = [:]
     public private(set) var activityFileURLs: [URL] = []
 
     public init(
@@ -192,7 +193,8 @@ public final class CodexSessionActivityDetector {
     }
 
     private func activeTasks(changedFileURLs: Set<URL>?) throws -> [AIProgressTask] {
-        let candidates = recentRollouts(changedFileURLs: changedFileURLs)
+        let discovery = recentRollouts(changedFileURLs: changedFileURLs)
+        let candidates = discovery.candidates
         let selectedURLs = Set(candidates.map(\.url))
         cache = cache.filter { selectedURLs.contains($0.key) }
 
@@ -427,8 +429,9 @@ public final class CodexSessionActivityDetector {
                 task = previous
             } else {
                 // A short turn can start and finish between scans; old or replayed logs must stay silent.
-                guard let lastScanAt, let start = starts[record.event.turnID],
-                      start.event.timestamp > lastScanAt, start.event.timestamp <= observedAt else { return nil }
+                let lastObservedAt = lastObservedAtByRolloutURL[record.rolloutURL] ?? lastDiscoveryAt
+                guard let lastObservedAt, let start = starts[record.event.turnID],
+                      start.event.timestamp > lastObservedAt, start.event.timestamp <= observedAt else { return nil }
                 task = AIProgressTask(
                     id: id, provider: .codex,
                     title: start.sessionID.flatMap { titlesBySessionID[$0] } ?? "Codex",
@@ -443,7 +446,14 @@ public final class CodexSessionActivityDetector {
             task.updatedAt = record.event.timestamp
             return task
         }
-        lastScanAt = observedAt
+        let refreshedURLs = discovery.changedURLs.map { $0.intersection(selectedURLs) } ?? selectedURLs
+        for url in refreshedURLs.subtracting(unreadableURLs) {
+            lastObservedAtByRolloutURL[url] = observedAt
+        }
+        if discovery.changedURLs == nil {
+            lastDiscoveryAt = observedAt
+            lastObservedAtByRolloutURL = lastObservedAtByRolloutURL.filter { rolloutCandidates?[$0.key] != nil }
+        }
         let unreadableTaskIDs = Set(unreadableTurnIDs.map(Self.taskID(forTurnID:)))
         previouslyActiveTasks = previouslyActiveTasks.filter { unreadableTaskIDs.contains($0.key) }
         previouslyActiveTasks.merge(tasks.map { ($0.id, $0) }) { _, latest in latest }
@@ -679,7 +689,7 @@ public final class CodexSessionActivityDetector {
         return (.error, latestSignal?.reason)
     }
 
-    private func recentRollouts(changedFileURLs: Set<URL>?) -> [Candidate] {
+    private func recentRollouts(changedFileURLs: Set<URL>?) -> (candidates: [Candidate], changedURLs: Set<URL>?) {
         if let changedFileURLs, var candidates = rolloutCandidates,
            changedFileURLs.allSatisfy({ $0.lastPathComponent.hasPrefix("rollout-") && $0.pathExtension == "jsonl" }) {
             let directory = sessionsDirectory.standardizedFileURL.path + "/"
@@ -691,13 +701,13 @@ public final class CodexSessionActivityDetector {
             let minimumModificationDate = now().addingTimeInterval(-maximumRolloutAge)
             candidates = candidates.filter { $0.value.modificationDate >= minimumModificationDate }
             rolloutCandidates = candidates
-            return selectedRollouts(Array(candidates.values))
+            return (selectedRollouts(Array(candidates.values)), Set(changedFileURLs.map(\.standardizedFileURL)))
         }
         // Directory changes can introduce new sessions or replace whole subtrees.
         // Periodic scans use the same discovery path to recover missed filesystem events.
         rolloutCandidates = nil
         guard fileManager.fileExists(atPath: sessionsDirectory.path) else {
-            return []
+            return ([], nil)
         }
 
         guard let enumerator = fileManager.enumerator(
@@ -709,7 +719,7 @@ public final class CodexSessionActivityDetector {
             ],
             options: [.skipsHiddenFiles]
         ) else {
-            return []
+            return ([], nil)
         }
 
         let minimumModificationDate = now().addingTimeInterval(-maximumRolloutAge)
@@ -720,7 +730,7 @@ public final class CodexSessionActivityDetector {
             candidates.append(candidate)
         }
         rolloutCandidates = Dictionary(uniqueKeysWithValues: candidates.map { ($0.url, $0) })
-        return selectedRollouts(candidates)
+        return (selectedRollouts(candidates), nil)
     }
 
     private func selectedRollouts(_ candidates: [Candidate]) -> [Candidate] {
