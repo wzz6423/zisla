@@ -78,6 +78,7 @@ struct CompactPillStatusContent: View {
     let item: NowPlayingSnapshot?
     let date: Date
     var leadingInset: CGFloat = CompactPillStatusPresentation.trailingInset
+    var controlRegionThickness: CGFloat? = nil
     var onJoinMeeting: (String) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -124,6 +125,8 @@ struct CompactPillStatusContent: View {
         .background {
             if presentation.priority == .focusCountdown {
                 CompactPomodoroControlRegion()
+                    .frame(width: edge.isVertical ? controlRegionThickness : nil,
+                           height: edge.isVertical ? nil : controlRegionThickness)
             }
         }
     }

@@ -123,7 +123,8 @@ struct FloatingIslandInformationView: View {
             ForEach(layout.primary) { status in
                 CompactPillStatusContent(presentation: status.presentation, text: status.text, edge: layout.edge,
                     visualizationStyle: visualizationStyle, item: status.presentation.isMedia ? item : nil,
-                    date: date, leadingInset: status.leadingInset, onJoinMeeting: onJoinMeeting)
+                    date: date, leadingInset: status.leadingInset,
+                    controlRegionThickness: layout.primaryThickness, onJoinMeeting: onJoinMeeting)
                     .frame(width: layout.edge.isVertical ? layout.statusThickness : status.length,
                            height: layout.edge.isVertical ? status.length : layout.statusThickness)
             }
