@@ -339,6 +339,8 @@ struct AIStateMonitorActivityDetectorTests {
         #expect(unchanged.callCount == unchangedCalls,
             "One log event must not launch filesystem scans or processes for unrelated providers")
         #expect(usage.callCount == 0)
+        #expect(changed.lastChangedURLs == [log.standardizedFileURL],
+                "The detector needs the changed path to avoid rescanning its whole log directory")
     }
 
     @Test @MainActor
@@ -413,6 +415,8 @@ struct AIStateMonitorActivityDetectorTests {
         #expect(monitor.activityTimer == nil)
         let timer = try #require(monitor.usageTimer)
         #expect(timer.timeInterval == 5 * 60)
+        #expect(abs(timer.fireDate.timeIntervalSinceNow - timer.timeInterval) < 1,
+                "The first usage deadline must honor the usage interval even when activity scans run daily")
         timer.fire()
         let repository = AIStateRepository(directoryURL: directory)
         #expect(await waitForMonitorState {
@@ -613,6 +617,41 @@ struct AIStateMonitorActivityDetectorTests {
     }
 
     @Test @MainActor
+    func pendingFileEventsMergePathsAndFullRefreshStillWins() async throws {
+        let directory = monitorTempDirectory("pending-file-paths")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let logs = ["first.jsonl", "second.jsonl"].map { directory.appendingPathComponent($0) }
+        for log in logs { try Data().write(to: log) }
+        let task = AIProgressTask(id: "pending", provider: .codex, title: "Initial", progress: nil, updatedAt: .now)
+        let detector = MutableActivityDetector(tasks: [task], activityFileURLs: logs)
+        let monitor = AIStateMonitor(directoryURL: directory.appendingPathComponent("state"),
+            activityDetectors: [detector], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+        defer { monitor.stop() }
+        monitor.start()
+        #expect(await waitForMonitorState { detector.callCount == 1 })
+        for needsFullScan in [false, true] {
+            let gate = detector.suspendNextCall()
+            defer { gate.signal() }
+            let before = detector.callCount
+            monitor.refreshActiveTasks()
+            #expect(await waitForMonitorState { detector.callCount > before })
+            for log in logs { try Data(UUID().uuidString.utf8).write(to: log) }
+            // The fixed watcher deadline must elapse while the detector is still held at its gate.
+            try await Task.sleep(for: .milliseconds(350))
+            if needsFullScan { monitor.refreshActiveTasks() }
+            gate.signal()
+            #expect(await waitForMonitorState { detector.callCount >= before + 2 })
+            if needsFullScan {
+                #expect(detector.lastChangedURLs == nil,
+                        "An explicit refresh must not be weakened to the paths of pending file events")
+            } else {
+                #expect(detector.lastChangedURLs == Set(logs.map(\.standardizedFileURL)))
+            }
+        }
+    }
+
+    @Test @MainActor
     func continuousLogWritesDoNotPostponeActivityUntilTheWriterStops() async throws {
         let directory = monitorTempDirectory("continuous-log-events")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -666,6 +705,7 @@ private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sen
     private let lock = NSLock()
     private var tasks: [AIProgressTask]
     private var calls = 0
+    private var changedURLs: Set<URL>?
     private var fails = false
     private var nextCallGate: DispatchSemaphore?
     let activityFileURLs: [URL]
@@ -686,6 +726,13 @@ private final class MutableActivityDetector: AIActivityDetecting, @unchecked Sen
         if snapshot.1 { throw DetectionError() }
         return snapshot.0
     }
+
+    func taskUpdates(changedFileURLs: Set<URL>?) throws -> [AIProgressTask] {
+        lock.withLock { changedURLs = changedFileURLs }
+        return try activeTasks()
+    }
+
+    var lastChangedURLs: Set<URL>? { lock.withLock { changedURLs } }
 
     func setFailure(_ value: Bool) {
         lock.withLock { fails = value }

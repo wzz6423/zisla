@@ -8,6 +8,7 @@ public final class CodexSessionActivityDetector {
 
     private struct Candidate {
         var url: URL
+        var providerCacheKey: String
         var modificationDate: Date
         var changeDate: Date?
         var size: UInt64
@@ -143,6 +144,7 @@ public final class CodexSessionActivityDetector {
     private let clientProvidersForProcessIdentifiers: (Set<Int32>) -> [Int32: AIProvider]
     private let unverifiedActivityLifetime: TimeInterval
     private var cache: [URL: CachedRollout] = [:]
+    private var rolloutCandidates: [URL: Candidate]?
     private var sessionIndexCache: CachedSessionIndex?
     private var confirmedActiveTurnIDs = Set<String>()
     private var retiredTurnIDs = Set<String>()
@@ -186,7 +188,11 @@ public final class CodexSessionActivityDetector {
     }
 
     public func activeTasks() throws -> [AIProgressTask] {
-        let candidates = recentRollouts()
+        try activeTasks(changedFileURLs: nil)
+    }
+
+    private func activeTasks(changedFileURLs: Set<URL>?) throws -> [AIProgressTask] {
+        let candidates = recentRollouts(changedFileURLs: changedFileURLs)
         let selectedURLs = Set(candidates.map(\.url))
         cache = cache.filter { selectedURLs.contains($0.key) }
 
@@ -317,7 +323,7 @@ public final class CodexSessionActivityDetector {
             candidateTurnIDs.contains($0.key)
         }
         let selectedProviderKeys = Set(activities.map {
-            Self.providerCacheKey(sessionID: $0.activity.sessionID, rolloutURL: $0.candidate.url)
+            $0.activity.sessionID.map { "session:\($0)" } ?? $0.candidate.providerCacheKey
         })
         confirmedProvidersByActivityKey = confirmedProvidersByActivityKey.filter {
             selectedProviderKeys.contains($0.key)
@@ -452,7 +458,11 @@ public final class CodexSessionActivityDetector {
     }
 
     public func taskUpdates() throws -> [AIProgressTask] {
-        let active = try activeTasks()
+        try taskUpdates(changedFileURLs: nil)
+    }
+
+    public func taskUpdates(changedFileURLs: Set<URL>?) throws -> [AIProgressTask] {
+        let active = try activeTasks(changedFileURLs: changedFileURLs)
         return active + completedTasks
     }
 
@@ -475,32 +485,33 @@ public final class CodexSessionActivityDetector {
     public static func defaultClientProvidersForProcessIdentifiers(
         _ processIdentifiers: Set<Int32>
     ) -> [Int32: AIProvider] {
-        guard !processIdentifiers.isEmpty,
-              let data = runProcessOutput(
-                  executableURL: URL(fileURLWithPath: "/bin/ps"),
-                  arguments: ["-axo", "pid=,ppid=,command="],
-                  timeout: 2
-              ) else {
-            return [:]
+        clientProviders(for: processIdentifiers) { identifier in
+            guard let info = processInfo(for: identifier) else { return nil }
+            var path = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+            guard proc_pidpath(identifier, &path, UInt32(path.count)) > 0 else { return nil }
+            let end = path.firstIndex(of: 0) ?? path.endIndex
+            return (Int32(info.pbi_ppid), String(decoding: path[..<end].map { UInt8(bitPattern: $0) }, as: UTF8.self))
         }
-        return parseClientProviders(
-            fromProcessList: data,
-            matching: processIdentifiers
-        )
     }
 
     public static func defaultProcessStartDatesForProcessIdentifiers(
         _ processIdentifiers: Set<Int32>
     ) -> [Int32: Date] {
-        guard !processIdentifiers.isEmpty,
-              let data = runProcessOutput(
-                  executableURL: URL(fileURLWithPath: "/bin/ps"),
-                  arguments: ["-axo", "pid=,lstart="],
-                  timeout: 2
-              ) else {
-            return [:]
+        var dates: [Int32: Date] = [:]
+        for identifier in processIdentifiers {
+            guard let info = processInfo(for: identifier) else { continue }
+            dates[identifier] = Date(timeIntervalSince1970:
+                Double(info.pbi_start_tvsec) + Double(info.pbi_start_tvusec) / 1_000_000)
         }
-        return parseProcessStartDates(fromProcessList: data, matching: processIdentifiers)
+        return dates
+    }
+
+    private static func processInfo(for identifier: Int32) -> proc_bsdinfo? {
+        guard identifier > 0 else { return nil }
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        guard proc_pidinfo(identifier, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+        return info
     }
 
     static func runProcessOutput(
@@ -599,36 +610,17 @@ public final class CodexSessionActivityDetector {
         return result
     }
 
-    static func parseClientProviders(
-        fromProcessList data: Data,
-        matching processIdentifiers: Set<Int32>
+    static func clientProviders(
+        for processIdentifiers: Set<Int32>,
+        lookup: (Int32) -> (parentIdentifier: Int32, path: String)?
     ) -> [Int32: AIProvider] {
-        struct ProcessEntry {
-            var parentIdentifier: Int32
-            var command: Substring
-        }
-
-        var entries: [Int32: ProcessEntry] = [:]
-        for line in String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline) {
-            let fields = line.split(maxSplits: 2, whereSeparator: \.isWhitespace)
-            guard fields.count == 3,
-                  let processIdentifier = Int32(fields[0]),
-                  let parentIdentifier = Int32(fields[1]) else {
-                continue
-            }
-            entries[processIdentifier] = ProcessEntry(
-                parentIdentifier: parentIdentifier,
-                command: fields[2]
-            )
-        }
-
         var providers: [Int32: AIProvider] = [:]
         for processIdentifier in processIdentifiers {
             var currentIdentifier = processIdentifier
             var visited = Set<Int32>()
             while visited.insert(currentIdentifier).inserted,
-                  let entry = entries[currentIdentifier] {
-                let command = entry.command.lowercased()
+                  let entry = lookup(currentIdentifier) {
+                let command = entry.path.lowercased()
                 if command.contains("/chatgpt.app/") {
                     providers[processIdentifier] = .gpt
                     break
@@ -645,31 +637,6 @@ public final class CodexSessionActivityDetector {
             }
         }
         return providers
-    }
-
-    static func parseProcessStartDates(
-        fromProcessList data: Data,
-        matching processIdentifiers: Set<Int32>
-    ) -> [Int32: Date] {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        formatter.dateFormat = "EEE MMM d HH:mm:ss yyyy"
-
-        var startDates: [Int32: Date] = [:]
-        for line in String(decoding: data, as: UTF8.self).split(whereSeparator: \.isNewline) {
-            let fields = line.split(whereSeparator: \.isWhitespace)
-            guard fields.count >= 6,
-                  let processIdentifier = Int32(fields[0]),
-                  processIdentifiers.contains(processIdentifier) else {
-                continue
-            }
-            let value = fields[1...5].map(String.init).joined(separator: " ")
-            if let startDate = formatter.date(from: value) {
-                startDates[processIdentifier] = startDate
-            }
-        }
-        return startDates
     }
 
     private static func sortOrder(for kind: Event.Kind) -> Int {
@@ -712,7 +679,23 @@ public final class CodexSessionActivityDetector {
         return (.error, latestSignal?.reason)
     }
 
-    private func recentRollouts() -> [Candidate] {
+    private func recentRollouts(changedFileURLs: Set<URL>?) -> [Candidate] {
+        if let changedFileURLs, var candidates = rolloutCandidates,
+           changedFileURLs.allSatisfy({ $0.lastPathComponent.hasPrefix("rollout-") && $0.pathExtension == "jsonl" }) {
+            let directory = sessionsDirectory.standardizedFileURL.path + "/"
+            for url in changedFileURLs where url.standardizedFileURL.path.hasPrefix(directory) {
+                // Create fresh URLs so Foundation cannot reuse metadata cached before the write event.
+                let url = URL(fileURLWithPath: url.path).standardizedFileURL
+                candidates[url] = rolloutCandidate(at: url)
+            }
+            let minimumModificationDate = now().addingTimeInterval(-maximumRolloutAge)
+            candidates = candidates.filter { $0.value.modificationDate >= minimumModificationDate }
+            rolloutCandidates = candidates
+            return selectedRollouts(Array(candidates.values))
+        }
+        // Directory changes can introduce new sessions or replace whole subtrees.
+        // Periodic scans use the same discovery path to recover missed filesystem events.
+        rolloutCandidates = nil
         guard fileManager.fileExists(atPath: sessionsDirectory.path) else {
             return []
         }
@@ -732,32 +715,32 @@ public final class CodexSessionActivityDetector {
         let minimumModificationDate = now().addingTimeInterval(-maximumRolloutAge)
         var candidates: [Candidate] = []
         for case let url as URL in enumerator {
-            guard url.lastPathComponent.hasPrefix("rollout-"),
-                  url.pathExtension == "jsonl",
-                  let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                  ]),
-                  values.isRegularFile == true else {
-                continue
-            }
-            let modificationDate = values.contentModificationDate ?? .distantPast
-            guard modificationDate >= minimumModificationDate else { continue }
-            candidates.append(Candidate(
-                url: url,
-                modificationDate: modificationDate,
-                changeDate: Self.fileChangeDate(for: url),
-                size: UInt64(max(0, values.fileSize ?? 0))
-            ))
+            guard let candidate = rolloutCandidate(at: url),
+                  candidate.modificationDate >= minimumModificationDate else { continue }
+            candidates.append(candidate)
         }
+        rolloutCandidates = Dictionary(uniqueKeysWithValues: candidates.map { ($0.url, $0) })
+        return selectedRollouts(candidates)
+    }
 
+    private func selectedRollouts(_ candidates: [Candidate]) -> [Candidate] {
         return Array(candidates.sorted {
             if $0.modificationDate != $1.modificationDate {
                 return $0.modificationDate > $1.modificationDate
             }
             return $0.url.path < $1.url.path
         }.prefix(maxRolloutFiles))
+    }
+
+    private func rolloutCandidate(at url: URL) -> Candidate? {
+        guard url.lastPathComponent.hasPrefix("rollout-"), url.pathExtension == "jsonl",
+              let values = try? url.resourceValues(forKeys: [
+                  .isRegularFileKey, .contentModificationDateKey, .fileSizeKey,
+              ]), values.isRegularFile == true else { return nil }
+        let url = url.standardizedFileURL
+        return Candidate(url: url, providerCacheKey: "rollout:\(url.path)",
+                         modificationDate: values.contentModificationDate ?? .distantPast,
+                         changeDate: Self.fileChangeDate(for: url), size: UInt64(max(0, values.fileSize ?? 0)))
     }
 
     private func activity(in candidate: Candidate) throws -> RolloutActivity {

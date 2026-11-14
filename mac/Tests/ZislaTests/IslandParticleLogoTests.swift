@@ -124,15 +124,60 @@ struct IslandParticleLogoTests {
         }
         let first = try frame()
         #expect(first.contains { $0 > 0 }, "The paused status bar must still render its logo")
-        var frames: Set<[UInt8]> = [first]
-        let deadline = Date().addingTimeInterval(0.5)
-        repeat {
-            RunLoop.main.run(mode: .default, before: min(deadline, Date().addingTimeInterval(1.0 / 60)))
-            frames.insert(try frame())
-        } while Date() < deadline
-        #expect(reduceMotion ? frames.count == 1 : frames.count > 1,
-                "The logo must advance its own frames unless Reduce Motion is enabled")
+        func particleView(in view: NSView) -> ParticleLogoView? {
+            if let particle = view as? ParticleLogoView { return particle }
+            return view.subviews.lazy.compactMap { particleView(in: $0) }.first
+        }
+        let particle = try #require(particleView(in: host))
+        func layerFrame(at time: TimeInterval) throws -> [UInt8] {
+            particle.drawFrame(at: time)
+            let image = try #require(particle.layer?.contents) as! CGImage
+            return Array(try #require(image.dataProvider?.data) as Data)
+        }
+        let firstFrame = try layerFrame(at: 0)
+        let laterFrame = try layerFrame(at: 12)
+        #expect(reduceMotion ? firstFrame == laterFrame : firstFrame != laterFrame,
+                "The logo's own surface must animate while its enclosing status bar stays paused")
         #expect(!window.isVisible)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func nativeLogoFramesPreserveTheCanvasPixels(reduceMotion: Bool) throws {
+        let view = ParticleLogoView(reduceMotion: reduceMotion)
+        view.frame = CGRect(x: 0, y: 0, width: 18, height: 18)
+        for time in [0.0, 1.2, 12, 450_000_000] {
+            view.drawFrame(at: time)
+            let native = try #require(view.layer?.contents) as! CGImage
+            let expected = ImageRenderer(content: IslandParticleLogo.rendering(
+                side: 18, time: time, reduceMotion: reduceMotion))
+            expected.scale = 2
+            let expectedImage = try #require(expected.cgImage)
+            let actualBytes = Array(try #require(native.dataProvider?.data) as Data)
+            let expectedBytes = Array(try #require(expectedImage.dataProvider?.data) as Data)
+            #expect(actualBytes == expectedBytes,
+                    "The native surface must preserve every Canvas byte at time \(time)")
+        }
+        #expect(view.hitTest(CGPoint(x: 9, y: 9)) == nil,
+                "The decorative logo must let the island's existing controls receive mouse events")
+    }
+
+    @Test @MainActor
+    func removedNativeLogoReleasesItsFrameClock() throws {
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 18, height: 18),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.contentView = nil; window.close() }
+        weak var retained: ParticleLogoView?
+        autoreleasepool {
+            let view = ParticleLogoView(reduceMotion: false)
+            retained = view
+            window.contentView = view
+            view.reduceMotion = true
+            view.reduceMotion = false
+            view.removeFromSuperview()
+            window.contentView = nil
+        }
+        #expect(retained == nil, "A display link must not keep a removed logo and its window alive")
     }
 
     @Test @MainActor

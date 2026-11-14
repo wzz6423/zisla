@@ -222,10 +222,10 @@ final class SideNoticePresenter {
                 lastPhysicalSnapshot: &panels.lastPhysicalSnapshot
             )
             let displayState = panels.displayState
-            displayState.systemMonitorAvailable = availableStatusIcons.contains(where: \.isSystemMonitor)
-            displayState.hidesVoiceProcessingIndicator = hidesVoiceProcessingIndicator(
+            displayState.update(\.systemMonitorAvailable, to: availableStatusIcons.contains(where: \.isSystemMonitor))
+            displayState.update(\.hidesVoiceProcessingIndicator, to: hidesVoiceProcessingIndicator(
                 on: snapshot.displayID
-            )
+            ))
             var compactNotices = resultSweep.presentationNotices(from: queue.left + queue.right)
             if displayState.hidesVoiceProcessingIndicator {
                 compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
@@ -234,13 +234,11 @@ final class SideNoticePresenter {
                 notices: compactNotices, settings: settingsStore.settings, displayState: displayState
             )
             let configuration = compactConfiguration(
-                for: compactNotices, at: date, statusHidden: displayState.compactStatusHidden,
-                retainedLayout: panels.lastCompactLayout
+                for: compactNotices, at: date, statusHidden: displayState.compactStatusHidden
             )
             let screenLayout = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
-            panels.lastCompactLayout = screenLayout
-            displayState.statusIcons = configuration.statusIconSize == nil || resultSweep.current != nil
-                ? [] : availableStatusIcons
+            displayState.update(\.statusIcons, to: configuration.statusIconSize == nil || resultSweep.current != nil
+                ? [] : availableStatusIcons)
             onCompactLayoutChanged?(snapshot.displayID, configuration.expandsForDetailedStatus,
                                     configuration.compactStatusLength, configuration.compactStatusSideWidth,
                                     configuration.statusIconSize)
@@ -248,19 +246,19 @@ final class SideNoticePresenter {
                 panels.orderOut()
                 continue
             }
-            displayState.islandEdge = screenLayout.edge
-            displayState.placementMode = screenLayout.placementMode
-            displayState.compactBarCenterInset = screenLayout.style == .pill
+            displayState.update(\.islandEdge, to: screenLayout.edge)
+            displayState.update(\.placementMode, to: screenLayout.placementMode)
+            displayState.update(\.compactBarCenterInset, to: screenLayout.style == .pill
                 ? (screenLayout.placementMode == .camera
                     ? max(ScreenLayoutConfiguration.cameraPillCenterWidth, screenLayout.centerOcclusionWidth)
                     : screenLayout.centerOcclusionWidth) : screenLayout.topology.hasPhysicalNotch
-                    ? screenLayout.collapsedFrame.width : 0
+                    ? screenLayout.collapsedFrame.width : 0)
             let compactBarFrame = compactFrame(for: snapshot, notices: compactNotices, at: date,
                                                statusHidden: displayState.compactStatusHidden)
                 ?? (screenLayout.style == .pill ? screenLayout.collapsedFrame : layoutEngine.compactBarFrame(for: snapshot))
-            displayState.compactWingsEnabled = false
-            displayState.compactWingHeight = screenLayout.edge.isVertical ? compactBarFrame.width : compactBarFrame.height
-            displayState.reserveCompactWing = false
+            displayState.update(\.compactWingsEnabled, to: false)
+            displayState.update(\.compactWingHeight, to: screenLayout.edge.isVertical ? compactBarFrame.width : compactBarFrame.height)
+            displayState.update(\.reserveCompactWing, to: false)
             updateCompactBar(
                 screen: snapshot,
                 panels: panels,
@@ -320,8 +318,7 @@ final class SideNoticePresenter {
     }
 
     func compactConfiguration(
-        for notices: [IslandNotice], at date: Date, statusHidden: Bool = false,
-        retainedLayout: ScreenOverlayLayout? = nil
+        for notices: [IslandNotice], at date: Date, statusHidden: Bool = false
     ) -> ScreenLayoutConfiguration {
         var configuration = settingsStore.settings.islandScreenConfiguration
         if configuration.layoutStyle == .pill, configuration.placement.mode == .custom,
@@ -340,7 +337,7 @@ final class SideNoticePresenter {
             return configuration
         }
         let sizing = layoutEngine.compactBarSizing(
-            for: statusHidden ? [] : notices, settings: settingsStore.settings,
+            for: statusHidden && resultSweep.current == nil ? [] : notices, settings: settingsStore.settings,
             browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
                 ? browserDownloads.snapshots.count : 0
         )
@@ -370,15 +367,6 @@ final class SideNoticePresenter {
             configuration.expandsForDetailedStatus = false
             configuration.compactStatusLength = nil
         }
-        if settingsStore.settings.supportsStatusIconsInIsland, resultSweep.current != nil,
-           let retainedLayout, retainedLayout.placementMode == .custom,
-           retainedLayout.edge == configuration.placement.edge {
-            let retainedSize = retainedLayout.collapsedFrame.size
-            // Result content borrows the existing island's dimensions without inheriting its icons.
-            configuration.statusIconSize = retainedSize
-            configuration.compactStatusLength = max(configuration.compactStatusLength ?? 0,
-                configuration.placement.edge.isVertical ? retainedSize.height : retainedSize.width)
-        }
         return configuration
     }
 
@@ -386,8 +374,7 @@ final class SideNoticePresenter {
         for snapshot: ScreenSnapshot, notices: [IslandNotice], at date: Date = .now,
         statusHidden: Bool = false
     ) -> CGRect? {
-        let configuration = compactConfiguration(for: notices, at: date, statusHidden: statusHidden,
-            retainedLayout: panelsByDisplayID[snapshot.displayID]?.lastCompactLayout)
+        let configuration = compactConfiguration(for: notices, at: date, statusHidden: statusHidden)
         if settingsStore.settings.islandLayoutStyle == .pill {
             return ScreenLayoutEngine(configuration: configuration)
                 .layout(for: snapshot).collapsedFrame
@@ -444,8 +431,7 @@ final class SideNoticePresenter {
             notices = Self.noticesWithoutVoiceProcessing(notices)
         }
         let configuration = compactConfiguration(
-            for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true,
-            retainedLayout: panelsByDisplayID[displayID]?.lastCompactLayout
+            for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true
         )
         onCompactLayoutChanged?(displayID, configuration.expandsForDetailedStatus, configuration.compactStatusLength,
                                 configuration.compactStatusSideWidth,
@@ -482,7 +468,7 @@ final class SideNoticePresenter {
         }
         let targetPanelFrame = frame.integral
         if layout.topology.hasPhysicalNotch {
-            displayState.compactBarCenterInset = layout.topology.anchorFrame.width
+            displayState.update(\.compactBarCenterInset, to: layout.topology.anchorFrame.width)
         }
         let panel = ensureCompactBarPanel(in: panels)
         if !panel.isVisible {
@@ -741,7 +727,6 @@ private final class DisplayPanels {
     var left: IslandPanel?
     var right: IslandPanel?
     var compactBar: IslandPanel?
-    var lastCompactLayout: ScreenOverlayLayout?
     var compactConfiguration: ScreenLayoutConfiguration?
     var compactScreenFrame: CGRect?
     var compactResizeTask: Task<Void, Never>?

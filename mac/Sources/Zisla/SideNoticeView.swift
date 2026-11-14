@@ -22,6 +22,10 @@ final class SideNoticeDisplayState: ObservableObject {
     @Published var statusIcons: [IslandStatusIcon] = []
     @Published var systemMonitorAvailable = false
     @Published var compactLayout: CompactStatusBarLayout?
+
+    func update<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<SideNoticeDisplayState, Value>, to value: Value) {
+        if self[keyPath: keyPath] != value { self[keyPath: keyPath] = value }
+    }
 }
 
 struct CompactStatusBarLayout: Equatable {
@@ -309,7 +313,8 @@ struct CompactStatusBarView: View {
                     tint: compactProgressTint(for: progressPriority),
                     layoutStyle: settingsStore.settings.islandLayoutStyle,
                     pillCornerRadius: pillCornerRadius,
-                    usesBottomTrack: true
+                    usesBottomTrack: true,
+                    animatesProgress: progressPriority != .media
                 )
             }
         }
@@ -1661,11 +1666,7 @@ private struct CompactAIWing: View {
 
     @ViewBuilder
     private var mascotStack: some View {
-        let identities = notices.reduce(into: [AIMascotIdentity]()) { result, notice in
-            guard let provider = AIMascotLibrary.provider(fromNoticeID: notice.id) else { return }
-            let identity = AIMascotIdentity(provider: provider, taskID: notice.id, title: notice.title)
-            if !result.contains(identity) { result.append(identity) }
-        }.prefix(3)
+        let identities = AIMascotIdentity.stackIdentities(for: notices)
         if identities.count == 1, let identity = identities.first {
             AIMascotView(identity: identity, size: min(22, height * 0.72))
         } else {

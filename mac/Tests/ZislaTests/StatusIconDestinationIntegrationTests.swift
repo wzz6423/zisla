@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import SwiftUI
 import Testing
@@ -7,6 +8,40 @@ import ZislaCore
 @testable import Zisla
 
 struct StatusIconDestinationIntegrationTests {
+    @Test @MainActor
+    func unchangedMonitorRefreshesDoNotRepublishTheCompactLayout() async throws {
+        let fixture = try IconFixture(edge: .top)
+        defer { fixture.close() }
+        fixture.reducesMotion = true
+        fixture.settings.settings.islandShowMoreInformation = true
+        let icon = IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%", image: nil,
+            style: .detailed), tooltip: "CPU")
+        fixture.presenter.setStatusIcons([icon])
+        fixture.presenter.setScreenLocked(false)
+        let host = try #require(NSApp.windows.compactMap {
+            $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
+        }.first { $0.rootView.content.settingsStore === fixture.settings })
+        host.window?.alphaValue = 0
+        host.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(350))
+        let state = host.rootView.content.displayState
+        let frame = state.compactLayout?.frame
+        var publications = 0
+        let subscription = state.objectWillChange.sink { publications += 1 }
+        defer { subscription.cancel() }
+        for _ in 0..<3 { fixture.presenter.setStatusIcons([icon]) }
+        #expect(publications == 0, "Repeated readings must not invalidate an unchanged compact surface")
+        fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu", content: .metric(.cpu,
+            text: "32%", image: nil, style: .detailed), tooltip: "CPU")])
+        #expect(publications == 1, "A new reading must update its content without republishing unchanged geometry")
+        #expect(state.compactLayout?.frame == frame)
+        if case let .metric(_, text, _, _) = state.statusIcons.first?.content {
+            #expect(text == "32%")
+        } else {
+            Issue.record("The updated CPU reading must remain visible")
+        }
+    }
+
     @Test(arguments: IslandEdge.allCases) @MainActor
     func pomodoroInformationRowsReceiveMouseEventsAndRestorePassiveIcons(edge: IslandEdge) throws {
         let fixture = try IconFixture(edge: edge)
@@ -1008,8 +1043,9 @@ struct StatusIconDestinationIntegrationTests {
             let stackedIcon = try #require(icons.first { $0.id == "status-icon-stacked" })
             let image = try #require(stacked.button?.image)
             for edge in IslandEdge.allCases {
-                #expect(stackedIcon.size(edge: edge) == CGSize(width: image.size.width, height: 24),
-                        "Merged monitors must retain the menu bar image's width and both horizontal rows")
+                #expect(stackedIcon.size(edge: edge) == (edge.isVertical ? CGSize(width: 40, height: 33)
+                    : CGSize(width: image.size.width, height: 24)),
+                    "Vertical readings wrap within the compact column while horizontal rows retain their menu bar image")
             }
             let withoutCombined = IslandStatusIconRouting.update(destination: .island, application: application,
                 metrics: titles, stacked: stacked, readings: readings, combined: nil, style: style)
@@ -1295,8 +1331,8 @@ struct StatusIconDestinationIntegrationTests {
         #expect(changed == 0, "Compact and stacked images must preserve their original readings and image orientation")
     }
 
-    @Test(arguments: IslandEdge.allCases, SystemMonitorMenuBarDisplayStyle.allCases) @MainActor
-    func stackedImagesKeepTheSameMenuBarRowsOnEveryEdge(edge: IslandEdge, style: SystemMonitorMenuBarDisplayStyle) async throws {
+    @Test(arguments: [IslandEdge.top, .bottom], SystemMonitorMenuBarDisplayStyle.allCases) @MainActor
+    func horizontalStackedImagesKeepTheSameMenuBarRows(edge: IslandEdge, style: SystemMonitorMenuBarDisplayStyle) async throws {
         let rows = style == .compact ? ["C 14%", "G 30%"] : ["CPU 14%", "GPU 30%"]
         let image = try #require(SystemMonitorMenuBarImageRenderer.stacked(rows: rows, style: style))
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -1339,6 +1375,80 @@ struct StatusIconDestinationIntegrationTests {
         #expect(IslandStatusIconRouting.update(destination: .menuBar, application: nil, metrics: [],
             stacked: item, readings: [], combined: nil, style: style).isEmpty)
         #expect(item.isVisible && item.button?.image === image)
+    }
+
+    @Test(arguments: [IslandEdge.left, .right]) @MainActor
+    func verticalStackedReadingsFitTheCompactWidthWithoutChangingTheirMenuBarImage(edge: IslandEdge) async throws {
+        let cases: [([IslandStatusIcon.Reading], [String], CGFloat)] = [
+            ([.init(metric: .cpu, text: "100%"), .init(metric: .gpu, text: "32%")], ["C 100%", "G 32%"], 37),
+            ([.init(metric: .cpu, text: "--"), .init(metric: .gpu, text: "--")], ["C --", "G --"], 24),
+            ([.init(metric: .memory, text: "12 GB/64 GB"), .init(metric: .network, text: "↓123.45 MB/s ↑67.89 MB/s")],
+             ["M 12 GB/64 GB", "N ↓123.45 MB/s ↑67.89 MB/s"], 40),
+        ]
+        for (readings, rows, width) in cases {
+            let image = try #require(SystemMonitorMenuBarImageRenderer.stacked(rows: rows, style: .detailed))
+            let originalSize = image.size
+            for sourceImage in [image, nil] {
+                let icon = IslandStatusIcon(id: "stacked", content: .stacked(image: sourceImage, readings: readings),
+                    tooltip: rows.joined(separator: ", "))
+                let iconSize = icon.size(edge: edge)
+                #expect(iconSize.width == width)
+                let reference = VStack(alignment: .leading, spacing: 0) {
+                    ForEach(rows, id: \.self) { row in
+                        Text(row).font(Font(NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(width: width, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 24)
+                .foregroundStyle(.white)
+                .environment(\.layoutDirection, .leftToRight)
+                let renderer = ImageRenderer(content: reference)
+                renderer.scale = 2
+                let natural = try #require(renderer.cgImage)
+                #expect(iconSize.height == CGFloat(natural.height) / 2,
+                    "All wrapped units and transfer rates must fit their natural text height")
+                let size = try #require(IslandStatusIconLayout.size(icons: [icon], edge: edge))
+                #expect(size.width <= 48)
+                let actual = try await renderOffscreen(IslandStatusIconStrip(icons: [icon], edge: edge, date: .distantPast)
+                    .environment(\.layoutDirection, .rightToLeft), size: size)
+                let expected = try await renderOffscreen(reference.padding(.vertical, 8).padding(.horizontal, 4), size: size)
+                var changed = 0
+                var foreground = 0
+                for y in 0..<actual.pixelsHigh {
+                    for x in 0..<actual.pixelsWide {
+                        let a = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                        let b = try #require(expected.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                        if abs(a.redComponent - b.redComponent) > 0.02 { changed += 1 }
+                        if min(a.redComponent, a.greenComponent, a.blueComponent) > 0.5 { foreground += 1 }
+                    }
+                }
+                #expect(changed == 0, "Each configured reading must remain complete inside the narrow column")
+                #expect(foreground > 10)
+            }
+            #expect(image.size == originalSize && image.accessibilityDescription == rows.joined(separator: ", "))
+        }
+        let image = try #require(SystemMonitorMenuBarImageRenderer.stacked(rows: ["C --", "G --"], style: .compact))
+        for sourceImage in [image, nil] {
+            let icon = IslandStatusIcon(id: "stacked", content: .stacked(image: sourceImage, readings: []), tooltip: "Monitor")
+            let size = try #require(IslandStatusIconLayout.size(icons: [icon], edge: edge))
+            let actual = try await renderOffscreen(IslandStatusIconStrip(icons: [icon], edge: edge, date: .distantPast), size: size)
+            let expected = try await renderOffscreen(Group {
+                if let sourceImage { Image(nsImage: sourceImage).renderingMode(.template) }
+                else { Text("--").font(.system(size: 12, design: .monospaced)) }
+            }.frame(width: sourceImage?.size.width ?? 24, height: 24)
+                .padding(.vertical, 8).padding(.horizontal, 4).foregroundStyle(.white), size: size)
+            var changed = 0
+            for y in 0..<actual.pixelsHigh {
+                for x in 0..<actual.pixelsWide {
+                    let a = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    let b = try #require(expected.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if abs(a.redComponent - b.redComponent) > 0.02 { changed += 1 }
+                }
+            }
+            #expect(changed == 0, "Unavailable readings must preserve the existing image or visible placeholder")
+        }
     }
 
     @Test @MainActor
@@ -1467,7 +1577,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.presenter.setStatusIcons([stacked])
         let stackedFrame = try #require(coordinator.activeLayout).collapsedFrame
         let stackedThickness = edge.isVertical ? stackedFrame.width : stackedFrame.height
-        #expect(stackedThickness == (edge.isVertical ? stackedImage.size.width + 8 : 32))
+        #expect(stackedThickness == (edge.isVertical ? 48 : 32))
         #expect(ScreenLayoutEngine.edgeDistance(of: stackedFrame, in: fixture.screen.frame, edge: edge)
             == min(120, stackedThickness * 3))
         #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: []) == stackedFrame)

@@ -24,7 +24,7 @@ final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked
         return stored
     }
 
-    func loadStats(capacity: Int?) -> SystemMetricsHistoryStats {
+    func loadStats(capacity: Int?) -> SystemMetricsHistoryStats? {
         lock.lock()
         defer { lock.unlock() }
         let timestamps = stored.map(\.timestamp).sorted()
@@ -800,10 +800,10 @@ struct SystemMetricsHistoryDatabaseTests {
         let inspection = try #require(connection)
         defer { sqlite3_close(inspection) }
         #expect(sqlite3_exec(inspection, "ALTER TABLE metrics RENAME TO unavailable_metrics", nil, nil, nil) == SQLITE_OK)
-        #expect(database.loadStats(capacity: nil) == .empty)
+        #expect(database.loadStats(capacity: nil) == nil)
 
         #expect(sqlite3_exec(inspection, "ALTER TABLE unavailable_metrics RENAME TO metrics", nil, nil, nil) == SQLITE_OK)
-        #expect(database.loadStats(capacity: nil).count == 1)
+        #expect(database.loadStats(capacity: nil)?.count == 1)
         #expect(database.loadRecords() == [record(at: 60)])
     }
 
@@ -820,15 +820,27 @@ struct SystemMetricsHistoryDatabaseTests {
         let inspection = try #require(connection)
         defer { sqlite3_close(inspection) }
         #expect(sqlite3_exec(inspection, "ALTER TABLE metrics RENAME TO unavailable_metrics", nil, nil, nil) == SQLITE_OK)
-        #expect(database.loadStats(capacity: nil) == .empty)
+        #expect(database.loadStats(capacity: nil) == nil)
 
+        store.append(record(at: 120))
+        #expect(store.stats == expected,
+                "A failed recording refresh must preserve the last successfully read summary")
         for _ in 0..<3 {
             #expect(store.stats == expected, "Reading a displayed snapshot must not require another storage read")
         }
         #expect(sqlite3_exec(inspection, "ALTER TABLE unavailable_metrics RENAME TO metrics", nil, nil, nil) == SQLITE_OK)
+        #expect(store.stats == expected)
         store.append(record(at: 120))
         #expect(store.stats.count == 2)
         #expect(store.stats.newest == Date(timeIntervalSince1970: 120))
+        database.removeAll()
+        #expect(store.stats.count == 2)
+        #expect(sqlite3_exec(inspection, """
+            CREATE TRIGGER reject_record BEFORE INSERT ON metrics
+            BEGIN SELECT RAISE(ABORT, 'injected recording failure'); END;
+            """, nil, nil, nil) == SQLITE_OK)
+        store.append(record(at: 180))
+        #expect(store.stats == .empty, "A successfully read empty archive must replace the cached summary")
     }
 
     @Test

@@ -92,12 +92,14 @@ enum SystemMonitorCombinedMenuBarPresentation {
 }
 
 @MainActor
-struct IslandStatusIcon: Identifiable {
-    struct Reading {
+struct IslandStatusIcon: Identifiable, Equatable {
+    struct Reading: Equatable {
         let metric: SystemMonitorMenuBarMetric
         let text: String
+
+        var compactText: String { "\(SystemMonitorCombinedMenuBarPresentation.shortLabel(metric)) \(text)" }
     }
-    enum Content {
+    enum Content: Equatable {
         case application
         case metric(SystemMonitorMenuBarMetric, text: String, image: NSImage?, style: SystemMonitorMenuBarDisplayStyle)
         case stacked(image: NSImage?, readings: [Reading])
@@ -120,7 +122,8 @@ struct IslandStatusIcon: Identifiable {
             if edge.isVertical { return Self.readingSize(text) }
             if style == .compact, let image { return CGSize(width: image.size.width, height: 24) }
             return CGSize(width: 24 + Self.textWidth(text), height: 24)
-        case let .stacked(image, _):
+        case let .stacked(image, readings):
+            if edge.isVertical, !readings.isEmpty { return Self.stackedReadingSize(readings) }
             return CGSize(width: image?.size.width ?? 24, height: 24)
         case let .combined(image):
             return image?.size ?? CGSize(width: 24, height: 24)
@@ -130,6 +133,19 @@ struct IslandStatusIcon: Identifiable {
     static func readingSize(_ text: String) -> CGSize {
         CGSize(width: 32, height: 30 + CGFloat(CompactPillStatusPresentation.verticalTextRows(text,
             availableWidth: 32, availableHeight: CGFloat(text.count) * 14).count) * 14)
+    }
+
+    static let stackedReadingFont = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+
+    static func stackedReadingSize(_ readings: [Reading]) -> CGSize {
+        let rows = readings.map(\.compactText)
+        let attributes: [NSAttributedString.Key: Any] = [.font: stackedReadingFont]
+        let width = min(40, rows.reduce(CGFloat(24)) { max($0, ceil(($1 as NSString).size(withAttributes: attributes).width)) })
+        let height = rows.reduce(CGFloat(0)) { height, row in
+            height + ceil((row as NSString).boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes).height)
+        }
+        return CGSize(width: width, height: max(24, height))
     }
 
     private static func textWidth(_ text: String) -> CGFloat {
@@ -244,8 +260,16 @@ struct IslandStatusIconStrip: View {
                     Text(text).font(.system(size: 12, weight: .medium)).monospacedDigit()
                 }
             }
-        case let .stacked(image, _):
-            if let image {
+        case let .stacked(image, readings):
+            if edge.isVertical, !readings.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(readings.enumerated()), id: \.offset) { _, reading in
+                        Text(reading.compactText).font(Font(IslandStatusIcon.stackedReadingFont))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let image {
                 Image(nsImage: image).renderingMode(.template).frame(height: 24)
             } else {
                 Text("--").font(.system(size: 12, design: .monospaced))

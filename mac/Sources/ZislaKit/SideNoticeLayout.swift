@@ -745,7 +745,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         case .focusMode: notices.first { $0.id.hasPrefix("focus-mode-") }
         case .systemMonitor: nil
         }
-        let aiCount = selectedPriority == .aiActivity ? notices.count { $0.id.hasPrefix("ai-active-") } : 0
+        let aiNotices = selectedPriority == .aiActivity ? notices.filter { $0.id.hasPrefix("ai-active-") } : []
+        let aiCount = aiNotices.count
         let text: String
         switch selectedPriority {
         case .aiActivity:
@@ -775,7 +776,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         return selectedNotice.map {
             CompactPillStatusPresentation(priority: selectedPriority, notice: $0, text: text,
-                aiCount: aiCount,
+                aiCount: aiCount, aiNotices: aiNotices,
                 showsWaveform: selectedPriority == .media && $0.id.hasPrefix("media-active-")
                     && settings.mediaVisualizationStyle == .waveform,
                 showsMediaIdentity: selectedPriority == .media && $0.id.hasPrefix("media-active-")

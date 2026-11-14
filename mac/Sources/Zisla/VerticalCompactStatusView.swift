@@ -249,7 +249,8 @@ struct CompactPillStatusContent: View {
                 isActive: item?.isPlaying ?? true
             )
         } else if presentation.priority == .aiActivity {
-            AIMascotView(identity: AIMascotIdentity(noticeID: presentation.notice.id), size: size)
+            AIMascotStack(notices: presentation.aiNotices.isEmpty ? [presentation.notice] : presentation.aiNotices,
+                size: size, edge: edge)
         } else if presentation.notice.style == .headphone {
             HeadphoneGlyph(
                 productID: presentation.notice.headphoneProductID,

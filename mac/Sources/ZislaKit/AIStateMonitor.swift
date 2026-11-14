@@ -100,6 +100,7 @@ public final class AIStateMonitor: ObservableObject {
     private var activityFileReloadTask: Task<Void, Never>?
     private var activityFileDetectorIndices: [URL: Set<Int>] = [:]
     private var activityFilePendingDetectorIndices: Set<Int> = []
+    private var activityFilePendingURLs: Set<URL> = []
     private var detectedTasks: [Int: [AIProgressTask]] = [:]
     private var detectedActivityFileURLs: [Int: [URL]] = [:]
     private var usageHistoryLoadInFlight = false
@@ -127,6 +128,7 @@ public final class AIStateMonitor: ObservableObject {
     private var persistedReloadPending = false
     private var detectorRefreshInFlight = false
     private var detectorRefreshPendingIndices: Set<Int> = []
+    private var detectorRefreshPendingFileURLs: Set<URL>?
     private var detectorRefreshPendingAllowsUsageScan = false
     private var refreshGeneration: UInt64 = 0
     private var usageHistoryRequested = false
@@ -311,7 +313,7 @@ public final class AIStateMonitor: ObservableObject {
             }
             if !usageDetectors.isEmpty || subscriptionUsageDetector != nil || accountBalanceDetector != nil {
                 let checkInterval = min(detectorRefreshInterval, usageRefreshInterval)
-                let timer = Timer(fire: Date(timeIntervalSinceNow: detectorRefreshInterval),
+                let timer = Timer(fire: Date(timeIntervalSinceNow: checkInterval),
                     interval: checkInterval, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         guard let self, self.refreshGeneration == watcherGeneration else { return }
@@ -360,10 +362,12 @@ public final class AIStateMonitor: ObservableObject {
         activityFileSources.removeAll()
         activityFileDetectorIndices.removeAll()
         activityFilePendingDetectorIndices.removeAll()
+        activityFilePendingURLs.removeAll()
         detectedTasks.removeAll()
         detectedActivityFileURLs.removeAll()
         detectorRefreshInFlight = false
         detectorRefreshPendingIndices.removeAll()
+        detectorRefreshPendingFileURLs = nil
         detectorRefreshPendingAllowsUsageScan = false
         lastUsageRefreshAt = .distantPast
         usageHistoryGeneration &+= 1
@@ -814,6 +818,7 @@ public final class AIStateMonitor: ObservableObject {
                     self.activityFileSources.removeValue(forKey: url)?.cancel()
                 }
                 self.activityFilePendingDetectorIndices.formUnion(self.activityFileDetectorIndices[url] ?? [])
+                self.activityFilePendingURLs.insert(url)
                 // Flush a burst at a fixed deadline so a continuously growing log cannot starve activity updates.
                 guard self.activityFileReloadTask == nil else { return }
                 self.activityFileReloadTask = Task { [weak self] in
@@ -825,8 +830,11 @@ public final class AIStateMonitor: ObservableObject {
                     guard let self, self.refreshGeneration == generation else { return }
                     self.activityFileReloadTask = nil
                     let indices = self.activityFilePendingDetectorIndices
+                    let changedURLs = self.activityFilePendingURLs
                     self.activityFilePendingDetectorIndices.removeAll()
-                    self.scheduleDetectorRefresh(detectorIndices: indices, allowUsageScan: false)
+                    self.activityFilePendingURLs.removeAll()
+                    self.scheduleDetectorRefresh(detectorIndices: indices, allowUsageScan: false,
+                                                 changedFileURLs: changedURLs)
                 }
             }
             watcher.setCancelHandler { close(descriptor) }
@@ -914,9 +922,18 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
-    private func scheduleDetectorRefresh(detectorIndices: Set<Int>? = nil, allowUsageScan: Bool) {
+    private func scheduleDetectorRefresh(
+        detectorIndices: Set<Int>? = nil, allowUsageScan: Bool, changedFileURLs: Set<URL>? = nil
+    ) {
         let indices = detectorIndices ?? Set(activityDetectors.indices)
         guard !detectorRefreshInFlight else {
+            if detectorRefreshPendingIndices.isEmpty {
+                detectorRefreshPendingFileURLs = changedFileURLs
+            } else if let pending = detectorRefreshPendingFileURLs, let changedFileURLs {
+                detectorRefreshPendingFileURLs = pending.union(changedFileURLs)
+            } else {
+                detectorRefreshPendingFileURLs = nil
+            }
             detectorRefreshPendingIndices.formUnion(indices)
             detectorRefreshPendingAllowsUsageScan =
                 detectorRefreshPendingAllowsUsageScan || allowUsageScan
@@ -935,10 +952,13 @@ public final class AIStateMonitor: ObservableObject {
             self.applyDetector(result)
             if !self.detectorRefreshPendingIndices.isEmpty || self.detectorRefreshPendingAllowsUsageScan {
                 let pendingIndices = self.detectorRefreshPendingIndices
+                let pendingFileURLs = self.detectorRefreshPendingFileURLs
                 self.detectorRefreshPendingIndices.removeAll()
+                self.detectorRefreshPendingFileURLs = nil
                 let pendingAllowsUsageScan = self.detectorRefreshPendingAllowsUsageScan
                 self.detectorRefreshPendingAllowsUsageScan = false
-                self.scheduleDetectorRefresh(detectorIndices: pendingIndices, allowUsageScan: pendingAllowsUsageScan)
+                self.scheduleDetectorRefresh(detectorIndices: pendingIndices, allowUsageScan: pendingAllowsUsageScan,
+                                             changedFileURLs: pendingFileURLs)
             }
         }
 
@@ -947,7 +967,8 @@ public final class AIStateMonitor: ObservableObject {
                 using: dependencies,
                 detectorIndices: indices,
                 detectsUsage: detectsUsage,
-                loadsUsageHistory: false
+                loadsUsageHistory: false,
+                changedFileURLs: changedFileURLs
             )
             // Page-entry refreshes inspect active tasks only; forcing allocator pressure relief
             // there can invalidate the just-composited Liquid Glass surface. Reclaim memory only
@@ -1014,7 +1035,8 @@ public final class AIStateMonitor: ObservableObject {
         using dependencies: RefreshDependencies,
         detectorIndices: Set<Int>,
         detectsUsage: Bool,
-        loadsUsageHistory: Bool
+        loadsUsageHistory: Bool,
+        changedFileURLs: Set<URL>? = nil
     ) -> DetectorRefreshResult {
         do {
             var automaticUsage: [AIUsageSample] = []
@@ -1032,7 +1054,8 @@ public final class AIStateMonitor: ObservableObject {
             var activities: [Int: ActivityDetection] = [:]
             for index in detectorIndices.sorted() {
                 let detector = dependencies.activityDetectors[index]
-                activities[index] = ActivityDetection(tasks: try? detector.taskUpdates(), fileURLs: detector.activityFileURLs)
+                activities[index] = ActivityDetection(tasks: try? detector.taskUpdates(changedFileURLs: changedFileURLs),
+                                                      fileURLs: detector.activityFileURLs)
             }
             var usageChanged = false
             if detectsUsage, usageScanComplete {

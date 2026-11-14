@@ -179,14 +179,14 @@ public struct SystemMetricsHistoryStats: Equatable, Sendable {
 public protocol SystemMetricsHistoryPersisting: Sendable {
     /// Every stored sample, oldest first.
     func loadRecords() -> [SystemMetricsRecord]
-    func loadStats(capacity: Int?) -> SystemMetricsHistoryStats
+    func loadStats(capacity: Int?) -> SystemMetricsHistoryStats?
     /// Stores one sample; a `nil` capacity keeps all samples.
     func appendRecord(_ record: SystemMetricsRecord, capacity: Int?)
     func removeAll()
 }
 
 extension SystemMetricsHistoryPersisting {
-    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats {
+    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats? {
         let records = loadRecords().sorted { $0.timestamp < $1.timestamp }
         let retained = records.suffix(capacity.map { max(1, $0) } ?? records.count)
         return SystemMetricsHistoryStats(
@@ -241,10 +241,10 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
         }
     }
 
-    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats {
+    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats? {
         queue.sync {
-            guard let database = connectionOrNil() else { return .empty }
-            return (try? readStats(capacity: capacity, from: database)) ?? .empty
+            guard let database = connectionOrNil() else { return nil }
+            return try? readStats(capacity: capacity, from: database)
         }
     }
 
@@ -777,7 +777,7 @@ public final class LazySystemMetricsHistoryPersistence: SystemMetricsHistoryPers
         database().loadRecords()
     }
 
-    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats {
+    public func loadStats(capacity: Int?) -> SystemMetricsHistoryStats? {
         database().loadStats(capacity: capacity)
     }
 
@@ -847,8 +847,8 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
         _ = loadStatsIfNeededLocked()
         guard !isCancelled() else { return nil }
         persistence.appendRecord(record, capacity: capacity)
-        storedStats = persistence.loadStats(capacity: capacity)
-        return storedStats
+        if let stats = persistence.loadStats(capacity: capacity) { storedStats = stats }
+        return storedStats ?? .empty
     }
 
     public func removeAll() {
@@ -862,7 +862,7 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
         if let storedStats { return storedStats }
         let stats = persistence.loadStats(capacity: capacity)
         storedStats = stats
-        return stats
+        return stats ?? .empty
     }
 }
 

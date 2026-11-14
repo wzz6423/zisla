@@ -133,6 +133,54 @@ struct FloatingIslandInformationTests {
         #expect(layout.primary.count == 3)
     }
 
+    @Test(arguments: [IslandEdge.left, .right])
+    func verticalMonitorReadingsDoNotEnlargeTheAIIconOrItsSlot(edge: IslandEdge) throws {
+        let monitor = NSImage(size: CGSize(width: 36, height: 36))
+        let rows = try #require(SystemMonitorMenuBarImageRenderer.stacked(
+            rows: ["CPU 100%", "GPU 32%"], style: .detailed))
+        let icons = [
+            IslandStatusIcon(id: "app", content: .application, tooltip: "zisla"),
+            IslandStatusIcon(id: "combined", content: .combined(monitor), tooltip: "Monitor"),
+            IslandStatusIcon(id: "stacked", content: .stacked(image: rows,
+                readings: [.init(metric: .cpu, text: "100%"), .init(metric: .gpu, text: "32%")]),
+                tooltip: "CPU 100%, GPU 32%"),
+        ]
+        let notices = (1...4).map { IslandNotice(id: "ai-active-openai-\($0)", title: "AI") }
+        let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
+            settings: settings(edge: edge), item: nil, at: date))
+        let status = try #require(layout.primary.first)
+        #expect(layout.size.width <= 48, "Vertical readings must fit the compact 40pt content width and side insets")
+        #expect(status.length == 56, "The AI icon needs its 24pt slot, one 14pt count row, and normal insets")
+        #expect(status.text == "4")
+
+        let renderer = ImageRenderer(content: FloatingIslandInformationView(layout: layout,
+            visualizationStyle: .waveform, item: nil, date: date)
+            .frame(width: layout.size.width, height: layout.size.height)
+            .environment(\._accessibilityReduceMotion, true)
+            .environment(\.colorScheme, .dark)
+            .background(.black))
+        renderer.scale = 2
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        let iconStart = try #require(layout.iconSize).height
+        let iconEnd = iconStart + status.length - 32
+        var iconBounds = CGRect.null
+        var countPixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                guard min(color.redComponent, color.greenComponent, color.blueComponent) > 0.4 else { continue }
+                let pointY = CGFloat(y) / 2
+                if pointY >= iconStart, pointY < iconEnd {
+                    iconBounds = iconBounds.union(CGRect(x: CGFloat(x) / 2, y: pointY, width: 0.5, height: 0.5))
+                }
+                if pointY >= layout.size.height - 26, pointY < layout.size.height - 12 { countPixels += 1 }
+            }
+        }
+        #expect(iconBounds.width > 16 && iconBounds.width <= 24)
+        #expect(iconBounds.height > 16 && iconBounds.height <= 24)
+        #expect(countPixels > 5, "The full AI count must remain below the compact icon")
+    }
+
     @Test(arguments: [IslandEdge.top, .left])
     func informationRowsStayInsideTheAnimatedViewport(edge: IslandEdge) throws {
         var settings = settings(edge: edge)
