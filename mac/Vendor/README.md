@@ -1,5 +1,7 @@
 # Vendored dependencies
 
+**English** | [简体中文](README.zh-CN.md)
+
 `Sparkle.xcframework` is extracted without modification from the official Sparkle 2.10.0 binary artifact:
 
 - Source: `https://github.com/sparkle-project/Sparkle/releases/tag/2.10.0`
@@ -17,12 +19,13 @@ The XCFramework is vendored because SwiftPM Git and artifact downloads are not r
 
 The helper is vendored so packaged builds can read the system Now Playing session on macOS 15.4 and newer without a network-time dependency.
 
-`SkyLightWindow` is vendored from its upstream 1.0.0 source snapshot without modification:
+`SkyLightWindow` is vendored from its upstream 1.0.0 source snapshot with unmodified source code:
 
 - Source: `https://github.com/Lakr233/SkyLightWindow`
 - Version: `1.0.0`
 - Commit: `b7bd99f62a0673a99bed4bfd31098ca1dcdd10eb`
 - License: MIT, copied to `SkyLightWindow/LICENSE`
+- Local documentation: English/Chinese README navigation and a preview image link to the pinned upstream snapshot.
 
 The package is local so SwiftPM does not fetch it during normal builds. To update it, manually replace `SkyLightWindow` with a verified upstream snapshot, retain its license, and update the version and commit recorded above.
 
@@ -34,5 +37,6 @@ The package is local so SwiftPM does not fetch it during normal builds. To updat
 - License: CC0, copied to `zstd.swift/LICENSE.md`
 - Bundled binary: upstream `libzstd.xcframework`, including its iOS, Mac Catalyst, simulator, and macOS universal slices
 - Local patch: `ZStd.decompress(src:dst:)` throws when the input ends inside a frame instead of returning the partial output, following the end-of-stream check in Zstandard's streaming decompression example. Reapply it after updating the snapshot.
+- Local documentation: English/Chinese README navigation and usage examples matching the bundled API.
 
 The package is local so SwiftPM does not fetch it during normal builds. To update it, replace `zstd.swift` with a verified upstream snapshot, retain its license and binary slices, and update the version and commit recorded above. The bundled Zstandard library remains covered by `Resources/ThirdPartyLicenses/Zstandard-LICENSE.txt`.

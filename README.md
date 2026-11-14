@@ -107,6 +107,28 @@ zisla requests a permission only when an enabled feature first needs it. You can
 | Browser downloads and media | Uses macOS public file-progress information, MediaRemote metadata, and Core Audio output state. It does not read browser history databases or capture audio content. |
 | Network | Weather, release checks, downloader requests, and optional remote voice organization access the network only for their respective enabled actions. |
 
+### Permissions by feature
+
+zisla requests the required authorization when a feature is first used. If you previously denied access, open the corresponding item in **System Settings > Privacy & Security** and allow `zisla`; item names may differ between macOS versions.
+
+| Permission or system setting | When it is needed | Authorized scope |
+| --- | --- | --- |
+| Device Control and Data Access (shown as Accessibility on some versions) | Automatically inserting voice transcripts into the current app's text field | Reads and locates non-password input fields, then delivers the transcript through Accessibility APIs or `Cmd+V`. Without authorization, the transcript is still copied to the clipboard. |
+| Microphone | Starting voice input | Captures sound only while actively recording. |
+| Speech Recognition | Converting recorded speech to text | Processes only actively recorded speech. Voice input requires both Microphone and Speech Recognition authorization. |
+| Full Disk Access | Viewing mail while Mail.app is not running | Reads the local index in `~/Library/Mail` to show accounts, senders, subjects, summaries, timestamps, and read status. This Mail index access path requires authorization. |
+| Automation | Reading, composing, replying to, marking, or deleting Mail.app messages; reading and writing Apple Notes | Allows zisla to control the corresponding system apps. Mail and Notes authorization can be revoked separately in System Settings. |
+| Calendars; Reminders | Using the schedule module | Reads and manages calendar events and reminders with separate authorizations. |
+| Location Services | Using current-location weather | Requests the current location once without continuous tracking. Manually added locations do not require location access. |
+| Camera | Opening the camera mirror | Uses the camera only while the mirror window is open. |
+| Input Monitoring | Using voice shortcuts that distinguish left and right modifier keys, or keyboard cleaning | Monitors only the keyboard events required for these shortcuts. Ordinary global shortcuts do not require this authorization. |
+| Bluetooth | Viewing accessory battery levels in the battery module | Reads only publicly available battery information for connected or paired devices. |
+| Screen & System Audio Recording (shown as Screen Recording on older macOS versions) | Taking or editing screenshots, or showing the waveform of system audio playback | Reads screen images during capture. Audio waveforms analyze current system audio energy without saving or uploading audio content. |
+| Notifications | Using Pomodoro alerts | Plays one audible alert and shows a local notification when a timer ends. |
+| User-selected folders (no manual authorization required) | File handoff, imports and exports, or choosing a download directory | The system file picker grants access to the selected directory. These features do not require Full Disk Access. |
+
+Revoking a permission disables only the corresponding feature. If a feature remains unavailable after changing a setting, quit and reopen zisla, then try again.
+
 The [macOS guide](mac/README.md#permissions-and-privacy) documents the complete permission and network behavior.
 
 ## Documentation
@@ -114,6 +136,8 @@ The [macOS guide](mac/README.md#permissions-and-privacy) documents the complete 
 | Document | Purpose |
 | --- | --- |
 | [macOS development guide](mac/README.md) | Modules, AI integration, dependencies, build, test, permissions, and system limitations. |
+| [Website guide](web/README.md) | Local development, production builds, and current download links. |
+| [Launch film guide](promo/README.md) | Remotion preview, rendering, compositions, soundtracks, and asset licenses. |
 | [Architecture and performance design](mac/Docs/architecture.md) | Top-edge triggering, window behavior, concurrency, media, and download safety. |
 | [CLI integration reference](mac/Docs/cli-reference.md) | `zislactl` providers, commands, fields, and exit codes. |
 | [Signing and release design](mac/Docs/releasing.md) | Signing, notarization, DMGs, update channels, and release acceptance. |

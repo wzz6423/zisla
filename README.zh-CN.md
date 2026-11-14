@@ -136,6 +136,8 @@ zisla 仅在启用的功能首次实际需要时请求系统权限。你可以�
 | 文档 | 用途 |
 | --- | --- |
 | [macOS 开发指南](mac/README.zh-CN.md) | 模块、AI 接入、依赖、构建、测试、权限与系统限制。 |
+| [官网开发指南](web/README.zh-CN.md) | 本地开发、生产构建与当前下载链接。 |
+| [宣传片制作指南](promo/README.zh-CN.md) | Remotion 预览、渲染、合成、配乐与素材许可。 |
 | [架构与性能设计](mac/Docs/architecture.zh-CN.md) | 顶部触发、窗口行为、并发、媒体与下载安全设计。 |
 | [CLI 接入设计](mac/Docs/cli-reference.zh-CN.md) | `zislactl` 的 Provider、命令、字段与退出码。 |
 | [签名与发布设计](mac/Docs/releasing.zh-CN.md) | 签名、公证、DMG、更新通道与发布验收。 |

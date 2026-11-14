@@ -1,8 +1,10 @@
 # SkyLightWindow
 
+**English** | [简体中文](README.zh-CN.md)
+
 A powerful macOS framework that enables views to be displayed above all other windows using private SkyLight APIs.
 
-![Preview](./Resources/截屏2025-05-23%2020.18.33.png)
+![Preview](https://raw.githubusercontent.com/Lakr233/SkyLightWindow/b7bd99f62a0673a99bed4bfd31098ca1dcdd10eb/Resources/%E6%88%AA%E5%B1%8F2025-05-23%2020.18.33.png)
 
 ## Features
 

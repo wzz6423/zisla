@@ -1,8 +1,10 @@
-# zisla 发布宣传片
+# zisla launch film
 
-160 秒、60 fps 的 zisla 产品宣传片，用 [Remotion](https://www.remotion.dev/) 逐帧渲染：React + TypeScript + Tailwind CSS，覆盖官网列出的 12 个模块和 19 项扩展功能。同一条画面时间轴提供放克与电影配乐两个版本，各支持 1080p 和 4K。布局、尺寸和弹簧参数取自原生应用源码，演示数据为虚构样例。
+**English** | [简体中文](README.zh-CN.md)
 
-## 本地运行
+A 160-second, 60 fps product film for zisla, rendered frame by frame with [Remotion](https://www.remotion.dev/) using React, TypeScript, and Tailwind CSS. It covers the website's 12 modules and 19 additional features. The same visual timeline has funk and cinematic soundtrack variants, each available in 1080p and 4K. Layouts, dimensions, and spring parameters come from the native app's source code; all demonstration data is fictional.
+
+## Run locally
 
 ```bash
 cd promo
@@ -10,9 +12,9 @@ npm install
 npm run studio
 ```
 
-`npm run studio` 打开 Remotion Studio，可以逐帧拖动、单独预览每一幕。已在 macOS 27、Node 26、npm 11 上验证。
+`npm run studio` opens Remotion Studio, where you can scrub frame by frame and preview individual scenes. The project has been validated on macOS 27, Node 26, and npm 11.
 
-## 渲染
+## Rendering
 
 ```bash
 npm run render
@@ -22,7 +24,7 @@ npm run render
 npm run render:4k
 ```
 
-抽单帧：
+Render a single frame:
 
 ```bash
 npm run still -- out/frame.png --frame=300
@@ -32,55 +34,55 @@ npm run still -- out/frame.png --frame=300
 npx remotion still Scene3Flow out/scene3.png --frame=200
 ```
 
-类型检查与自动化测试：
+Type checking and automated tests:
 
 ```bash
 npm run typecheck
 npm test
 ```
 
-- 首次渲染时 Remotion 会自行取得 Chrome Headless Shell，放进 `node_modules/.remotion/`。
-- `out/` 已忽略，4K 交付文件不入库。官网使用的 1080p 成片与海报保存在 `web/public/media/`。
-- 逐帧渲染，任何一帧都能单独渲染；单帧 PNG 可逐字节复现，整片 mp4 因编码器不保证逐字节一致。
-- 工程不分发字体，字体栈是系统字体，因此在 macOS 上渲染才是 SF Pro。
+- On the first render, Remotion downloads Chrome Headless Shell into `node_modules/.remotion/`.
+- `out/` is ignored, and 4K deliverables are not committed. The website's 1080p film and poster are stored in `web/public/media/`.
+- Every frame can be rendered independently. Single-frame PNGs can be reproduced byte for byte; encoder behavior means complete MP4 files are not guaranteed to be byte-identical.
+- The project does not distribute fonts. It uses the system font stack, so SF Pro is used when rendering on macOS.
 
-## 合成与时间轴
+## Compositions and timeline
 
-| 合成 id | 尺寸 | 帧数 | 内容 |
+| Composition ID | Dimensions | Frames | Content |
 | --- | --- | --- | --- |
-| `ZislaLaunchFilm` | 1920×1080 | 9600 | 2 分 40 秒，Funkorama 配乐 |
-| `ZislaLaunchFilm4K` | 3840×2160 | 9600 | 同画面放克版，4K |
-| `ZislaLaunchFilmCinematic` | 1920×1080 | 9600 | 同画面，The Miracle of Flight 配乐 |
-| `ZislaLaunchFilmCinematic4K` | 3840×2160 | 9600 | 同画面电影配乐版，4K |
-| `Scene1Awakening` | 1920×1080 | 300 | 0–5s，顶部触发和按应用汇总 |
-| `SceneLayouts` | 1920×1080 | 960 | 5–21s，刘海、摄像头、四边定位和宠物 |
-| `Scene2AICenter` | 1920×1080 | 840 | 21–35s，任务、按日模型统计、历史和双窗口额度 |
-| `Scene3Flow` | 1920×1080 | 900 | 35–50s，媒体、中转站多选和视频／音频下载 |
-| `SceneMail` | 1920×1080 | 480 | 50–58s，阅读、撰写、发送和全部已读 |
-| `SceneEveryday` | 1920×1080 | 1440 | 58–82s，随记、剪贴板、会议、位置便签、简报和语音 |
-| `SceneCreativeTools` | 1920×1080 | 1920 | 82–114s，截图、录屏、图片、音频和 PDF |
-| `SceneDesktopTools` | 1920×1080 | 1460 | 114–138.3s，混音、键盘、专注、清洁、系统历史和电池 |
-| `SceneSettings` | 1920×1080 | 1140 | 138.3–157.3s，窗口、快捷动作、权限、CLI／Skills、Zshell 和整屏合盖 |
-| `Scene4Bento` | 1920×1080 | 600 | 独立工具快览预览 |
-| `Scene5Outro` | 1920×1080 | 160 | 157.3–160s，品牌、完整安装命令和对应音乐署名 |
+| `ZislaLaunchFilm` | 1920×1080 | 9600 | 2 minutes 40 seconds, with Funkorama |
+| `ZislaLaunchFilm4K` | 3840×2160 | 9600 | The same funk version in 4K |
+| `ZislaLaunchFilmCinematic` | 1920×1080 | 9600 | The same visuals, with The Miracle of Flight |
+| `ZislaLaunchFilmCinematic4K` | 3840×2160 | 9600 | The same cinematic version in 4K |
+| `Scene1Awakening` | 1920×1080 | 300 | 0–5s, top-edge activation and activity grouped by app |
+| `SceneLayouts` | 1920×1080 | 960 | 5–21s, notch, camera, placement along all four edges, and pets |
+| `Scene2AICenter` | 1920×1080 | 840 | 21–35s, tasks, daily model statistics, history, and account quotas in two windows |
+| `Scene3Flow` | 1920×1080 | 900 | 35–50s, media, handoff tray multi-selection, and video/audio downloads |
+| `SceneMail` | 1920×1080 | 480 | 50–58s, reading, composing, sending, and marking all messages read |
+| `SceneEveryday` | 1920×1080 | 1440 | 58–82s, notes, clipboard, meetings, location notes, briefings, and voice |
+| `SceneCreativeTools` | 1920×1080 | 1920 | 82–114s, screenshots, recording, images, audio, and PDF tools |
+| `SceneDesktopTools` | 1920×1080 | 1460 | 114–138.3s, mixing, keyboard, focus, cleaning, system history, and battery |
+| `SceneSettings` | 1920×1080 | 1140 | 138.3–157.3s, windows, Quick Actions, permissions, CLI/Skills, Zshell, and full-screen lid-close effect |
+| `Scene4Bento` | 1920×1080 | 600 | Standalone preview of the quick tool overview |
+| `Scene5Outro` | 1920×1080 | 160 | 157.3–160s, branding, the complete install command, and the matching music credit |
 
-相邻两幕有 16 帧叠化：后一幕提前 16 帧在仍不透明的前一幕之上淡入，到名义起点时完全显现。歌曲进度和番茄钟用 `filmFrame()` 换算成全片帧号。分幕合成按名义长度注册，用于无声预览；全片中的布局与工具导览按含叠化的幕长缩放，并保留各幕末态。
+Adjacent scenes use a 16-frame crossfade: the incoming scene starts 16 frames early and fades in over the still-opaque outgoing scene, becoming fully visible at its nominal start. Song progress and the Pomodoro timer use `filmFrame()` to convert to full-film frame numbers. Individual scene compositions are registered with their nominal durations for silent previews. Layout and tool tours in the full film are scaled to scene durations that include crossfades, retaining each scene's final state.
 
-## 配乐
+## Soundtracks
 
-两个版本均使用一首完整作品的连续前 160 秒，保留原曲编排，只在首尾淡入淡出。MP3 为 44.1 kHz 立体声、320 kbps，整体降低 2 dB，开头淡入 0.4 秒，155.8–159.6 秒淡出。
+Both variants use the continuous first 160 seconds of one complete work, preserving the original arrangement with fades only at the beginning and end. The MP3 files are 44.1 kHz stereo at 320 kbps, reduced by 2 dB overall, with a 0.4-second fade-in and a fade-out from 155.8 to 159.6 seconds.
 
-- 放克版：[Kevin MacLeod《Funkorama》](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474)。官网播放器采用此版。
-- 电影配乐版：[Scott Buckley《The Miracle of Flight》](https://www.scottbuckley.com.au/library/the-miracle-of-flight/)。
+- Funk: [Funkorama by Kevin MacLeod](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474). This variant is used by the website player.
+- Cinematic: [The Miracle of Flight by Scott Buckley](https://www.scottbuckley.com.au/library/the-miracle-of-flight/).
 
-两首作品均以 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 发布。片尾、音频元数据与官网保留作者和来源；再分发影片时使用对应署名：
+Both works are released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The end credits, audio metadata, and website retain the author and source. Use the matching attribution when redistributing the film:
 
 ```text
 Funkorama by Kevin MacLeod (incompetech.com), licensed under Creative Commons Attribution 4.0.
 'The Miracle of Flight' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
 ```
 
-从作者曲目页取得原曲后重新生成（需要 ffmpeg）：
+Regenerate the audio after obtaining the original tracks from their authors' pages (requires ffmpeg):
 
 ```bash
 node tools/make-soundtrack.mjs /absolute/path/Funkorama.mp3 public/audio/zisla-launch.mp3 funk
@@ -89,55 +91,55 @@ npx remotion render ZislaLaunchFilmCinematic out/zisla-launch-cinematic-1080p60.
 npx remotion render ZislaLaunchFilmCinematic4K out/zisla-launch-cinematic-2160p60.mp4
 ```
 
-时长取自 `src/timeline.ts`，曲目和许可统一保存在 `src/soundtrack.ts`。
+Durations come from `src/timeline.ts`; track details and licenses are centralized in `src/soundtrack.ts`.
 
-## 结构
+## Structure
 
 ```
 promo/
-├── public/audio/        # 配乐
+├── public/audio/        # Soundtracks
 ├── src/
-│   ├── timeline.ts      # FPS、十幕起止、叠化帧数、filmFrame()
-│   ├── soundtrack.ts    # 曲目、作者、来源与许可
-│   ├── theme.ts         # 尺寸/颜色/字号，数值取自应用源码
-│   ├── motion.ts        # ZislaMotion（岛内，与应用一致）+ FilmMotion（影片层）
-│   ├── content.ts       # 全部样例数据与字幕文案（虚构原创）
-│   ├── LaunchFilm.tsx   # 十幕编排 + 叠化 + 配乐
-│   ├── Root.tsx         # 全片与分幕合成注册
-│   ├── components/      # 岛外壳、玻璃、光标、桌面、终端、浮层等通用件
-│   ├── modules/         # 岛内模块及 AI 统计、邮件、文件工具、系统监控
-│   └── scenes/          # 十幕
-└── tools/               # 配乐处理脚本与帧驱动测试
+│   ├── timeline.ts      # FPS, ten scene boundaries, crossfade frames, filmFrame()
+│   ├── soundtrack.ts    # Tracks, authors, sources, and licenses
+│   ├── theme.ts         # Dimensions, colors, and font sizes from the app source
+│   ├── motion.ts        # ZislaMotion (inside the island) + FilmMotion (film layer)
+│   ├── content.ts       # Fictional sample data and captions
+│   ├── LaunchFilm.tsx   # Ten-scene sequencing, crossfades, and soundtrack
+│   ├── Root.tsx         # Full-film and individual scene composition registration
+│   ├── components/      # Shared island shell, glass, cursor, desktop, terminal, overlays
+│   ├── modules/         # Island modules, AI statistics, mail, file tools, system monitoring
+│   └── scenes/          # Ten scenes
+└── tools/               # Soundtrack processing script and frame-driven tests
 ```
 
-## 约定
+## Conventions
 
-- 时间只写在 `src/timeline.ts`；跨幕读数用 `filmFrame()` 换算成全片帧。
-- 舞台是 1280×720 的逻辑画布，`Stage` 按输出尺寸等比放大（1080p 1.5×、4K 3×）。
-- 全部帧驱动：没有 `Math.random`、`Date.now`、CSS transition 或 `@keyframes`，任何一帧单独渲染结果一致。
-- 岛内动效用 `ZislaMotion`（参数与应用一致），影片层强调动效用 `FilmMotion`。
-- 玻璃质感统一为 `backdrop-filter: blur(24px) saturate(180%)` 加 1px 内描边；`backdrop-filter` 要求祖先不带 opacity 或 filter。
-- 样例数据与字幕集中在 `src/content.ts`；只在某一幕出现的演示字符串留在该幕文件里。
+- Define timing only in `src/timeline.ts`; use `filmFrame()` for readouts shared across scenes.
+- The stage is a 1280×720 logical canvas. `Stage` scales it proportionally to the output dimensions (1.5× for 1080p and 3× for 4K).
+- Everything is frame-driven: no `Math.random`, `Date.now`, CSS transitions, or `@keyframes`. Rendering a frame independently produces the same result.
+- Use `ZislaMotion` inside the island, with parameters matching the app, and `FilmMotion` for emphasis in the film layer.
+- Glass uses `backdrop-filter: blur(24px) saturate(180%)` with a 1px inset border. Ancestors must not have opacity or filter applied for `backdrop-filter` to work.
+- Sample data and captions are centralized in `src/content.ts`; demonstration strings used by only one scene remain in that scene's file.
 
-## 素材与数据
+## Assets and data
 
-- 全部虚构原创：任务、文件名、歌曲《Paper Lanterns》及其歌词、城市、日程、笔记、路径，都不来自本机真实数据，也不含受版权保护的歌词。
-- 品牌图标直接引用仓库内应用自带资源（lobehub/lobe-icons，MIT）：`mac/Resources/BrandIcons/`；zisla 图标引用 `web/public/assets/zisla-icon.png`，promo 里不存副本。
-- 宠物小熊与小鸡直接引用 `mac/Resources/Pets/` 的 Kenney Animal Pack Redux 素材，CC0 1.0；单帧素材使用应用相同的 1.4 秒呼吸动画。
-- 两首配乐遵循 CC BY 4.0，作品许可证与仓库代码许可证独立。
-- 仓库不提交 Apple 字体。
+- Tasks, filenames, the song Paper Lanterns and its lyrics, cities, schedules, notes, and paths are original fictional data. They do not come from real local data or include copyrighted lyrics.
+- Brand icons reference the app's bundled resources directly (lobehub/lobe-icons, MIT) in `mac/Resources/BrandIcons/`. The zisla icon references `web/public/assets/zisla-icon.png`; no duplicate is stored in promo.
+- The bear and chick pets reference the Kenney Animal Pack Redux assets in `mac/Resources/Pets/`, licensed under CC0 1.0. Single-frame assets use the same 1.4-second breathing animation as the app.
+- Both soundtracks follow CC BY 4.0, independently of the repository's code license.
+- Apple fonts are not committed.
 
-## 忠于真实界面
+## Fidelity to the app
 
-尺寸、颜色、弹簧参数都对着应用源码写。以下五处与分镜草稿的描述不同，以真实界面为准：
+Dimensions, colors, and spring parameters are taken from the app source. These five details differ from the storyboard draft and follow the actual interface:
 
-1. Token 趋势图是最近 7 天、每天一个点（应用里 `AIProgressModuleView` 调 `dailyUsageSeries` 时传的是 `days: 7`），不是 12 小时；`mac/Docs/cli-reference.md` 里的 "12-hour chart" 与当前实现不一致。
-2. 专辑封面在岛内是静止的，旋转唱片只出现在岛外的影片特写层。
-3. Handoff 托盘的 Finder/Share 入口是标题行的 `Share`、`Show` 按钮加右键菜单，没有悬停操作条。
-4. 下载完成后的快捷操作是从顶部落下的岛形横条，不是从右侧滑出的卡片。
-5. 随记是左列表 + 右所见即所得编辑器，没有独立的 Markdown 预览区。
+1. The token trend chart covers the last 7 days with one point per day (`AIProgressModuleView` passes `days: 7` to `dailyUsageSeries`), rather than 12 hours. The "12-hour chart" description in `mac/Docs/cli-reference.md` differs from the current implementation.
+2. Album artwork is stationary inside the island. The spinning record appears only in the film's close-up layer outside the island.
+3. The handoff tray's Finder/share controls are the `Share` and `Show` buttons in the header plus the context menu; there is no hover action bar.
+4. Completed downloads use an island-shaped bar descending from the top, rather than a card sliding in from the right.
+5. Notes use a list on the left and a WYSIWYG editor on the right, with no separate Markdown preview pane.
 
-## 许可
+## License
 
-- Remotion 不是 MIT：它的免费许可只覆盖个人使用、不超过 3 名员工的营利组织、非营利组织等情形，详见 https://www.remotion.dev/docs/license 。
-- 本目录其余内容随 zisla 仓库，PolyForm Noncommercial 1.0.0。
+- Remotion is not MIT-licensed. Its free license covers personal use, for-profit organizations with up to 3 employees, nonprofits, and other specified cases. See https://www.remotion.dev/docs/license .
+- The rest of this directory follows the zisla repository's PolyForm Noncommercial 1.0.0 license.

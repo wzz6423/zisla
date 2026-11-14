@@ -1,22 +1,24 @@
 # zstd-swift
 
-Simple implementation of prebuilt facebook/zstd in swift
+**English** | [简体中文](README.zh-CN.md)
+
+A simple Swift wrapper around prebuilt facebook/zstd binaries.
 
 ```swift
-// Simple compress usage
-let compressedData = try ZStd.compress(Data())
+import Foundation
+import zstd
 
-// Simple decompress usage
-let decompressedData = try ZStd.decompress(zstdCompressedData)
+let data = Data("Hello, zstd!".utf8)
+let compressedData = try ZStd.compress(data)
+let decompressedData = try ZStd.decompress(compressedData)
 
-// Compress decomression made by Streams API
+let compressionOutput = OutputStream(toMemory: ())
+try ZStd.compress(src: InputStream(data: data), dst: compressionOutput)
+let streamCompressedData = compressionOutput.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
 
-try ZStd.compress(src: InputStream(), dst: OutputStream())
-try ZStd.decompress(src: InputStream(), dst: OutputStream())
+let decompressionOutput = OutputStream(toMemory: ())
+try ZStd.decompress(src: InputStream(data: streamCompressedData), dst: decompressionOutput)
+let streamDecompressedData = decompressionOutput.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
 
-// or you may use prebuilt functions on top of the streams
-let data: Data = try ZStd.decompress(src: InputStream()))
-// etc..
-
-
+let fileData = try ZStd.decompress(src: URL(fileURLWithPath: "/path/to/compressed.zst"))
 ```
