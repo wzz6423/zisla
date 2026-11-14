@@ -81,9 +81,9 @@ struct CollapsedProgressGlowTests {
 
     @Test(arguments: [0.25, 0.5, 1.0], [false, true])
     @MainActor
-    func notchPlaybackAndPomodoroFillFromLeftToRightOnlyAtTheBottom(progress: Double, countdown: Bool) throws {
+    func notchPlaybackAndPomodoroFillFromLeftToRightOnlyAtTheBottom(progress: Double, countdown: Bool) async throws {
         let size = CGSize(width: 180, height: 34)
-        let pixels = try Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement(),
+        let pixels = try await Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement(),
             includesMedia: !countdown, countdown: countdown)
         let width = Int(size.width)
         let height = Int(size.height)
@@ -103,10 +103,10 @@ struct CollapsedProgressGlowTests {
 
     @Test(arguments: [IslandPlacement()] + IslandEdge.allCases.map { IslandPlacement(mode: .custom, edge: $0) })
     @MainActor
-    func pillPlaybackKeepsTheClockwiseOutlineAtCameraAndCustomPlacements(placement: IslandPlacement) throws {
+    func pillPlaybackKeepsTheClockwiseOutlineAtCameraAndCustomPlacements(placement: IslandPlacement) async throws {
         let size = placement.edge.isVertical ? CGSize(width: 34, height: 180) : CGSize(width: 180, height: 34)
-        let full = try Self.playbackPixels(progress: 1, style: .pill, placement: placement)
-        let half = try Self.playbackPixels(progress: 0.5, style: .pill, placement: placement)
+        let full = try await Self.playbackPixels(progress: 1, style: .pill, placement: placement)
+        let half = try await Self.playbackPixels(progress: 0.5, style: .pill, placement: placement)
         let width = Int(size.width)
         let height = Int(size.height)
         let middleX = width / 2
@@ -123,15 +123,15 @@ struct CollapsedProgressGlowTests {
 
     @Test(arguments: [0.0, -1, Double.nan, -Double.infinity])
     @MainActor
-    func invalidNotchPlaybackPaintsNoProgress(progress: Double) throws {
-        #expect(try Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement())
+    func invalidNotchPlaybackPaintsNoProgress(progress: Double) async throws {
+        #expect(try await Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement())
             .allSatisfy { $0 < 0.02 })
     }
 
     @Test(arguments: [2.0, Double.infinity])
     @MainActor
-    func elapsedTimeBeyondTheTrackEndKeepsTheCompleteBottomBar(progress: Double) throws {
-        let pixels = try Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement())
+    func elapsedTimeBeyondTheTrackEndKeepsTheCompleteBottomBar(progress: Double) async throws {
+        let pixels = try await Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement())
         #expect(pixels[..<(180 * 31)].allSatisfy { $0 < 0.02 })
         #expect(Self.lit(pixels, width: 180, x: 88...92, y: 31...33))
         #expect(Self.lit(pixels, width: 180, x: 150...154, y: 31...33))
@@ -139,8 +139,8 @@ struct CollapsedProgressGlowTests {
 
     @Test(arguments: [0.25, 0.5, 1.0], [false, true])
     @MainActor
-    func notchRecordingProgressFillsOnlyTheBottomWithAndWithoutMedia(progress: Double, includesMedia: Bool) throws {
-        let pixels = try Self.playbackPixels(progress: 0.1, style: .notch, placement: IslandPlacement(),
+    func notchRecordingProgressFillsOnlyTheBottomWithAndWithoutMedia(progress: Double, includesMedia: Bool) async throws {
+        let pixels = try await Self.playbackPixels(progress: 0.1, style: .notch, placement: IslandPlacement(),
                                              recordingProgress: progress, includesMedia: includesMedia)
         #expect(pixels[..<(180 * 31)].allSatisfy { $0 < 0.02 },
                 "Notch exports must leave the top and side edges clear even when music is waiting")
@@ -155,8 +155,8 @@ struct CollapsedProgressGlowTests {
 
     @Test(arguments: ["browser-download-progress", "video-download-progress"], [0.25, 0.5, 1.0])
     @MainActor
-    func notchDownloadProgressFillsFromLeftToRightOnlyAtTheBottom(noticeID: String, progress: Double) throws {
-        let pixels = try Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement(),
+    func notchDownloadProgressFillsFromLeftToRightOnlyAtTheBottom(noticeID: String, progress: Double) async throws {
+        let pixels = try await Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement(),
                                              downloadNoticeID: noticeID)
         #expect(pixels[..<(180 * 31)].allSatisfy { $0 < 0.02 },
                 "Notch downloads must leave the top and side edges clear")
@@ -170,11 +170,11 @@ struct CollapsedProgressGlowTests {
     @Test(arguments: ["screen-recording-operation-progress", "browser-download-progress", "video-download-progress"],
           [IslandPlacement()] + IslandEdge.allCases.map { IslandPlacement(mode: .custom, edge: $0) })
     @MainActor
-    func pillExportAndDownloadProgressKeepTheClockwiseOutline(noticeID: String, placement: IslandPlacement) throws {
+    func pillExportAndDownloadProgressKeepTheClockwiseOutline(noticeID: String, placement: IslandPlacement) async throws {
         let recording = noticeID.hasPrefix(ScreenRecordingOperationNotice.prefix)
-        let full = try Self.playbackPixels(progress: 1, style: .pill, placement: placement,
+        let full = try await Self.playbackPixels(progress: 1, style: .pill, placement: placement,
             recordingProgress: recording ? 1 : nil, downloadNoticeID: recording ? nil : noticeID, includesMedia: false)
-        let half = try Self.playbackPixels(progress: 0.5, style: .pill, placement: placement,
+        let half = try await Self.playbackPixels(progress: 0.5, style: .pill, placement: placement,
             recordingProgress: recording ? 0.5 : nil, downloadNoticeID: recording ? nil : noticeID, includesMedia: false)
         let size = placement.edge.isVertical ? CGSize(width: 34, height: 180) : CGSize(width: 180, height: 34)
         let width = Int(size.width)
@@ -598,7 +598,7 @@ struct CollapsedProgressGlowTests {
         progress: Double, style: IslandLayoutStyle, placement: IslandPlacement,
         recordingProgress: Double? = nil, downloadNoticeID: String? = nil, includesMedia: Bool = true,
         countdown: Bool = false
-    ) throws -> [Double] {
+    ) async throws -> [Double] {
         let suiteName = "Zisla.PlaybackProgress.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         let settings = FeatureSettingsStore(defaults: defaults)
@@ -607,12 +607,12 @@ struct CollapsedProgressGlowTests {
         settings.settings.islandPlacement = placement
         settings.settings.islandNotchBackground = .black
         let date = Date(timeIntervalSince1970: 100)
-        let media = NowPlayingService(loadLyrics: { _, _, _ in .init(lyrics: nil, artistName: nil) })
+        let snapshot = includesMedia ? NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
+            duration: 100, elapsedTime: progress * 100, timestamp: date, isPlaying: true) : nil
+        let media = NowPlayingService(loadLyrics: { _, _, _ in .init(lyrics: nil, artistName: nil) },
+            initialRemoteSnapshot: snapshot)
         defer { media.publishSnapshot(nil) }
-        if includesMedia {
-            media.publishSnapshot(NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
-                duration: 100, elapsedTime: progress * 100, timestamp: date, isPlaying: true))
-        }
+        media.resolveSnapshot()
         let queue = SideNoticeQueue()
         defer { queue.removeAll() }
         if includesMedia || downloadNoticeID != nil {
@@ -635,18 +635,36 @@ struct CollapsedProgressGlowTests {
         let view = CompactStatusBarView(queue: queue, displayState: state, media: media,
             browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
             resultSweep: AIResultSweepController(), pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
-        func render(enabled: Bool) throws -> [Double] {
+        func render(enabled: Bool) async throws -> [Double] {
             settings.settings.collapsedProgressGlowEnabled = enabled
-            let renderer = ImageRenderer(content: view.statusBarContent(at: date)
+            // ImageRenderer omits AppKit-backed countdown content and its progress overlay.
+            let host = NSHostingView(rootView: view.statusBarContent(at: date)
                 .environment(\._accessibilityReduceMotion, true)
                 .transaction { $0.disablesAnimations = true }
                 .frame(width: size.width, height: size.height).background(.black))
-            renderer.scale = 1
-            return try Self.pixelValues(NSBitmapImageRep(cgImage: #require(renderer.cgImage)))
+            host.sizingOptions = []
+            let window = PlaybackRasterPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
+                styleMask: .borderless, backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            defer { window.contentView = nil; window.close() }
+            for _ in 0..<3 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            #expect(!window.isVisible && bitmap.pixelsWide == Int(size.width) && bitmap.pixelsHigh == Int(size.height))
+            return try Self.pixelValues(bitmap)
         }
-        let baseline = try render(enabled: false)
-        let actual = try render(enabled: true)
+        let baseline = try await render(enabled: false)
+        let actual = try await render(enabled: true)
         return zip(actual, baseline).map { max(0, $0 - $1) }
+    }
+
+    @MainActor
+    private final class PlaybackRasterPanel: NSPanel {
+        override var backingScaleFactor: CGFloat { 1 }
     }
 
     private static func flattened(_ path: Path) -> [CGPoint] {
