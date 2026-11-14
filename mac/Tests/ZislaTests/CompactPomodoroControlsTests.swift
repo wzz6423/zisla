@@ -168,8 +168,10 @@ struct CompactPomodoroControlsTests {
         #expect(!fixture.base.presenter.containsCompactPomodoroControl(at: moved))
     }
 
-    @Test(arguments: IslandLayoutStyle.allCases)
-    func cameraCountdownWingsStayCollapsedWhileTheCenterExpands(style: IslandLayoutStyle) async throws {
+    @Test(arguments: IslandLayoutStyle.allCases, [CGFloat(1), 2])
+    func cameraCountdownWingsStayCollapsedWhileTheCenterExpands(
+        style: IslandLayoutStyle, renderScale: CGFloat
+    ) async throws {
         let fixture = try Fixture(edge: .top, moreInformation: false, camera: true, style: style)
         defer { fixture.close() }
         fixture.base.reducesMotion = true
@@ -194,15 +196,18 @@ struct CompactPomodoroControlsTests {
             presenter.setIslandExpanded($0)
         }
         presenter.setScreenLocked(false)
-        let host = try #require(NSApplication.shared.windows.compactMap {
+        let renderedHost = try #require(NSApplication.shared.windows.compactMap {
             $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
         }.first { $0.rootView.content.settingsStore === fixture.base.settings })
-        let window = try #require(host.window)
+        let window = try #require(renderedHost.window)
+        let host = NSHostingView(rootView: renderedHost.rootView.environment(\.displayScale, renderScale))
+        host.sizingOptions = []
+        window.contentView = host
         for _ in 0..<3 {
             host.layoutSubtreeIfNeeded()
             await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
         }
-        let frame = try #require(host.rootView.content.displayState.compactLayout).frame
+        let frame = try #require(renderedHost.rootView.content.displayState.compactLayout).frame
         for point in [CGPoint(x: frame.minX, y: frame.midY), CGPoint(x: frame.minX + 1, y: frame.minY),
                       CGPoint(x: frame.maxX, y: frame.midY), CGPoint(x: frame.maxX - 1, y: frame.maxY)] {
             #expect(presenter.containsCompactPomodoroControl(at: point),
@@ -224,7 +229,7 @@ struct CompactPomodoroControlsTests {
             host.layoutSubtreeIfNeeded()
             await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
         }
-        let status = try #require(host.rootView.content.displayState.compactLayout).frame
+        let status = try #require(renderedHost.rootView.content.displayState.compactLayout).frame
         #expect(!presenter.containsCompactPomodoroControl(at: CGPoint(x: status.minX + 1, y: status.midY)),
             "Camera wings showing another status must not retain a countdown exclusion")
     }

@@ -649,8 +649,10 @@ final class SideNoticePresenter {
             guard let panel = panels.compactBar, panel.isVisible, !panel.ignoresMouseEvents,
                   let content = panel.contentView else { return false }
             @MainActor func containsControl(in view: NSView) -> Bool {
-                if view is CompactPomodoroControlRegionView {
+                if let region = view as? CompactPomodoroControlRegionView {
+                    // SwiftUI snaps representable frames to pixels, leaving half-pixel seams at trigger boundaries.
                     let frame = panel.convertToScreen(view.convert(view.bounds, to: nil))
+                        .insetBy(dx: -region.pixelAlignmentInset, dy: -region.pixelAlignmentInset)
                     return point.x >= frame.minX && point.x <= frame.maxX
                         && point.y >= frame.minY && point.y <= frame.maxY
                 }
