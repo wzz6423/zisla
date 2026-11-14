@@ -2372,16 +2372,22 @@ struct CodexRolloutIntegrityTests {
         #expect(try detector.taskUpdates().isEmpty)
     }
 
-    @Test
-    func deniedReadPreservesTheCompletionCutoffUntilRecovery() throws {
+    @Test(arguments: [false, true])
+    func deniedReadPreservesTheCompletionCutoffUntilRecovery(newDirectory: Bool) throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         var now = iso8601Date("2026-07-19T01:00:00.000Z")
         let file = root.appendingPathComponent("rollout-denied-short.jsonl")
-        try writeRollout(under: root, relativePath: file.lastPathComponent, lines: [], modifiedAt: now)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        if !newDirectory {
+            try writeRollout(under: root, relativePath: file.lastPathComponent, lines: [], modifiedAt: now)
+        }
         let detector = CodexSessionActivityDetector(sessionsDirectory: root,
             processIdentifiersForOpenFiles: { _ in [:] }, now: { now })
         #expect(try detector.taskUpdates().isEmpty)
+        if newDirectory {
+            try writeRollout(under: root, relativePath: file.lastPathComponent, lines: [], modifiedAt: now)
+        }
         for (timestamp, kind) in [("01", "task_started"), ("02", "task_complete")] {
             try appendLine(eventLine(timestamp: "2026-07-19T01:00:\(timestamp).000Z",
                 payloadType: kind, turnID: "short"), to: file)
@@ -2389,10 +2395,12 @@ struct CodexRolloutIntegrityTests {
         now = now.addingTimeInterval(3)
         try withDeniedRolloutRead(at: file) { () throws in
             #expect(try detector.taskUpdates().isEmpty)
+            now = now.addingTimeInterval(1)
+            #expect(try detector.taskUpdates().isEmpty)
         }
         now = now.addingTimeInterval(1)
         #expect(try detector.taskUpdates().first?.status == .succeeded,
-            "An unreadable scan must not move a previously observed file's completion cutoff")
+            "Unreadable scans must preserve the cutoff for existing and newly discovered rollouts")
         #expect(try detector.taskUpdates().isEmpty)
     }
 

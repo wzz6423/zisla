@@ -450,6 +450,9 @@ public final class CodexSessionActivityDetector {
         for url in refreshedURLs.subtracting(unreadableURLs) {
             lastObservedAtByRolloutURL[url] = observedAt
         }
+        for url in unreadableURLs where lastObservedAtByRolloutURL[url] == nil {
+            lastObservedAtByRolloutURL[url] = lastDiscoveryAt
+        }
         if discovery.changedURLs == nil {
             lastDiscoveryAt = observedAt
             lastObservedAtByRolloutURL = lastObservedAtByRolloutURL.filter { rolloutCandidates?[$0.key] != nil }
