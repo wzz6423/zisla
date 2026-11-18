@@ -619,6 +619,7 @@ public final class AIStateMonitor: ObservableObject {
         let generation = refreshGeneration
         let repository = repository
         subscriptionUsageTask = Task { [weak self] in
+            guard !Task.isCancelled else { return }
             let work = Task.detached(priority: .utility) { await detector.subscriptionUsage() }
             let result = await withTaskCancellationHandler {
                 await work.value

@@ -126,6 +126,26 @@ struct AIStateMonitorSubscriptionTests {
         #expect(monitor.failedUsageProviders.isEmpty)
     }
 
+    /// Detector release is a completion barrier for the queued monitor task and any detached fetch.
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true]) @MainActor
+    func stopBeforeSubscriptionRefreshStartsDoesNotReadCredentials(startWatcher: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-subscription-prestart-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let events = AsyncStream<SubscriptionCredentialProbe.Event>.makeStream()
+        do {
+            let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [],
+                subscriptionUsageDetector: SubscriptionCredentialProbe(events: events.continuation),
+                accountBalanceNotificationCenter: NotificationCenter(), environment: [:])
+            if startWatcher { monitor.start() } else { monitor.refresh() }
+            monitor.stop()
+            #expect(monitor.failedUsageProviders.isEmpty)
+            #expect(try await monitor.readUsageHistory() == AIUsageHistory())
+        }
+        var received: [SubscriptionCredentialProbe.Event] = []
+        for await event in events.stream { received.append(event) }
+        #expect(received == [.released], "A refresh stopped before its task starts must not read subscription credentials")
+    }
+
     @MainActor private func waitFor(_ condition: @MainActor () -> Bool) async -> Bool {
         for _ in 0..<100 {
             if condition() { return true }
@@ -133,6 +153,24 @@ struct AIStateMonitorSubscriptionTests {
         }
         return condition()
     }
+}
+
+private final class SubscriptionCredentialProbe: AISubscriptionUsageDetecting {
+    enum Event: Equatable, Sendable { case credentialRead, released }
+    private let service: AISubscriptionUsageService
+    private let events: AsyncStream<Event>.Continuation
+
+    init(events: AsyncStream<Event>.Continuation) {
+        self.events = events
+        service = AISubscriptionUsageService(cursorCookie: { events.yield(.credentialRead); return nil })
+    }
+
+    deinit {
+        events.yield(.released)
+        events.finish()
+    }
+
+    func subscriptionUsage() async -> AISubscriptionUsageRefresh { await service.subscriptionUsage() }
 }
 
 private actor SubscriptionGate: AISubscriptionUsageDetecting {
