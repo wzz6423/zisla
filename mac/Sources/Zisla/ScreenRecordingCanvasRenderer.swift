@@ -11,6 +11,9 @@ struct RecordingCaptionLayout {
 }
 
 extension RecordingExportRenderer {
+    private static let hdrPreviewContext = CIContext(options: [.cacheIntermediates: false,
+        .workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!])
+
     static func captionLayout(_ caption: RecordingCaption, canvas: CGRect) -> RecordingCaptionLayout {
         let fontSize = caption.fontSize.map { min(canvas.width, canvas.height) * $0 }
             ?? max(12, min(canvas.width, canvas.height) * 0.035)
@@ -71,8 +74,8 @@ extension RecordingExportRenderer {
         let canvas = CGRect(x: 0, y: 0, width: base.width, height: base.height)
         let image = try overlays(project: project, sourceTime: sourceTime, canvas: canvas, editingText: editingText)
             .composited(over: CIImage(cgImage: base))
-        guard let result = context.createCGImage(image, from: canvas, format: .RGBA8,
-                                               colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else {
+        let context = ScreenshotImageRendering.isHDR(base) ? hdrPreviewContext : context
+        guard let result = ScreenshotImageRendering.render(image, matching: base, context: context) else {
             throw ScreenRecordingExportError.cannotRender
         }
         return result

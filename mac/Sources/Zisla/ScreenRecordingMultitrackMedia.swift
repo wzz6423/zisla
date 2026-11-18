@@ -19,13 +19,15 @@ final class RecordingMultitrackMedia {
     let audioMix: AVAudioMix
     let duration: Double
     let adjustsSpeed: Bool
+    let preservesHDR: Bool
     private(set) var playbackClockTrackID: CMPersistentTrackID?
     private var carrier: URL?
     private let voiceMedia: RecordingVoiceMedia
 
     private init(composition: AVMutableComposition, layers: [String: RecordingMultitrackVideoLayer],
                  videoTracks: [AVMutableCompositionTrack], audioTracks: [AVMutableCompositionTrack],
-                 audioMix: AVAudioMix, duration: Double, adjustsSpeed: Bool, voiceMedia: RecordingVoiceMedia) {
+                 audioMix: AVAudioMix, duration: Double, adjustsSpeed: Bool, voiceMedia: RecordingVoiceMedia,
+                 preservesHDR: Bool) {
         self.composition = composition
         self.layers = layers
         self.videoTracks = videoTracks
@@ -33,6 +35,7 @@ final class RecordingMultitrackMedia {
         self.audioMix = audioMix
         self.duration = duration
         self.adjustsSpeed = adjustsSpeed
+        self.preservesHDR = preservesHDR
         self.voiceMedia = voiceMedia
     }
 
@@ -54,6 +57,7 @@ final class RecordingMultitrackMedia {
         var transforms: [String: CGAffineTransform] = [:]
         var videoEntries: [(clip: RecordingTimelineClip, key: String, source: AVAssetTrack, range: CMTimeRange, transform: CGAffineTransform)] = []
         var audioEntries: [(clip: RecordingTimelineClip, source: AVAssetTrack, range: CMTimeRange, volume: Float)] = []
+        var preservesHDR = false
 
         func asset(_ file: String) throws -> AVURLAsset {
             if let source = retained[file] { return source }
@@ -68,6 +72,8 @@ final class RecordingMultitrackMedia {
             }
             let range = try await RecordingExportMedia.availableRange(of: track)
             let transform = try await track.load(.preferredTransform)
+            let hdr = try await RecordingHDR.containsHDR(track)
+            preservesHDR = preservesHDR || hdr
             videoSources[file] = track
             ranges["v" + file] = range
             transforms[file] = transform
@@ -168,7 +174,8 @@ final class RecordingMultitrackMedia {
         mix.inputParameters = audioLanes.map { parameters[$0.trackID]! }
         withExtendedLifetime(retained) {}
         return .init(composition: composition, layers: layers, videoTracks: videoLanes, audioTracks: audioLanes,
-            audioMix: mix, duration: timeline.duration, adjustsSpeed: timeline.clips.contains { $0.speed != 1 }, voiceMedia: voiceMedia)
+            audioMix: mix, duration: timeline.duration, adjustsSpeed: timeline.clips.contains { $0.speed != 1 },
+            voiceMedia: voiceMedia, preservesHDR: preservesHDR)
     }
 
     private static func lane(at start: Double, mediaType: AVMediaType, composition: AVMutableComposition,
@@ -252,6 +259,11 @@ extension ScreenRecordingExporter {
         composition.customVideoCompositorClass = RecordingMultitrackPlaybackCompositor.self
         composition.renderSize = size
         composition.frameDuration = CMTime(value: 1, timescale: 30)
+        if media.preservesHDR {
+            composition.colorPrimaries = AVVideoColorPrimaries_ITU_R_2020
+            composition.colorTransferFunction = AVVideoTransferFunction_SMPTE_ST_2084_PQ
+            composition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_2020
+        }
         composition.instructions = [try RecordingMultitrackPlaybackInstruction(project: project, directory: directory,
             media: media, size: size)]
         let item = AVPlayerItem(asset: media.composition)
@@ -278,23 +290,35 @@ extension ScreenRecordingExporter {
             var generators: [String: AVAssetImageGenerator] = [:]
             var availableRanges: [String: CMTimeRange] = [:]
             var frames: [String: CGImage] = [:]
-            func frame(_ file: String, at sourceTime: Double, optional: Bool) async throws -> CGImage? {
-                let generator: AVAssetImageGenerator
-                if let cached = generators[file] { generator = cached }
-                else {
-                    let asset = AVURLAsset(url: try store.mediaURL(file, in: directory))
-                    guard let track = try await asset.loadTracks(withMediaType: .video).first else {
-                        throw ScreenRecordingExportError.unavailableMedia
-                    }
-                    let range = try await RecordingExportMedia.availableRange(of: track)
-                    availableRanges[file] = range
-                    generator = AVAssetImageGenerator(asset: asset)
-                    generator.appliesPreferredTrackTransform = true
-                    generator.maximumSize = maximumSize
-                    generator.requestedTimeToleranceBefore = .zero
-                    generator.requestedTimeToleranceAfter = .zero
-                    generators[file] = generator
+            var preservesHDR = false
+            func generator(_ file: String) async throws -> AVAssetImageGenerator {
+                if let cached = generators[file] { return cached }
+                let asset = AVURLAsset(url: try store.mediaURL(file, in: directory))
+                guard let track = try await asset.loadTracks(withMediaType: .video).first else {
+                    throw ScreenRecordingExportError.unavailableMedia
                 }
+                availableRanges[file] = try await RecordingExportMedia.availableRange(of: track)
+                let hdr = try await RecordingHDR.containsHDR(track)
+                preservesHDR = preservesHDR || hdr
+                let generator = AVAssetImageGenerator(asset: asset)
+                if #available(macOS 15.0, *) { generator.dynamicRangePolicy = .matchSource }
+                generator.appliesPreferredTrackTransform = true
+                generator.maximumSize = maximumSize
+                generator.requestedTimeToleranceBefore = .zero
+                generator.requestedTimeToleranceAfter = .zero
+                generators[file] = generator
+                return generator
+            }
+            let visibleTracks = Set(timeline.tracks.filter { !$0.isHidden }.map(\.id))
+            for clip in timeline.clips where visibleTracks.contains(clip.trackID) && clip.content.trackKind == .video {
+                try Task.checkCancellation()
+                _ = try await generator(assets[clip.content.assetID!]!.file)
+                if case .recording = clip.content, project.edits.effectiveShowCamera, let camera = project.editingCameraFile {
+                    _ = try await generator(camera)
+                }
+            }
+            func frame(_ file: String, at sourceTime: Double, optional: Bool) async throws -> CGImage? {
+                let generator = try await generator(file)
                 let range = availableRanges[file]!
                 if optional && (sourceTime < range.start.seconds || sourceTime >= range.end.seconds) { return nil }
                 guard sourceTime < range.end.seconds else { throw ScreenRecordingExportError.timelineOutsideMedia }
@@ -312,7 +336,8 @@ extension ScreenRecordingExporter {
                 }
             }
             try Task.checkCancellation()
-            return RecordingMultitrackPreviewScene(project: project, directory: directory, time: time, size: size, frames: frames)
+            return RecordingMultitrackPreviewScene(project: project, directory: directory, time: time, size: size, frames: frames,
+                preservesHDR: preservesHDR)
         }
         return try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
     }

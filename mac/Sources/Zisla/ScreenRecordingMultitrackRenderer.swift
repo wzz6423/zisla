@@ -69,20 +69,23 @@ struct RecordingMultitrackPreviewScene: @unchecked Sendable {
     let time: Double
     let size: CGSize
     let frames: [String: CGImage]
+    let preservesHDR: Bool
     let directory: URL
     let imageStore: RecordingMediaImageStore
 
     init(project: ScreenRecordingProject, directory: URL, time: Double, size: CGSize,
-         frames: [String: CGImage]) {
+         frames: [String: CGImage], preservesHDR: Bool = false) {
         self.directory = directory
         self.time = time
         self.size = size
         self.frames = frames
+        self.preservesHDR = preservesHDR
         imageStore = RecordingMediaImageStore(project: project, directory: directory)
     }
 
     func image(project: ScreenRecordingProject, editingText: RecordingCanvasSelection? = nil) throws -> CGImage {
-        let renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size, imageStore: imageStore)
+        let renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size, imageStore: imageStore,
+            preservesHDR: preservesHDR)
         let renderedTime = project.outputDuration > 0 ? min(time, max(0, project.outputDuration - 1.0 / 60_000)) : 0
         return try renderer.image(frames: frames.mapValues(CIImage.init(cgImage:)), at: renderedTime, editingText: editingText)
     }
@@ -91,6 +94,7 @@ struct RecordingMultitrackPreviewScene: @unchecked Sendable {
 final class RecordingMultitrackRenderer {
     let canvas: CGRect
     let context: CIContext
+    let preservesHDR: Bool
     let index: RecordingTimelineClipIndex
     private let project: ScreenRecordingProject
     private let recording: RecordingExportRenderer
@@ -109,9 +113,11 @@ final class RecordingMultitrackRenderer {
 
     init(project: ScreenRecordingProject, directory: URL, size: CGSize,
          imageStore: RecordingMediaImageStore? = nil,
-         makePortraitProcessor: @escaping () -> RecordingPortraitProcessor = { RecordingPortraitProcessor() }) throws {
+         makePortraitProcessor: @escaping () -> RecordingPortraitProcessor = { RecordingPortraitProcessor() },
+         preservesHDR: Bool = false) throws {
         guard let timeline = project.timeline else { throw ScreenRecordingProjectError.invalidProject }
         self.project = project
+        self.preservesHDR = preservesHDR
         self.makePortraitProcessor = makePortraitProcessor
         canvas = CGRect(origin: .zero, size: size)
         index = RecordingTimelineClipIndex(timeline)
@@ -122,7 +128,8 @@ final class RecordingMultitrackRenderer {
         var base = project
         base.edits.annotations = []
         base.edits.showCaptions = false
-        recording = try RecordingExportRenderer(project: base, size: size, portraitProcessor: makePortraitProcessor())
+        recording = try RecordingExportRenderer(project: base, size: size, portraitProcessor: makePortraitProcessor(),
+            preservesHDR: preservesHDR)
         context = recording.context
         base.pointers = []
         base.edits.zoomClips = []
@@ -239,9 +246,7 @@ final class RecordingMultitrackRenderer {
     func image(frames: [String: CIImage], at time: Double,
                editingText: RecordingCanvasSelection? = nil) throws -> CGImage {
         let rendered = try render(frames: frames, at: time, editingText: editingText)
-        guard let image = context.createCGImage(rendered, from: canvas, format: .RGBA8,
-            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { throw ScreenRecordingExportError.cannotRender }
-        return image
+        return try RecordingHDR.image(rendered, in: canvas, context: context, preservesHDR: preservesHDR)
     }
 
     private func rect(_ layout: RecordingRect) -> CGRect {
@@ -312,10 +317,7 @@ final class RecordingMultitrackRenderer {
         guard !extent.isInfinite, !extent.isNull, extent.width >= 1, extent.height >= 1 else {
             throw ScreenRecordingExportError.cannotRender
         }
-        guard let raster = context.createCGImage(image, from: extent, format: .RGBA8,
-            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else {
-            throw ScreenRecordingExportError.cannotRender
-        }
+        let raster = try RecordingHDR.image(image, in: extent, context: context, preservesHDR: preservesHDR)
         let bitmap = CIImage(cgImage: raster)
         guard extent.minX != 0 || extent.minY != 0 else { return bitmap }
         return bitmap.transformed(by: .init(translationX: extent.minX, y: extent.minY))

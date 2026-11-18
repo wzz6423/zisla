@@ -243,6 +243,10 @@ struct ScreenRecordingCaptureBar: View {
                     value: $model.configuration.microphone, identifier: "microphone")
                 inputButton("video", disabledSymbol: "video.slash", title: "摄像头",
                     value: $model.configuration.camera, identifier: "camera")
+                if ScreenshotCaptureService.supportsHDRCapture {
+                    inputButton("hdr", disabledSymbol: "hdr", title: "保留 HDR",
+                        value: $model.configuration.preservesHDR, identifier: "hdr")
+                }
                 if model.configuration.camera || model.configuration.microphone {
                     Button { showsPortraitEffects.toggle() } label: {
                         Image(systemName: "person.crop.rectangle.badge.plus")
