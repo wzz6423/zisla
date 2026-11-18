@@ -49,10 +49,6 @@ final class AppSettings: ObservableObject {
         static let keyboardVolumeCurveVersion = "keyboardVolumeCurveVersion"
         static let releaseSound = "releaseSound"
         static let pitchVariation = "pitchVariation"
-        static let pointerSoundEnabled = "pointerSoundEnabled"
-        static let selectedPointerProfile = "selectedPointerProfile"
-        static let pointerVolume = "pointerVolume"
-        static let pointerReleaseSound = "pointerReleaseSound"
         static let typingStatsEnabled = "typingStatsEnabled"
         static let launchAtLoginEnabled = "launchAtLoginEnabled"
         static let languagePreference = "languagePreference"
@@ -84,22 +80,6 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(usesPitchVariation, forKey: Key.pitchVariation) }
     }
 
-    @Published var isPointerSoundEnabled: Bool {
-        didSet { defaults.set(isPointerSoundEnabled, forKey: Key.pointerSoundEnabled) }
-    }
-
-    @Published var selectedPointerProfileID: String {
-        didSet { defaults.set(selectedPointerProfileID, forKey: Key.selectedPointerProfile) }
-    }
-
-    @Published var pointerVolume: Double {
-        didSet { defaults.set(pointerVolume, forKey: Key.pointerVolume) }
-    }
-
-    @Published var playsPointerReleaseSound: Bool {
-        didSet { defaults.set(playsPointerReleaseSound, forKey: Key.pointerReleaseSound) }
-    }
-
     /// Opt-in because this persists aggregate key/app activity rather than only playing sound.
     @Published var isTypingStatsEnabled: Bool {
         didSet { defaults.set(isTypingStatsEnabled, forKey: Key.typingStatsEnabled) }
@@ -121,11 +101,6 @@ final class AppSettings: ObservableObject {
     var selectedProfile: SwitchProfile {
         get { SwitchProfile(rawValue: selectedProfileID) ?? .holyPanda }
         set { selectedProfileID = newValue.rawValue }
-    }
-
-    var selectedPointerProfile: PointerSoundProfile {
-        get { PointerSoundProfile(rawValue: selectedPointerProfileID) ?? .classic }
-        set { selectedPointerProfileID = newValue.rawValue }
     }
 
     var keyboardPlaybackGain: Double {
@@ -158,17 +133,6 @@ final class AppSettings: ObservableObject {
         volume = resolvedKeyboardVolume
         playsReleaseSound = defaults.object(forKey: Key.releaseSound) as? Bool ?? true
         usesPitchVariation = defaults.object(forKey: Key.pitchVariation) as? Bool ?? true
-        isPointerSoundEnabled = defaults.object(forKey: Key.pointerSoundEnabled) as? Bool ?? false
-        let storedPointerProfileID = defaults.string(forKey: Key.selectedPointerProfile)
-            ?? PointerSoundProfile.classic.rawValue
-        selectedPointerProfileID = PointerSoundProfile(rawValue: storedPointerProfileID) == nil
-            ? PointerSoundProfile.classic.rawValue
-            : storedPointerProfileID
-        let storedPointerVolume = defaults.object(forKey: Key.pointerVolume) as? Double
-        let resolvedPointerVolume = storedPointerVolume
-            ?? KeyboardVolumeCurve.playbackGain(for: resolvedKeyboardVolume) * 0.65
-        pointerVolume = min(max(resolvedPointerVolume, 0), 1)
-        playsPointerReleaseSound = defaults.object(forKey: Key.pointerReleaseSound) as? Bool ?? true
         isTypingStatsEnabled = defaults.object(forKey: Key.typingStatsEnabled) as? Bool ?? false
         isLaunchAtLoginEnabled = defaults.object(forKey: Key.launchAtLoginEnabled) as? Bool ?? true
         let storedLanguagePreference = defaults.string(forKey: Key.languagePreference)
@@ -176,17 +140,11 @@ final class AppSettings: ObservableObject {
         let storedAppearancePreference = defaults.string(forKey: Key.appearancePreference)
         appearancePreference = AppAppearancePreference(rawValue: storedAppearancePreference ?? "") ?? .system
         L10n.configure(for: languagePreference)
-        if selectedPointerProfileID != storedPointerProfileID {
-            defaults.set(selectedPointerProfileID, forKey: Key.selectedPointerProfile)
-        }
         if storedKeyboardVolume == nil || storedKeyboardVolume != resolvedKeyboardVolume {
             defaults.set(resolvedKeyboardVolume, forKey: Key.volume)
         }
         if storedKeyboardVolumeCurveVersion < KeyboardVolumeCurve.currentVersion {
             defaults.set(KeyboardVolumeCurve.currentVersion, forKey: Key.keyboardVolumeCurveVersion)
-        }
-        if storedPointerVolume == nil || storedPointerVolume != pointerVolume {
-            defaults.set(pointerVolume, forKey: Key.pointerVolume)
         }
         if storedLanguagePreference != languagePreference.rawValue {
             defaults.set(languagePreference.rawValue, forKey: Key.languagePreference)

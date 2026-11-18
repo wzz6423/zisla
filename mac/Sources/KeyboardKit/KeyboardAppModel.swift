@@ -19,7 +19,6 @@ final class KeyboardAppModel: ObservableObject {
     var onBeforeTermination: (@MainActor () async -> Bool)?
     @Published private(set) var monitoringState: KeyboardMonitoringState = .stopped
     @Published private(set) var audioError: String?
-    @Published private(set) var pointerSoundError: String?
     @Published private(set) var soundPackError: String?
     @Published private(set) var soundPacks: [SoundPackDescriptor] = SoundPackDescriptor.bundledDefaults
 
@@ -31,7 +30,6 @@ final class KeyboardAppModel: ObservableObject {
     private var selectionLoadTask: Task<Void, Never>?
     private var libraryRefreshTask: Task<Void, Never>?
     private var selectionGeneration: UInt64 = 0
-    private var isRollingBackPointerSelection = false
     private var soundPackEditorWindowController: SoundPackEditorWindowController?
     private var typingStatsWindowController: TypingStatsWindowController?
     private var frontmostApplication: TypingApplicationIdentity = .unknown
@@ -68,28 +66,6 @@ final class KeyboardAppModel: ObservableObject {
             audioEngine.load(profile: profile)
         } else {
             audioEngine.load(profile: .holyPanda)
-        }
-        let initialPointerProfile = settings.selectedPointerProfile
-        if !audioEngine.load(pointerProfile: initialPointerProfile) {
-            let reason = localizedMessage(
-                audioEngine.pointerResourceError,
-                fallback: "点击音资源不可用。"
-            )
-            if initialPointerProfile != .classic,
-               audioEngine.load(pointerProfile: .classic) {
-                settings.selectedPointerProfile = .classic
-                pointerSoundError = L10n.format(
-                    "%@ 载入失败，已回退到经典微动：%@",
-                    initialPointerProfile.displayName,
-                    reason
-                )
-            } else {
-                pointerSoundError = L10n.format(
-                    "%@ 载入失败：%@",
-                    initialPointerProfile.displayName,
-                    reason
-                )
-            }
         }
         syncAudioError()
         frontmostApplication = Self.typingApplicationIdentity(
@@ -178,9 +154,7 @@ final class KeyboardAppModel: ObservableObject {
             let (keyboardEnabled, keyboardReleases) = audioSettings
             return KeyboardMonitor.EventInterest(
                 keyboardPresses: keyboardEnabled || statsEnabled,
-                keyboardReleases: keyboardEnabled && keyboardReleases,
-                pointerPresses: false,
-                pointerReleases: false
+                keyboardReleases: keyboardEnabled && keyboardReleases
             )
         }
         .removeDuplicates()
@@ -391,15 +365,13 @@ final class KeyboardAppModel: ObservableObject {
         activeEventInterest = started ? interest : nil
         monitoringState = started
             ? .running
-            : .failed(L10n.tr("无法启动全局键盘与点击监听。请退出并重新打开 Keyboard 后再试。"))
+            : .failed(L10n.tr("监听启动失败"))
     }
 
     private var inputEventInterest: KeyboardMonitor.EventInterest {
         KeyboardMonitor.EventInterest(
             keyboardPresses: settings.isEnabled || settings.isTypingStatsEnabled,
-            keyboardReleases: settings.isEnabled && settings.playsReleaseSound,
-            pointerPresses: false,
-            pointerReleases: false
+            keyboardReleases: settings.isEnabled && settings.playsReleaseSound
         )
     }
 
@@ -463,17 +435,8 @@ final class KeyboardAppModel: ObservableObject {
         }
     }
 
-    private func handle(_ event: GlobalInputEvent) {
-        guard permission.isGranted else { return }
-        switch event {
-        case let .keyboard(keyboardEvent):
-            handle(keyboardEvent)
-        case let .pointer(pointerEvent):
-            handle(pointerEvent)
-        }
-    }
-
     private func handle(_ event: KeyboardEvent) {
+        guard permission.isGranted else { return }
         let occurredAt = Date()
         let shouldPlaySound = settings.isEnabled
             && !(event.kind == .keyDown && event.isRepeat)
@@ -499,55 +462,6 @@ final class KeyboardAppModel: ObservableObject {
                 at: occurredAt
             )
         }
-    }
-
-    private func handle(_ event: PointerEvent) {
-        guard settings.isPointerSoundEnabled else { return }
-        if event.phase == .release, !settings.playsPointerReleaseSound { return }
-
-        audioEngine.play(
-            pointerButton: event.button,
-            phase: event.phase,
-            volume: settings.pointerVolume,
-            pitchVariation: settings.usesPitchVariation
-        )
-        syncAudioError()
-    }
-
-    private func loadPointerSoundProfile(profileID: String) {
-        guard let profile = PointerSoundProfile(rawValue: profileID) else {
-            let fallback = audioEngine.loadedPointerProfile
-            pointerSoundError = L10n.format(
-                "无法识别所选点击音，继续使用 %@。",
-                fallback.displayName
-            )
-            rollBackPointerSelection(to: fallback)
-            return
-        }
-        guard audioEngine.load(pointerProfile: profile) else {
-            let fallback = audioEngine.loadedPointerProfile
-            let reason = localizedMessage(
-                audioEngine.pointerResourceError,
-                fallback: "点击音资源不可用。"
-            )
-            pointerSoundError = L10n.format(
-                "%@ 载入失败，继续使用 %@：%@",
-                profile.displayName,
-                fallback.displayName,
-                reason
-            )
-            rollBackPointerSelection(to: fallback)
-            syncAudioError()
-            return
-        }
-        pointerSoundError = nil
-        syncAudioError()
-    }
-
-    private func rollBackPointerSelection(to profile: PointerSoundProfile) {
-        guard settings.selectedPointerProfileID != profile.rawValue else { return }
-        isRollingBackPointerSelection = true
-        settings.selectedPointerProfileID = profile.rawValue
     }
 
     private static func typingApplicationIdentity(

@@ -361,7 +361,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let defaults = UserDefaults.standard
         let hasExistingInstallation = [
             "feature-settings-v1", "keyboardVolumeCurveVersion",
-            "selectedPointerProfile", "download-directory-bookmark",
+            "download-directory-bookmark",
         ].contains { defaults.object(forKey: $0) != nil }
         self.hasExistingInstallation = hasExistingInstallation
         let state = FirstLaunchOnboardingState(hasExistingInstallation: hasExistingInstallation)
