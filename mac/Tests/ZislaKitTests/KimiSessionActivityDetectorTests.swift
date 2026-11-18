@@ -49,6 +49,87 @@ struct KimiSessionActivityDetectorTests {
         #expect(try detector.activeTasks().isEmpty)
     }
 
+    @Test(arguments: [
+        (#"{"type":"step.end","finishReason":"tool_use"}"#, AIProgressStatus.running),
+        (#"{"type":"step.end","finishReason":"paused"}"#, AIProgressStatus.blocked),
+        (#"{"type":"turn.interrupted"}"#, AIProgressStatus.error),
+    ])
+    func testCancellationClearsActivityAndAllowsTheNextTurn(loopEvent: String, status: AIProgressStatus) throws {
+        let home = makeKimiTempHome("cancel-state")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let wireURL = try writeKimiSession(
+            under: home,
+            sessionID: "kimi-cancel-state",
+            lines: [
+                #"{"type":"turn.prompt","time":1910000040000}"#,
+                "{\"type\":\"context.append_loop_event\",\"event\":\(loopEvent),\"time\":1910000041000}",
+            ]
+        )
+        let detector = KimiSessionActivityDetector(homeDirectory: home)
+        #expect(try detector.activeTasks().first?.status == status)
+
+        try appendKimiLine(#"{"type":"turn.cancel","time":1910000042000}"#, to: wireURL)
+        #expect(try detector.activeTasks().isEmpty, "Cancellation must clear the previous activity state")
+        #expect(try detector.activeTasks().isEmpty, "Cached cancellation must not revive a task")
+        #expect(try KimiSessionActivityDetector(homeDirectory: home).activeTasks().isEmpty,
+            "Replaying a cancelled transcript must remain idle")
+
+        try appendKimiLine(#"{"type":"turn.prompt","time":1910000043000}"#, to: wireURL)
+        let next = try #require(detector.activeTasks().first)
+        #expect(next.id == KimiSessionActivityDetector.taskID(forSessionID: "kimi-cancel-state"))
+        #expect(next.status == .running)
+        #expect(next.startedAt == Date(timeIntervalSince1970: 1910000043))
+    }
+
+    @Test
+    func testPartialCancellationClearsErrorOnlyAfterTheRecordCompletes() throws {
+        let home = makeKimiTempHome("partial-cancel")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let wireURL = try writeKimiSession(
+            under: home,
+            sessionID: "kimi-partial-cancel",
+            lines: [
+                #"{"type":"turn.prompt","time":1910000050000}"#,
+                #"{"type":"context.append_loop_event","event":{"type":"turn.interrupted"},"time":1910000051000}"#,
+            ]
+        )
+        let detector = KimiSessionActivityDetector(homeDirectory: home)
+        #expect(try detector.activeTasks().first?.status == .error)
+        let handle = try FileHandle(forWritingTo: wireURL)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(#"{"type":"turn.cancel","time":1910000052000"#.utf8))
+        #expect(try detector.activeTasks().first?.status == .error,
+            "An incomplete cancellation must preserve the last readable activity")
+        try handle.write(contentsOf: Data("}\n".utf8))
+        #expect(try detector.activeTasks().isEmpty, "Completing the cancellation must clear the error")
+    }
+
+    @Test
+    func testCancellationDoesNotEndAnotherSession() throws {
+        let home = makeKimiTempHome("cancel-isolation")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let wireURL = try writeKimiSession(
+            under: home,
+            sessionID: "kimi-cancelled",
+            lines: [
+                #"{"type":"turn.prompt","time":1910000060000}"#,
+                #"{"type":"context.append_loop_event","event":{"type":"turn.interrupted"},"time":1910000061000}"#,
+            ]
+        )
+        try writeKimiSession(
+            under: home,
+            sessionID: "kimi-other",
+            lines: [#"{"type":"turn.prompt","time":1910000060000}"#]
+        )
+        let detector = KimiSessionActivityDetector(homeDirectory: home)
+        let before = try detector.activeTasks()
+        let other = try #require(before.first { $0.id == KimiSessionActivityDetector.taskID(forSessionID: "kimi-other") })
+        #expect(before.count == 2)
+        try appendKimiLine(#"{"type":"turn.cancel","time":1910000062000}"#, to: wireURL)
+        #expect(try detector.activeTasks() == [other], "Cancellation must only end its own session")
+    }
+
     @Test
     func testPausedStepBlocksAndArchivedSessionIsIgnored() throws {
         let home = makeKimiTempHome("blocked")
