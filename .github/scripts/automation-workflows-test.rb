@@ -189,6 +189,17 @@ class AutomationWorkflowsTest < Minitest::Test
     ].each { |path| refute excluded.call(path), path }
   end
 
+  def test_dependency_review_pin_declares_an_exact_release_version
+    source = File.read(File.join(ROOT, '.github/workflows/dependency-review.yml'))
+    review = YAML.load(source).fetch('jobs').fetch('review').fetch('steps').find do |entry|
+      entry.fetch('uses', '').start_with?('actions/dependency-review-action@')
+    end
+    reference = review.fetch('uses')
+    assert_match(/\Aactions\/dependency-review-action@[0-9a-f]{40}\z/, reference)
+    assert_match(/#{Regexp.escape(reference)}[ \t]+# v\d+\.\d+\.\d+[ \t]*$/, source,
+                 'Dependency Review must declare an exact release version because its major branch moves.')
+  end
+
   def test_swift_required_check_rejects_incomplete_shards_and_smoke_checks
     aggregate = step('swift-tests', 'Require every Swift test shard and smoke check')
     environment = {
