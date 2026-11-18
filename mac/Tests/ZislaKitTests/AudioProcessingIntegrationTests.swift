@@ -138,8 +138,8 @@ struct AudioProcessingIntegrationTests {
         let rate = Double(options.sampleRate)
         let fadeInFrames = (fades.0 * rate).rounded()
         let fadeOutFrames = (fades.1 * rate).rounded()
-        let fadeOutStart = ((summary.duration - fades.1) * rate).rounded()
         for channel in samples.indices {
+            let fadeOutStart = Double(samples[channel].count) - fadeOutFrames
             let maximumError = zip(actual[channel], samples[channel]).enumerated().reduce(0.0) { error, frame in
                 let position = Double(frame.offset)
                 var gain = fadeInFrames > 0 ? min(1, position / fadeInFrames) : 1
