@@ -101,7 +101,10 @@ struct KimiSessionActivityDetectorTests {
         try handle.write(contentsOf: Data(#"{"type":"turn.cancel","time":1910000052000"#.utf8))
         #expect(try detector.activeTasks().first?.status == .error,
             "An incomplete cancellation must preserve the last readable activity")
-        try handle.write(contentsOf: Data("}\n".utf8))
+        try handle.write(contentsOf: Data("}".utf8))
+        #expect(try detector.activeTasks().first?.status == .error,
+            "A cancellation without a newline must preserve the last readable activity")
+        try handle.write(contentsOf: Data("\n".utf8))
         #expect(try detector.activeTasks().isEmpty, "Completing the cancellation must clear the error")
     }
 
