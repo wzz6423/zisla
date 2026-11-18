@@ -112,6 +112,47 @@ struct AudioProcessingIntegrationTests {
         #expect(abs(try await fixture.service.inspect(output).duration - 2.1 / speed) < 0.16)
     }
 
+    @Test(arguments: [AudioExportFormat.wav, .wma], [(0.5, 0.0), (0.0, 0.5), (0.5, 0.5)])
+    func fadesFollowDecodedSamplesAcrossContainerTimestampOffsets(format: AudioExportFormat, fades: (Double, Double)) async throws {
+        let fixture = try AudioIntegrationFixture()
+        defer { fixture.clean() }
+        var options = AudioProcessingOptions()
+        options.format = format
+        let input = fixture.root.appendingPathComponent("input.\(format.fileExtension)")
+        _ = try await fixture.service.process(.init(operation: .convert, inputURLs: [fixture.first], options: options), outputURL: input)
+        let original = try Data(contentsOf: input)
+        let summary = try await fixture.service.inspect(input)
+        options.format = .wav
+        options.bitDepth = 32
+        let decoded = fixture.root.appendingPathComponent("decoded.wav")
+        _ = try await fixture.service.process(.init(operation: .convert, inputURLs: [input], options: options), outputURL: decoded)
+        let samples = try fixture.samples(decoded)
+        options.bitDepth = 16
+        options.fadeInDuration = fades.0
+        options.fadeOutDuration = fades.1
+        let output = fixture.root.appendingPathComponent("faded.wav")
+        let outputs = try await fixture.service.process(.init(operation: .fade, inputURLs: [input], options: options), outputURL: output)
+        #expect(outputs == [output])
+        let actual = try fixture.samples(output)
+        try #require(actual.map(\.count) == samples.map(\.count), "Fading must preserve every decoded frame and channel")
+        let rate = Double(options.sampleRate)
+        let fadeInFrames = (fades.0 * rate).rounded()
+        let fadeOutFrames = (fades.1 * rate).rounded()
+        for channel in samples.indices {
+            let fadeOutStart = Double(samples[channel].count) - fadeOutFrames
+            let maximumError = zip(actual[channel], samples[channel]).enumerated().reduce(0.0) { error, frame in
+                let position = Double(frame.offset)
+                var gain = fadeInFrames > 0 ? min(1, position / fadeInFrames) : 1
+                if fadeOutFrames > 0 { gain *= min(1, max(0, (fadeOutStart + fadeOutFrames - position) / fadeOutFrames)) }
+                return max(error, abs(Double(frame.element.0) - Double(frame.element.1) * gain))
+            }
+            #expect(maximumError <= 1.0 / 32_768, "The fade envelope must follow decoded samples in channel \(channel); maximum error: \(maximumError)")
+        }
+        #expect(abs(try await fixture.service.inspect(output).duration - summary.duration) <= 1.0 / rate)
+        #expect(try Data(contentsOf: input) == original)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).allSatisfy { !$0.hasPrefix(".zisla-audio-") })
+    }
+
     @Test(arguments: AudioChannelMode.allCases)
     func appliesChannelSelectionAndSwap(mode: AudioChannelMode) async throws {
         let fixture = try AudioIntegrationFixture()
