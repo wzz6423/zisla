@@ -3788,3 +3788,6 @@
 "自动更新依赖组件" = "Automatically Update Dependencies";
 "每天更新已安装的依赖组件" = "Update installed dependencies daily";
 "（默认）" = "(Default)";
+
+"按应用" = "By app";
+"搜索内容或应用" = "Search content or apps";

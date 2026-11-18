@@ -60,6 +60,7 @@ struct ClipboardHistoryModuleView: View {
     @ObservedObject private var store: ClipboardHistoryStore
     @State private var filter: ClipboardFilter = .all
     @State private var categoryFilter: FileShelfCategory = .all
+    @State private var grouping: ClipboardHistoryGrouping = .none
     @State private var additionPresentation: ClipboardAdditionPresentation?
     @State private var draftText = ""
     @State private var searchText = ""
@@ -87,16 +88,13 @@ struct ClipboardHistoryModuleView: View {
         sendToQuickNote: @escaping (ClipboardHistoryItem) -> Void
     ) {
         _store = ObservedObject(wrappedValue: store)
+        _grouping = State(initialValue: store.currentQuery.grouping)
         self.copyItem = copyItem
         self.sendToQuickNote = sendToQuickNote
     }
 
     private var visibleItems: [ClipboardHistoryItem] {
-        switch filter {
-        case .all: visiblePinnedItems + visibleHistoryItems
-        case .pinned: visiblePinnedItems
-        case .history: visibleHistoryItems
-        }
+        store.items
     }
 
     private var visiblePinnedItems: [ClipboardHistoryItem] {
@@ -108,7 +106,7 @@ struct ClipboardHistoryModuleView: View {
     }
 
     private var queryID: String {
-        filter.rawValue + "\u{0}" + categoryFilter.rawValue + "\u{0}" + searchText
+        filter.rawValue + "\u{0}" + categoryFilter.rawValue + "\u{0}" + grouping.rawValue + "\u{0}" + searchText
     }
 
     var body: some View {
@@ -117,6 +115,11 @@ struct ClipboardHistoryModuleView: View {
                 Label(AppLocalization.text("剪贴板"), systemImage: "clipboard")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
+                if store.isLoading && !visibleItems.isEmpty {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .accessibilityIdentifier("clipboardHistory.refreshing")
+                }
                 Text("\(store.totalItemCount)")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -151,11 +154,23 @@ struct ClipboardHistoryModuleView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 6)
 
+            Picker(AppLocalization.text("分组"), selection: $grouping) {
+                ForEach(ClipboardHistoryGrouping.allCases) { option in
+                    Text(AppLocalization.text(option.title)).tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .font(.system(size: 11))
+            .accessibilityIdentifier("clipboardHistory.grouping")
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                TextField(AppLocalization.text("搜索"), text: $searchText)
+                TextField(AppLocalization.text("搜索内容或应用"), text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
                     .focused($isSearchFocused)
@@ -194,14 +209,22 @@ struct ClipboardHistoryModuleView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if visibleItems.isEmpty {
                 EmptyState(
-                    symbol: filter == .pinned ? "star" : "clipboard",
+                    symbol: store.displayedQuery.scope == .pinned ? "star" : "clipboard",
                     title: emptyStateTitle,
                     detail: emptyStateDetail
                 )
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
-                        if filter == .all {
+                        if store.displayedQuery.grouping == .sourceApp {
+                            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+                                if index == 0 || !Self.hasSameSource(item, visibleItems[index - 1]) {
+                                    sectionTitle(item.sourceApp?.name ?? AppLocalization.text("未知应用"))
+                                        .accessibilityIdentifier("clipboardHistory.sourceGroup." + (item.sourceApp?.bundleIdentifier ?? "unknown"))
+                                }
+                                itemRow(item)
+                            }
+                        } else if store.displayedQuery.scope == .all {
                             if !visiblePinnedItems.isEmpty {
                                 sectionTitle("常用")
                                 ForEach(visiblePinnedItems) { item in
@@ -292,7 +315,8 @@ struct ClipboardHistoryModuleView: View {
             }
         }
         .task(id: queryID) {
-            await Self.updateQuery(store: store, filter: $filter, categoryFilter: $categoryFilter, searchText: $searchText)
+            await Self.updateQuery(store: store, filter: $filter, categoryFilter: $categoryFilter,
+                grouping: $grouping, searchText: $searchText)
         }
         .onAppear { pageInput = displayedPageNumber }
         .onChange(of: store.currentPage) { _, _ in
@@ -304,37 +328,51 @@ struct ClipboardHistoryModuleView: View {
         store: ClipboardHistoryStore,
         filter: Binding<ClipboardFilter>,
         categoryFilter: Binding<FileShelfCategory>,
+        grouping: Binding<ClipboardHistoryGrouping>,
         searchText: Binding<String>
     ) async {
         let requestedFilter = filter.wrappedValue
         let requestedCategory = categoryFilter.wrappedValue
+        let requestedGrouping = grouping.wrappedValue
         let requestedSearch = searchText.wrappedValue
         if !requestedSearch.isEmpty {
             try? await Task.sleep(for: .milliseconds(200))
         }
         guard !Task.isCancelled, filter.wrappedValue == requestedFilter,
-              categoryFilter.wrappedValue == requestedCategory, searchText.wrappedValue == requestedSearch else { return }
+              categoryFilter.wrappedValue == requestedCategory, grouping.wrappedValue == requestedGrouping,
+              searchText.wrappedValue == requestedSearch else { return }
         let normalizedSearch = requestedSearch.trimmingCharacters(in: .whitespacesAndNewlines)
         let current = store.currentQuery
         if current.scope != requestedFilter.scope || current.category != requestedCategory
-            || current.searchText != normalizedSearch {
-            store.updateQuery(scope: requestedFilter.scope, searchText: requestedSearch, category: requestedCategory)
+            || current.searchText != normalizedSearch || current.grouping != requestedGrouping {
+            store.updateQuery(scope: requestedFilter.scope, searchText: requestedSearch,
+                category: requestedCategory, grouping: requestedGrouping)
         } else if !store.isLoading {
             return
         }
         await store.waitUntilLoaded()
         guard !Task.isCancelled, filter.wrappedValue == requestedFilter,
-              categoryFilter.wrappedValue == requestedCategory, searchText.wrappedValue == requestedSearch else { return }
+              categoryFilter.wrappedValue == requestedCategory, grouping.wrappedValue == requestedGrouping,
+              searchText.wrappedValue == requestedSearch else { return }
         let loaded = store.currentQuery
         guard loaded.scope != requestedFilter.scope || loaded.category != requestedCategory
-            || loaded.searchText != normalizedSearch else { return }
+            || loaded.searchText != normalizedSearch || loaded.grouping != requestedGrouping else { return }
         switch loaded.scope {
         case .all: filter.wrappedValue = .all
         case .pinned: filter.wrappedValue = .pinned
         case .history: filter.wrappedValue = .history
         }
         categoryFilter.wrappedValue = loaded.category
+        grouping.wrappedValue = loaded.grouping
         searchText.wrappedValue = loaded.searchText
+    }
+
+    static func hasSameSource(_ lhs: ClipboardHistoryItem, _ rhs: ClipboardHistoryItem) -> Bool {
+        switch (lhs.sourceApp?.bundleIdentifier, rhs.sourceApp?.bundleIdentifier) {
+        case let (left?, right?): left.utf8.elementsEqual(right.utf8)
+        case (nil, nil): true
+        default: false
+        }
     }
 
     @ViewBuilder
@@ -456,7 +494,10 @@ struct ClipboardHistoryModuleView: View {
     }
 
     private var emptyStateTitle: String {
-        switch filter {
+        if !store.displayedQuery.searchText.isEmpty || store.displayedQuery.category != .all {
+            return "无符合条件的内容"
+        }
+        return switch store.displayedQuery.scope {
         case .all: "还没有剪贴板历史"
         case .pinned: "还没有常用项"
         case .history: "这里空空如也"
@@ -477,7 +518,10 @@ struct ClipboardHistoryModuleView: View {
     }
 
     private var emptyStateDetail: String? {
-        switch filter {
+        if !store.displayedQuery.searchText.isEmpty || store.displayedQuery.category != .all {
+            return nil
+        }
+        return switch store.displayedQuery.scope {
         case .all: "复制内容后会自动记录"
         case .pinned: "点击右上角加号，添加文字、图片或文件"
         case .history: nil
@@ -769,9 +813,13 @@ private struct ClipboardHistoryItemRow: View, Equatable {
     }
 
     private var subtitle: String {
-        AppLocalization.text(contentTypeName)
+        let detail = AppLocalization.text(contentTypeName)
             + " · "
             + AppLocalization.text("拷贝于 %@", item.lastCopiedAtText())
+        if let source = item.sourceApp {
+            return source.name + " · " + detail
+        }
+        return detail
     }
 
     private var contentTypeName: String {

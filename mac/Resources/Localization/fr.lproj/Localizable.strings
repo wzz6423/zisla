@@ -3785,3 +3785,6 @@
 "自动更新依赖组件" = "Mettre à jour automatiquement les dépendances";
 "每天更新已安装的依赖组件" = "Mettre à jour chaque jour les dépendances installées";
 "（默认）" = "(Par défaut)";
+
+"按应用" = "Par application";
+"搜索内容或应用" = "Rechercher du contenu ou une application";

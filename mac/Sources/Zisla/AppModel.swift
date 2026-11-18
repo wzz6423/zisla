@@ -792,11 +792,11 @@ final class AppModel: ObservableObject {
           settings: self.settingsStore.settings, language: language)
       }
       .store(in: &cancellables)
-    clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
+    clipboardHistoryMonitor.onContentCaptured = { [weak self] content, sourceApp in
       guard let self else { return }
       self.dailyBriefing.recordActivity(.clipboardCaptured)
       if self.settingsStore.settings.clipboardHistoryEnabled {
-        _ = self.clipboardHistory.record(content)
+        _ = self.clipboardHistory.record(content, sourceApp: sourceApp)
       }
       self.handleCapturedClipboardContent(content)
     }
@@ -1960,7 +1960,7 @@ final class AppModel: ObservableObject {
   }
 
   func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
-    guard ClipboardHistoryPasteboard.write(item.content) else {
+    guard ClipboardHistoryPasteboard.write(item) else {
       transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
