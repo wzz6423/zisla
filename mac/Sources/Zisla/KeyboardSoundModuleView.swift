@@ -7,24 +7,11 @@ struct KeyboardSoundModuleView: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                if let summary = model.keyboardSound.typingStatsSummary {
-                    KeyboardTypingStatsDashboardView(
-                        summary: summary,
-                        voiceStatistics: model.settingsStore.settings.voiceInputEnabled
-                            ? model.voiceHistory.statistics : nil
-                    )
-                } else {
-                    Label(AppLocalization.text("暂无可显示的输入统计"), systemImage: "chart.xyaxis.line")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .padding(12)
-        }
-        .thinScrollChrome()
+        Self.content(
+            summary: model.keyboardSound.typingStatsSummary,
+            voiceStatistics: model.settingsStore.settings.voiceInputEnabled
+                ? model.voiceHistory.statistics : nil
+        )
         .task(id: model.settingsStore.settings.keyboardTypingStatsEnabled) {
             guard model.settingsStore.settings.keyboardTypingStatsEnabled else { return }
             await model.keyboardSound.refreshTypingStats()
@@ -35,6 +22,31 @@ struct KeyboardSoundModuleView: View {
                     return
                 }
                 await model.keyboardSound.refreshTypingStats()
+            }
+        }
+    }
+
+    static func content(
+        summary: KeyboardTypingStatsSummary?,
+        voiceStatistics: VoiceHistoryStatistics?
+    ) -> some View {
+        Group {
+            if let summary {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        KeyboardTypingStatsDashboardView(
+                            summary: summary,
+                            voiceStatistics: voiceStatistics
+                        )
+                    }
+                    .padding(12)
+                }
+                .thinScrollChrome()
+            } else {
+                EmptyState(
+                    symbol: "chart.xyaxis.line",
+                    title: AppLocalization.text("暂无可显示的输入统计")
+                )
             }
         }
     }
