@@ -395,6 +395,7 @@ public struct AudioProcessingService: Sendable {
         case .volume: filters.append("volume=\(options.volumeDB)dB")
         case .normalize: filters.append(normalization ?? "loudnorm=I=\(options.targetLoudness):TP=-1.5:LRA=11:print_format=json")
         case .fade:
+            filters.append("asetpts=N/SR/TB")
             if options.fadeInDuration > 0 { filters.append("afade=t=in:st=0:d=\(options.fadeInDuration)") }
             if options.fadeOutDuration > 0 { filters.append("afade=t=out:st=\(duration - options.fadeOutDuration):d=\(options.fadeOutDuration)") }
         case .speed: filters += Self.tempoFilters(options.speed)
