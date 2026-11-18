@@ -468,6 +468,20 @@ struct WindowPreviewWindowMatchTests {
         ) == nil)
     }
 
+    @Test(arguments: [CGWindowID(11), CGWindowID(12)])
+    func overlappingPagesActivateTheirExactAccessibilityWindow(windowID: CGWindowID) {
+        let frame = CGRect(x: 163, y: 122, width: 1180, height: 722)
+        let candidates: [(title: String?, frame: CGRect?)] = [("Player", frame), ("Player", frame)]
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Player", frame: frame, candidates: candidates,
+            windowID: windowID, candidateWindowIDs: [11, 12]
+        ) == (windowID == 11 ? 0 : 1), "The retained preview must activate its exact page despite overlapping titles and geometry")
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Player", frame: frame, candidates: candidates,
+            windowID: windowID, candidateWindowIDs: [nil, nil]
+        ) == nil, "An unavailable identity must not arbitrarily activate another overlapping page")
+    }
+
     @Test
     func aSingleUnmeasurableFullscreenWindowCanBeActivatedWithoutGuessingAmongOthers() {
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)

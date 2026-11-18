@@ -7,6 +7,9 @@ import VideoToolbox
 import ZislaCore
 import ZislaKit
 
+@_silgen_name("_AXUIElementGetWindow")
+private func accessibilityWindowID(_ element: AXUIElement, _ identifier: UnsafeMutablePointer<CGWindowID>) -> AXError
+
 enum WindowPreviewSource {
     case dock
     case switcher
@@ -232,16 +235,108 @@ struct WindowPreviewSnapshot: Identifiable {
     }
 }
 
+struct WindowPreviewAccessibleWindow {
+    let id: CGWindowID?
+    let frame: CGRect?
+    var isMain: Bool = false
+}
+
+extension WindowPreviewAccessibleWindow {
+    init(
+        element: AXUIElement,
+        frame: CGRect?,
+        isMain: Bool = false,
+        copyWindowID: (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError = accessibilityWindowID
+    ) {
+        var identifier: CGWindowID = 0
+        let result = copyWindowID(element, &identifier)
+        self.init(id: result == .success ? identifier : nil, frame: frame, isMain: isMain)
+    }
+}
+
 struct WindowPreviewWindowMatch {
+    static let qqMusicBundleIdentifier = "com.tencent.QQMusicMac"
+
+    static func previewWindowIDs(
+        candidates: [(id: CGWindowID, frame: CGRect)],
+        accessibleWindows: [WindowPreviewAccessibleWindow]?,
+        bundleIdentifier: String?,
+        frontmostWindowIDs: () -> [CGWindowID]?
+    ) -> Set<CGWindowID> {
+        var identifiers = Set(candidates.map(\.id))
+        guard bundleIdentifier == qqMusicBundleIdentifier else { return identifiers }
+        var queriedOrder = false
+        var frontOrder: [CGWindowID]?
+        for candidate in candidates {
+            let group = candidates.filter { $0.frame == candidate.frame }
+            guard group.count > 1 else { continue }
+            let groupIDs = Set(group.map(\.id))
+            let accessible = (accessibleWindows ?? []).filter { window in
+                window.id.map(groupIDs.contains) == true
+            }
+            guard !accessible.isEmpty else { continue }
+            if !queriedOrder {
+                frontOrder = frontmostWindowIDs()
+                queriedOrder = true
+            }
+            let mainIDs = accessible.filter(\.isMain).compactMap(\.id)
+            let liveIDs = accessible.compactMap(\.id)
+            let preferred = frontOrder?.first(where: groupIDs.contains)
+                ?? (mainIDs.count == 1 ? mainIDs.first : (liveIDs.count == 1 ? liveIDs.first : nil))
+            guard let preferred else { continue }
+            // QQ Music presents its playback page above an identically framed homepage.
+            identifiers.subtract(groupIDs.subtracting([preferred]))
+        }
+        return identifiers
+    }
+
+    static func presentWindowIDs(
+        processIdentifier: pid_t,
+        windowInfo: [[String: Any]],
+        accessibleWindows: [WindowPreviewAccessibleWindow]?,
+        screenFrames: [CGRect],
+        mainScreenTop: CGFloat,
+        bundleIdentifier: String? = nil,
+        frontmostWindowIDs: () -> [CGWindowID]? = { nil }
+    ) -> Set<CGWindowID> {
+        let applicationWindows = windowInfo.compactMap { info -> (id: CGWindowID, frame: CGRect, isOnScreen: Bool)? in
+            guard (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier,
+                  (info[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+                  let identifier = (info[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
+                  let bounds = info[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return nil }
+            return (identifier, WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: mainScreenTop),
+                    (info[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue == true)
+        }
+        let accessibleFrames = accessibleWindows?.compactMap(\.frame)
+        let companionFrames = applicationWindows.map(\.frame)
+        let candidates = applicationWindows.filter { window in
+            window.frame.width >= 80 && window.frame.height >= 50 && isPreviewCandidate(
+                frame: window.frame, isOnScreen: window.isOnScreen, accessibleWindows: accessibleFrames,
+                screenFrames: screenFrames, companionFrames: companionFrames,
+                windowID: window.id, accessibleWindowIdentities: accessibleWindows
+            )
+        }
+        return previewWindowIDs(
+            candidates: candidates.map { ($0.id, $0.frame) }, accessibleWindows: accessibleWindows,
+            bundleIdentifier: bundleIdentifier, frontmostWindowIDs: frontmostWindowIDs
+        )
+    }
+
     static func isPreviewCandidate(
         frame: CGRect,
         isOnScreen: Bool,
         accessibleWindows: [CGRect]?,
         screenFrames: [CGRect] = [],
-        companionFrames: [CGRect] = []
+        companionFrames: [CGRect] = [],
+        windowID: CGWindowID? = nil,
+        accessibleWindowIdentities: [WindowPreviewAccessibleWindow]? = nil
     ) -> Bool {
         // Browsers expose toolbar surfaces as layer-zero windows with extreme aspect ratios.
         guard frame.width <= frame.height * 6, frame.height <= frame.width * 6 else { return false }
+        if let windowID, accessibleWindowIdentities?.contains(where: { $0.id == windowID }) == true {
+            return true
+        }
         if let accessibleWindows, !accessibleWindows.isEmpty {
             if accessibleWindows.contains(where: {
                 abs($0.minX - frame.minX) <= 8 && abs($0.minY - frame.minY) <= 8
@@ -322,8 +417,13 @@ struct WindowPreviewWindowMatch {
         candidates: [(title: String?, frame: CGRect?)],
         screenFrames: [CGRect] = [],
         isOnlyPreview: Bool = false,
-        companionFrames: [CGRect] = []
+        companionFrames: [CGRect] = [],
+        windowID: CGWindowID? = nil,
+        candidateWindowIDs: [CGWindowID?] = []
     ) -> Int? {
+        if let windowID, let index = candidateWindowIDs.firstIndex(where: { $0 == windowID }) {
+            return index
+        }
         if isOnlyPreview, candidates.count == 1, candidates[0].frame == nil,
            matchesFullScreenDisplay(frame, screenFrames: screenFrames, companionFrames: companionFrames) {
             return 0
@@ -431,12 +531,19 @@ final class WindowPreviewController: ObservableObject {
         var presentWindowIDs: (pid_t) -> Set<CGWindowID>? = { processIdentifier in
             guard let windows = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID)
                 as? [[String: Any]] else { return nil }
-            return Set(windows.compactMap {
-                guard ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier else {
-                    return nil
-                }
-                return ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value
-            })
+            let screenFrames = NSScreen.screens.map(\.frame)
+            let bundleIdentifier = NSRunningApplication(processIdentifier: processIdentifier)?.bundleIdentifier
+            return WindowPreviewWindowMatch.presentWindowIDs(
+                processIdentifier: processIdentifier, windowInfo: windows,
+                accessibleWindows: WindowPreviewController.accessibleWindows(
+                    processIdentifier: processIdentifier,
+                    readsMainWindow: bundleIdentifier == WindowPreviewWindowMatch.qqMusicBundleIdentifier
+                ),
+                screenFrames: screenFrames,
+                mainScreenTop: screenFrames.first?.maxY ?? 0,
+                bundleIdentifier: bundleIdentifier,
+                frontmostWindowIDs: { WindowPreviewController.frontmostWindowIDs(processIdentifier: processIdentifier) }
+            )
         }
         var timer: (TimeInterval, Bool, @escaping @MainActor () -> Void) -> Timer = { interval, repeats, action in
             Timer.scheduledTimer(withTimeInterval: interval, repeats: repeats) { _ in
@@ -850,24 +957,36 @@ final class WindowPreviewController: ObservableObject {
     private static func captureWindows(processIdentifier: pid_t) async throws -> [WindowPreviewSnapshot] {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         try Task.checkCancellation()
-        let axWindows = Self.attribute(
-            kAXWindowsAttribute, from: AXUIElementCreateApplication(processIdentifier)
-        ) as? [AXUIElement]
-        let accessibleFrames = axWindows?.compactMap { Self.frame(of: $0) }
+        let bundleIdentifier = NSRunningApplication(processIdentifier: processIdentifier)?.bundleIdentifier
+        let accessibleWindows = Self.accessibleWindows(
+            processIdentifier: processIdentifier,
+            readsMainWindow: bundleIdentifier == WindowPreviewWindowMatch.qqMusicBundleIdentifier
+        )
+        let accessibleFrames = accessibleWindows?.compactMap(\.frame)
         let screenFrames = NSScreen.screens.map(\.frame)
         let mainScreenTop = screenFrames.first?.maxY ?? 0
         let applicationWindows = content.windows.filter { $0.owningApplication?.processID == processIdentifier }
         let companionFrames = applicationWindows.filter { $0.windowLayer == 0 }.map {
             WindowPreviewLayout.appKitFrame(for: $0.frame, mainScreenTop: mainScreenTop)
         }
-        let candidates = applicationWindows.filter {
+        var candidates = applicationWindows.filter {
             guard $0.windowLayer == 0 && $0.frame.width >= 80 && $0.frame.height >= 50 else { return false }
             let frame = WindowPreviewLayout.appKitFrame(for: $0.frame, mainScreenTop: mainScreenTop)
             return WindowPreviewWindowMatch.isPreviewCandidate(
                 frame: frame, isOnScreen: $0.isOnScreen, accessibleWindows: accessibleFrames,
-                screenFrames: screenFrames, companionFrames: companionFrames
+                screenFrames: screenFrames, companionFrames: companionFrames,
+                windowID: $0.windowID, accessibleWindowIdentities: accessibleWindows
             )
         }
+        let identifiers = WindowPreviewWindowMatch.previewWindowIDs(
+            candidates: candidates.map {
+                ($0.windowID, WindowPreviewLayout.appKitFrame(for: $0.frame, mainScreenTop: mainScreenTop))
+            },
+            accessibleWindows: accessibleWindows,
+            bundleIdentifier: bundleIdentifier,
+            frontmostWindowIDs: { Self.frontmostWindowIDs(processIdentifier: processIdentifier) }
+        )
+        candidates.removeAll { !identifiers.contains($0.windowID) }
         var snapshots: [WindowPreviewSnapshot] = []
         for window in candidates {
             try Task.checkCancellation()
@@ -1005,6 +1124,30 @@ final class WindowPreviewController: ObservableObject {
         return value
     }
 
+    private static func frontmostWindowIDs(processIdentifier: pid_t) -> [CGWindowID]? {
+        guard let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
+            as? [[String: Any]] else { return nil }
+        return windows.compactMap { window in
+            guard (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier else { return nil }
+            return (window[kCGWindowNumber as String] as? NSNumber)?.uint32Value
+        }
+    }
+
+    private static func accessibleWindows(
+        processIdentifier: pid_t,
+        readsMainWindow: Bool = false
+    ) -> [WindowPreviewAccessibleWindow]? {
+        let windows = Self.attribute(
+            kAXWindowsAttribute, from: AXUIElementCreateApplication(processIdentifier)
+        ) as? [AXUIElement]
+        return windows?.map {
+            WindowPreviewAccessibleWindow(
+                element: $0, frame: Self.frame(of: $0),
+                isMain: readsMainWindow && (Self.attribute(kAXMainAttribute, from: $0) as? Bool == true)
+            )
+        }
+    }
+
     private static func attributeString(_ name: String, from element: AXUIElement) -> String? {
         attribute(name, from: element) as? String
     }
@@ -1054,13 +1197,16 @@ final class WindowPreviewController: ObservableObject {
         let candidates = axWindows.map {
             (title: Self.attributeString(kAXTitleAttribute, from: $0), frame: Self.frame(of: $0))
         }
+        let identities = axWindows.map { WindowPreviewAccessibleWindow(element: $0, frame: nil).id }
         let index = WindowPreviewWindowMatch.index(
             title: target.title,
             frame: target.frame,
             candidates: candidates,
             screenFrames: screenFrames,
             isOnlyPreview: isOnlyPreview,
-            companionFrames: target.companionFrames
+            companionFrames: target.companionFrames,
+            windowID: snapshot.id,
+            candidateWindowIDs: identities
         )
         guard let index else { return }
         _ = app.activate()
