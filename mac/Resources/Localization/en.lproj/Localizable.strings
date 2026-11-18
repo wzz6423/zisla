@@ -2786,6 +2786,9 @@
 "onboarding.unmute" = "Unmute";
 "onboarding.manual" = "Enable in System Settings";
 "onboarding.unavailable" = "Unavailable on this system";
+"onboarding.unknown" = "Permission status could not be determined";
+"onboarding.partially_granted" = "Partially allowed";
+"permission.drag_app.body" = "Drag this icon into the app list in System Settings.";
 "onboarding.introduction.title" = "Meet zisla";
 "onboarding.introduction.body" = "Keep everyday information and tools within reach.";
 "onboarding.feature.island.title" = "Your everyday assistant at the top of the screen";
@@ -2819,7 +2822,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "For viewing the battery levels of connected devices.";
 "onboarding.permission.automation.title" = "Automation";
-"onboarding.permission.automation.body" = "For controlling supported media apps and performing actions across apps. macOS confirms permission for each target app.";
+"onboarding.permission.automation.body" = "For controlling supported media apps and performing actions across apps. Status is checked for currently running target apps; macOS confirms permission for each app separately.";
 "onboarding.permission.files.title" = "File Access";
 "onboarding.permission.files.body" = "Select the files or folders you need, and macOS will grant the corresponding access permissions.";
 "onboarding.ready.title" = "You’re ready";

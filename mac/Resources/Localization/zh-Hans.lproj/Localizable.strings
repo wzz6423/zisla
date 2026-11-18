@@ -2727,6 +2727,9 @@
 "onboarding.unmute" = "开启声音";
 "onboarding.manual" = "需在系统设置中开启";
 "onboarding.unavailable" = "当前系统不可用";
+"onboarding.unknown" = "无法确认授权状态";
+"onboarding.partially_granted" = "部分已授权";
+"permission.drag_app.body" = "将此图标拖到系统设置的应用列表中。";
 "onboarding.introduction.title" = "认识 zisla";
 "onboarding.introduction.body" = "让常用信息和工具，随时触手可及。";
 "onboarding.feature.island.title" = "屏幕顶端的日常助手";
@@ -2760,7 +2763,7 @@
 "onboarding.permission.bluetooth.title" = "蓝牙";
 "onboarding.permission.bluetooth.body" = "用于查看已连接设备的电量。";
 "onboarding.permission.automation.title" = "自动化";
-"onboarding.permission.automation.body" = "用于控制支持的媒体应用和跨应用操作，具体授权由 macOS 按目标应用确认。";
+"onboarding.permission.automation.body" = "用于控制支持的媒体应用和跨应用操作。状态按当前运行的目标应用检查，macOS 会分别确认授权。";
 "onboarding.permission.files.title" = "文件访问";
 "onboarding.permission.files.body" = "选择需要使用的文件或文件夹，由 macOS 授予相应访问权限。";
 "onboarding.ready.title" = "准备好了";

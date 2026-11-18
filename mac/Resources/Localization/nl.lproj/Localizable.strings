@@ -2787,6 +2787,9 @@
 "onboarding.unmute" = "Geluid inschakelen";
 "onboarding.manual" = "Inschakelen in Systeeminstellingen";
 "onboarding.unavailable" = "Niet beschikbaar op dit systeem";
+"onboarding.unknown" = "De machtigingsstatus kon niet worden bepaald";
+"onboarding.partially_granted" = "Gedeeltelijk toegestaan";
+"permission.drag_app.body" = "Sleep dit pictogram naar de applijst in Systeeminstellingen.";
 "onboarding.introduction.title" = "Maak kennis met zisla";
 "onboarding.introduction.body" = "Houd alledaagse informatie en hulpmiddelen altijd binnen handbereik.";
 "onboarding.feature.island.title" = "Uw dagelijkse assistent bovenaan het scherm";
@@ -2820,7 +2823,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Voor het bekijken van het batterijniveau van verbonden apparaten.";
 "onboarding.permission.automation.title" = "Automatisering";
-"onboarding.permission.automation.body" = "Voor het bedienen van ondersteunde media-apps en het uitvoeren van acties tussen apps. macOS bevestigt de toestemming voor elke doel-app.";
+"onboarding.permission.automation.body" = "Voor het bedienen van ondersteunde media-apps en het uitvoeren van acties tussen apps. De status wordt gecontroleerd voor doel-apps die momenteel actief zijn; macOS bevestigt de toestemming voor elke app afzonderlijk.";
 "onboarding.permission.files.title" = "Bestandstoegang";
 "onboarding.permission.files.body" = "Selecteer de bestanden of mappen die u nodig hebt. macOS verleent de bijbehorende toegangsrechten.";
 "onboarding.ready.title" = "Alles is klaar";

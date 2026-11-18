@@ -2787,6 +2787,9 @@
 "onboarding.unmute" = "Aktifkan suara";
 "onboarding.manual" = "Aktifkan di Pengaturan Sistem";
 "onboarding.unavailable" = "Tidak tersedia di sistem ini";
+"onboarding.unknown" = "Status izin tidak dapat ditentukan";
+"onboarding.partially_granted" = "Diizinkan sebagian";
+"permission.drag_app.body" = "Seret ikon ini ke daftar app di Pengaturan Sistem.";
 "onboarding.introduction.title" = "Kenali zisla";
 "onboarding.introduction.body" = "Jadikan informasi dan alat sehari-hari selalu mudah dijangkau.";
 "onboarding.feature.island.title" = "Asisten sehari-hari di bagian atas layar";
@@ -2820,7 +2823,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Untuk melihat tingkat baterai perangkat yang terhubung.";
 "onboarding.permission.automation.title" = "Otomatisasi";
-"onboarding.permission.automation.body" = "Untuk mengontrol aplikasi media yang didukung dan melakukan tindakan antar-aplikasi. macOS mengonfirmasi izin untuk setiap aplikasi tujuan.";
+"onboarding.permission.automation.body" = "Untuk mengontrol app media yang didukung dan melakukan tindakan antar-app. Status diperiksa untuk app tujuan yang sedang berjalan; macOS mengonfirmasi izin untuk setiap app secara terpisah.";
 "onboarding.permission.files.title" = "Akses File";
 "onboarding.permission.files.body" = "Pilih file atau folder yang perlu digunakan, dan macOS akan memberikan izin akses yang sesuai.";
 "onboarding.ready.title" = "Semua siap";

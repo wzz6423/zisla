@@ -50,7 +50,7 @@ public enum OnboardingPermissionID: String, CaseIterable, Identifiable, Sendable
 }
 
 public enum OnboardingPermissionStatus: Equatable, Sendable {
-    case notDetermined, denied, restricted, granted, requesting, manual, unavailable
+    case notDetermined, denied, restricted, granted, requesting, manual, unavailable, unknown, partiallyGranted
 
     public var localizationKey: String {
         switch self {
@@ -60,6 +60,8 @@ public enum OnboardingPermissionStatus: Equatable, Sendable {
         case .requesting: "onboarding.requesting"
         case .manual: "onboarding.manual"
         case .unavailable: "onboarding.unavailable"
+        case .unknown: "onboarding.unknown"
+        case .partiallyGranted: "onboarding.partially_granted"
         }
     }
 }
@@ -72,7 +74,7 @@ public struct OnboardingPermissionItem: Identifiable, Equatable, Sendable {
     public var settingsURL: URL { id.settingsURL }
     public var actionKey: String {
         switch status {
-        case .denied, .restricted, .manual: "onboarding.open_settings"
+        case .denied, .restricted, .manual, .unknown, .partiallyGranted: "onboarding.open_settings"
         case .unavailable: "onboarding.retry"
         default: "onboarding.grant"
         }
@@ -104,7 +106,7 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
     }
 
     @Published public private(set) var permissions = OnboardingPermissionID.allCases.map {
-        OnboardingPermissionItem(id: $0, status: $0.requiresManualSetup ? .manual : .notDetermined)
+        OnboardingPermissionItem(id: $0, status: $0.requiresManualSetup ? .unknown : .notDetermined)
     }
     @Published public private(set) var requesting: OnboardingPermissionID?
     public private(set) var isClosed = false
@@ -118,7 +120,7 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
             read: { system.read($0, completion: $1) },
             request: { system.request($0, completion: $1) },
             cancel: { system.cancel() },
-            openSettings: { NSWorkspace.shared.open($0) }
+            openSettings: { PermissionSettingsAssistant.shared.openSettings($0) }
         ))
     }
 
@@ -178,6 +180,7 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
     }
 
     public func cancelCurrentRequest() {
+        PermissionSettingsAssistant.shared.cancelPreparation()
         generation = UUID()
         refreshGeneration = UUID()
         let id = requesting
@@ -190,6 +193,7 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
     /// Terminal: create a new coordinator if the user opens another onboarding flow.
     public func close() {
         guard !isClosed else { return }
+        PermissionSettingsAssistant.shared.cancelPreparation()
         isClosed = true
         generation = UUID()
         refreshGeneration = UUID()
@@ -211,13 +215,21 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
 }
 
 @MainActor
-private final class OnboardingSystemPermissions: NSObject,
+final class OnboardingSystemPermissions: NSObject,
     @preconcurrency CLLocationManagerDelegate, @preconcurrency CBCentralManagerDelegate {
+    private let manualStatus: @Sendable (OnboardingPermissionID) -> OnboardingPermissionStatus
     private var locationManager: CLLocationManager?
     private var bluetoothManager: CBCentralManager?
     private var pending: OnboardingPermissionCoordinator.RequestCompletion?
     private var timeout: Task<Void, Never>?
     private var host: NSWindow?
+
+    init(manualStatus: @escaping @Sendable (OnboardingPermissionID) -> OnboardingPermissionStatus = {
+        SystemPermissionStatusReader().read($0)
+    }) {
+        self.manualStatus = manualStatus
+        super.init()
+    }
 
     func read(_ id: OnboardingPermissionID, completion: @escaping OnboardingPermissionCoordinator.Completion) {
         switch id {
@@ -265,8 +277,11 @@ private final class OnboardingSystemPermissions: NSObject,
         case .bluetooth:
             completion(Self.bluetoothStatus())
         case .systemAudio, .automation, .files, .fullDiskAccess:
-            // These permissions have no global public preflight/request API.
-            completion(.manual)
+            let read = manualStatus
+            DispatchQueue.global(qos: .utility).async {
+                let status = read(id)
+                Task { @MainActor in completion(status) }
+            }
         }
     }
 
@@ -281,12 +296,15 @@ private final class OnboardingSystemPermissions: NSObject,
         }
         switch id {
         case .accessibility:
+            PermissionSettingsAssistant.shared.prepare(for: id)
             _ = AccessibilityPermission.promptIfNeeded()
             finish(.success(AccessibilityPermission.isTrusted ? .granted : .denied))
         case .inputMonitoring:
+            PermissionSettingsAssistant.shared.prepare(for: id)
             _ = GlobalHotkeyManager.requestInputMonitoringAccess()
             finish(.success(GlobalHotkeyManager.hasInputMonitoringAccess ? .granted : .denied))
         case .screenRecording:
+            PermissionSettingsAssistant.shared.prepare(for: id)
             _ = CGRequestScreenCaptureAccess()
             finish(.success(CGPreflightScreenCaptureAccess() ? .granted : .denied))
         case .microphone, .camera:

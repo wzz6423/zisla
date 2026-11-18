@@ -23,6 +23,8 @@ struct FirstLaunchOnboardingLocalizationTests {
         "onboarding.unmute",
         "onboarding.manual",
         "onboarding.unavailable",
+        "onboarding.unknown",
+        "onboarding.partially_granted",
         "onboarding.introduction.title",
         "onboarding.introduction.body",
         "onboarding.feature.island.title",
@@ -70,7 +72,7 @@ struct FirstLaunchOnboardingLocalizationTests {
     @Test(arguments: AppLanguage.allCases)
     func everyLanguageHasCompleteNonemptyTranslations(language: AppLanguage) throws {
         let table = try translations(for: language)
-        #expect(keys.count == 60)
+        #expect(keys.count == 62)
         #expect(Set(OnboardingPermissionID.allCases.flatMap { [$0.titleKey, $0.bodyKey] }).isSubset(of: keys))
         for key in keys.sorted() {
             let value = try #require(table[key], "Missing \(language.rawValue) translation for \(key)")

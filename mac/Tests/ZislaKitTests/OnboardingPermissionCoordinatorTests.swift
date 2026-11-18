@@ -145,6 +145,23 @@ struct OnboardingPermissionCoordinatorTests {
         #expect(fake.requests.isEmpty)
     }
 
+    @Test(arguments: [OnboardingPermissionID.systemAudio, .automation, .files, .fullDiskAccess])
+    func manualPermissionsRefreshGrantsRevocationsAndUnknownStatesWithoutRequesting(id: OnboardingPermissionID) {
+        let fake = FakeOnboardingPermissions()
+        let coordinator = fake.coordinator()
+        defer { coordinator.close() }
+        for expected in [OnboardingPermissionStatus.granted, .denied, .unknown, .partiallyGranted, .granted] {
+            fake.statuses[id] = expected
+            coordinator.refresh()
+            #expect(status(id, coordinator) == expected)
+            #expect(!coordinator.request(id))
+            if expected != .granted {
+                #expect(coordinator.permissions.first(where: { $0.id == id })?.actionKey == "onboarding.open_settings")
+            }
+        }
+        #expect(fake.requests.isEmpty && fake.opened.isEmpty)
+    }
+
     @Test func requestRechecksActualAuthorizationBeforePrompting() {
         let fake = FakeOnboardingPermissions()
         fake.statuses[.camera] = .granted
