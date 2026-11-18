@@ -3224,8 +3224,7 @@
 "关闭后不影响已启用的监控图标" = "Kapatmak etkin izleme simgelerini etkilemez";
 
 "截图与录屏" = "Ekran görüntüleri ve kayıt";
-"推荐与反馈更新" = "Öneriler, geri bildirim ve güncellemeler";
-"反馈更新" = "Geri bildirim ve güncellemeler";
+"关于" = "Hakkında";
 
 "剩余额度" = "Kalan kota";
 "套餐额度" = "Plan kotası";

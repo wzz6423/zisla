@@ -271,7 +271,7 @@ struct SettingsSplitViewTests {
     }
 
     @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
-    func productionSidebarHidesEmptyGroupsAndUpdatesItsRecommendationHeading(language: AppLanguage) async throws {
+    func productionSidebarHidesEmptyGroupsAndKeepsTheAboutHeading(language: AppLanguage) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let input = SettingsInput()
@@ -295,7 +295,7 @@ struct SettingsSplitViewTests {
         settings.weatherEnabled = false
         settings.updateChecksEnabled = false
         settings.recommendedToolsEnabled = false
-        let titles = SettingsSectionGroup.allCases.map(\.title) + ["反馈更新"]
+        let titles = ["基础功能", "信息", "工具", "截图与录屏", "AI 与语音", "声音", "其他", "权限", "关于"]
         let localizedTitles = Set(titles.map { AppLocalization.string($0, locale: language.locale) })
         let sidebarHost = NSHostingView(rootView: AnyView(EmptyView()))
         let sidebarWindow = NSWindow(contentRect: NSRect(x: 20_000, y: 100, width: 250, height: 1_200),
@@ -336,7 +336,7 @@ struct SettingsSplitViewTests {
 
         try await expectHeadings(["基础功能", "信息", "其他", "权限"])
         settings.pdfToolsEnabled = true
-        try await expectHeadings(["基础功能", "信息", "文件", "其他", "权限"])
+        try await expectHeadings(["基础功能", "信息", "工具", "其他", "权限"])
         settings.pdfToolsEnabled = false
         settings.screenshotEnabled = true
         try await expectHeadings(["基础功能", "信息", "截图与录屏", "其他", "权限"])
@@ -345,11 +345,11 @@ struct SettingsSplitViewTests {
         try await expectHeadings(["基础功能", "信息", "截图与录屏", "其他", "权限"])
         settings.screenRecordingEnabled = false
         settings.updateChecksEnabled = true
-        try await expectHeadings(["基础功能", "信息", "其他", "权限", "反馈更新"])
+        try await expectHeadings(["基础功能", "信息", "其他", "权限", "关于"])
         settings.recommendedToolsEnabled = true
-        try await expectHeadings(["基础功能", "信息", "其他", "权限", "推荐与反馈更新"])
+        try await expectHeadings(["基础功能", "信息", "其他", "权限", "关于"])
         settings.updateChecksEnabled = false
-        try await expectHeadings(["基础功能", "信息", "其他", "权限", "推荐与反馈更新"])
+        try await expectHeadings(["基础功能", "信息", "其他", "权限"])
         settings.recommendedToolsEnabled = false
         try await expectHeadings(["基础功能", "信息", "其他", "权限"])
     }

@@ -164,10 +164,10 @@ struct SettingsNavigationTests {
             "通用",
             "功能",
             "灵动岛布局",
-            "每日简报",
-            "通知与关怀",
             "工作流",
             "快捷操作",
+            "通知与关怀",
+            "每日简报",
             "邮件",
             "天气",
             "截图",
@@ -183,8 +183,8 @@ struct SettingsNavigationTests {
             "依赖组件",
             "网络",
             "宠物",
-            "权限",
             "推荐",
+            "权限",
             "反馈与更新",
         ])
         #expect(SettingsSection.general.subtitle == "调整语言、外观、启动与展开方式。")
@@ -423,21 +423,24 @@ struct SettingsNavigationTests {
     @Test
     func sidebarGroupsSeparatePDFAndCaptureAndCollectTheOtherPages() {
         #expect(SettingsSectionGroup.allCases.map(\.title) == [
-            "基础功能", "信息", "文件", "截图与录屏", "AI 与语音", "声音", "其他", "权限", "推荐与反馈更新",
+            "基础功能", "信息", "工具", "截图与录屏", "AI 与语音", "声音", "其他", "权限", "关于",
         ])
         #expect(SettingsSection.allCases.filter { $0.group == .basics } == [.general, .features])
         #expect(SettingsSection.allCases.filter { $0.group == .information }
-            == [.info, .dailyBriefing, .notifications, .workflow, .clipboardAssistant, .mail, .weather])
+            == [.info, .workflow, .clipboardAssistant, .notifications, .dailyBriefing, .mail, .weather])
         #expect(SettingsSection.allCases.filter { $0.group == .sound } == [.keyboardSound])
         #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools, .imageTools, .audioTools])
         #expect(SettingsSection.allCases.filter { $0.group == .capture } == [.screenshot, .recording])
         #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
-        #expect(SettingsSection.allCases.filter { $0.group == .others } == [.scheduledCleanup, .saveLocations, .download, .networkProxy, .pet])
-        #expect(SettingsSection.allCases.filter { $0.group == .recommendationsAndUpdates } == [.recommendations, .updates])
+        #expect(SettingsSection.allCases.filter { $0.group == .others }
+            == [.scheduledCleanup, .saveLocations, .download, .networkProxy, .pet, .recommendations])
+        #expect(SettingsSection.allCases.filter { $0.group == .recommendationsAndUpdates } == [.updates])
     }
 
-    @Test(arguments: [0, 1, 2, 3], [false, true])
-    func otherSettingsKeepTheirOrderAcrossFeatureToggles(dependencySource: Int, petEnabled: Bool) {
+    @Test(arguments: [0, 1, 2, 3], Array(0..<4))
+    func otherSettingsKeepTheirOrderAcrossFeatureToggles(dependencySource: Int, combination: Int) {
+        let petEnabled = combination & 1 != 0
+        let recommendationsEnabled = combination & 2 != 0
         var settings = FeatureSettings.default
         settings.downloaderEnabled = dependencySource == 1
         settings.pdfToolsEnabled = dependencySource == 2
@@ -445,11 +448,13 @@ struct SettingsNavigationTests {
         settings.systemMonitorEnabled = petEnabled
         settings.networkProxyEnabled = petEnabled
         settings.petEnabled = petEnabled
+        settings.recommendedToolsEnabled = recommendationsEnabled
 
         var expectedSections: [SettingsSection] = [.scheduledCleanup, .saveLocations]
         if dependencySource != 0 { expectedSections.append(.download) }
         expectedSections.append(.networkProxy)
         if petEnabled { expectedSections.append(.pet) }
+        if recommendationsEnabled { expectedSections.append(.recommendations) }
 
         let visibleSections = SettingsSection.allCases.filter { $0.isVisible(settings: settings) }
             .filter { $0.group == .others }
@@ -466,15 +471,14 @@ struct SettingsNavigationTests {
     }
 
     @Test(arguments: [false, true], [false, true])
-    func recommendationGroupTitleFollowsTheRecommendationToggle(recommendationsEnabled: Bool, updatesEnabled: Bool) {
+    func aboutGroupVisibilityFollowsOnlyTheUpdateToggle(recommendationsEnabled: Bool, updatesEnabled: Bool) {
         var settings = FeatureSettings.default
         settings.recommendedToolsEnabled = recommendationsEnabled
         settings.updateChecksEnabled = updatesEnabled
-        #expect(SettingsSectionGroup.recommendationsAndUpdates.title(settings: settings)
-            == (recommendationsEnabled ? "推荐与反馈更新" : "反馈更新"))
-        for group in SettingsSectionGroup.allCases where group != .recommendationsAndUpdates {
-            #expect(group.title(settings: settings) == group.title)
-        }
+        #expect(SettingsSectionGroup.recommendationsAndUpdates.title == "关于")
+        let visibleSections = SettingsSection.allCases.filter { $0.isVisible(settings: settings) }
+            .filter { $0.group == .recommendationsAndUpdates }
+        #expect(visibleSections == (updatesEnabled ? [.updates] : []))
     }
 
     /// Bundle lookup silently falls back to Chinese keys, so catalog presence and rendered values need separate assertions.
@@ -482,7 +486,6 @@ struct SettingsNavigationTests {
     func groupedSettingsAndPDFLabelsUseEveryRequestedLanguage(language: AppLanguage) throws {
         let dependencyGuidance = try #require(YTDLPResolverError.executableNotFound(searched: []).errorDescription)
         let keys = Set(SettingsSectionGroup.allCases.map(\.title) + [
-            "反馈更新",
             "灵动岛功能顺序",
             SettingsSection.pdfTools.title,
             SettingsSection.pdfTools.subtitle,
@@ -508,7 +511,7 @@ struct SettingsNavigationTests {
                 options: .anchorsMatchLines
             )
             #expect(expression.numberOfMatches(in: source, range: NSRange(source.startIndex..., in: source)) == 1)
-            if language == .traditionalChinese && ["PDF 工具", "其他"].contains(key) {
+            if language == .traditionalChinese && ["PDF 工具", "工具", "其他"].contains(key) {
                 #expect(value == key)
             } else if language != .simplifiedChinese {
                 #expect(value != key, "\(language.rawValue) did not translate \(key)")
@@ -520,8 +523,8 @@ struct SettingsNavigationTests {
             #expect(table["灵动岛功能顺序"] == "Dynamic Island Feature Order")
             #expect(dependencyTitle == "Dependency Components")
             #expect(table["截图与录屏"] == "Screenshots & Recording")
-            #expect(table["推荐与反馈更新"] == "Recommendations, Feedback & Updates")
-            #expect(table["反馈更新"] == "Feedback & Updates")
+            #expect(table["工具"] == "Tool")
+            #expect(table["关于"] == "About")
         }
     }
 

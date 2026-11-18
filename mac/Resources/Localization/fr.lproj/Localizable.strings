@@ -3220,8 +3220,7 @@
 "关闭后不影响已启用的监控图标" = "La désactivation ne masque pas les icônes de surveillance activées";
 
 "截图与录屏" = "Captures et enregistrements";
-"推荐与反馈更新" = "Recommandations, retours et mises à jour";
-"反馈更新" = "Retours et mises à jour";
+"关于" = "À propos";
 
 "剩余额度" = "Quota restant";
 "套餐额度" = "Quota du forfait";
