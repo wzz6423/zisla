@@ -847,10 +847,7 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
         captureScreen: @escaping CaptureScreen = { try await ScreenshotCaptureService.capture(screen: $0, includeHDR: true) },
         presentPanels: @escaping PresentPanels = ScreenshotSelectionController.present,
         snapTargets: @escaping SnapTargets = {
-            ScreenshotSnapTargetProvider.windowRects(
-                on: $0,
-                excludingProcessIdentifier: ProcessInfo.processInfo.processIdentifier
-            )
+            ScreenshotSnapTargetProvider.windowRects(on: $0)
         }
     ) {
         self.capturedProcessIdentifier = capturedProcessIdentifier
