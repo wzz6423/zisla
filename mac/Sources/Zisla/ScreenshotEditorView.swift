@@ -1,6 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 import CoreImage
+import CoreML
 import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
@@ -3874,7 +3875,16 @@ final class ScreenshotRecognitionOperation: @unchecked Sendable {
         if lock.withLock({ isCancelled }) { throw CancellationError() }
     }
 
-    func recognize(_ image: CGImage) throws -> [ScreenshotRecognizedFragment] {
+    func recognize(
+        _ image: CGImage,
+        perform: (CGImage, VNRecognizeTextRequest) throws -> [ScreenshotRecognizedFragment] = { image, request in
+            try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+            return (request.results ?? []).compactMap { observation in
+                guard let candidate = observation.topCandidates(1).first else { return nil }
+                return ScreenshotRecognizedFragment(text: candidate.string, boundingBox: observation.boundingBox)
+            }
+        }
+    ) throws -> [ScreenshotRecognizedFragment] {
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
         if let supportedLanguages = try? request.supportedRecognitionLanguages() {
@@ -3883,11 +3893,29 @@ final class ScreenshotRecognitionOperation: @unchecked Sendable {
             if !validLanguages.isEmpty { request.recognitionLanguages = validLanguages }
         }
         try checkCancellation()
-        try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
-        return (request.results ?? []).compactMap { observation in
-            guard let candidate = observation.topCandidates(1).first else { return nil }
-            return ScreenshotRecognizedFragment(text: candidate.string, boundingBox: observation.boundingBox)
+        let result = Result { try perform(image, request) }
+        try checkCancellation()
+        switch result {
+        case let .success(fragments) where !fragments.isEmpty:
+            return fragments
+        case let .failure(error):
+            let visionError = error as NSError
+            if error is CancellationError || (visionError.domain == VNErrorDomain
+                && visionError.code == VNErrorCode.requestCancelled.rawValue) {
+                throw CancellationError()
+            }
+        default: break
         }
+        // Accurate OCR can fail or return no text when the Neural Engine cannot load its model.
+        guard let cpu = try request.supportedComputeStageDevices[.main]?.first(where: {
+            if case .cpu = $0 { return true }
+            return false
+        }) else { return try result.get() }
+        request.setComputeDevice(cpu, for: .main)
+        try checkCancellation()
+        let fragments = try perform(image, request)
+        try checkCancellation()
+        return fragments
     }
 }
 
@@ -5395,6 +5423,18 @@ struct ScreenshotEditorView: View {
                     cornerRadius: model.cornerRadius
                 )
 
+                if let message = statusMessage ?? model.statusMessage {
+                    Text(message)
+                        .font(.system(size: 11))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(8)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                        .frame(maxWidth: min(600, proxy.size.width - 16))
+                        .padding(8)
+                        .frame(maxWidth: .infinity)
+                        .allowsHitTesting(false)
+                }
             }
             .background(Color.black)
         }

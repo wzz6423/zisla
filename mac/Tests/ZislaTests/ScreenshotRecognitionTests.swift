@@ -1,4 +1,5 @@
 import AppKit
+import CoreML
 import SwiftUI
 import Testing
 import Vision
@@ -10,6 +11,195 @@ import ZislaCore
 @MainActor
 @Suite(.serialized)
 struct ScreenshotRecognitionTests {
+    @Test(arguments: ["识图 / OCR", "翻译并复制", "表格识别"])
+    func toolbarMenuStartsRecognitionBeforeReturningToTheEditor(title: String) throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let fixture = try Fixture(image: makeImage())
+        defer { fixture.close() }
+        let window = try #require(fixture.controller.window)
+        let host = try #require(window.contentView)
+        window.setFrameOrigin(CGPoint(x: -100_000, y: -100_000))
+        window.orderFrontRegardless()
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+        }
+        let control = try #require(Self.accessibilityObjects(host).first {
+            $0.responds(to: NSSelectorFromString("accessibilityHelp"))
+                && $0.value(forKey: "accessibilityHelp") as? String
+                    == AppLocalization.text("识别图片中的文字或表格")
+        })
+        let selection = RecognitionMenuSelection(title: AppLocalization.text(title), model: fixture.model)
+        NotificationCenter.default.addObserver(selection, selector: #selector(RecognitionMenuSelection.began(_:)),
+            name: NSMenu.didBeginTrackingNotification, object: nil)
+        defer { NotificationCenter.default.removeObserver(selection) }
+        let action = NSSelectorFromString("accessibilityPerformPress")
+        try #require(control.responds(to: action))
+        control.performSelector(onMainThread: action, with: nil, waitUntilDone: true)
+        let deadline = Date(timeIntervalSinceNow: 3)
+        while !selection.selected, Date() < deadline {
+            RunLoop.main.run(mode: .default, before: deadline)
+        }
+        #expect(selection.selected, "The screenshot menu must dispatch its selected recognition action")
+        #expect(selection.startedRecognition, "Selecting \(title) must start a recognition operation")
+        #expect(!fixture.model.isRecognizing, "Cancelling a queued menu action must stop recognition")
+    }
+
+    @Test(arguments: [ScreenshotRecognitionMode.text, .translate, .table], ["failure", "empty"])
+    func engineFailureRecoversOCRTranslationAndTableOnCPU(mode: ScreenshotRecognitionMode, outcome: String) async throws {
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let destination = directory.appendingPathComponent("recovered.xlsx")
+        let source = "识别成功 2468"
+        var result: String?
+        let task = try #require(model.recognize(mode,
+            translationService: .init(providers: [{ text, _ in
+                #expect(text == source, "Translation must receive the recovered OCR text")
+                return "Recovered translation"
+            }]), chooseTableDestination: { destination }, recognizeImage: { image, operation in
+                try operation.recognize(image) { _, request in
+                    #expect(request.recognitionLevel == .accurate, "Recovery must retain accurate Chinese recognition")
+                    #expect(request.recognitionLanguages.contains("zh-Hans"))
+                    if request.computeDevice(for: .main) == nil {
+                        if outcome == "failure" { throw Self.engineFailure }
+                        return []
+                    }
+                    #expect(Self.usesCPU(request), "The failed engine must recover without Neural Engine acceleration")
+                    return Self.fragments(source)
+                }
+            }
+        ) { text, _ in result = text })
+        await task.value
+        #expect(!model.isRecognizing)
+        switch mode {
+        case .text: #expect(result == source && model.statusMessage == nil)
+        case .translate: #expect(result == "Recovered translation" && model.statusMessage == nil)
+        case .table:
+            #expect(result == nil)
+            #expect(FileManager.default.fileExists(atPath: destination.path), "Recovered table recognition must save a workbook")
+            if FileManager.default.fileExists(atPath: destination.path) {
+                #expect(try Data(contentsOf: destination).starts(with: [0x50, 0x4B]))
+                let output = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/unzip"),
+                    arguments: ["-p", destination.path, "xl/worksheets/sheet1.xml"], workingDirectoryURL: directory)
+                #expect(output.status == 0)
+                #expect(String(decoding: output.standardOutput, as: UTF8.self).contains(source))
+            }
+            #expect(model.statusMessage == AppLocalization.text("表格已保存：%@", destination.lastPathComponent))
+        }
+    }
+
+    @Test(arguments: ["failure", "empty", "unsupported CPU"])
+    func unsuccessfulCPURecoveryReportsAResultAndAllowsRetry(outcome: String) async throws {
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let request = CancellationProbeRequest()
+        request.supportsCPU = outcome != "unsupported CPU"
+        let task = try #require(model.recognize(.text, recognizeImage: { image, _ in
+            try ScreenshotRecognitionOperation(request: request).recognize(image) { _, request in
+                if request.computeDevice(for: .main) == nil { throw Self.engineFailure }
+                #expect(Self.usesCPU(request))
+                if outcome == "empty" { return [] }
+                throw RecognitionFailure()
+            }
+        }) { _, _ in Issue.record("Failed recovery must not present a result") })
+        await task.value
+        #expect(!model.isRecognizing)
+        if outcome == "empty" {
+            #expect(model.statusMessage == AppLocalization.text("未识别到文字"))
+        } else {
+            let failure = outcome == "unsupported CPU" ? Self.engineFailure.localizedDescription
+                : RecognitionFailure().localizedDescription
+            #expect(model.statusMessage == AppLocalization.text("识别失败：%@", failure))
+        }
+        var result: String?
+        let retry = try #require(model.recognize(.text, recognizeImage: { _, _ in Self.fragments("retry") }) {
+            text, _ in result = text
+        })
+        await retry.value
+        #expect(result == "retry" && model.statusMessage == nil && !model.isRecognizing)
+    }
+
+    @Test(arguments: ["before retry", "during CPU configuration", "during retry", "first result", "Vision cancellation", "Swift cancellation"])
+    func cancellationStopsCPURecoveryAndDiscardsItsResult(stage: String) throws {
+        let request = CancellationProbeRequest()
+        let operation = ScreenshotRecognitionOperation(request: request)
+        if stage == "during CPU configuration" { request.onSupportedDevices = { [weak operation] in operation?.cancel() } }
+        let image = try #require(makeImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(throws: CancellationError.self) {
+            try operation.recognize(image) { _, request in
+                if request.computeDevice(for: .main) == nil {
+                    if stage == "first result" {
+                        operation.cancel()
+                        return Self.fragments("late first result")
+                    }
+                    if stage == "Vision cancellation" {
+                        throw NSError(domain: VNErrorDomain, code: VNErrorCode.requestCancelled.rawValue)
+                    }
+                    if stage == "Swift cancellation" { throw CancellationError() }
+                    if stage == "before retry" { operation.cancel() }
+                    throw Self.engineFailure
+                }
+                #expect(stage == "during retry", "Cancelled work must not start CPU recovery")
+                operation.cancel()
+                return Self.fragments("late result")
+            }
+        }
+    }
+
+    @Test
+    func normalRecognitionKeepsAutomaticAcceleration() throws {
+        let request = CancellationProbeRequest()
+        let operation = ScreenshotRecognitionOperation(request: request)
+        let image = try #require(makeImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let fragments = try operation.recognize(image) { _, request in
+            #expect(request.computeDevice(for: .main) == nil, "Successful OCR must retain Vision's default device choice")
+            return Self.fragments("normal result")
+        }
+        #expect(fragments == Self.fragments("normal result"))
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func screenshotOverlayShowsRecognitionAndExportStatusInEveryLanguage(language: AppLanguage) async throws {
+        let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previous
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previous, forName: UserDefaults.argumentDomain) }
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let fixture = try Fixture(image: makeImage())
+        defer { fixture.close() }
+        let window = try #require(fixture.controller.window)
+        let frame = window.frame
+        let host = try #require(window.contentView)
+        let localizationRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/Localization")
+        let translations = try #require(NSDictionary(contentsOf: localizationRoot
+            .appendingPathComponent("\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
+        let keys = ["正在识别...", "识别失败：%@", "未识别到文字", "翻译失败，请重试或使用浏览器翻译", "表格已保存：%@"]
+        for key in keys {
+            let translation = try #require(translations[key], "Missing \(language.rawValue) recognition status: \(key)")
+            #expect(!translation.isEmpty)
+            #expect(translation.components(separatedBy: "%@").count == key.components(separatedBy: "%@").count)
+            #expect(AppLocalization.string(key, language: language) == translation)
+            let message = key.contains("%@")
+                ? AppLocalization.format(key, locale: language.locale, ["synthetic.xlsx"])
+                : AppLocalization.string(key, language: language)
+            fixture.model.statusMessage = message
+            for _ in 0..<3 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            #expect(Self.accessibilityObjects(host).contains { object in
+                ["accessibilityTitle", "accessibilityLabel", "accessibilityValue"].contains { key in
+                    object.responds(to: NSSelectorFromString(key)) && object.value(forKey: key) as? String == message
+                }
+            }, "The screenshot overlay must expose its \(language.rawValue) status: \(message)")
+        }
+        #expect(window.frame == frame && fixture.model.annotations.isEmpty && !fixture.model.canUndo)
+    }
+
     @Test(arguments: [ScreenshotRecognitionMode.text, .table, .translate])
     func cancellationBeforeQueuedTaskStartsDoesNotOpenDialogsOrChangeStatus(mode: ScreenshotRecognitionMode) async throws {
         let model = ScreenshotEditorModel(image: try makeImage())
@@ -626,8 +816,53 @@ struct ScreenshotRecognitionTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func CPURecoveryRecognizesSyntheticChineseAndHDRUsingVision(hdr: Bool) async throws {
+        let text = "中文 OCR 2468"
+        let source = try #require(makeImage(text: text).cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let image: CGImage
+        if hdr {
+            let context = try #require(CGContext(data: nil, width: source.width, height: source.height,
+                bitsPerComponent: 16, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                    | CGBitmapInfo.floatComponents.rawValue | CGBitmapInfo.byteOrder16Little.rawValue))
+            context.draw(source, in: CGRect(x: 0, y: 0, width: source.width, height: source.height))
+            image = try #require(context.makeImage())
+        } else { image = source }
+        let fragments = try await Task.detached(priority: .userInitiated) {
+            try ScreenshotRecognitionOperation().recognize(image) { image, request in
+                if request.computeDevice(for: .main) == nil { throw Self.engineFailure }
+                #expect(Self.usesCPU(request))
+                try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+                return (request.results ?? []).compactMap { observation in
+                    guard let candidate = observation.topCandidates(1).first else { return nil }
+                    return ScreenshotRecognizedFragment(text: candidate.string, boundingBox: observation.boundingBox)
+                }
+            }
+        }.value
+        #expect(fragments.map(\.text).joined().contains(text), "CPU recovery must preserve Chinese text and numbers")
+        #expect(fragments.allSatisfy { !$0.boundingBox.isEmpty })
+    }
+
     private nonisolated static func fragments(_ text: String) -> [ScreenshotRecognizedFragment] {
         [ScreenshotRecognizedFragment(text: text, boundingBox: CGRect(x: 0.1, y: 0.5, width: 0.8, height: 0.2))]
+    }
+
+    private nonisolated static var engineFailure: NSError {
+        NSError(domain: "CRImageReaderErrorDomain", code: -1, userInfo: [
+            NSLocalizedDescriptionKey: "E5RT compute operation failed (Code: 13)",
+        ])
+    }
+
+    private nonisolated static func usesCPU(_ request: VNRecognizeTextRequest) -> Bool {
+        if case .cpu? = request.computeDevice(for: .main) { return true }
+        return false
+    }
+
+    private static func accessibilityObjects(_ root: NSObject) -> [NSObject] {
+        let children = root.responds(to: NSSelectorFromString("accessibilityChildren"))
+            ? root.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] : []
+        return [root] + children.flatMap(accessibilityObjects)
     }
 
     private nonisolated static func recognizeSynthetic(
@@ -724,11 +959,20 @@ struct ScreenshotRecognitionTests {
 
     private final class CancellationProbeRequest: VNRecognizeTextRequest, @unchecked Sendable {
         var wasCancelled = false
+        var supportsCPU = true
         var onSupportedLanguages: (() -> Void)?
+        var onSupportedDevices: (() -> Void)?
         override func cancel() { wasCancelled = true; super.cancel() }
         override func supportedRecognitionLanguages() throws -> [String] {
             onSupportedLanguages?()
             return ["en-US"]
+        }
+        override func __supportedComputeStageDevices() throws -> [VNComputeStage: [any MLComputeDeviceProtocol]] {
+            onSupportedDevices?()
+            return [.main: supportsCPU ? MLComputeDevice.allComputeDevices.compactMap {
+                if case let .cpu(device) = $0 { return device }
+                return nil
+            } : []]
         }
     }
 
@@ -764,6 +1008,36 @@ struct ScreenshotRecognitionTests {
         func finish(_ text: String) {
             continuation?.resume(returning: text)
             continuation = nil
+        }
+    }
+
+    @MainActor
+    private final class RecognitionMenuSelection: NSObject {
+        let title: String
+        let model: ScreenshotEditorModel
+        var selected = false
+        var startedRecognition = false
+        private var menu: NSMenu?
+
+        init(title: String, model: ScreenshotEditorModel) {
+            self.title = title
+            self.model = model
+        }
+
+        @objc func began(_ notification: Notification) {
+            guard let menu = notification.object as? NSMenu,
+                  let index = menu.items.firstIndex(where: { $0.title == title }) else { return }
+            self.menu = menu
+            RunLoop.main.perform(inModes: [.eventTracking]) {
+                MainActor.assumeIsolated {
+                    self.menu?.cancelTrackingWithoutAnimation()
+                    self.menu?.performActionForItem(at: index)
+                    self.startedRecognition = self.model.isRecognizing
+                    self.model.cancelRecognition()
+                    self.selected = true
+                    self.menu = nil
+                }
+            }
         }
     }
 
