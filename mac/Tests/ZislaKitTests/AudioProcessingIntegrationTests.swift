@@ -134,7 +134,7 @@ struct AudioProcessingIntegrationTests {
         let outputs = try await fixture.service.process(.init(operation: .fade, inputURLs: [input], options: options), outputURL: output)
         #expect(outputs == [output])
         let actual = try fixture.samples(output)
-        #expect(actual.map(\.count) == samples.map(\.count), "Fading must preserve every decoded frame and channel")
+        try #require(actual.map(\.count) == samples.map(\.count), "Fading must preserve every decoded frame and channel")
         let rate = Double(options.sampleRate)
         let fadeInFrames = (fades.0 * rate).rounded()
         let fadeOutFrames = (fades.1 * rate).rounded()
