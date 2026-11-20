@@ -215,8 +215,14 @@ struct IslandDashboardViewLayoutTests {
                     "Camera and screen changes must reserve the future budget without disturbing dictation")
         }
         let restored = try #require(delegate?.voiceRecordingSavedPanelSize)
+        let layouts = AsyncStream<CGSize>.makeStream()
+        coordinator.onActiveLayoutChanged = { layout in
+            if let layout { layouts.continuation.yield(layout.expandedFrame.size) }
+        }
+        defer { layouts.continuation.finish() }
+        var updates = layouts.stream.makeAsyncIterator()
         delegate?.updateExpandedPanelSize(restored, duringVoiceRecording: false, coordinator: coordinator)
-        for _ in 0..<6 { await Task.yield() }
+        #expect(await updates.next() == restored)
         #expect(coordinator.activeLayout?.expandedFrame.size == restored)
         delegate = nil
         #expect(weakDelegate == nil, "A queued panel update cannot retain the application owner")

@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import CoreMedia
 import CoreVideo
 import ScreenCaptureKit
@@ -143,6 +144,199 @@ struct WindowPreviewLifecycleTests {
         #expect(system.activatedWindowIDs == [12])
         #expect(system.solePreviewActivations == [false])
         #expect(controller.windows.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func contextClickCancelsAPendingDockPreview(controlClick: Bool) async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+        let hover = try #require(system.timers.last)
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(
+            controlClick ? .leftMouseDown : .rightMouseDown, modifiers: controlClick ? .control : []
+        ))
+        hover.fire()
+        await controller.captureTask?.value
+
+        #expect(!hover.isValid, "Opening a context menu must cancel the pending hover")
+        #expect(controller.windows.isEmpty, "A pending preview must not cover the Dock context menu")
+        #expect(controller.appName.isEmpty)
+        #expect(system.presentationAnchors.allSatisfy { $0 == nil })
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved, timestamp: 2))
+        try #require(system.timers.last).fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [1], "A context click must not impose the left-click restoration delay")
+    }
+
+    @Test(arguments: [false, true])
+    func contextClickImmediatelyHidesAnExistingDockPreview(controlClick: Bool) async throws {
+        let system = PreviewSystem()
+        let controller = WindowPreviewController(dependencies: system.dependencies())
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [1])
+        let refresh = try #require(system.timers.first { $0.timeInterval == 1 })
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(
+            controlClick ? .leftMouseDown : .rightMouseDown, modifiers: controlClick ? .control : []
+        ))
+
+        #expect(controller.windows.isEmpty, "An existing preview must hide before the context menu opens")
+        #expect(controller.appName.isEmpty)
+        #expect((system.presentationAnchors.last ?? nil) == nil)
+        #expect(!refresh.isValid)
+        #expect(controller.captureTask == nil)
+    }
+
+    @Test
+    func anOpenDockMenuBlocksHoverAndClosingItRestoresPreviews() async throws {
+        let system = PreviewSystem()
+        system.dockMenuIsOpen = true
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+        system.timers.forEach { $0.fire() }
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty, "Pointer movement over a Dock icon must not cover an open menu")
+        #expect(controller.appName.isEmpty)
+        #expect(system.presentationAnchors.allSatisfy { $0 == nil })
+
+        system.dockMenuIsOpen = false
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved, timestamp: 2))
+        try #require(system.timers.last).fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [1], "Normal hover must resume after the menu closes")
+    }
+
+    @Test
+    func openingADockMenuDuringTheHoverDelayPreventsPresentation() async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+        let hover = try #require(system.timers.last)
+
+        system.dockMenuIsOpen = true
+        hover.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty, "The delayed hover must recheck whether a menu has opened")
+        #expect(controller.appName.isEmpty)
+        #expect(system.presentationAnchors.allSatisfy { $0 == nil })
+    }
+
+    @Test
+    func movingAcrossAnOpenDockMenuHidesTheExistingPreview() async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+
+        system.dockMenuIsOpen = true
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+        #expect(controller.windows.isEmpty, "A menu detected without its opening click must hide the existing preview")
+        #expect((system.presentationAnchors.last ?? nil) == nil)
+    }
+
+    @Test
+    func aHoverCancelledByAnOpenDockMenuCannotReappearAfterItCloses() async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+
+        system.dockMenuIsOpen = true
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved, timestamp: 2))
+        system.dockMenuIsOpen = false
+        system.timers.forEach { $0.fire() }
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty, "Closing a menu must not revive the hover it cancelled")
+        #expect(controller.appName.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func contextClickRejectsALateDockCaptureCompletion(fails: Bool) async throws {
+        let system = PreviewSystem()
+        let capture = PreviewCaptureGate()
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { try await capture.capture($0) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        let task = try #require(controller.captureTask)
+        await capture.waitForRequests(1)
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(.rightMouseDown))
+        #expect(task.isCancelled, "Opening a menu must cancel the preview capture already in flight")
+        capture.finish(0, fails: fails)
+        await task.value
+        #expect(controller.windows.isEmpty)
+        #expect(controller.appName.isEmpty)
+        #expect(system.presentationAnchors.allSatisfy { $0 == nil })
+    }
+
+    @Test(arguments: [false, true])
+    func contextClickPreservesCommandTabPreviews(controlClick: Bool) async throws {
+        let system = PreviewSystem()
+        system.switcher = PreviewSystem.selection(2, source: .switcher)
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(2, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.beginSwitcher()
+        await controller.captureTask?.value
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(
+            controlClick ? .leftMouseDown : .rightMouseDown, modifiers: controlClick ? .control : []
+        ))
+        #expect(controller.windows.map(\.id) == [2], "Dock context-click handling must preserve the active switcher")
+        #expect(!controller.showsAppHeader)
+    }
+
+    @Test(arguments: [pid_t?.none, pid_t(42)], ["missing", "invalid", "empty", "list", "menu", "missing-role", "invalid-role"])
+    func dockMenuDetectionRequiresAnAccessibleMenu(processIdentifier: pid_t?, state: String) {
+        let child = AXUIElementCreateApplication(42)
+        let result = WindowPreviewController.dockMenuIsOpen(processIdentifier: processIdentifier) { name, _ in
+            if name == kAXChildrenAttribute {
+                switch state {
+                case "missing": return nil
+                case "invalid": return NSNumber(value: 42)
+                case "empty": return [] as CFArray
+                default: return [child] as CFArray
+                }
+            }
+            switch state {
+            case "menu": return kAXMenuRole as CFString
+            case "missing-role": return nil
+            case "invalid-role": return NSNumber(value: 42)
+            default: return kAXListRole as CFString
+            }
+        }
+        #expect(result == (processIdentifier != nil && state == "menu"),
+                "Only a Dock child with the menu role may suppress hover; missing or invalid AX data must not")
     }
 
     @Test
@@ -1401,6 +1595,7 @@ private final class PreviewSystem {
     var workspaceObservers: [NSObject] = []
     var timers: [Timer] = []
     var timerDelays: [TimeInterval] = []
+    var dockMenuIsOpen = false
     var switcher: WindowPreviewSelection?
     var commandPressed = true
     var presentations: [[CGWindowID]] = []
@@ -1460,6 +1655,7 @@ private final class PreviewSystem {
         }
         value.captureWindows = { [Self.snapshot($0)] }
         value.dockSelection = { nil }
+        value.dockMenuIsOpen = { self.dockMenuIsOpen }
         value.switcherSelection = { self.switcher }
         value.commandPressed = { self.commandPressed }
         value.present = { controller, selection in
@@ -1472,6 +1668,17 @@ private final class PreviewSystem {
             self.solePreviewActivations.append(isOnlyPreview)
         }
         return value
+    }
+
+    static func mouseEvent(
+        _ type: NSEvent.EventType,
+        modifiers: NSEvent.ModifierFlags = [],
+        timestamp: TimeInterval = 1
+    ) throws -> NSEvent {
+        try #require(NSEvent.mouseEvent(
+            with: type, location: .zero, modifierFlags: modifiers, timestamp: timestamp,
+            windowNumber: 0, context: nil, eventNumber: 1, clickCount: 1, pressure: 1
+        ))
     }
 
     static func selection(
