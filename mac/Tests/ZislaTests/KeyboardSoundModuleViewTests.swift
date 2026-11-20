@@ -62,9 +62,13 @@ struct KeyboardSoundModuleViewTests {
         #expect(!window.isVisible)
     }
 
-    @Test(arguments: [Int64(0), Int64(42)])
+    @Test(arguments: [(Int64(0), false), (42, false), (0, true), (42, true)],
+        [String?.none, "1", "0", "", "true", "01", " 1", "1 "])
     @MainActor
-    func typingStatsAppearAndDisappearWithoutLeavingScrollContent(characterCount: Int64) async throws {
+    func typingStatsAppearAndDisappearWithoutLeavingScrollContent(
+        scenario: (characterCount: Int64, isDebugBuild: Bool), overrideValue: String?
+    ) async throws {
+        let (characterCount, isDebugBuild) = scenario
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let summary = KeyboardTypingStatsSummary(
@@ -85,8 +89,10 @@ struct KeyboardSoundModuleViewTests {
             todayKeyCounts: [:],
             allTimeKeyCounts: [:]
         )
+        let environment = overrideValue.map { ["ZISLA_DEBUG_IGNORE_KEYBOARD_STATS": $0] } ?? [:]
         let content = { (snapshot: KeyboardTypingStatsSummary?) in
-            KeyboardSoundModuleView.content(summary: snapshot, voiceStatistics: nil)
+            KeyboardSoundModuleView.content(summary: snapshot, voiceStatistics: nil,
+                environment: environment, isDebugBuild: isDebugBuild)
                 .frame(width: 720, height: 401)
         }
         let host = NSHostingView(rootView: content(nil))
@@ -109,9 +115,12 @@ struct KeyboardSoundModuleViewTests {
             let hasScrollArea = objects.contains {
                 value($0, "accessibilityRole") as? String == NSAccessibility.Role.scrollArea.rawValue
             }
-            #expect(hasEmptyTitle == (snapshot == nil), "Only unavailable statistics must show the empty state")
-            #expect(hasScrollArea == (snapshot != nil), "Only a statistics dashboard must own a scroll area")
-            if snapshot != nil {
+            let showsDashboard = snapshot != nil && !(isDebugBuild && overrideValue == "1")
+            #expect(hasEmptyTitle == !showsDashboard,
+                "Only unavailable statistics or an exact debug opt-in must show the empty state")
+            #expect(hasScrollArea == showsDashboard,
+                "Only a displayed statistics dashboard must own a scroll area")
+            if showsDashboard {
                 #expect(objects.contains {
                     value($0, "accessibilityLabel") as? String == AppLocalization.text("今日按键")
                 }, "The dashboard must keep its keyboard count label")

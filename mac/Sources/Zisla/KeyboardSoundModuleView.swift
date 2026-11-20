@@ -28,10 +28,12 @@ struct KeyboardSoundModuleView: View {
 
     static func content(
         summary: KeyboardTypingStatsSummary?,
-        voiceStatistics: VoiceHistoryStatistics?
+        voiceStatistics: VoiceHistoryStatistics?,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isDebugBuild: Bool = LegacyAppDataMigration.isDebugBuild
     ) -> some View {
         Group {
-            if let summary {
+            if let summary, !(isDebugBuild && environment["ZISLA_DEBUG_IGNORE_KEYBOARD_STATS"] == "1") {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         KeyboardTypingStatsDashboardView(
