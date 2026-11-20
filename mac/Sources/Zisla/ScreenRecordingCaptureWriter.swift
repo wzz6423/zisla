@@ -485,7 +485,8 @@ final class ScreenRecordingNativeAssetWriter: ScreenRecordingCaptureAssetWriter,
                 AVVideoCompressionPropertiesKey: compression,
             ]
             if preservesHDR { settings[AVVideoColorPropertiesKey] = RecordingHDR.colorProperties }
-            let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
+            let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings,
+                sourceFormatHint: CMSampleBufferGetFormatDescription(firstSample))
             input.expectsMediaDataInRealTime = true
             guard asset.canAdd(input) else { throw ScreenRecordingCaptureError.writerUnavailable }
             asset.add(input)

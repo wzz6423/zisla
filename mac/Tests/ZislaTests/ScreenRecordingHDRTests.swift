@@ -223,8 +223,8 @@ struct ScreenRecordingHDRTests {
         #expect(canvas.backingImageView.isHidden, "SDR media must use the existing canvas drawing above its selection")
     }
 
-    @Test
-    func captureHDRControlTogglesOnlyTheRecordingConfiguration() async throws {
+    @Test(arguments: [false, true])
+    func captureHDRControlIsVisibleAndTogglesOnlyTheRecordingConfiguration(darkMode: Bool) async throws {
         let release = EnhancedAccessibilityTestScope.acquire()
         defer { release() }
         let defaultsName = "zisla-recording-hdr-\(UUID())"
@@ -240,6 +240,9 @@ struct ScreenRecordingHDRTests {
         let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(defaults: defaults),
             selectRegion: {}, start: {}, openStudio: {}, cancel: {})
         defer { controller.shutdown() }
+        let window = try #require(controller.hostingView.window)
+        window.appearance = NSAppearance(named: darkMode ? .darkAqua : .aqua)
+        window.setContentSize(controller.preferredSize)
         for _ in 0..<4 {
             controller.hostingView.layoutSubtreeIfNeeded()
             await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
@@ -255,8 +258,34 @@ struct ScreenRecordingHDRTests {
         if let button {
             let original = model.configuration
             #expect(!original.preservesHDR)
+            func expectVisibleLabel() throws {
+                controller.hostingView.layoutSubtreeIfNeeded()
+                let element = try #require(button as? any NSAccessibilityElementProtocol)
+                let frame = controller.hostingView.convert(window.convertFromScreen(element.accessibilityFrame()), from: nil)
+                #expect(controller.hostingView.bounds.contains(frame), "The HDR control must fit inside the capture bar")
+                let interior = frame.insetBy(dx: 4, dy: 4)
+                let bitmap = try #require(controller.hostingView.bitmapImageRepForCachingDisplay(in: interior))
+                controller.hostingView.cacheDisplay(in: interior, to: bitmap)
+                let colors = (0..<bitmap.pixelsHigh).flatMap { y in
+                    (0..<bitmap.pixelsWide).compactMap { x in
+                        bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB)
+                    }
+                }
+                let contrasts = try [\NSColor.redComponent, \.greenComponent, \.blueComponent].map { channel in
+                    let values = colors.map { $0[keyPath: channel] }
+                    return try #require(values.max()) - #require(values.min())
+                }
+                let contrast = try #require(contrasts.max())
+                #expect(contrast > 0.2,
+                    "The HDR label must draw visible foreground pixels while the control is \(model.configuration.preservesHDR ? "on" : "off")")
+            }
+            try expectVisibleLabel()
             Self.press(button)
             #expect(model.configuration.preservesHDR)
+            for _ in 0..<4 {
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            try expectVisibleLabel()
             Self.press(button)
             #expect(model.configuration == original && model.capture.phase == .idle)
         }

@@ -3,6 +3,7 @@ import Combine
 import CoreImage
 import Darwin
 import Foundation
+import VideoToolbox
 import ZislaCore
 import ZislaKit
 
@@ -386,16 +387,18 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
         writer = try AVAssetWriter(outputURL: url, fileType: fileType)
         let width = Int(frames.canvas.width)
         let height = Int(frames.canvas.height)
+        var compression: [String: Any] = [
+            AVVideoAverageBitRateKey: min(80_000_000, max(250_000, width * height * schedule.frameRate / 5)),
+            AVVideoExpectedSourceFrameRateKey: schedule.frameRate,
+            AVVideoMaxKeyFrameIntervalKey: schedule.frameRate * 2,
+            AVVideoAllowFrameReorderingKey: false,
+        ]
+        if preservesHDR { compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel }
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: ScreenRecordingCaptureEncoding.codec(width: width, height: height, preservesHDR: preservesHDR),
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: min(80_000_000, max(250_000, width * height * schedule.frameRate / 5)),
-                AVVideoExpectedSourceFrameRateKey: schedule.frameRate,
-                AVVideoMaxKeyFrameIntervalKey: schedule.frameRate * 2,
-                AVVideoAllowFrameReorderingKey: false,
-            ],
+            AVVideoCompressionPropertiesKey: compression,
             AVVideoColorPropertiesKey: preservesHDR ? RecordingHDR.colorProperties : [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
                 AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
