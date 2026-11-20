@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
-unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_AI_ACCOUNT_BALANCE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL ZISLA_DEBUG_IGNORE_KEYBOARD_STATS
+unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_AI_ACCOUNT_BALANCE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL ZISLA_DEBUG_IGNORE_KEYBOARD_STATS ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS
 
 MAC_ROOT="${0:A:h:h:h}"
 TEMPORARY_ROOT="$(mktemp -d "${TMPDIR%/}/zisla-first-launch-tests.XXXXXX")"
@@ -71,6 +71,10 @@ if "TEST_EXPECT_AI_MODEL_USAGE" in os.environ:
     expected_usage = os.environ["TEST_EXPECT_AI_MODEL_USAGE"]
     actual_usage = agent["EnvironmentVariables"].get("ZISLA_DEBUG_AI_MODEL_USAGE")
     assert actual_usage == (expected_usage or None), "The model-usage fixture must reach launchd exactly and be removed when cleared"
+if "TEST_EXPECT_TOOL_ERRORS" in os.environ:
+    expected_errors = os.environ["TEST_EXPECT_TOOL_ERRORS"]
+    actual_errors = agent["EnvironmentVariables"].get("ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS")
+    assert actual_errors == (expected_errors or None), "The tool-error fixture must reach launchd exactly and be removed when cleared"
 print(f"plist first={value} home={home} bundle={bundle}")
 PYTHON
 }
@@ -181,6 +185,16 @@ for target in run update; do
     env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_MODEL_USAGE=
   expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target defaults to real usage after fixture removal" '' \
     env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_MODEL_USAGE make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_TOOL_ERRORS "$target forwards tool errors from the environment" '1' \
+    env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS=1 make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_TOOL_ERRORS "$target forwards tool errors from make" '1' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS=1
+  expect_fixture_launch TEST_EXPECT_TOOL_ERRORS "$target safely preserves tool error values" 'invalid; $(touch SHOULD_NOT_EXIST)' \
+    env -u MAKEFLAGS -u MFLAGS 'ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS=invalid; $(touch SHOULD_NOT_EXIST)' make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_TOOL_ERRORS "$target clears tool errors explicitly" '' \
+    env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS=
+  expect_fixture_launch TEST_EXPECT_TOOL_ERRORS "$target clears tool errors on the next launch" '' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS make -C "$TEST_ROOT" "$target"
 done
 
 for target in run update; do

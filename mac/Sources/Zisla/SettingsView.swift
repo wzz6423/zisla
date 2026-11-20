@@ -3052,10 +3052,12 @@ struct SettingsView: View {
 
     private func recommendedToolRow(_ tool: ManagedTool) -> some View {
         let state = model.managedTools.states[tool] ?? ManagedToolState()
+        let detail = managedToolDetail(tool, state: state)
         return settingRow(
             symbol: recommendedToolSymbol(for: tool),
             title: tool.displayName,
-            detail: managedToolDetail(tool, state: state)
+            detail: detail,
+            detailLineLimit: 2
         ) {
             HStack(spacing: 8) {
                 if case .downloading(let fraction) = state.phase, fraction > 0 {
@@ -3080,6 +3082,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .help(detail)
     }
 
     private func recommendationActionButton(
