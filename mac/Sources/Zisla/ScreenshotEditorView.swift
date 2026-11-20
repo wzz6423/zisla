@@ -2154,6 +2154,7 @@ final class ScreenshotEditorModel: ObservableObject {
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
+        textView.textColor = .labelColor
         textView.isHorizontallyResizable = false
         textView.textContainer?.containerSize = NSSize(
             width: contentWidth,
@@ -2183,20 +2184,8 @@ final class ScreenshotEditorModel: ObservableObject {
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.scrollerStyle = .overlay
-        ThinScrollChrome.apply(to: scrollView)
-
-        let resultContainer = NSVisualEffectView(frame: scrollView.frame)
-        resultContainer.material = .sidebar
-        resultContainer.blendingMode = .withinWindow
-        resultContainer.state = .active
-        resultContainer.appearance = NSAppearance(named: .aqua)
-        resultContainer.wantsLayer = true
-        resultContainer.layer?.cornerRadius = 8
-        resultContainer.layer?.masksToBounds = true
-        scrollView.frame = resultContainer.bounds.insetBy(dx: 1, dy: 1)
-        scrollView.autoresizingMask = [.width, .height]
-        resultContainer.addSubview(scrollView)
-        alert.accessoryView = resultContainer
+        ThinScrollChrome.apply(to: scrollView, scrollerStyle: .overlay)
+        alert.accessoryView = scrollView
         let copyResult: @MainActor () -> Void = {
             self.statusMessage = copyText(result)
                 ? AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
@@ -5377,14 +5366,14 @@ struct ScreenshotEditorView: View {
             )
 
             ZStack(alignment: .topLeading) {
-                ScreenshotBackingImage(image: configuration.backgroundImage)
+                ScreenshotBackingImage(image: configuration.backgroundImage, preservesHDR: true)
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .allowsHitTesting(false)
 
                 Color.black.opacity(0.44)
                     .allowsHitTesting(false)
 
-                ScreenshotBackingImage(image: configuration.backgroundImage)
+                ScreenshotBackingImage(image: configuration.backgroundImage, preservesHDR: true)
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .mask {
                         RoundedRectangle(cornerRadius: selectionCornerRadius, style: .circular)
@@ -8312,7 +8301,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     selectionState: annotationSelectionState,
                     settingsStore: shortcutSettings,
                     overlayConfiguration: ScreenshotEditorOverlayConfiguration(
-                        backgroundImage: screenImage,
+                        backgroundImage: hdrScreenCGImage.map { NSImage(cgImage: $0, size: screenImage.size) } ?? screenImage,
                         initialSelection: captureRect,
                         cropImage: { [weak self] rect in self?.updateCaptureRect(rect) },
                         cropSDRImage: { [weak self] rect in

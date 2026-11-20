@@ -392,12 +392,10 @@ struct ScreenshotRecognitionTests {
         #expect(alert.messageText == AppLocalization.text(mode.title))
         #expect(alert.buttons.map(\.title) == [AppLocalization.text("复制"), AppLocalization.text("关闭")])
         #expect(alert.buttons[1].keyEquivalent == "\u{1b}")
-        let container = try #require(alert.accessoryView as? NSVisualEffectView)
-        let scroll = try #require(container.subviews.first as? NSScrollView)
+        let scroll = try #require(alert.accessoryView as? NSScrollView)
         let textView = try #require(scroll.documentView as? NSTextView)
-        #expect(container.frame.width == 480)
-        #expect(container.material == .sidebar)
-        #expect(container.layer?.cornerRadius == 8)
+        #expect(scroll.frame.width == 480)
+        #expect(!scroll.drawsBackground && !scroll.contentView.drawsBackground && !textView.drawsBackground)
         #expect(textView.string == text)
         #expect(textView.isSelectable && !textView.isEditable)
         #expect(scroll.hasVerticalScroller && !scroll.hasHorizontalScroller)
@@ -411,6 +409,93 @@ struct ScreenshotRecognitionTests {
         }
     }
 
+    @Test(arguments: ["short", "path", "unspaced", "tabs", "unicode", "multiline"],
+        [NSAppearance.Name.aqua, .darkAqua])
+    func recognitionResultsWrapWithinTheViewportAndInheritTheDialogAppearance(
+        content: String, appearanceName: NSAppearance.Name
+    ) async throws {
+        _ = NSApplication.shared
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let alert = PresentationProbeAlert()
+        alert.response = .alertSecondButtonReturn
+        alert.window.isReleasedWhenClosed = false
+        alert.window.alphaValue = 0
+        alert.window.appearance = NSAppearance(named: appearanceName)
+        defer { alert.window.close() }
+        let text = switch content {
+        case "short": "  Short result\nSecond line  "
+        case "path": "/Users/" + String(repeating: "directory/", count: 300) + "file.txt"
+        case "unspaced": String(repeating: "abcdefghijkABCDEFGHIJK1234567890", count: 100)
+        case "tabs": String(repeating: "\t", count: 30) + String(repeating: "lastColumn", count: 100)
+        case "unicode": String(repeating: "截图翻译👨‍👩‍👧‍👦é مرحبا بالعالم ", count: 100)
+        default: String(repeating: "Recognized line\n", count: 120)
+        }
+        let task = try #require(model.recognize(.text, recognizeImage: { _, _ in Self.fragments(text) }) {
+            result, operation in
+            model.presentRecognitionResult(result, mode: .text, operation: operation, alert: alert)
+        })
+        await task.value
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
+        }
+        alert.layout()
+        let accessory = try #require(alert.accessoryView)
+        let scroll = try #require((accessory as? NSScrollView)
+            ?? accessory.subviews.compactMap { $0 as? NSScrollView }.first)
+        let textView = try #require(scroll.documentView as? NSTextView)
+        #expect(!(accessory is NSVisualEffectView), "The result must use the surrounding dialog background")
+        #expect(accessory.appearance == nil && scroll.appearance == nil && textView.appearance == nil)
+        #expect(!scroll.drawsBackground && !scroll.contentView.drawsBackground && !textView.drawsBackground)
+        #expect(textView.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == appearanceName)
+        textView.effectiveAppearance.performAsCurrentDrawingAppearance {
+            #expect(textView.textColor?.usingColorSpace(.deviceRGB) == NSColor.labelColor.usingColorSpace(.deviceRGB))
+        }
+        for width: CGFloat in [480, 240] {
+            scroll.frame.size.width = width
+            scroll.tile()
+            #expect(abs(scroll.contentSize.width - width) <= 0.5,
+                    "Scrollbar chrome must preserve the width used to measure and wrap the result")
+            try Self.expectCompleteRecognitionLayout(text, in: scroll)
+        }
+        if content == "short" {
+            #expect(scroll.frame.height <= 160, "Short results must keep a compact dialog")
+            #expect(textView.frame.height <= scroll.contentSize.height + 1)
+        } else if content == "multiline" {
+            #expect(textView.frame.height > scroll.contentSize.height, "Long results must scroll vertically")
+            let screenHeight = alert.window.screen?.visibleFrame.height ?? 800
+            #expect(alert.window.frame.height <= screenHeight, "The result and its buttons must fit on screen")
+            textView.scrollRangeToVisible(NSRange(location: text.utf16.count - 1, length: 1))
+            #expect(scroll.contentView.bounds.maxY >= textView.frame.height - 1,
+                    "The final line must remain reachable by vertical scrolling")
+        }
+    }
+
+    private static func expectCompleteRecognitionLayout(_ text: String, in scroll: NSScrollView) throws {
+        let textView = try #require(scroll.documentView as? NSTextView)
+        let container = try #require(textView.textContainer)
+        let layoutManager = try #require(textView.layoutManager)
+        layoutManager.ensureLayout(for: container)
+        let glyphRange = layoutManager.glyphRange(for: container)
+        #expect(glyphRange == NSRange(location: 0, length: layoutManager.numberOfGlyphs))
+        #expect(layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+            == NSRange(location: 0, length: text.utf16.count))
+        #expect(textView.string == text && textView.accessibilityValue() == text)
+        #expect(textView.isSelectable && !textView.isEditable)
+        #expect(textView.frame.width <= scroll.contentSize.width + 0.5)
+        var lineCount = 0
+        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { fragment, used, _, _, _ in
+            lineCount += 1
+            for rect in [fragment, used] {
+                let bounds = rect.offsetBy(dx: textView.textContainerOrigin.x, dy: textView.textContainerOrigin.y)
+                #expect(bounds.minX >= -0.5 && bounds.maxX <= scroll.contentSize.width + 0.5,
+                        "Every laid-out line must fit within the visible result width")
+                #expect(bounds.maxY <= textView.frame.height + 1, "Every line must have reachable document space")
+            }
+        }
+        #expect(lineCount > 1)
+        #expect(scroll.hasVerticalScroller && !scroll.hasHorizontalScroller)
+    }
+
     @Test(arguments: [ScreenshotRecognitionMode.text, .translate])
     func theSharedCopyButtonWritesTheCompleteResult(mode: ScreenshotRecognitionMode) async throws {
         let model = ScreenshotEditorModel(image: try makeImage())
@@ -418,7 +503,8 @@ struct ScreenshotRecognitionTests {
         alert.window.isReleasedWhenClosed = false
         alert.window.alphaValue = 0
         defer { alert.window.close() }
-        let text = "Full result\nLine two + & <text>"
+        let text = "  Full result\nLine two + & <text>\n/Users/"
+            + String(repeating: "directory/", count: 120) + String(repeating: "X", count: 600) + "  "
         var copies: [String] = []
         let task = try #require(model.recognize(mode,
             translationService: .init(providers: [{ text, _ in text }]),
