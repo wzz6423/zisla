@@ -3384,6 +3384,7 @@
 "依赖组件" = "Componenti necessari";
 "管理下载与文档转换所需组件。" = "Gestire i componenti necessari per i download e la conversione di documenti.";
 "更改 %@ 的保存位置" = "Cambia la posizione di salvataggio di %@";
+"恢复默认位置" = "Ripristina posizioni predefinite";
 
 "本地优先的原生笔记应用" = "App nativa per le note che privilegia l’archiviazione locale";
 "AI 会话工作目录" = "Cartelle di lavoro delle sessioni IA";

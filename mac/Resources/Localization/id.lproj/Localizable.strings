@@ -3384,6 +3384,7 @@
 "依赖组件" = "Komponen yang diperlukan";
 "管理下载与文档转换所需组件。" = "Kelola komponen yang diperlukan untuk unduhan dan konversi dokumen.";
 "更改 %@ 的保存位置" = "Ubah lokasi penyimpanan untuk %@";
+"恢复默认位置" = "Pulihkan lokasi bawaan";
 
 "本地优先的原生笔记应用" = "Aplikasi catatan native yang mengutamakan penyimpanan lokal";
 "AI 会话工作目录" = "Folder kerja sesi AI";

@@ -59,9 +59,11 @@ public enum SaveLocation: String, CaseIterable, Identifiable, Sendable {
 @MainActor
 public final class SaveLocationStore: ObservableObject {
     @Published public private(set) var directories: [SaveLocation: URL]
-    private let stores: [SaveLocation: ScreenRecordingOutputDirectoryStore]
+    private let defaults: UserDefaults
+    private var stores: [SaveLocation: ScreenRecordingOutputDirectoryStore]
 
     public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         let download = ScreenRecordingOutputDirectoryStore(defaults: defaults,
             bookmarkKey: SaveLocation.download.bookmarkKey, pathKey: nil)
         var stores: [SaveLocation: ScreenRecordingOutputDirectoryStore] = [.download: download]
@@ -90,5 +92,17 @@ public final class SaveLocationStore: ObservableObject {
         let store = stores[location]!
         try store.setDirectory(url)
         directories[location] = store.directory
+    }
+
+    public func resetToDefaults() {
+        for location in SaveLocation.allCases {
+            defaults.removeObject(forKey: location.bookmarkKey)
+            if let pathKey = location.pathKey {
+                defaults.set(location.defaultDirectory.path, forKey: pathKey)
+            }
+            stores[location] = ScreenRecordingOutputDirectoryStore(defaults: defaults,
+                bookmarkKey: location.bookmarkKey, pathKey: location.pathKey)
+        }
+        directories = stores.mapValues(\.directory)
     }
 }

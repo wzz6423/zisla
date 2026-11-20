@@ -3384,6 +3384,7 @@
 "依赖组件" = "Thành phần phụ thuộc";
 "管理下载与文档转换所需组件。" = "Quản lý các thành phần cần thiết để tải xuống và chuyển đổi tài liệu.";
 "更改 %@ 的保存位置" = "Đổi vị trí lưu cho %@";
+"恢复默认位置" = "Khôi phục vị trí mặc định";
 
 "本地优先的原生笔记应用" = "Ứng dụng ghi chú gốc ưu tiên lưu trữ cục bộ";
 "AI 会话工作目录" = "Thư mục làm việc của phiên AI";

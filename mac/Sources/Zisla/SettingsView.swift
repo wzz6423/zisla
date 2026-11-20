@@ -2880,6 +2880,16 @@ struct SettingsView: View {
                             [AppLocalization.string(location.title, locale: locale)]))
                 }
             }
+            HStack {
+                Spacer()
+                Button(AppLocalization.text("恢复默认位置")) {
+                    model.saveLocations.resetToDefaults()
+                }
+                .buttonStyle(.bordered)
+                .keepsIntrinsicWidth()
+                .settingsSearchAnchor(.row(AppLocalization.string("恢复默认位置", locale: locale)))
+            }
+            .padding(.top, 12)
         }
     }
 
