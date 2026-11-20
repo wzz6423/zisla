@@ -292,7 +292,7 @@ public final class KeyboardSoundController: ObservableObject {
         case .running: "输入监控正在运行"
         case let .failed(message): message
         }
-        audioError = model.audioError ?? model.pointerSoundError
+        audioError = model.audioError
         guard let snapshot = model.typingStats.snapshot else {
             typingStatsSummary = nil
             return

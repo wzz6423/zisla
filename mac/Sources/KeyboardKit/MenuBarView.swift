@@ -59,7 +59,6 @@ struct MenuBarView: View {
                         dismiss()
                     }
                 )
-                PointerSoundSection(settings: settings)
                 InterfacePreferencesSection(settings: settings)
                 LaunchAtLoginSection(
                     settings: settings,
@@ -106,7 +105,7 @@ struct MenuBarView: View {
 
     private func monitoringFailureCard(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            Label(AppLocalization.text("键盘与点击监听未启动"), systemImage: "exclamationmark.triangle.fill")
+            Label(AppLocalization.text("输入监控"), systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline.weight(.semibold))
             Text(L10n.tr(message))
                 .font(.caption)
@@ -172,9 +171,6 @@ struct MenuBarView: View {
         if let message = model.audioError {
             failures.append(("键盘声音", message))
         }
-        if let message = model.pointerSoundError {
-            failures.append(("鼠标与触控板", message))
-        }
         if let message = model.soundPackError {
             failures.append(("DIY 音色包", message))
         }
@@ -216,22 +212,16 @@ private struct MenuBarHeader: View {
         switch model.monitoringState {
         case .running:
             if !settings.isTypingStatsEnabled {
-                switch (settings.isEnabled, settings.isPointerSoundEnabled) {
-                case (true, true): return "正在监听键盘与点击 · 统计已暂停"
-                case (true, false): return "正在监听键盘 · 统计已暂停"
-                case (false, true): return "点击音已开启 · 统计已暂停"
-                case (false, false): return "声音与统计均已暂停"
-                }
+                return settings.isEnabled
+                    ? "正在监听键盘 · 统计已暂停"
+                    : "声音与统计均已暂停"
             }
-            switch (settings.isEnabled, settings.isPointerSoundEnabled) {
-            case (true, true): return "正在监听键盘与点击 · 统计已开启"
-            case (true, false): return "正在监听键盘 · 统计已开启"
-            case (false, true): return "正在统计输入 · 点击音已开启"
-            case (false, false): return "正在统计输入 · 声音已暂停"
-            }
+            return settings.isEnabled
+                ? "正在监听键盘 · 统计已开启"
+                : "正在统计输入 · 声音已暂停"
         case .waitingForPermission: return "等待输入监控授权"
-        case .failed: return "键盘与点击监听启动失败"
-        case .stopped: return "键盘与点击监听已停止"
+        case .failed: return "监听启动失败"
+        case .stopped: return "监听已停止"
         }
     }
 
@@ -313,8 +303,7 @@ private struct KeyboardSoundSection: View {
 
             Toggle(AppLocalization.text("播放键盘回弹音"), isOn: $settings.playsReleaseSound)
                 .disabled(!settings.isEnabled)
-            Toggle(AppLocalization.text("自然音色变化（键盘轮换 / 点击音高）"), isOn: $settings.usesPitchVariation)
-                .help(AppLocalization.text("键盘在四种轻微变化间轮换；点击音使用轻微随机音高"))
+            Toggle(AppLocalization.text("自然音高变化"), isOn: $settings.usesPitchVariation)
         }
         .font(.subheadline)
         .padding(KeyboardVisualStyle.cardPadding)
@@ -510,69 +499,6 @@ private struct LaunchAtLoginSection: View {
 
     private var shouldShowActions: Bool {
         shouldShowRetry || shouldShowSystemSettings
-    }
-}
-
-private struct PointerSoundSection: View {
-    @ObservedObject var settings: AppSettings
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                KeyboardSectionHeading(
-                    "鼠标与触控板".localized,
-                    subtitle: settings.selectedPointerProfile.tone.localized,
-                    symbol: "computermouse.fill"
-                )
-                Spacer()
-                Toggle(AppLocalization.text("启用点击音"), isOn: $settings.isPointerSoundEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .accessibilityLabel(AppLocalization.text("启用鼠标与触控板点击音"))
-            }
-
-            Picker(AppLocalization.text("点击音色"), selection: $settings.selectedPointerProfileID) {
-                ForEach(PointerSoundProfile.allCases) { profile in
-                    Text(L10n.format("%@ · %@", profile.displayName, profile.family))
-                        .tag(profile.rawValue)
-                }
-            }
-            .pickerStyle(.menu)
-            .disabled(!settings.isPointerSoundEnabled)
-
-            HStack {
-                Text(settings.selectedPointerProfile.family.localized)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Toggle(AppLocalization.text("播放抬起音"), isOn: $settings.playsPointerReleaseSound)
-                    .disabled(!settings.isPointerSoundEnabled)
-                    .toggleStyle(.checkbox)
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(AppLocalization.text("点击音量"))
-                    Spacer()
-                    Text("\(Int(settings.pointerVolume * 100))%")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-                Slider(value: $settings.pointerVolume, in: 0...1, step: 0.01)
-                    .accessibilityLabel(AppLocalization.text("鼠标与触控板点击音量"))
-                    .disabled(!settings.isPointerSoundEnabled)
-            }
-
-            Text(AppLocalization.text("触控板轻点、物理点按和鼠标点击共用此配置；点击音量独立于键盘音量。"))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .font(.subheadline)
-        .padding(KeyboardVisualStyle.cardPadding)
-        .keyboardPanel()
     }
 }
 
