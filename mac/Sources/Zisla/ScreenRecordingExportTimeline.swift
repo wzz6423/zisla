@@ -110,6 +110,7 @@ struct RecordingExportMediaTrack {
     let track: AVMutableCompositionTrack
     let transform: CGAffineTransform
     let availableRanges: [CMTimeRange?]
+    var preservesHDR = false
 }
 
 struct RecordingExportMedia {
@@ -153,8 +154,9 @@ struct RecordingExportMedia {
             && $0.sourceEnd <= sourceRange.end.seconds + 0.001 }) else {
             throw ScreenRecordingExportError.timelineOutsideMedia
         }
-        let video = try makeTrack(source: sourceVideo, range: sourceRange, transform: transform,
+        var video = try makeTrack(source: sourceVideo, range: sourceRange, transform: transform,
                                   timeline: timeline, mediaType: .video)
+        video.preservesHDR = try await RecordingHDR.containsHDR(sourceVideo)
 
         let camera: RecordingExportMediaTrack?
         if let cameraFile = project.editingCameraFile {

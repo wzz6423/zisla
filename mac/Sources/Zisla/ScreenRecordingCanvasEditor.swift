@@ -60,6 +60,20 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
     private var moved = false
     private(set) var textEditor: NSTextView?
     private(set) var renderedImage: CGImage?
+    let backingImageView = ScreenshotBackingImageView()
+    private let hdrSelectionOutline = CAShapeLayer()
+    private let hdrSelectionHandles = CAShapeLayer()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        backingImageView.imageScaling = .scaleAxesIndependently
+        addSubview(backingImageView)
+        hdrSelectionOutline.fillColor = nil
+        backingImageView.layer?.addSublayer(hdrSelectionOutline)
+        backingImageView.layer?.addSublayer(hdrSelectionHandles)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { editable }
@@ -89,22 +103,44 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        editable && baseImage != nil ? super.hitTest(point) : nil
+        guard editable, baseImage != nil else { return nil }
+        let target = super.hitTest(point)
+        return target === backingImageView ? self : target
     }
 
     override func layout() {
         super.layout()
+        backingImageView.frame = canvasRect
         positionTextEditor()
         needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        if let renderedImage {
+        hdrSelectionOutline.path = nil
+        hdrSelectionHandles.path = nil
+        if let renderedImage, !ScreenshotImageRendering.isHDR(renderedImage) {
             NSImage(cgImage: renderedImage, size: canvasSize).draw(in: canvasRect, from: .zero,
                 operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }
         guard editable, let element = selectedElement else { return }
         let box = viewRect(element.bounds(canvas: canvasSize))
+        if renderedImage.map(ScreenshotImageRendering.isHDR) == true {
+            hdrSelectionOutline.frame = backingImageView.bounds
+            hdrSelectionHandles.frame = backingImageView.bounds
+            hdrSelectionOutline.strokeColor = NSColor.controlAccentColor.cgColor
+            hdrSelectionHandles.strokeColor = NSColor.controlAccentColor.cgColor
+            hdrSelectionHandles.fillColor = NSColor.white.cgColor
+            hdrSelectionOutline.path = CGPath(rect: backingImageView.convert(box, from: self), transform: nil)
+            let handles = CGMutablePath()
+            if textEditor == nil {
+                for (_, point) in RecordingCanvasGeometry.handles(for: element, canvas: canvasSize) {
+                    let position = backingImageView.convert(viewPoint(point), from: self)
+                    handles.addRect(.init(x: position.x - 4, y: position.y - 4, width: 8, height: 8))
+                }
+            }
+            hdrSelectionHandles.path = handles
+            return
+        }
         NSColor.controlAccentColor.setStroke()
         let outline = NSBezierPath(rect: box)
         outline.lineWidth = 1
@@ -290,6 +326,13 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
     }
 
     private func render() {
+        defer {
+            let hdr = renderedImage.map(ScreenshotImageRendering.isHDR) == true
+            backingImageView.isHidden = !hdr
+            backingImageView.frame = canvasRect
+            let image = renderedImage.map { NSImage(cgImage: $0, size: canvasSize) } ?? NSImage(size: .zero)
+            backingImageView.update(image: image, preservesHDR: hdr, opacity: 1)
+        }
         guard var project, let baseImage else { renderedImage = nil; needsDisplay = true; return }
         if let original, let draft { draft.write(to: &project, replacing: original) }
         do {

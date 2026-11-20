@@ -237,12 +237,20 @@ struct ScreenRecordingCaptureBar: View {
                 sourcePicker(width: ScreenRecordingCaptureBarGeometry.sourceWidth(
                     availableWidth: ScreenRecordingCaptureBarGeometry.setupWidth))
                 separator
-                inputButton("speaker.wave.2", disabledSymbol: "speaker.slash", title: "系统音频",
-                    value: $model.configuration.systemAudio, identifier: "systemAudio")
-                inputButton("mic", disabledSymbol: "mic.slash", title: "麦克风",
-                    value: $model.configuration.microphone, identifier: "microphone")
-                inputButton("video", disabledSymbol: "video.slash", title: "摄像头",
-                    value: $model.configuration.camera, identifier: "camera")
+                inputButton(title: "系统音频", value: $model.configuration.systemAudio, identifier: "systemAudio") {
+                    Image(systemName: model.configuration.systemAudio ? "speaker.wave.2" : "speaker.slash")
+                }
+                inputButton(title: "麦克风", value: $model.configuration.microphone, identifier: "microphone") {
+                    Image(systemName: model.configuration.microphone ? "mic" : "mic.slash")
+                }
+                inputButton(title: "摄像头", value: $model.configuration.camera, identifier: "camera") {
+                    Image(systemName: model.configuration.camera ? "video" : "video.slash")
+                }
+                if ScreenshotCaptureService.supportsHDRCapture {
+                    inputButton(title: "保留 HDR", value: $model.configuration.preservesHDR, identifier: "hdr") {
+                        Text("HDR")
+                    }
+                }
                 if model.configuration.camera || model.configuration.microphone {
                     Button { showsPortraitEffects.toggle() } label: {
                         Image(systemName: "person.crop.rectangle.badge.plus")
@@ -340,10 +348,10 @@ struct ScreenRecordingCaptureBar: View {
         }
     }
 
-    private func inputButton(_ symbol: String, disabledSymbol: String, title: String,
-                             value: Binding<Bool>, identifier: String) -> some View {
+    private func inputButton<Content: View>(title: String, value: Binding<Bool>, identifier: String,
+                                          @ViewBuilder label: () -> Content) -> some View {
         Button { value.wrappedValue.toggle() } label: {
-            Image(systemName: value.wrappedValue ? symbol : disabledSymbol)
+            label()
                 .font(.system(size: 13, weight: .semibold)).frame(width: 32, height: ScreenshotToolbarLayout.controlHeight)
                 .foregroundStyle(value.wrappedValue ? Color.accentColor : Color.secondary)
                 .background(value.wrappedValue ? Color.accentColor.opacity(0.12) : Color.clear,

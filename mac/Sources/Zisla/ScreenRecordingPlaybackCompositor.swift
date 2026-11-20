@@ -29,17 +29,17 @@ final class RecordingPlaybackInstruction: NSObject, AVVideoCompositionInstructio
         screenTransform = media.video.transform
         cameraTransform = media.camera?.transform ?? .identity
         cameraRanges = media.camera?.availableRanges ?? []
-        renderer = try RecordingExportRenderer(project: project, size: size)
+        renderer = try RecordingExportRenderer(project: project, size: size, preservesHDR: media.video.preservesHDR)
     }
 }
 
 final class RecordingPlaybackCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     var sourcePixelBufferAttributes: [String: any Sendable]? {
-        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        [kCVPixelBufferPixelFormatTypeKey as String: [RecordingHDR.pixelFormat, kCVPixelFormatType_32BGRA]]
     }
 
     var requiredPixelBufferAttributesForRenderContext: [String: any Sendable] {
-        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_64RGBAHalf,
          kCVPixelBufferIOSurfacePropertiesKey as String: [String: Int]()]
     }
 
@@ -66,7 +66,7 @@ final class RecordingPlaybackCompositor: NSObject, AVVideoCompositing, @unchecke
                     screen: CIImage(cvPixelBuffer: screen).transformed(by: instruction.screenTransform),
                     camera: camera, sourceTime: slice.sourceTime(at: request.compositionTime.seconds), slice: slice)
                 renderer.context.render(image, to: output, bounds: renderer.canvas,
-                                        colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                    colorSpace: renderer.preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
                 request.finish(withComposedVideoFrame: output)
             } catch { request.finish(with: error) }
         }
@@ -87,17 +87,18 @@ final class RecordingMultitrackPlaybackInstruction: NSObject, AVVideoComposition
         timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: media.duration, preferredTimescale: 60_000))
         requiredSourceTrackIDs = (media.videoTracks.map(\.trackID) + [media.playbackClockTrackID].compactMap { $0 })
             .map { NSNumber(value: $0) }
-        renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size)
+        renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size,
+            preservesHDR: media.preservesHDR)
     }
 }
 
 final class RecordingMultitrackPlaybackCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     var sourcePixelBufferAttributes: [String: any Sendable]? {
-        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        [kCVPixelBufferPixelFormatTypeKey as String: [RecordingHDR.pixelFormat, kCVPixelFormatType_32BGRA]]
     }
 
     var requiredPixelBufferAttributesForRenderContext: [String: any Sendable] {
-        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_64RGBAHalf,
          kCVPixelBufferIOSurfacePropertiesKey as String: [String: Int]()]
     }
 
@@ -122,7 +123,7 @@ final class RecordingMultitrackPlaybackCompositor: NSObject, AVVideoCompositing,
                 let renderer = instruction.renderer
                 let image = try renderer.render(frames: frames, at: time.seconds)
                 renderer.context.render(image, to: output, bounds: renderer.canvas,
-                    colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                    colorSpace: renderer.preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
                 request.finish(withComposedVideoFrame: output)
             } catch { request.finish(with: error) }
         }
