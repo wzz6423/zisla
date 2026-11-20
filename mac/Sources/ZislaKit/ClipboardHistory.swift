@@ -118,22 +118,49 @@ public enum ClipboardHistoryScope: Sendable {
     case history
 }
 
+public enum ClipboardHistoryGrouping: String, CaseIterable, Identifiable, Sendable {
+    case none
+    case sourceApp
+
+    public var id: Self { self }
+
+    public var title: String {
+        switch self {
+        case .none: "不分组"
+        case .sourceApp: "按应用"
+        }
+    }
+}
+
+public struct ClipboardSourceApp: Codable, Equatable, Sendable {
+    public var bundleIdentifier: String
+    public var name: String
+
+    public init(bundleIdentifier: String, name: String) {
+        self.bundleIdentifier = bundleIdentifier
+        self.name = name
+    }
+}
+
 public struct ClipboardHistoryItem: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var content: ClipboardHistoryContent
     public var lastCopiedAt: Date
     public var isPinned: Bool
+    public var sourceApp: ClipboardSourceApp?
 
     public init(
         id: UUID = UUID(),
         content: ClipboardHistoryContent,
         lastCopiedAt: Date = Date(),
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        sourceApp: ClipboardSourceApp? = nil
     ) {
         self.id = id
         self.content = content
         self.lastCopiedAt = lastCopiedAt
         self.isPinned = isPinned
+        self.sourceApp = sourceApp
     }
 
     public func lastCopiedAtText(now: Date = Date(), calendar: Calendar = .current) -> String {

@@ -93,7 +93,10 @@ struct ClipboardAssistantIslandPresentationTests {
         defer { pasteboard.releaseGlobally() }
         var handoff = IslandClipboardHandoff()
         var captures = 0
-        let monitor = ClipboardHistoryMonitor(pasteboard: pasteboard, pollInterval: 3600) { content in
+        let monitor = ClipboardHistoryMonitor(
+            pasteboard: pasteboard, pollInterval: 3600, workspaceNotificationCenter: NotificationCenter(),
+            sourceAppProvider: { _ in nil }, sourceAppResolver: { _ in nil }
+        ) { content, _ in
             #expect(handoff.shouldDefer, "The capture must stay queued until the island finishes folding")
             captures += 1
             handoff.hold(.init(content: content, downloadableURL: nil, changeCount: pasteboard.changeCount))
