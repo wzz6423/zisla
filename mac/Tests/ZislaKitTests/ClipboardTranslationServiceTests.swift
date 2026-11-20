@@ -46,7 +46,7 @@ struct ClipboardTranslationServiceTests {
             providers: [{ _, _ in throw URLError(.notConnectedToInternet) }, { _, _ in "" }],
             waitForTimeout: { try await timeout.wait() }
         )
-        await #expect(throws: ClipboardTranslationError.unavailable) {
+        await #expect(throws: URLError(.notConnectedToInternet)) {
             try await service.translate("source", targetLanguage: "zh-CN")
         }
         #expect(await XCTWaiter.fulfillment(of: [timeout.cancelled], timeout: 3) == .completed)
@@ -80,7 +80,54 @@ struct ClipboardTranslationServiceTests {
         case .success: Issue.record("取消或超时不得返回译文")
         case .failure(let error):
             if cancel { #expect(error is CancellationError) }
-            else { #expect(error as? ClipboardTranslationError == .unavailable) }
+            else { #expect((error as? URLError)?.code == .timedOut) }
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func concreteProviderFailuresSurviveRegardlessOfCompletionOrder(firstFinishesFirst: Bool) async throws {
+        let first = TranslationGate<String>()
+        let second = TranslationGate<String>()
+        let service = ClipboardTranslationService(providers: [
+            { _, _ in try await first.wait() },
+            { _, _ in try await second.wait() },
+            { _, _ in throw ClipboardTranslationError.unavailable },
+        ])
+        let task = Task { try await service.translate("Hello", targetLanguage: "zh-CN") }
+        #expect(await XCTWaiter.fulfillment(of: [first.started, second.started], timeout: 3) == .completed)
+        if firstFinishesFirst {
+            await first.resolve(.failure(URLError(.timedOut)))
+            await second.resolve(.failure(URLError(.notConnectedToInternet)))
+        } else {
+            await second.resolve(.failure(URLError(.notConnectedToInternet)))
+            await first.resolve(.failure(URLError(.timedOut)))
+        }
+        switch await task.result {
+        case .success: Issue.record("Failed providers must not return a translation")
+        case .failure(let error): #expect((error as? URLError)?.code == .timedOut)
+        }
+    }
+
+    @Test
+    func genericProviderFailuresKeepTheExistingUnavailableError() async {
+        let service = ClipboardTranslationService(providers: [
+            { _, _ in throw ClipboardTranslationError.invalidResponse },
+            { _, _ in throw ClipboardTranslationError.unavailable },
+            { _, _ in " \n" },
+        ])
+        await #expect(throws: ClipboardTranslationError.unavailable) {
+            try await service.translate("Hello", targetLanguage: "zh-CN")
+        }
+    }
+
+    @Test
+    func providerCancellationDoesNotCancelTheTranslationRequest() async {
+        let service = ClipboardTranslationService(providers: [
+            { _, _ in throw CancellationError() },
+            { _, _ in throw ClipboardTranslationError.unavailable },
+        ])
+        await #expect(throws: ClipboardTranslationError.unavailable) {
+            try await service.translate("Hello", targetLanguage: "zh-CN")
         }
     }
 

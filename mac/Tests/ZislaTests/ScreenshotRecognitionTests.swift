@@ -203,7 +203,10 @@ struct ScreenshotRecognitionTests {
     @Test(arguments: [ScreenshotRecognitionMode.text, .table, .translate])
     func cancellationBeforeQueuedTaskStartsDoesNotOpenDialogsOrChangeStatus(mode: ScreenshotRecognitionMode) async throws {
         let model = ScreenshotEditorModel(image: try makeImage())
-        let task = try #require(model.recognize(mode, chooseTableDestination: {
+        let task = try #require(model.recognize(mode, makeTranslationFailureAlert: {
+            Issue.record("A screenshot closed before dispatch must not open an error dialog")
+            return NSAlert()
+        }, chooseTableDestination: {
             Issue.record("A screenshot closed before dispatch must not open its destination panel")
             return nil
         }, recognizeImage: { _, _ in
@@ -266,17 +269,54 @@ struct ScreenshotRecognitionTests {
         #expect(model.statusMessage != nil)
     }
 
-    @Test
-    func failedTranslationReportsFailureAndAllowsRetry() async throws {
+    @Test(arguments: [false, true])
+    func failedTranslationReportsFailureAndAllowsRetry(unrelatedWindowIsKey: Bool) async throws {
+        _ = NSApplication.shared
         let model = ScreenshotEditorModel(image: try makeImage())
+        let screenshot = ScreenshotEditorWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 320, height: 200),
+            styleMask: [.borderless], backing: .buffered, defer: false)
+        screenshot.isReleasedWhenClosed = false
+        screenshot.alphaValue = 0
+        screenshot.level = .screenSaver
+        screenshot.orderFrontRegardless()
+        let other = NSWindow(contentRect: screenshot.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        other.isReleasedWhenClosed = false
+        other.alphaValue = 0
+        if unrelatedWindowIsKey { other.makeKeyAndOrderFront(nil) }
+        let alert = PresentationProbeAlert()
+        alert.window.isReleasedWhenClosed = false
+        alert.window.alphaValue = 0
+        defer { alert.window.close(); other.close(); screenshot.close() }
+        alert.onPresent = {
+            #expect(!model.isRecognizing, "Failure must release the toolbar before opening its error dialog")
+            #expect(alert.window.level.rawValue > screenshot.level.rawValue)
+            alert.window.level = .normal
+            NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: alert.window)
+            #expect(alert.window.level.rawValue > screenshot.level.rawValue,
+                    "AppKit making the error dialog key must not place it below the screenshot")
+        }
         let failed = try #require(model.recognize(.translate,
             translationService: .init(providers: [{ _, _ in throw URLError(.notConnectedToInternet) }],
                 waitForTimeout: {}),
+            makeTranslationFailureAlert: { alert },
             recognizeImage: { _, _ in Self.fragments("source") }
         ) { _, _ in Issue.record("A failed translation must not present or copy the OCR source") })
         await failed.value
-        #expect(model.statusMessage == AppLocalization.text("翻译失败，请重试或使用浏览器翻译"))
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
+        }
+        #expect(alert.wasPresented, "Translation failure must open its error dialog")
+        #expect(alert.messageText == AppLocalization.text("翻译"))
+        #expect(alert.informativeText.hasPrefix(AppLocalization.text("翻译失败，请重试或使用浏览器翻译")))
+        #expect(alert.buttons.map(\.title) == [AppLocalization.text("关闭")])
+        #expect(alert.buttons.first?.keyEquivalent == "\u{1b}")
+        #expect(alert.accessoryView == nil, "Failure must not display or copy untranslated OCR text")
+        #expect(model.statusMessage == nil)
         #expect(!model.isRecognizing)
+        #expect(screenshot.isVisible)
+        alert.window.level = .normal
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: alert.window)
+        #expect(alert.window.level == .normal, "A closed error dialog must release its level observer")
         var result: String?
         let retry = try #require(model.recognize(.translate,
             translationService: .init(providers: [{ _, _ in "recovered translation" }]),
@@ -288,6 +328,97 @@ struct ScreenshotRecognitionTests {
         #expect(model.statusMessage == nil)
     }
 
+    @Test(arguments: ["unavailable", "timeout", "system", "localized"])
+    func translationFailureDialogExplainsTheErrorWithoutPresentingASuccess(kind: String) async throws {
+        _ = NSApplication.shared
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let alert = PresentationProbeAlert()
+        alert.window.isReleasedWhenClosed = false
+        alert.window.alphaValue = 0
+        defer { alert.window.close() }
+        let error: any Error = switch kind {
+        case "unavailable": ClipboardTranslationError.unavailable
+        case "timeout": URLError(.timedOut)
+        case "system": NSError(domain: "TranslationErrorDomain", code: 11,
+            userInfo: [NSLocalizedDescriptionKey: "Synthetic target language is unavailable"])
+        default: RecognitionFailure()
+        }
+        let task = try #require(model.recognize(.text, recognizeImage: { _, _ in Self.fragments("source") }) {
+            _, operation in
+            model.presentTranslationFailure(error, operation: operation, alert: alert)
+        })
+        await task.value
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
+        }
+        let summary = AppLocalization.text("翻译失败，请重试或使用浏览器翻译")
+        #expect(alert.wasPresented)
+        #expect(alert.messageText == AppLocalization.text("翻译"))
+        #expect(alert.informativeText == (kind == "unavailable"
+            ? summary : summary + "\n\n" + error.localizedDescription))
+        #expect(alert.buttons.map(\.title) == [AppLocalization.text("关闭")])
+        #expect(alert.accessoryView == nil)
+        #expect(model.statusMessage == nil)
+    }
+
+    @Test(arguments: ["close", "replace"])
+    func aQueuedTranslationFailureIsDiscardedWhenItsCaptureIsInvalidated(action: String) async throws {
+        _ = NSApplication.shared
+        let fixture = try Fixture(image: makeImage())
+        defer { fixture.close() }
+        let model = fixture.model
+        let replacement = try makeImage()
+        let alert = PresentationProbeAlert()
+        alert.window.isReleasedWhenClosed = false
+        alert.window.alphaValue = 0
+        defer { alert.window.close() }
+        let task = try #require(model.recognize(.translate,
+            translationService: .init(providers: [{ _, _ in throw ClipboardTranslationError.unavailable }],
+                waitForTimeout: {}),
+            makeTranslationFailureAlert: {
+                switch action {
+                case "close": fixture.controller.close()
+                default: model.image = replacement
+                }
+                model.statusMessage = "replacement capture"
+                return alert
+            }, recognizeImage: { _, _ in Self.fragments("source") }
+        ) { _, _ in Issue.record("Failed translation must not present a successful result") })
+        await task.value
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
+        }
+        #expect(!alert.wasPresented, "An invalidated capture must not open a queued error dialog")
+        #expect(model.statusMessage == "replacement capture")
+        #expect(!model.isRecognizing)
+    }
+
+    @Test
+    func directTaskCancellationDuringTranslationNeverShowsAnErrorDialog() async throws {
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let gate = TranslationGate()
+        let task = try #require(model.recognize(.translate,
+            translationService: .init(providers: [{ _, _ in await gate.translate() }]),
+            makeTranslationFailureAlert: {
+                Issue.record("Task cancellation must not be reported as a translation failure")
+                return NSAlert()
+            }, recognizeImage: { _, _ in Self.fragments("source") }
+        ) { _, _ in Issue.record("Task cancellation must not present or copy a translation") })
+        #expect(await XCTWaiter.fulfillment(of: [gate.started], timeout: 3) == .completed)
+        task.cancel()
+        let completed = XCTestExpectation(description: "Cancelled translation finished")
+        let completion = Task {
+            await task.value
+            completed.fulfill()
+        }
+        #expect(await XCTWaiter.fulfillment(of: [completed, gate.cancelled], timeout: 3) == .completed)
+        await gate.finish("late translation")
+        await completion.value
+        #expect(await XCTWaiter.fulfillment(of: [gate.returned], timeout: 3) == .completed)
+        #expect(model.statusMessage == nil)
+        #expect(!model.isRecognizing)
+    }
+
     @Test(arguments: ["close", "replace", "cancel"])
     func cancellationDuringTranslationDiscardsLateResultsAndReleasesTheProvider(action: String) async throws {
         let fixture = try Fixture(image: makeImage())
@@ -296,6 +427,10 @@ struct ScreenshotRecognitionTests {
         let gate = TranslationGate()
         let task = try #require(model.recognize(.translate,
             translationService: .init(providers: [{ _, _ in await gate.translate() }]),
+            makeTranslationFailureAlert: {
+                Issue.record("Cancelled translation must not open an error dialog")
+                return NSAlert()
+            },
             recognizeImage: { _, _ in Self.fragments("source") }
         ) { _, _ in Issue.record("Cancelled translation must not present or copy a result") })
         #expect(await XCTWaiter.fulfillment(of: [gate.started], timeout: 3) == .completed)

@@ -2056,6 +2056,7 @@ final class ScreenshotEditorModel: ObservableObject {
         _ mode: ScreenshotRecognitionMode,
         targetLanguage: String = AppLocalization.currentLanguage.translateTargetCode,
         translationService: ClipboardTranslationService = .live(),
+        makeTranslationFailureAlert: @escaping @MainActor () -> NSAlert = { NSAlert() },
         chooseTableDestination: @escaping @MainActor () async -> URL? = { nil },
         recognizeImage: @escaping @Sendable (CGImage, ScreenshotRecognitionOperation) async throws -> [ScreenshotRecognizedFragment] = {
             try await ScreenshotRecognitionWarmUp.shared.recognize($0, operation: $1)
@@ -2126,7 +2127,9 @@ final class ScreenshotEditorModel: ObservableObject {
                             )
                         } catch {
                             guard isCurrentRecognition(operation) else { return }
-                            statusMessage = AppLocalization.text("翻译失败，请重试或使用浏览器翻译")
+                            statusMessage = nil
+                            guard !Task.isCancelled else { return }
+                            presentTranslationFailure(error, operation: operation, alert: makeTranslationFailureAlert())
                             return
                         }
                         guard isCurrentRecognition(operation) else { return }
@@ -2137,6 +2140,19 @@ final class ScreenshotEditorModel: ObservableObject {
             }
         }
         return recognitionTask
+    }
+
+    func presentTranslationFailure(
+        _ error: any Error,
+        operation: ScreenshotRecognitionOperation,
+        alert: NSAlert = NSAlert()
+    ) {
+        alert.messageText = AppLocalization.text("翻译")
+        let summary = AppLocalization.text("翻译失败，请重试或使用浏览器翻译")
+        alert.informativeText = error is ClipboardTranslationError ? summary : summary + "\n\n" + error.localizedDescription
+        ScreenshotDialogPresentation.present(alert, buttonTitles: ["关闭"], shouldPresent: {
+            self.isCurrentRecognition(operation)
+        }) { _ in }
     }
 
     func presentRecognitionResult(
@@ -4887,6 +4903,7 @@ enum ScreenshotDialogPresentation {
 
     static func present(
         _ alert: NSAlert,
+        buttonTitles: [String] = ["复制", "关闭"],
         shouldPresent: @escaping @MainActor () -> Bool = { true },
         onPresent: @escaping @MainActor () -> Void = {},
         completionHandler: @escaping @MainActor (NSApplication.ModalResponse) -> Void
@@ -4895,8 +4912,10 @@ enum ScreenshotDialogPresentation {
         RunLoop.main.perform(inModes: [.common]) {
             MainActor.assumeIsolated {
                 guard shouldPresent() else { return }
-                alert.addButton(withTitle: AppLocalization.text("复制"))
-                alert.addButton(withTitle: AppLocalization.text("关闭")).keyEquivalent = "\u{1b}"
+                for title in buttonTitles {
+                    let button = alert.addButton(withTitle: AppLocalization.text(title))
+                    if title == "关闭" { button.keyEquivalent = "\u{1b}" }
+                }
                 prepare(alert.window)
                 // AppKit resets the alert's level while runModal() makes it key.
                 let observer = NotificationCenter.default.addObserver(
