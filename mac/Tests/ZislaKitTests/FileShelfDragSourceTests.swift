@@ -81,6 +81,24 @@ struct FileShelfDragSourceTests {
         #expect(source.ignoresModifierKeys)
     }
 
+    @Test
+    func dragCompletionPreservesTheDestinationResult() {
+        let source = FileShelfDraggingView()
+        let session = NSDraggingSession()
+        var results: [NSDragOperation] = []
+        var locations: [NSPoint] = []
+        let point = NSPoint(x: 100, y: 200)
+        source.onDragEnded = { locations.append($0); results.append($1) }
+        for operation: NSDragOperation in [[], .copy] {
+            source.draggingSession(session, endedAt: point, operation: operation)
+        }
+        #expect(results == [[], .copy])
+        #expect(locations == [point, point])
+        source.onDragEnded = nil
+        source.draggingSession(session, endedAt: .zero, operation: .copy)
+        #expect(results == [[], .copy], "Existing shelf drags without a completion handler retain their behavior")
+    }
+
     @Test func multiItemDragPreservesSelectionOrderAndEmptySelectionStartsNoDrag() throws {
         let source = FileShelfDraggingView()
         source.frame = .init(x: 0, y: 0, width: 42, height: 42)

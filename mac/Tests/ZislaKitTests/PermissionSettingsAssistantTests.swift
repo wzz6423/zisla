@@ -9,6 +9,40 @@ import ZislaCore
 @Suite(.serialized)
 struct PermissionSettingsAssistantTests {
     @Test
+    func settingsWindowMustBeVisibleBeforeAssistantAppears() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settingsFrame = nil
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        await fixture.settle()
+        #expect(fixture.assistant.panel == nil, "Opening Settings must not present a helper before its window appears")
+        fixture.assistant.settingsDidActivate()
+        #expect(fixture.assistant.panel == nil)
+        fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
+        fixture.tickSettings()
+        #expect(fixture.assistant.panel != nil)
+        #expect(fixture.settingsTimers.allSatisfy { !$0.isValid }, "Stop watching Settings once the helper appears")
+    }
+
+    @Test
+    func closingSettingsAndReturningToTheAppKeepsTheAssistantAtItsLastPosition() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        await fixture.settle()
+        let panel = try #require(fixture.assistant.panel)
+        let frame = panel.frame
+        fixture.settingsFrame = nil
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        fixture.workspaceCenter.post(name: NSWorkspace.didActivateApplicationNotification, object: nil,
+            userInfo: [NSWorkspace.applicationUserInfoKey: NSRunningApplication.current])
+        #expect(fixture.assistant.panel === panel, "Returning to the app must preserve the drag helper")
+        fixture.assistant.settingsDidActivate()
+        #expect(fixture.assistant.panel === panel && panel.frame == frame,
+            "A missing Settings window must not close or reposition the helper")
+    }
+
+    @Test
     func supportedSettingsPresentTheRunningBundleWithoutChangingPermission() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
@@ -73,7 +107,7 @@ struct PermissionSettingsAssistantTests {
     }
 
     @Test
-    func closingBeforePresentationAndReturningToTheAppDismissPendingWork() async throws {
+    func closingBeforePresentationAndExplicitCloseCancelPendingWork() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
         #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
@@ -92,8 +126,9 @@ struct PermissionSettingsAssistantTests {
         #expect(fixture.assistant.panel == nil)
         #expect(fixture.assistant.openSettings(OnboardingPermissionID.accessibility.settingsURL))
         await fixture.settle()
-        fixture.center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
-        #expect(fixture.assistant.panel == nil)
+        let reopened = try #require(fixture.assistant.panel)
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        #expect(fixture.assistant.panel === reopened)
     }
 
     @Test
@@ -154,7 +189,7 @@ struct PermissionSettingsAssistantTests {
         #expect(fixture.assistant.prepare(for: .accessibility))
         await fixture.settle()
         #expect(fixture.opened.isEmpty && fixture.assistant.panel == nil)
-        fixture.center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
         fixture.assistant.settingsDidActivate()
         #expect(fixture.assistant.panel != nil && fixture.presentations == 1)
         fixture.assistant.settingsDidActivate()
@@ -167,6 +202,148 @@ struct PermissionSettingsAssistantTests {
         fixture.assistant.settingsDidActivate()
         await fixture.settle()
         #expect(fixture.presentations == 2)
+    }
+
+    @Test
+    func aNativeRequestWaitsForTheWindowAfterSettingsActivates() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settingsFrame = nil
+        #expect(fixture.assistant.prepare(for: .accessibility))
+        fixture.assistant.settingsDidActivate()
+        fixture.tickSettings()
+        #expect(fixture.assistant.panel == nil)
+        fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
+        fixture.tickSettings()
+        #expect(fixture.assistant.panel != nil && fixture.presentations == 1)
+        #expect(fixture.opened.isEmpty)
+        #expect(fixture.settingsTimers.allSatisfy { !$0.isValid })
+    }
+
+    @Test
+    func delayedWindowChecksCannotReviveClosedOrSupersededRequests() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settingsFrame = nil
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        let timer = try #require(fixture.settingsTimers.first)
+        let delayed = try #require(fixture.timerHandlers.first)
+        fixture.assistant.settingsDidActivate()
+        #expect(fixture.settingsTimers.count == 1)
+        fixture.assistant.dismiss()
+        #expect(!timer.isValid)
+        fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
+        delayed(timer)
+        #expect(fixture.assistant.panel == nil)
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.accessibility.settingsURL))
+        delayed(timer)
+        #expect(fixture.assistant.panel == nil, "A stale check must not present the replacement request")
+        await fixture.settle()
+        #expect(fixture.assistant.panel != nil && fixture.presentations == 1)
+    }
+
+    @Test
+    func theMainRunLoopPresentsOnceAndStopsPollingWhenSettingsAppears() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settingsFrame = nil
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        let timer = try #require(fixture.settingsTimers.first)
+        #expect(timer.isValid && fixture.assistant.panel == nil)
+        fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
+        timer.fireDate = .distantPast
+        let deadline = Date(timeIntervalSinceNow: 0.2)
+        while fixture.assistant.panel == nil && Date() < deadline {
+            RunLoop.main.run(mode: .default, before: deadline)
+        }
+        #expect(fixture.assistant.panel != nil && fixture.presentations == 1,
+            "A Settings window that appears after activation must be found without another activation event")
+        #expect(!timer.isValid)
+        fixture.tickSettings()
+        #expect(fixture.presentations == 1)
+    }
+
+    @Test
+    func aWindowWaitDoesNotOutliveItsAssistant() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settingsFrame = nil
+        var assistant: PermissionSettingsAssistant? = fixture.makeAssistant(applicationURL: fixture.applicationURL)
+        #expect(assistant?.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL) == true)
+        assistant = nil
+        fixture.tickSettings()
+        #expect(fixture.settingsTimers.allSatisfy { !$0.isValid })
+        #expect(fixture.presentations == 0)
+    }
+
+    @Test
+    func onlyAnAcceptedDropDismissesTheAssistant() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        await fixture.settle()
+        let panel = try #require(fixture.assistant.panel)
+        let image = try #require(panel.contentView?.subviews.compactMap { $0 as? NSStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? FileShelfDraggingView }.first)
+        let session = NSDraggingSession()
+        let frame = panel.frame
+        #expect(image.draggingItems().count == 1)
+        #expect(fixture.assistant.panel === panel)
+        image.draggingSession(session, endedAt: .zero, operation: .copy)
+        #expect(fixture.assistant.panel === panel, "An accepted drop outside Settings must not dismiss the helper")
+        fixture.settingsFrame = nil
+        for operation: NSDragOperation in [[], .generic, .copy] {
+            image.draggingSession(session, endedAt: CGPoint(x: 100, y: 400), operation: operation)
+            #expect(fixture.assistant.panel === panel && panel.frame == frame,
+                "A drag without a Settings destination must preserve the helper and its position")
+        }
+        fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
+        image.draggingSession(session, endedAt: CGPoint(x: 100, y: 400), operation: [])
+        #expect(fixture.assistant.panel === panel, "A rejected drop inside Settings must not dismiss the helper")
+        image.draggingSession(session, endedAt: CGPoint(x: 100, y: 400), operation: .copy)
+        #expect(fixture.assistant.panel == nil, "Dismiss only after the destination accepts the app bundle")
+        fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
+        fixture.assistant.settingsDidActivate()
+        fixture.tickSettings()
+        #expect(fixture.assistant.panel == nil)
+    }
+
+    @Test
+    func anOldDragCannotDismissAReplacementAssistantOrCancelItsPreparation() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        await fixture.settle()
+        let oldPanel = try #require(fixture.assistant.panel)
+        let image = try #require(oldPanel.contentView?.subviews.compactMap { $0 as? NSStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? FileShelfDraggingView }.first)
+        image.removeFromSuperview()
+        fixture.settingsFrame = nil
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.accessibility.settingsURL))
+        let session = NSDraggingSession()
+        fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
+        image.draggingSession(session, endedAt: CGPoint(x: 100, y: 400), operation: .copy)
+        await fixture.settle()
+        let replacement = try #require(fixture.assistant.panel)
+        image.draggingSession(session, endedAt: CGPoint(x: 100, y: 400), operation: .copy)
+        #expect(fixture.assistant.panel === replacement)
+    }
+
+    @Test
+    func acceptedDropsUseTheSettingsWindowAtTheTimeOfTheDrop() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        await fixture.settle()
+        let panel = try #require(fixture.assistant.panel)
+        let image = try #require(panel.contentView?.subviews.compactMap { $0 as? NSStackView }.first?
+            .arrangedSubviews.compactMap { $0 as? FileShelfDraggingView }.first)
+        fixture.settingsFrame = CGRect(x: 900, y: 200, width: 500, height: 600)
+        let session = NSDraggingSession()
+        image.draggingSession(session, endedAt: CGPoint(x: 100, y: 400), operation: .copy)
+        #expect(fixture.assistant.panel === panel, "The old Settings position is not an accepted destination")
+        image.draggingSession(session, endedAt: CGPoint(x: 1000, y: 400), operation: .copy)
+        #expect(fixture.assistant.panel == nil)
     }
 
     @Test
@@ -213,12 +390,13 @@ struct PermissionSettingsAssistantTests {
     private final class Fixture {
         let root: URL
         let applicationURL: URL
-        let center = NotificationCenter()
         let workspaceCenter = NotificationCenter()
         var canOpen = true
         var opened: [URL] = []
         var presentations = 0
         var settingsFrame: CGRect? = CGRect(x: 50, y: 200, width: 700, height: 600)
+        var settingsTimers: [Timer] = []
+        var timerHandlers: [@Sendable (Timer) -> Void] = []
         lazy var assistant = makeAssistant(applicationURL: applicationURL)
 
         init() throws {
@@ -234,7 +412,14 @@ struct PermissionSettingsAssistantTests {
                 placement: { [unowned self] in (self.settingsFrame, CGRect(x: 0, y: 0, width: 1600, height: 1000)) },
                 orderFront: { [unowned self] _ in self.presentations += 1 },
                 language: { language },
-                notificationCenter: center, workspaceNotificationCenter: workspaceCenter)
+                timerFactory: { [unowned self] interval, block in
+                    let timer = Timer(timeInterval: interval, repeats: true, block: block)
+                    timer.fireDate = .distantFuture
+                    self.settingsTimers.append(timer)
+                    self.timerHandlers.append(block)
+                    return timer
+                },
+                workspaceNotificationCenter: workspaceCenter)
         }
 
         func settle() async {
@@ -243,6 +428,11 @@ struct PermissionSettingsAssistantTests {
                     DispatchQueue.main.async { continuation.resume() }
                 }
             }
+            tickSettings()
+        }
+
+        func tickSettings() {
+            for timer in settingsTimers where timer.isValid { timer.fire() }
         }
 
         func close() {

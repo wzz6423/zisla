@@ -12,7 +12,8 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
     private let placement: @MainActor () -> (settingsFrame: CGRect?, visibleFrame: CGRect)
     private let orderFront: @MainActor (NSPanel) -> Void
     private let language: @MainActor () -> AppLanguage
-    private var generation = UUID()
+    private let timerFactory: (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer
+    private var settingsTimer: Timer?
     private var awaitingSettings = false
     private(set) var panel: NSPanel?
 
@@ -23,7 +24,9 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         placement: @escaping @MainActor () -> (settingsFrame: CGRect?, visibleFrame: CGRect) = PermissionSettingsAssistant.currentPlacement,
         orderFront: @escaping @MainActor (NSPanel) -> Void = { $0.orderFrontRegardless() },
         language: @escaping @MainActor () -> AppLanguage = { AppLocalization.currentLanguage },
-        notificationCenter: NotificationCenter = .default,
+        timerFactory: @escaping (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer = {
+            Timer(timeInterval: $0, repeats: true, block: $1)
+        },
         workspaceNotificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter
     ) {
         self.applicationURL = applicationURL
@@ -32,9 +35,8 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         self.placement = placement
         self.orderFront = orderFront
         self.language = language
+        self.timerFactory = timerFactory
         super.init()
-        notificationCenter.addObserver(self, selector: #selector(applicationDidBecomeActive),
-            name: NSApplication.didBecomeActiveNotification, object: nil)
         workspaceNotificationCenter.addObserver(self, selector: #selector(workspaceDidActivate(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
     }
@@ -51,12 +53,7 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         guard openURL(url) else { return false }
         guard let id = OnboardingPermissionID.allCases.first(where: { $0.settingsURL == url }),
               prepare(for: id) else { return true }
-        let token = generation
-        // Opening Settings can activate its window on the next run loop; keep the helper nonactivating.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.generation == token else { return }
-            self.showPreparedAssistant()
-        }
+        waitForSettingsWindow()
         return true
     }
 
@@ -71,24 +68,20 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
     }
 
     func dismiss() {
-        generation = UUID()
-        awaitingSettings = false
+        cancelPreparation()
         panel?.close()
         panel = nil
     }
 
     func cancelPreparation() {
         awaitingSettings = false
+        settingsTimer?.invalidate()
+        settingsTimer = nil
     }
 
     func windowWillClose(_ notification: Notification) {
-        generation = UUID()
-        awaitingSettings = false
+        cancelPreparation()
         panel = nil
-    }
-
-    @objc private func applicationDidBecomeActive() {
-        if panel != nil { dismiss() }
     }
 
     @objc private func workspaceDidActivate(_ notification: Notification) {
@@ -101,17 +94,37 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
     }
 
     func settingsDidActivate() {
-        if awaitingSettings { showPreparedAssistant() }
-        else { reposition() }
+        if awaitingSettings {
+            waitForSettingsWindow()
+            showPreparedAssistant()
+        } else { reposition() }
+    }
+
+    private func waitForSettingsWindow() {
+        guard settingsTimer == nil else { return }
+        // Settings may activate before creating its window, so visibility must outlive the activation event.
+        let timer = timerFactory(0.1) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            let timerID = ObjectIdentifier(timer)
+            MainActor.assumeIsolated {
+                guard let activeTimer = self.settingsTimer,
+                      ObjectIdentifier(activeTimer) == timerID else { return }
+                self.showPreparedAssistant()
+            }
+        }
+        settingsTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private func showPreparedAssistant() {
         guard awaitingSettings else { return }
-        awaitingSettings = false
-        present()
+        let destination = placement()
+        guard let settingsFrame = destination.settingsFrame else { return }
+        cancelPreparation()
+        present(settingsFrame: settingsFrame, visibleFrame: destination.visibleFrame)
     }
 
-    private func present() {
+    private func present(settingsFrame: CGRect, visibleFrame: CGRect) {
         let currentLanguage = language()
         let instruction = AppLocalization.string("permission.drag_app.body", language: currentLanguage)
         let image = FileShelfDraggingView(frame: NSRect(x: 0, y: 0, width: 72, height: 72))
@@ -120,6 +133,11 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         image.setAccessibilityLabel("zisla")
         image.setAccessibilityHelp(instruction)
         image.makeContextMenu = { NSMenu() }
+        image.onDragEnded = { [weak self, weak image] point, operation in
+            guard operation.contains(.copy), let self, let window = image?.window, window === self.panel else { return }
+            guard self.placement().settingsFrame?.contains(point) == true else { return }
+            self.dismiss()
+        }
         image.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([image.widthAnchor.constraint(equalToConstant: 72), image.heightAnchor.constraint(equalToConstant: 72)])
 
@@ -157,14 +175,16 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         helper.collectionBehavior = [.moveToActiveSpace, .transient, .ignoresCycle]
         helper.delegate = self
         panel = helper
-        reposition()
+        helper.setFrame(Self.frame(size: helper.frame.size, settingsFrame: settingsFrame,
+            visibleFrame: visibleFrame), display: true)
         orderFront(helper)
     }
 
     func reposition() {
         guard let panel else { return }
         let destination = placement()
-        panel.setFrame(Self.frame(size: panel.frame.size, settingsFrame: destination.settingsFrame,
+        guard let settingsFrame = destination.settingsFrame else { return }
+        panel.setFrame(Self.frame(size: panel.frame.size, settingsFrame: settingsFrame,
             visibleFrame: destination.visibleFrame), display: true)
     }
 

@@ -102,6 +102,7 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
     var preparePayloads: (() -> [TransferPasteboardPayload])?
     var onSelect: (() -> Void)?
     var makeContextMenu: (() -> NSMenu)?
+    var onDragEnded: ((NSPoint, NSDragOperation) -> Void)?
     private var didBeginDragging = false
 
     var ignoresModifierKeys: Bool { true }
@@ -185,6 +186,10 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
 
     func ignoreModifierKeys(for session: NSDraggingSession) -> Bool {
         ignoresModifierKeys
+    }
+
+    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+        onDragEnded?(screenPoint, operation)
     }
 
     private func menuItem(title: String, action: Selector) -> NSMenuItem {
