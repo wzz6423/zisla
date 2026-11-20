@@ -1352,6 +1352,81 @@ struct WindowPreviewLifecycleTests {
         #expect(system.presentations.last == [])
     }
 
+    @Test(arguments: [WindowPreviewSource.dock, .switcher])
+    func aClosedSameFrameWindowCannotBorrowAnotherWindowsAccessibilityIdentity(source: WindowPreviewSource) async throws {
+        let system = PreviewSystem()
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        let accessibleFrame = WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: screen.maxY)
+        let home = PreviewSystem.snapshot(11)
+        let video = PreviewSystem.snapshot(12)
+        var accessible = [WindowPreviewAccessibleWindow(id: 11, frame: accessibleFrame),
+                          WindowPreviewAccessibleWindow(id: 12, frame: accessibleFrame)]
+        let retained = [PreviewSystem.windowInfo(11, frame: frame), PreviewSystem.windowInfo(12, frame: frame)]
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.presentWindowIDs = { pid in
+            WindowPreviewWindowMatch.presentWindowIDs(
+                processIdentifier: pid, windowInfo: retained, accessibleWindows: accessible,
+                screenFrames: [screen], mainScreenTop: screen.maxY
+            )
+        }
+        dependencies.captureWindows = { _ in
+            captures += 1
+            return captures == 1 ? [home, video] : [home]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: source))
+        await controller.captureTask?.value
+        try #require(controller.windows.map(\.id) == [11, 12])
+
+        accessible = [WindowPreviewAccessibleWindow(id: 11, frame: accessibleFrame)]
+        try #require(system.timers.last { $0.timeInterval == 1 }).fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [11],
+                "A closed window must not reappear through the live window's identical Accessibility frame")
+        #expect(controller.windows.first?.image === home.image)
+    }
+
+    @Test
+    func unavailableAccessibilityPreservesTheMinimizedImageUntilLivenessRecovers() throws {
+        var cache = WindowPreviewImageCache()
+        let snapshot = PreviewSystem.snapshot(11)
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        let retained = [PreviewSystem.windowInfo(11, frame: frame)]
+        let accessible = [WindowPreviewAccessibleWindow(
+            id: 11, frame: WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: screen.maxY)
+        )]
+        _ = cache.reconcile([snapshot], processIdentifier: 1, presentWindowIDs: { _ in [11] })
+        let unknown = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: retained, accessibleWindows: nil,
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        #expect(cache.reconcile([], processIdentifier: 1, presentWindowIDs: { _ in unknown }).isEmpty,
+                "Unknown liveness must not display an unconfirmed cached window")
+
+        let live = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: retained, accessibleWindows: accessible,
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        let recovered = cache.reconcile([], processIdentifier: 1, presentWindowIDs: { _ in live })
+        #expect(recovered.map(\.id) == [11])
+        #expect(recovered.first?.image === snapshot.image,
+                "An AX query failure must not discard the minimized window's recoverable image")
+
+        let closed = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: retained, accessibleWindows: [],
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        #expect(cache.reconcile([], processIdentifier: 1, presentWindowIDs: { _ in closed }).isEmpty)
+        let missingImage = PreviewSystem.snapshot(11, alpha: nil)
+        #expect(cache.reconcile([missingImage], processIdentifier: 1, presentWindowIDs: { _ in [11] }).first?.image == nil,
+                "Confirmed closure must evict the old image")
+    }
+
     @Test(arguments: ["normal", "other-owner", "other-layer", "small", "strip", "missing-id", "invalid-bounds"])
     func cachedWindowLivenessUsesOnlyManageableApplicationWindows(metadata: String) {
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
@@ -1378,7 +1453,7 @@ struct WindowPreviewLifecycleTests {
         #expect(WindowPreviewWindowMatch.presentWindowIDs(
             processIdentifier: 1, windowInfo: [], accessibleWindows: accessible,
             screenFrames: [screen], mainScreenTop: screen.maxY
-        ).isEmpty)
+        ) == [])
     }
 
     @Test(arguments: [false, true])
@@ -1420,8 +1495,21 @@ struct WindowPreviewLifecycleTests {
         ) == (result == .success), "Only a successful identity lookup may establish a moved or minimized target")
     }
 
+    @Test
+    func anUnavailableNativeWindowIDReaderKeepsTheGeometryFallback() {
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        let window = WindowPreviewAccessibleWindow(
+            element: AXUIElementCreateApplication(1), frame: frame, copyWindowID: nil
+        )
+        #expect(window.id == nil)
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: frame, isOnScreen: false, accessibleWindows: [frame],
+            windowID: 11, accessibleWindowIdentities: [window]
+        ), "Unavailable private symbols must preserve the existing geometry fallback")
+    }
+
     @Test(arguments: [true, false])
-    func unavailableAccessibilityOnlyKeepsVisibleOrdinaryWindowLiveness(isOnScreen: Bool) {
+    func unavailableAccessibilityReportsUnknownWindowLiveness(isOnScreen: Bool) {
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
         let ids = WindowPreviewWindowMatch.presentWindowIDs(
             processIdentifier: 1,
@@ -1429,8 +1517,7 @@ struct WindowPreviewLifecycleTests {
                                                   isOnScreen: isOnScreen)],
             accessibleWindows: nil, screenFrames: [screen], mainScreenTop: screen.maxY
         )
-        #expect(ids == (isOnScreen ? [11] : []),
-                "A failed AX query cannot confirm an offscreen ordinary window merely because its CG ID remains")
+        #expect(ids == nil, "A failed AX query must remain distinguishable from confirmed closure")
     }
 
     @Test(arguments: [WindowPreviewSource.dock, .switcher])
@@ -1458,7 +1545,7 @@ struct WindowPreviewLifecycleTests {
         dependencies.presentWindowIDs = { _ in currentIDs() }
         dependencies.captureWindows = { _ in
             let ids = currentIDs()
-            return [home, playback].filter { ids.contains($0.id) }
+            return [home, playback].filter { ids?.contains($0.id) == true }
         }
         let controller = WindowPreviewController(dependencies: dependencies)
         defer { controller.stop() }

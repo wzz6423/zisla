@@ -1,14 +1,23 @@
 import AppKit
 import ApplicationServices
 import CoreMedia
+import Darwin
 import ScreenCaptureKit
 import SwiftUI
 import VideoToolbox
 import ZislaCore
 import ZislaKit
 
-@_silgen_name("_AXUIElementGetWindow")
-private func accessibilityWindowID(_ element: AXUIElement, _ identifier: UnsafeMutablePointer<CGWindowID>) -> AXError
+private typealias AccessibilityWindowIDReader = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
+private let accessibilityWindowID: AccessibilityWindowIDReader? = {
+    guard let handle = dlopen(
+        "/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/HIServices",
+        RTLD_LAZY | RTLD_LOCAL
+    ) else { return nil }
+    defer { dlclose(handle) }
+    guard let symbol = dlsym(handle, "_AXUIElementGetWindow") else { return nil }
+    return unsafeBitCast(symbol, to: AccessibilityWindowIDReader.self)
+}()
 
 enum WindowPreviewSource {
     case dock
@@ -246,10 +255,10 @@ extension WindowPreviewAccessibleWindow {
         element: AXUIElement,
         frame: CGRect?,
         isMain: Bool = false,
-        copyWindowID: (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError = accessibilityWindowID
+        copyWindowID: ((AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError)? = accessibilityWindowID
     ) {
         var identifier: CGWindowID = 0
-        let result = copyWindowID(element, &identifier)
+        let result = copyWindowID?(element, &identifier)
         self.init(id: result == .success ? identifier : nil, frame: frame, isMain: isMain)
     }
 }
@@ -298,7 +307,8 @@ struct WindowPreviewWindowMatch {
         mainScreenTop: CGFloat,
         bundleIdentifier: String? = nil,
         frontmostWindowIDs: () -> [CGWindowID]? = { nil }
-    ) -> Set<CGWindowID> {
+    ) -> Set<CGWindowID>? {
+        guard let accessibleWindows else { return nil }
         let applicationWindows = windowInfo.compactMap { info -> (id: CGWindowID, frame: CGRect, isOnScreen: Bool)? in
             guard (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier,
                   (info[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
@@ -308,7 +318,7 @@ struct WindowPreviewWindowMatch {
             return (identifier, WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: mainScreenTop),
                     (info[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue == true)
         }
-        let accessibleFrames = accessibleWindows?.compactMap(\.frame)
+        let accessibleFrames = accessibleWindows.compactMap(\.frame)
         let companionFrames = applicationWindows.map(\.frame)
         let candidates = applicationWindows.filter { window in
             window.frame.width >= 80 && window.frame.height >= 50 && isPreviewCandidate(
@@ -334,8 +344,11 @@ struct WindowPreviewWindowMatch {
     ) -> Bool {
         // Browsers expose toolbar surfaces as layer-zero windows with extreme aspect ratios.
         guard frame.width <= frame.height * 6, frame.height <= frame.width * 6 else { return false }
-        if let windowID, accessibleWindowIdentities?.contains(where: { $0.id == windowID }) == true {
-            return true
+        if let windowID, let accessibleWindowIdentities, !accessibleWindowIdentities.isEmpty {
+            if accessibleWindowIdentities.contains(where: { $0.id == windowID }) { return true }
+            return accessibleWindowIdentities.contains(where: {
+                $0.id == nil && framesMatch($0.frame, frame, tolerance: 8)
+            }) || matchesFullScreenDisplay(frame, screenFrames: screenFrames, companionFrames: companionFrames)
         }
         if let accessibleWindows, !accessibleWindows.isEmpty {
             if accessibleWindows.contains(where: {
@@ -424,15 +437,18 @@ struct WindowPreviewWindowMatch {
         if let windowID, let index = candidateWindowIDs.firstIndex(where: { $0 == windowID }) {
             return index
         }
-        if isOnlyPreview, candidates.count == 1, candidates[0].frame == nil,
+        let fallbackIndices = candidates.indices.filter {
+            windowID == nil || $0 >= candidateWindowIDs.count || candidateWindowIDs[$0] == nil
+        }
+        if isOnlyPreview, candidates.count == 1, fallbackIndices.contains(0), candidates[0].frame == nil,
            matchesFullScreenDisplay(frame, screenFrames: screenFrames, companionFrames: companionFrames) {
             return 0
         }
-        let nearby = candidates.indices.filter {
+        let nearby = fallbackIndices.filter {
             framesMatch(candidates[$0].frame, frame, tolerance: 8)
         }
         if nearby.count == 1 { return nearby.first }
-        let matches = candidates.indices.filter {
+        let matches = fallbackIndices.filter {
             (candidates[$0].title == title || (title.isEmpty && candidates[$0].title == nil))
                 && framesMatch(candidates[$0].frame, frame, tolerance: 16)
         }
