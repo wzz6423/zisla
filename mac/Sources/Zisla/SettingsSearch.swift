@@ -211,6 +211,7 @@ enum SettingsSearchIndex {
                   keywords: ["默认保存位置", "更改保存位置"]
                     + (location == .download ? ["默认下载目录", "下载目录"] : []))
         }
+        rows(.saveLocations, ["恢复默认位置"])
         entry(.weather, "地点", anchor: .group("地点"), keywords: ["城市、区县或地区", "搜索地区"])
         rows(.weather, ["天气数据"])
         rows(.networkProxy, ["代理链接", "启用本地代理", "代理状态"])

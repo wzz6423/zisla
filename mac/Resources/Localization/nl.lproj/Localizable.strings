@@ -3385,6 +3385,7 @@
 "依赖组件" = "Vereiste componenten";
 "管理下载与文档转换所需组件。" = "Beheer de componenten die nodig zijn voor downloads en documentconversie.";
 "更改 %@ 的保存位置" = "Opslaglocatie voor %@ wijzigen";
+"恢复默认位置" = "Standaardlocaties herstellen";
 
 "本地优先的原生笔记应用" = "Native notitie-app die lokale opslag vooropstelt";
 "AI 会话工作目录" = "Werkmappen van AI-sessies";

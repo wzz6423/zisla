@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Testing
 @testable import ZislaKit
@@ -161,6 +162,78 @@ struct SaveLocationStoreTests {
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: custom.path).isEmpty,
                 "Changing defaults must not move or create content")
+    }
+
+    @Test func resetRestoresEveryDefaultAndPersistsWithoutMovingFilesOrChangingOtherPreferences() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let locations = SaveLocationStore(defaults: fixture.defaults)
+        var files: [URL] = []
+        for location in SaveLocation.allCases {
+            let custom = try fixture.makeDirectory(location.rawValue)
+            try locations.setDirectory(custom, for: location)
+            let file = custom.appendingPathComponent("existing.txt")
+            try Data("existing".utf8).write(to: file)
+            files.append(file)
+        }
+        fixture.defaults.set(Data([1, 2, 3]), forKey: "screen-recording-directory-bookmark")
+        fixture.defaults.set("/legacy-recording", forKey: "screen-recording-directory-path")
+        fixture.defaults.set(false, forKey: "unrelated-feature-enabled")
+        let preferences = fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:]
+        let expected = Dictionary(uniqueKeysWithValues: SaveLocation.allCases.map { ($0, $0.defaultDirectory) })
+        let existingDirectories = expected.mapValues { FileManager.default.fileExists(atPath: $0.path) }
+        var published: [SaveLocation: URL]?
+        let observation = locations.$directories.dropFirst().sink { published = $0 }
+        defer { observation.cancel() }
+
+        locations.resetToDefaults()
+
+        #expect(locations.directories == expected)
+        #expect(published == expected, "Reset must publish the restored locations to the settings page")
+        #expect(SaveLocationStore(defaults: fixture.defaults).directories == expected)
+        for location in SaveLocation.allCases {
+            #expect(fixture.defaults.object(forKey: location.bookmarkKey) == nil)
+            #expect(FileManager.default.fileExists(atPath: location.defaultDirectory.path) == existingDirectories[location],
+                    "Reset must not create default directories")
+            if let pathKey = location.pathKey {
+                #expect(fixture.defaults.string(forKey: pathKey) == location.defaultDirectory.path)
+            }
+        }
+        for key in ["screen-recording-directory-bookmark", "screen-recording-directory-path", "unrelated-feature-enabled"] {
+            #expect(NSDictionary(dictionary: [key: fixture.defaults.object(forKey: key)!])
+                == NSDictionary(dictionary: [key: preferences[key]!]))
+        }
+        for file in files { #expect(try Data(contentsOf: file) == Data("existing".utf8)) }
+    }
+
+    @Test(arguments: [false, true])
+    func resetRepairsCorruptPreferencesAndRemainsIndependentAfterChangingDownloads(corrupt: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        if corrupt {
+            for location in SaveLocation.allCases {
+                fixture.defaults.set(Data([0]), forKey: location.bookmarkKey)
+                if let pathKey = location.pathKey { fixture.defaults.set("", forKey: pathKey) }
+            }
+        }
+        let locations = SaveLocationStore(defaults: fixture.defaults)
+
+        locations.resetToDefaults()
+        let preferences = fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:]
+        locations.resetToDefaults()
+
+        #expect(NSDictionary(dictionary: fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:])
+            == NSDictionary(dictionary: preferences), "Repeated reset must be idempotent")
+        for location in SaveLocation.allCases {
+            #expect(locations[location] == location.defaultDirectory)
+        }
+        try locations.setDirectory(fixture.root, for: .download)
+        let restored = SaveLocationStore(defaults: fixture.defaults)
+        #expect(restored[.download].path == fixture.root.path)
+        for location in SaveLocation.allCases where location != .download {
+            #expect(restored[location] == location.defaultDirectory,
+                    "Reset locations must not inherit a later custom download directory")
+        }
     }
 
     @Test(arguments: SaveLocation.allCases)

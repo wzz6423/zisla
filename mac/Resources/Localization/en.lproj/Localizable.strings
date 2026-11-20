@@ -3384,6 +3384,7 @@
 "依赖组件" = "Dependency Components";
 "管理下载与文档转换所需组件。" = "Manage components required for downloads and document conversion.";
 "更改 %@ 的保存位置" = "Change save location for %@";
+"恢复默认位置" = "Restore Default Locations";
 
 "本地优先的原生笔记应用" = "Local-first native notes app";
 "AI 会话工作目录" = "AI session workspaces";
