@@ -137,14 +137,14 @@ struct AIUsageHistoryPresentationTests {
     }
 
     /// All seven dates remain on one row; details appear only after a user selects a date and survive refreshes.
-    @Test(arguments: [CGSize(width: 620, height: 480), CGSize(width: 760, height: 640)],
+    @Test(arguments: [CGSize(width: 620, height: 360), CGSize(width: 760, height: 480)],
         [LayoutDirection.leftToRight, .rightToLeft])
     @MainActor
     func historyWindowFitsAndRefreshKeepsTheSelectedDate(size: CGSize, direction: LayoutDirection) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let language: AppLanguage = direction == .rightToLeft ? .arabic : .english
-        let today = Calendar.current.startOfDay(for: Date())
+        let today = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
         let older = try #require(Calendar.current.date(byAdding: .day, value: -1, to: today))
         let archiveStart = try #require(Calendar.current.date(byAdding: .year, value: -1, to: today))
         var samples = [AIUsageSample(provider: .codex, timestamp: today, inputTokens: 10, outputTokens: 2, model: "today-model"),
@@ -152,7 +152,7 @@ struct AIUsageHistoryPresentationTests {
             AIUsageSample(provider: .gpt, timestamp: archiveStart, inputTokens: 1, outputTokens: 1, model: "archive-model")]
         let controller = AIUsageHistoryController(read: { .init(usageSamples: samples, modelUsageSamples: samples) }, clear: {}, write: { _, _ in })
         await controller.load()
-        let host = NSHostingView(rootView: AIUsageHistoryContent(controller: controller)
+        let host = NSHostingView(rootView: AIUsageHistoryContent(controller: controller, now: { today.addingTimeInterval(3600) })
             .environment(\.locale, language.locale).environment(\.layoutDirection, direction))
         host.sizingOptions = []
         let window = SystemMetricsHistoryPanel(contentRect: CGRect(origin: .zero, size: size),
@@ -160,13 +160,28 @@ struct AIUsageHistoryPresentationTests {
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
-        func settle() async {
+        func settle() async throws {
             for _ in 0..<5 {
                 host.layoutSubtreeIfNeeded()
                 await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
             }
+            let scroll = try #require(descendants(host).compactMap { $0 as? NSScrollView }.max(by: { $0.frame.height < $1.frame.height }))
+            let document = try #require(scroll.documentView)
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: max(0, document.frame.height - scroll.contentView.bounds.height)))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
         }
-        await settle()
+        try await settle()
+        let contentBounds = window.convertToScreen(host.convert(host.bounds, to: nil))
+        for key in ["AI 用量历史", "清空", "导出"] {
+            let title = AppLocalization.string(key, language: language)
+            let control = try #require(accessibilityObjects(host).first { object in
+                ["accessibilityLabel", "accessibilityTitle", "accessibilityValue"].contains { value(object, $0) as? String == title }
+            } as? any NSAccessibilityElementProtocol, "Missing history control \(title)")
+            #expect(contentBounds.insetBy(dx: -1, dy: -1).contains(control.accessibilityFrame()),
+                "History title and actions must remain within the compact window")
+        }
         let cells = accessibilityObjects(host).filter {
             value($0, "accessibilityRole") as? String == NSAccessibility.Role.button.rawValue
                 && (value($0, "accessibilityLabel") as? String)?.contains("Token") == true
@@ -178,10 +193,12 @@ struct AIUsageHistoryPresentationTests {
             "The seven calendar dates must form one horizontal row")
         #expect(Set(frames.map { Int($0.midX.rounded()) }).count == 7)
         let scroll = try #require(descendants(host).compactMap { $0 as? NSScrollView }.max(by: { $0.frame.height < $1.frame.height }))
-        let document = try #require(scroll.documentView)
-        scroll.contentView.scroll(to: CGPoint(x: 0, y: max(0, document.frame.height - scroll.contentView.bounds.height)))
-        scroll.reflectScrolledClipView(scroll.contentView)
-        await settle()
+        let scrollBounds = window.convertToScreen(scroll.convert(scroll.bounds, to: nil))
+        #expect(contentBounds.insetBy(dx: -1, dy: -1).contains(scrollBounds),
+            "The scrolling body must shrink within the compact window")
+        let weekViewport = window.convertToScreen(scroll.contentView.convert(scroll.contentView.bounds, to: nil))
+        #expect(frames.allSatisfy { weekViewport.insetBy(dx: -1, dy: -1).contains($0) },
+            "Scrolling must reveal every date in the seven-day row")
         func displayedValues() -> [String] {
             accessibilityObjects(host).compactMap { value($0, "accessibilityValue") as? String }
         }
@@ -191,11 +208,16 @@ struct AIUsageHistoryPresentationTests {
         let press = NSSelectorFromString("accessibilityPerformPress")
         try #require(oldCell.responds(to: press))
         _ = oldCell.perform(press)
-        await settle()
+        try await settle()
         #expect(displayedValues().contains { $0.contains("older-model") })
+        let detail = try #require(accessibilityObjects(host).first { value($0, "accessibilityValue") as? String == "older-model" }
+            as? any NSAccessibilityElementProtocol)
+        let detailViewport = window.convertToScreen(scroll.contentView.convert(scroll.contentView.bounds, to: nil))
+        #expect(detailViewport.insetBy(dx: -1, dy: -1).contains(detail.accessibilityFrame()),
+            "The selected day's model values must be reachable by scrolling")
         samples[0].inputTokens += 10
         await controller.load()
-        await settle()
+        try await settle()
         #expect(displayedValues().contains { $0.contains("older-model") }, "Refreshing must preserve the selected older day")
         let allRange = try #require(accessibilityObjects(host).first { object in
             ["accessibilityLabel", "accessibilityTitle", "accessibilityValue"].contains { key in
@@ -204,12 +226,12 @@ struct AIUsageHistoryPresentationTests {
         })
         try #require(allRange.responds(to: press))
         _ = allRange.perform(press)
-        await settle()
+        try await settle()
         let scrolls = descendants(host).compactMap { $0 as? NSScrollView }
         try #require(scrolls.count == 2, "All history must keep a vertical body and a horizontal calendar")
         let vertical = try #require(scrolls.max(by: { $0.frame.height < $1.frame.height }))
         let horizontal = try #require(scrolls.first { $0 !== vertical })
-        await settle()
+        try await settle()
         let viewport = window.convertToScreen(vertical.contentView.convert(vertical.contentView.bounds, to: nil))
         let calendarDocument = try #require(horizontal.documentView)
         let calendarBounds = window.convertToScreen(calendarDocument.convert(calendarDocument.bounds, to: nil))
@@ -239,22 +261,26 @@ struct AIUsageHistoryPresentationTests {
         #expect(!window.isVisible && window.level == .normal)
     }
 
-    /// Daily persistence cannot supply a 24-hour chart; the unselected date remains a working detail entry.
-    @Test(arguments: [false, true], [AppLanguage.simplifiedChinese, .english, .arabic]) @MainActor
-    func dayRangeHidesChartsAndOnlyRevealsDetailsAfterItsDateButton(empty: Bool, language: AppLanguage) async throws {
+    /// Daily ranges keep whole-day totals and empty dates selectable in every interface language.
+    @Test(arguments: [false, true], AppLanguage.allCases) @MainActor
+    func historyRangesShowOnlyDailyPeriodsAndPreserveWholeDayUsage(empty: Bool, language: AppLanguage) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
-        let today = Calendar.current.startOfDay(for: Date())
+        let today = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
         let yesterday = try #require(Calendar.current.date(byAdding: .day, value: -1, to: today))
+        let tomorrow = try #require(Calendar.current.date(byAdding: .day, value: 1, to: today))
         let samples = empty ? [] : [
             AIUsageSample(sourceID: AIUsageAnalytics.dailyUsageSummaryPrefix + "fixture", provider: .codex,
-                timestamp: today.addingTimeInterval(8 * 3600), inputTokens: 10, outputTokens: 2, model: "today-model"),
+                timestamp: today, inputTokens: 10, outputTokens: 2, model: "today-model"),
+            AIUsageSample(provider: .codex, timestamp: tomorrow.addingTimeInterval(-0.25),
+                inputTokens: 20, outputTokens: 2, model: "late-model"),
             AIUsageSample(provider: .claude, timestamp: yesterday, inputTokens: 20, outputTokens: 4, model: "older-model"),
+            AIUsageSample(provider: .gpt, timestamp: tomorrow, inputTokens: 99, outputTokens: 1, model: "future-model"),
         ]
         let history = AIUsageHistory(usageSamples: samples, modelUsageSamples: samples)
         let controller = AIUsageHistoryController(read: { history }, clear: {}, write: { _, _ in })
         await controller.load()
-        let host = NSHostingView(rootView: AIUsageHistoryContent(controller: controller)
+        let host = NSHostingView(rootView: AIUsageHistoryContent(controller: controller, now: { today.addingTimeInterval(3600) })
             .environment(\.locale, language.locale)
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
@@ -277,49 +303,62 @@ struct AIUsageHistoryPresentationTests {
             try #require(object.responds(to: selector))
             _ = object.perform(selector)
         }
-        func rangeControl(_ range: SystemMetricsHistoryRange) throws -> NSObject {
+        func rangeControl(_ range: SystemMetricsHistoryRange) -> NSObject? {
             let title = AppLocalization.string(range.titleKey, language: language)
-            return try #require(accessibilityObjects(host).first { object in
+            return accessibilityObjects(host).first { object in
                 ["accessibilityLabel", "accessibilityTitle", "accessibilityValue"].contains { key in value(object, key) as? String == title }
-            }, "Missing range control \(title)")
+            }
         }
         await settle()
-        try press(rangeControl(.day))
-        await settle()
+        #expect(rangeControl(.day) == nil, "AI history must not expose a 24-hour range in \(language.rawValue)")
+        #expect(SystemMetricsHistoryRange.allCases.filter { rangeControl($0) != nil } == [.week, .month, .all],
+            "The range picker must contain exactly 7 days, 30 days, and All")
         let objects = accessibilityObjects(host)
-        #expect(!objects.contains { object in AppLanguage.allCases.contains {
-            value(object, "accessibilityLabel") as? String == AppLocalization.string("AI token 用量热力图", language: $0)
-        } })
-        #expect(!objects.contains { object in AppLanguage.allCases.contains {
-            value(object, "accessibilityLabel") as? String == AppLocalization.string("Token 消耗趋势", language: $0)
-        } })
+        #expect(objects.contains { value($0, "accessibilityLabel") as? String == AppLocalization.string("AI token 用量热力图", language: language) })
+        #expect(objects.contains {
+            value($0, "accessibilityLabel") as? String == AppLocalization.string(empty ? "暂无 AI token 用量" : "Token 消耗趋势", language: language)
+        }, "The initial week must expose its trend even when every day is empty")
+        let cells = objects.filter {
+            value($0, "accessibilityRole") as? String == NSAccessibility.Role.button.rawValue
+                && (value($0, "accessibilityLabel") as? String)?.contains("Token") == true
+        }
+        try #require(cells.count == 7, "The initial range must show seven complete calendar days")
         #expect(!values().contains { $0.contains("today-model") || $0.contains("older-model") })
-        let dateButton = try #require(objects.first {
-            value($0, "accessibilityLabel") as? String == AppLocalization.string("日期", language: language)
-                && value($0, "accessibilityRole") as? String == NSAccessibility.Role.button.rawValue
+        let todayCell = try #require(cells.first {
+            (value($0, "accessibilityLabel") as? String)?.contains(today.formatted(date: .long, time: .omitted)) == true
         })
-        try press(dateButton)
+        #expect((value(todayCell, "accessibilityLabel") as? String)?.contains(empty ? "0 Token" : "34 Token") == true,
+            "The daily total must include midnight and the end of today while excluding tomorrow")
+        try press(todayCell)
         await settle()
         if empty {
             #expect(values().contains(AppLocalization.string("暂无模型用量", language: language)))
         } else {
-            #expect(values().contains("today-model"))
+            #expect(values().contains("today-model") && values().contains("late-model"))
+            #expect(values().contains("34 Token"))
         }
-        #expect(!values().contains("older-model"))
+        #expect(!values().contains("older-model") && !values().contains("future-model"))
         #expect(controller.history == history)
         #expect(!window.isVisible)
     }
 
-    /// Refreshing across midnight must clear an out-of-domain date without implicitly selecting the new today.
+    /// Range changes and refreshes retain in-domain dates, clear expired dates, and leave exports complete.
     @Test @MainActor
-    func daySelectionExpiresWhenRefreshAdvancesTheCalendarDomain() async throws {
+    func rangeChangesAndRefreshKeepOnlyDatesWithinTheDailyDomain() async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let today = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
         var now = today.addingTimeInterval(23 * 3600)
         let tomorrow = try #require(Calendar.current.date(byAdding: .day, value: 1, to: today))
-        var samples = [AIUsageSample(provider: .codex, timestamp: today, inputTokens: 10, outputTokens: 2, model: "before-midnight")]
-        let controller = AIUsageHistoryController(read: { .init(usageSamples: samples, modelUsageSamples: samples) }, clear: {}, write: { _, _ in })
+        let firstDay = try #require(Calendar.current.date(byAdding: .day, value: -6, to: today))
+        let recentDay = try #require(Calendar.current.date(byAdding: .day, value: -1, to: today))
+        let archiveDay = try #require(Calendar.current.date(byAdding: .day, value: -8, to: today))
+        var samples = [AIUsageSample(provider: .codex, timestamp: firstDay, inputTokens: 10, outputTokens: 2, model: "week-boundary"),
+            AIUsageSample(provider: .claude, timestamp: recentDay, inputTokens: 20, outputTokens: 4, model: "recent-model"),
+            AIUsageSample(provider: .gpt, timestamp: archiveDay, inputTokens: 30, outputTokens: 6, model: "archive-model")]
+        var exported: AIUsageHistory?
+        let controller = AIUsageHistoryController(read: { .init(usageSamples: samples, modelUsageSamples: samples) },
+            clear: {}, write: { history, _ in exported = history })
         await controller.load()
         let host = NSHostingView(rootView: AIUsageHistoryContent(controller: controller, now: { now })
             .environment(\.locale, AppLanguage.english.locale))
@@ -329,14 +368,23 @@ struct AIUsageHistoryPresentationTests {
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
-        func settle() async {
+        func settle() async throws {
             for _ in 0..<6 {
                 host.layoutSubtreeIfNeeded()
                 await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
             }
+            let scroll = try #require(descendants(host).compactMap { $0 as? NSScrollView }.max(by: { $0.frame.height < $1.frame.height }))
+            let document = try #require(scroll.documentView)
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: max(0, document.frame.height - scroll.contentView.bounds.height)))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
         }
-        func press(label: String) throws {
-            let control = try #require(accessibilityObjects(host).first { value($0, "accessibilityLabel") as? String == label })
+        func press(label: String, exact: Bool = true) throws {
+            let control = try #require(accessibilityObjects(host).first {
+                guard let title = value($0, "accessibilityLabel") as? String else { return false }
+                return exact ? title == label : title.contains(label)
+            }, "Missing selectable control \(label)")
             let selector = NSSelectorFromString("accessibilityPerformPress")
             try #require(control.responds(to: selector))
             _ = control.perform(selector)
@@ -344,20 +392,39 @@ struct AIUsageHistoryPresentationTests {
         func contains(_ text: String) -> Bool {
             accessibilityObjects(host).contains { value($0, "accessibilityValue") as? String == text }
         }
-        await settle()
-        try press(label: AppLocalization.string(SystemMetricsHistoryRange.day.titleKey, language: .english))
-        await settle()
-        try press(label: "Date")
-        await settle()
-        #expect(contains("before-midnight"))
-        now = tomorrow.addingTimeInterval(3600)
-        samples.append(AIUsageSample(provider: .claude, timestamp: tomorrow, inputTokens: 20, outputTokens: 4, model: "after-midnight"))
+        try await settle()
+        try press(label: "24 Token", exact: false)
+        try await settle()
+        #expect(contains("recent-model"))
         await controller.load()
-        await settle()
-        #expect(!contains("before-midnight") && !contains("after-midnight"), "Domain changes must clear the old selection")
-        try press(label: "Date")
-        await settle()
-        #expect(contains("after-midnight") && !contains("before-midnight"))
+        try await settle()
+        #expect(contains("recent-model"), "Refreshing must preserve a selected date inside the week")
+        try press(label: AppLocalization.string(SystemMetricsHistoryRange.month.titleKey, language: .english))
+        try await settle()
+        #expect(contains("recent-model"), "Expanding the range must preserve the selected date")
+        try press(label: "36 Token", exact: false)
+        try await settle()
+        #expect(contains("archive-model") && !contains("recent-model"))
+        try press(label: AppLocalization.string(SystemMetricsHistoryRange.all.titleKey, language: .english))
+        try await settle()
+        #expect(contains("archive-model"))
+        try press(label: AppLocalization.string(SystemMetricsHistoryRange.week.titleKey, language: .english))
+        try await settle()
+        #expect(!contains("archive-model"), "Narrowing the range must clear a date outside the week")
+        try press(label: "12 Token", exact: false)
+        try await settle()
+        #expect(contains("week-boundary"))
+        now = tomorrow.addingTimeInterval(3600)
+        samples.append(AIUsageSample(provider: .claude, timestamp: tomorrow, inputTokens: 40, outputTokens: 8, model: "after-midnight"))
+        await controller.load()
+        try await settle()
+        #expect(!contains("week-boundary") && !contains("after-midnight"), "The rolling week must clear an expired date without selecting today")
+        try press(label: "48 Token", exact: false)
+        try await settle()
+        #expect(contains("after-midnight") && !contains("week-boundary"))
+        await controller.export(to: URL(fileURLWithPath: "/fixture.xlsx"))
+        #expect(exported == AIUsageHistory(usageSamples: samples, modelUsageSamples: samples),
+            "Selecting a day in the week must not truncate exported history")
         #expect(!window.isVisible)
     }
 
@@ -369,7 +436,7 @@ struct AIUsageHistoryPresentationTests {
             "清空 AI 用量历史？", "删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。",
             "上一年", "下一年", "AI token 用量热力图", "查看历史记录", "导出", "清空", "取消", "重试", "刷新",
             "时间范围", "正在读取历史记录", "已保存到 %@", "导出失败：%@", "Token 消耗趋势", "日期"]
-            + SystemMetricsHistoryRange.allCases.map(\.titleKey)
+            + [SystemMetricsHistoryRange.week, .month, .all].map(\.titleKey)
         for language in AppLanguage.allCases {
             let table = try #require(NSDictionary(contentsOf: package.appendingPathComponent(
                 "Resources/Localization/\(language.rawValue).lproj/Localizable.strings")) as? [String: String])

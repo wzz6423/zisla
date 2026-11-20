@@ -68,11 +68,10 @@ struct KeyboardFunctionKeyStatsTests {
             keyDown: isDown
         ) else { return nil }
         event.setIntegerValueField(.keyboardEventAutorepeat, value: isRepeat ? 1 : 0)
-        guard case let .keyboard(keyboardEvent)? = KeyboardMonitor.decodedInputEvent(
+        return KeyboardMonitor.decodedInputEvent(
             rawEventType: isDown ? CGEventType.keyDown.rawValue : CGEventType.keyUp.rawValue,
             event: event
-        ) else { return nil }
-        return keyboardEvent
+        )
     }
 
     /// Mirrors `KeyboardMonitor.receive`: an event reaches the handler unless it is a duplicate.
@@ -120,41 +119,31 @@ struct KeyboardFunctionKeyStatsTests {
     func keyboardInterestTapsSystemDefinedEvents() {
         let presses = KeyboardMonitor.EventInterest(
             keyboardPresses: true,
-            keyboardReleases: false,
-            pointerPresses: false,
-            pointerReleases: false
+            keyboardReleases: false
         )
         let releases = KeyboardMonitor.EventInterest(
             keyboardPresses: false,
-            keyboardReleases: true,
-            pointerPresses: false,
-            pointerReleases: false
-        )
-        let pointerOnly = KeyboardMonitor.EventInterest(
-            keyboardPresses: false,
-            keyboardReleases: false,
-            pointerPresses: true,
-            pointerReleases: true
+            keyboardReleases: true
         )
         let empty = KeyboardMonitor.EventInterest(
             keyboardPresses: false,
-            keyboardReleases: false,
-            pointerPresses: false,
-            pointerReleases: false
+            keyboardReleases: false
         )
 
         #expect(presses.observesAuxiliaryControls)
         #expect(releases.observesAuxiliaryControls)
-        #expect(!pointerOnly.observesAuxiliaryControls)
         #expect(presses.eventMask & Self.systemDefinedMaskBit != 0)
         #expect(releases.eventMask & Self.systemDefinedMaskBit != 0)
-        #expect(pointerOnly.eventMask & Self.systemDefinedMaskBit == 0)
         #expect(KeyboardMonitor.observedEventMask & Self.systemDefinedMaskBit != 0)
         // The extra bit must not turn an idle interest into a live tap.
         #expect(empty.isEmpty)
+        #expect(empty.eventMask == 0)
+        #expect(!empty.observesAuxiliaryControls)
         #expect(!presses.isEmpty)
         // NX_SYSDEFINED has no CGEventType case, so it stays out of the type list.
         #expect(presses.eventTypes == [.keyDown, .flagsChanged])
+        #expect(releases.eventTypes == [.keyUp, .flagsChanged])
+        #expect(KeyboardMonitor.observedEventTypes == [.keyDown, .keyUp, .flagsChanged])
     }
 
     @Test @MainActor
@@ -253,7 +242,7 @@ struct KeyboardFunctionKeyStatsTests {
             data2: -1
         ))
         let decoded = KeyboardMonitor.decodedSystemDefinedEvent(brightnessUp)
-        guard case let .keyboard(keyboardEvent)? = decoded else {
+        guard let keyboardEvent = decoded else {
             Issue.record("brightness up should decode to a keyboard event")
             return
         }
@@ -281,7 +270,7 @@ struct KeyboardFunctionKeyStatsTests {
             rawEventType: CGEventType.keyDown.rawValue,
             event: f5Down
         )
-        guard case let .keyboard(keyboardEvent)? = decoded else {
+        guard let keyboardEvent = decoded else {
             Issue.record("F5 keyDown should decode to a keyboard event")
             return
         }
@@ -289,7 +278,7 @@ struct KeyboardFunctionKeyStatsTests {
         #expect(keyboardEvent.keyCode == 96)
 
         let f5Up = try #require(CGEvent(keyboardEventSource: nil, virtualKey: 96, keyDown: false))
-        guard case let .keyboard(release)? = KeyboardMonitor.decodedInputEvent(
+        guard let release = KeyboardMonitor.decodedInputEvent(
             rawEventType: CGEventType.keyUp.rawValue,
             event: f5Up
         ) else {
@@ -327,7 +316,7 @@ struct KeyboardFunctionKeyStatsTests {
             let event = try #require(
                 CGEvent(keyboardEventSource: nil, virtualKey: rawKeyCode, keyDown: true)
             )
-            guard case let .keyboard(decoded)? = KeyboardMonitor.decodedInputEvent(
+            guard let decoded = KeyboardMonitor.decodedInputEvent(
                 rawEventType: CGEventType.keyDown.rawValue,
                 event: event
             ) else {
@@ -349,7 +338,7 @@ struct KeyboardFunctionKeyStatsTests {
         let event = try #require(
             CGEvent(keyboardEventSource: nil, virtualKey: 160, keyDown: true)
         )
-        guard case let .keyboard(decoded)? = KeyboardMonitor.decodedInputEvent(
+        guard let decoded = KeyboardMonitor.decodedInputEvent(
             rawEventType: CGEventType.keyDown.rawValue,
             event: event
         ) else {

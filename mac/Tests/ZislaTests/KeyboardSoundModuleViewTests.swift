@@ -12,6 +12,128 @@ import ZislaKit
 
 @Suite(.serialized)
 struct KeyboardSoundModuleViewTests {
+    @Test(arguments: AppLanguage.allCases, [CGSize(width: 340, height: 220), CGSize(width: 720, height: 401)])
+    @MainActor
+    func missingTypingStatsMatchTheCenteredEmptyState(language: AppLanguage, size: CGSize) async throws {
+        let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previousArguments
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previousArguments, forName: UserDefaults.argumentDomain) }
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let key = "暂无可显示的输入统计"
+        let tableURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+        let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+        let title = try #require(table[key], "The empty-state title must exist in \(language.rawValue)")
+        #expect(!title.isEmpty)
+        let host = NSHostingView(rootView: HStack(spacing: 0) {
+            KeyboardSoundModuleView.content(summary: nil, voiceStatistics: nil)
+                .frame(width: size.width, height: size.height)
+            EmptyState(symbol: "chart.xyaxis.line", title: title)
+                .padding(12)
+                .frame(width: size.width, height: size.height)
+        }
+        .environment(\.locale, language.locale)
+        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: .init(x: -100_000, y: -100_000, width: size.width * 2, height: size.height),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        for _ in 0..<4 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
+        let titles = accessibilityObjects(host).filter { value($0, "accessibilityValue") as? String == title }
+            .compactMap { $0 as? any NSAccessibilityElementProtocol }
+        #expect(titles.count == 2, "The module and reference must both expose the translated title")
+        let frames = titles.map { $0.accessibilityFrame() }
+        let moduleFrame = try #require(frames.first { $0.midX < bounds.midX })
+        let referenceFrame = try #require(frames.first { $0.midX > bounds.midX })
+        #expect(abs(moduleFrame.midX - (bounds.minX + size.width / 2)) < 1,
+            "The missing-data title must be horizontally centered: \(moduleFrame)")
+        #expect(abs(moduleFrame.midY - referenceFrame.midY) < 1,
+            "The missing-data title must match the shared empty state's vertical center: \(moduleFrame), \(referenceFrame)")
+        #expect(bounds.insetBy(dx: -1, dy: -1).contains(moduleFrame))
+        #expect(!window.isVisible)
+    }
+
+    @Test(arguments: [(Int64(0), false), (42, false), (0, true), (42, true)],
+        [String?.none, "1", "0", "", "true", "01", " 1", "1 "])
+    @MainActor
+    func typingStatsAppearAndDisappearWithoutLeavingScrollContent(
+        scenario: (characterCount: Int64, isDebugBuild: Bool), overrideValue: String?
+    ) async throws {
+        let (characterCount, isDebugBuild) = scenario
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let summary = KeyboardTypingStatsSummary(
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            lastInputAt: nil,
+            todayCharacterCount: characterCount,
+            todayPeakCharactersPerSecond: 0,
+            todayActiveSeconds: 0,
+            todayActiveMinuteBuckets: 0,
+            todayTopApplication: nil,
+            todayKeyPressCount: characterCount,
+            allTimeKeyPressCount: characterCount,
+            applications: [],
+            history: [],
+            timelineRange: "day",
+            recentBuckets: [],
+            applicationTimelines: [],
+            todayKeyCounts: [:],
+            allTimeKeyCounts: [:]
+        )
+        let environment = overrideValue.map { ["ZISLA_DEBUG_IGNORE_KEYBOARD_STATS": $0] } ?? [:]
+        let content = { (snapshot: KeyboardTypingStatsSummary?) in
+            KeyboardSoundModuleView.content(summary: snapshot, voiceStatistics: nil,
+                environment: environment, isDebugBuild: isDebugBuild)
+                .frame(width: 720, height: 401)
+        }
+        let host = NSHostingView(rootView: content(nil))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: .init(x: -100_000, y: -100_000, width: 720, height: 401),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        for snapshot in [nil, summary, nil] as [KeyboardTypingStatsSummary?] {
+            host.rootView = content(snapshot)
+            for _ in 0..<4 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            let objects = accessibilityObjects(host)
+            let hasEmptyTitle = objects.contains {
+                value($0, "accessibilityValue") as? String == AppLocalization.text("暂无可显示的输入统计")
+            }
+            let hasScrollArea = objects.contains {
+                value($0, "accessibilityRole") as? String == NSAccessibility.Role.scrollArea.rawValue
+            }
+            let showsDashboard = snapshot != nil && !(isDebugBuild && overrideValue == "1")
+            #expect(hasEmptyTitle == !showsDashboard,
+                "Only unavailable statistics or an exact debug opt-in must show the empty state")
+            #expect(hasScrollArea == showsDashboard,
+                "Only a displayed statistics dashboard must own a scroll area")
+            if showsDashboard {
+                #expect(objects.contains {
+                    value($0, "accessibilityLabel") as? String == AppLocalization.text("今日按键")
+                }, "The dashboard must keep its keyboard count label")
+                #expect(objects.contains {
+                    value($0, "accessibilityValue") as? String == characterCount.formatted(.number)
+                },
+                    "Zero and populated summaries must retain their recorded counts")
+            }
+        }
+        #expect(summary.todayCharacterCount == characterCount)
+        #expect(!window.isVisible)
+    }
+
     @Test(.serialized, arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
     @MainActor
     func keyboardMenusAndSwitchesKeepNativeMediumHeight(language: AppLanguage) async throws {
@@ -29,7 +151,7 @@ struct KeyboardSoundModuleViewTests {
         let suite = "KeyboardControlSize.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        for key in ["enabled", "pointerSoundEnabled", "typingStatsEnabled", "launchAtLoginEnabled"] {
+        for key in ["enabled", "typingStatsEnabled", "launchAtLoginEnabled"] {
             defaults.set(false, forKey: key)
         }
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
@@ -84,7 +206,7 @@ struct KeyboardSoundModuleViewTests {
             value($0, "accessibilityRole") as? String == NSAccessibility.Role.popUpButton.rawValue
                 && value($0, "accessibilityIdentifier") as? String != "reference-menu"
         }
-        #expect(menus.count == 4, "The production keyboard menu must expose sound, pointer sound, language and appearance selectors")
+        #expect(menus.count == 3, "The production keyboard menu must expose sound, language and appearance selectors")
         for menu in menus {
             let element = try #require(menu as? any NSAccessibilityElementProtocol)
             #expect(abs(element.accessibilityFrame().height - referenceMenu.accessibilityFrame().height) < 0.5,
@@ -94,7 +216,7 @@ struct KeyboardSoundModuleViewTests {
             value($0, "accessibilitySubrole") as? String == "AXToggle"
                 && value($0, "accessibilityIdentifier") as? String != "reference-switch"
         }.compactMap { $0 as? any NSAccessibilityElementProtocol }
-        #expect(switches.count == 4)
+        #expect(switches.count == 3)
         for control in switches {
             #expect(abs(control.accessibilityFrame().height - referenceSwitch.accessibilityFrame().height) < 0.5)
         }

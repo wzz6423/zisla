@@ -73,7 +73,7 @@ struct RichNoteEditor: NSViewRepresentable {
     let pasteboard: any RichNotePasteboard
     let onChange: (String?, String, String) -> Void
 
-    static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><span style=\"font-size: 11px\"><br></span></div>" }
+    static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><br></div>" }
 
     init(
         html: String,
@@ -989,7 +989,21 @@ struct RichNoteEditor: NSViewRepresentable {
             }
             if (!editor.isContentEditable) return;
             const images = [...(event.clipboardData?.items || [])].filter(item => item.type.startsWith('image/'));
-            if (!images.length) return;
+            if (!images.length) {
+              const html = event.clipboardData?.getData('text/html');
+              if (!html) return;
+              event.preventDefault();
+              const template = document.createElement('template');
+              template.innerHTML = sanitize(html);
+              // Notes should supply body typography rather than persist the source app's theme.
+              template.content.querySelectorAll('*').forEach(node => {
+                ['color', 'font-size', 'font-family'].forEach(property => node.style.removeProperty(property));
+                if (node.matches('font')) {
+                  ['color', 'size', 'face'].forEach(attribute => node.removeAttribute(attribute));
+                }
+              });
+              insertHTML(template.innerHTML);
+            }
             event.preventDefault();
             for (const item of images) {
               const file = item.getAsFile();

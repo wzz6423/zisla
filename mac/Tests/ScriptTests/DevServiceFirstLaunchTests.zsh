@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
-unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_AI_ACCOUNT_BALANCE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL
+unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_AI_ACCOUNT_BALANCE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL ZISLA_DEBUG_IGNORE_KEYBOARD_STATS
 
 MAC_ROOT="${0:A:h:h:h}"
 TEMPORARY_ROOT="$(mktemp -d "${TMPDIR%/}/zisla-first-launch-tests.XXXXXX")"
@@ -51,6 +51,7 @@ with open(sys.argv[1], "rb") as source:
 value = agent["EnvironmentVariables"]["ZISLA_FIRST"]
 assert type(value) is str, "ZISLA_FIRST must be a plist string"
 assert agent["EnvironmentVariables"]["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL"] == (os.environ.get("ZISLA_DEBUG_SHOW_CHARGE_TO_FULL") or "0"), "Charge action display override must reach the launchd environment"
+assert agent["EnvironmentVariables"].get("ZISLA_DEBUG_IGNORE_KEYBOARD_STATS") == (os.environ.get("ZISLA_DEBUG_IGNORE_KEYBOARD_STATS") or "0"), "Keyboard statistics override must reach launchd and reset when removed"
 assert agent["ProgramArguments"] == [sys.argv[2]], "launchd must launch the app binary directly"
 assert agent["Label"] == "dev.wzz.zisla.debug", "debug service label must stay stable"
 with open(sys.argv[3], "rb") as source:
@@ -193,6 +194,20 @@ for target in run update; do
   for value in '' 0 true 01 ' 1' '1 '; do
     expect_launch "$target preserves charge display value '$value' for the app to validate" 0 0 \
       env -u MAKEFLAGS -u MFLAGS "ZISLA_DEBUG_SHOW_CHARGE_TO_FULL=$value" make -C "$TEST_ROOT" "$target"
+  done
+done
+
+for target in run update; do
+  expect_launch "$target forwards keyboard statistics environment" 0 0 \
+    env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_IGNORE_KEYBOARD_STATS=1 make -C "$TEST_ROOT" "$target"
+  expect_launch "$target forwards keyboard statistics make override" 0 0 \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_IGNORE_KEYBOARD_STATS \
+      make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_IGNORE_KEYBOARD_STATS=1
+  expect_launch "$target clears previous keyboard statistics override" 0 0 \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_IGNORE_KEYBOARD_STATS make -C "$TEST_ROOT" "$target"
+  for value in '' 0 true 01 ' 1' '1 '; do
+    expect_launch "$target preserves keyboard statistics value '$value' for the app to validate" 0 0 \
+      env -u MAKEFLAGS -u MFLAGS "ZISLA_DEBUG_IGNORE_KEYBOARD_STATS=$value" make -C "$TEST_ROOT" "$target"
   done
 done
 

@@ -148,14 +148,14 @@ struct AIUsageHistoryPanelPresenter: NSViewRepresentable {
             languageStore: AppLanguageStore, hostWindow: NSWindow?) {
             guard let requestID else { awaitingDismissal = false; self.dismiss(); return }
             if window == nil {
-                let window = SystemMetricsHistoryPanel(contentRect: CGRect(x: 0, y: 0, width: 760, height: 640),
+                let window = SystemMetricsHistoryPanel(contentRect: CGRect(x: 0, y: 0, width: 760, height: 480),
                     styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
                 window.title = AppLocalization.text("AI 用量历史")
                 window.isReleasedWhenClosed = false
                 window.hidesOnDeactivate = false
                 window.level = .normal
                 window.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]
-                window.minSize = CGSize(width: 620, height: 480)
+                window.contentMinSize = CGSize(width: 620, height: 360)
                 window.contentView = NSHostingView(rootView: AppLanguageEnvironment(languageStore: languageStore,
                     content: AIUsageHistoryContent(controller: controller)))
                 self.window = window
@@ -249,7 +249,7 @@ struct AIUsageHistoryContent: View {
             HStack {
                 Text(AppLocalization.string("时间范围", locale: locale)).font(.system(size: 11)).foregroundStyle(.secondary)
                 Picker("", selection: $range) {
-                    ForEach(SystemMetricsHistoryRange.allCases, id: \.self) { range in
+                    ForEach([SystemMetricsHistoryRange.week, .month, .all], id: \.self) { range in
                         Text(AppLocalization.string(range.titleKey, locale: locale)).tag(range)
                     }
                 }
@@ -269,19 +269,9 @@ struct AIUsageHistoryContent: View {
                             Text(message).foregroundStyle(.red)
                             Button(AppLocalization.string("重试", locale: locale)) { Task { await controller.load() } }
                         }
-                        if range == .day {
-                            Button { selectedDate = domain.lowerBound } label: {
-                                Text(domain.lowerBound, format: .dateTime.year().month().day())
-                            }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11, weight: selectedDate == nil ? .regular : .semibold))
-                            .foregroundStyle(selectedDate == nil ? Color.primary : Color.accentColor)
-                            .accessibilityLabel(AppLocalization.string("日期", locale: locale))
-                        } else {
-                            UsageTrendChart(series: AIUsageHistoryPresentation.trend(history: controller.history, domain: domain),
-                                selectedDate: $selectedDate, domain: domain).frame(height: 180)
-                            heatmap
-                        }
+                        UsageTrendChart(series: AIUsageHistoryPresentation.trend(history: controller.history, domain: domain),
+                            selectedDate: $selectedDate, domain: domain).frame(height: 180)
+                        heatmap
                         if let selectedDate {
                             DailyModelUsageList(day: AIUsageHistoryPresentation.selectedDay(in: controller.history, date: selectedDate))
                         }
@@ -298,7 +288,7 @@ struct AIUsageHistoryContent: View {
             }.frame(height: 18)
         }
         .padding(18)
-        .frame(minWidth: 620, minHeight: 480)
+        .frame(minWidth: 620, minHeight: 360)
         .background(Color(nsColor: .windowBackgroundColor))
         .task { await controller.load() }
         .onChange(of: domain) { _, domain in

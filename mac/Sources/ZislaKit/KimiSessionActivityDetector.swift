@@ -276,6 +276,7 @@ public final class KimiSessionActivityDetector: AIActivityDetecting {
         case "turn.cancel":
             state.isActive = false
             state.isBlocked = false
+            state.hasError = false
         case "context.append_loop_event":
             applyLoopEvent(root["event"] as? [String: Any], state: &state)
         default:

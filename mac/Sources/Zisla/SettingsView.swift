@@ -4803,17 +4803,13 @@ enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
         case .basics: "基础功能"
         case .information: "信息"
         case .sound: "声音"
-        case .files: "文件"
+        case .files: "工具"
         case .capture: "截图与录屏"
         case .aiAndVoice: "AI 与语音"
         case .others: "其他"
         case .permissions: "权限"
-        case .recommendationsAndUpdates: "推荐与反馈更新"
+        case .recommendationsAndUpdates: "关于"
         }
-    }
-
-    func title(settings: FeatureSettings) -> String {
-        self == .recommendationsAndUpdates && !settings.recommendedToolsEnabled ? "反馈更新" : title
     }
 }
 
@@ -4821,10 +4817,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case features
     case info
-    case dailyBriefing
-    case notifications
     case workflow
     case clipboardAssistant
+    case notifications
+    case dailyBriefing
     case mail
     case weather
     case screenshot
@@ -4840,8 +4836,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case download
     case networkProxy
     case pet
-    case permissions
     case recommendations
+    case permissions
     case updates
 
     var id: Self { self }
@@ -4854,9 +4850,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pdfTools, .imageTools, .audioTools: .files
         case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
-        case .download, .saveLocations, .scheduledCleanup, .networkProxy, .pet: .others
+        case .download, .saveLocations, .scheduledCleanup, .networkProxy, .pet, .recommendations: .others
         case .permissions: .permissions
-        case .recommendations, .updates: .recommendationsAndUpdates
+        case .updates: .recommendationsAndUpdates
         }
     }
 
@@ -5079,7 +5075,7 @@ struct SettingsSidebar: View {
                         let sections = visibleSections.filter { $0.group == group }
                         if !sections.isEmpty {
                             VStack(alignment: .leading, spacing: 5) {
-                                AppLocalizedText(group.title(settings: settings))
+                                AppLocalizedText(group.title)
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 10)

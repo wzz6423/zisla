@@ -570,6 +570,11 @@ final class WindowPreviewController: ObservableObject {
             try await WindowPreviewController.captureWindows(processIdentifier: $0)
         }
         var dockSelection: () -> WindowPreviewSelection? = { WindowPreviewController.dockSelectionAtPointer() }
+        var dockMenuIsOpen: () -> Bool = {
+            WindowPreviewController.dockMenuIsOpen(processIdentifier:
+                NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first?.processIdentifier
+            )
+        }
         var switcherSelection: () -> WindowPreviewSelection? = { WindowPreviewController.switcherSelection() }
         var commandPressed: () -> Bool = { CGEventSource.flagsState(.combinedSessionState).contains(.maskCommand) }
         var present: (WindowPreviewController, WindowPreviewSelection?) -> Void = { controller, selection in
@@ -730,7 +735,14 @@ final class WindowPreviewController: ObservableObject {
                 endSwitcher()
             }
         case .leftMouseDown, .rightMouseDown:
-            if event.type == .leftMouseDown, let clicked = dependencies.dockSelection() {
+            if switcherTimer == nil,
+               event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
+                hoverTimer?.invalidate()
+                clearSelection()
+                return
+            }
+            if event.type == .leftMouseDown, !event.modifierFlags.contains(.control),
+               let clicked = dependencies.dockSelection() {
                 deferCaptures(for: clicked.processIdentifier)
             }
             if switcherTimer == nil && panel?.frame.contains(NSEvent.mouseLocation) != true {
@@ -742,6 +754,11 @@ final class WindowPreviewController: ObservableObject {
     }
 
     private func handlePointer() {
+        if dependencies.dockMenuIsOpen() {
+            hoverTimer?.invalidate()
+            clearSelection()
+            return
+        }
         if panel?.frame.contains(NSEvent.mouseLocation) == true {
             dismissTimer?.invalidate()
             dismissTimer = nil
@@ -761,7 +778,8 @@ final class WindowPreviewController: ObservableObject {
         hoverTimer?.invalidate()
         let processIdentifier = hovered.processIdentifier
         hoverTimer = dependencies.timer(0.22, false) { [weak self] in
-            guard let self, let current = self.dependencies.dockSelection(),
+            guard let self, !self.dependencies.dockMenuIsOpen(),
+                  let current = self.dependencies.dockSelection(),
                   current.processIdentifier == processIdentifier else { return }
             self.hoverTimer = nil
             self.select(current)
@@ -1069,6 +1087,16 @@ final class WindowPreviewController: ObservableObject {
         panel.contentView = WindowPreviewHostingView(rootView: WindowPreviewView(controller: self))
         self.panel = panel
         return panel
+    }
+
+    static func dockMenuIsOpen(
+        processIdentifier: pid_t?,
+        attribute: @MainActor (String, AXUIElement) -> CFTypeRef? = WindowPreviewController.attribute
+    ) -> Bool {
+        guard let processIdentifier,
+              let children = attribute(kAXChildrenAttribute, AXUIElementCreateApplication(processIdentifier))
+                as? [AXUIElement] else { return false }
+        return children.contains { attribute(kAXRoleAttribute, $0) as? String == kAXMenuRole as String }
     }
 
     private static func dockSelectionAtPointer() -> WindowPreviewSelection? {
