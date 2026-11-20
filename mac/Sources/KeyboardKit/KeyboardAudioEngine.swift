@@ -92,7 +92,6 @@ enum AudioVoiceSelector {
     static func nextIndex(
         count: Int,
         cursor: Int,
-        allowsStealing: Bool,
         isActive: (Int) -> Bool,
         lastScheduledEpoch: (Int) -> UInt64
     ) -> Int? {
@@ -104,7 +103,6 @@ enum AudioVoiceSelector {
             if !isActive(index) { return index }
         }
 
-        guard allowsStealing else { return nil }
         var oldestIndex = 0
         for index in 1..<count
         where lastScheduledEpoch(index) < lastScheduledEpoch(oldestIndex) {
@@ -114,27 +112,13 @@ enum AudioVoiceSelector {
     }
 }
 
-enum AudioPlaybackDomain: Equatable, Sendable {
-    case keyboard
-    case pointer
-}
-
 struct AudioVoiceGainState: Equatable, Sendable {
-    let domain: AudioPlaybackDomain
     let sampleGain: Float
 
     func outputVolume(masterGain: Double) -> Float {
         let resolvedGain = masterGain * Double(sampleGain)
         guard resolvedGain.isFinite else { return 0 }
         return Float(min(max(resolvedGain, 0), 1))
-    }
-
-    func outputVolume(
-        masterGain: Double,
-        updating targetDomain: AudioPlaybackDomain
-    ) -> Float? {
-        guard domain == targetDomain else { return nil }
-        return outputVolume(masterGain: masterGain)
     }
 }
 
@@ -147,16 +131,6 @@ final class KeyboardAudioEngine {
     private struct BufferKey: Hashable {
         let phase: KeySoundPhase
         let sample: KeySoundSample
-    }
-
-    private struct PointerBufferKey: Hashable {
-        let phase: PointerSoundPhase
-        let sample: PointerSoundSample
-    }
-
-    private enum ResourceDomain {
-        case keyboard
-        case pointer
     }
 
     private final class Voice {
@@ -195,7 +169,6 @@ final class KeyboardAudioEngine {
     )!
     private var voices: [Voice] = []
     private var buffers: [BufferKey: PreparedKeyboardSample] = [:]
-    private var pointerBuffers: [PointerBufferKey: AVAudioPCMBuffer] = [:]
     private var customBuffers: [SoundPackAssetID: PreparedKeyboardSample] = [:]
     private var customResolver: SoundPackResolver?
     private var voiceCursor = 0
@@ -204,12 +177,10 @@ final class KeyboardAudioEngine {
     private var configurationObserver: NSObjectProtocol?
     private(set) var loadedProfile: SwitchProfile = .holyPanda
     private(set) var loadedSelectionID: String = SwitchProfile.holyPanda.rawValue
-    private(set) var loadedPointerProfile: PointerSoundProfile = .classic
     private(set) var engineError: String?
     private(set) var resourceError: String?
-    private(set) var pointerResourceError: String?
 
-    var lastError: String? { engineError ?? resourceError ?? pointerResourceError }
+    var lastError: String? { engineError ?? resourceError }
 
     init(
         voiceCount: Int = 16,
@@ -220,11 +191,7 @@ final class KeyboardAudioEngine {
     }
 
     func setKeyboardPlaybackGain(_ gain: Double) {
-        updateActiveVoiceVolumes(masterGain: gain, domain: .keyboard)
-    }
-
-    func setPointerPlaybackGain(_ gain: Double) {
-        updateActiveVoiceVolumes(masterGain: gain, domain: .pointer)
+        updateActiveVoiceVolumes(masterGain: gain)
     }
 
     @discardableResult
@@ -271,17 +238,6 @@ final class KeyboardAudioEngine {
         return true
     }
 
-    @discardableResult
-    func load(pointerProfile: PointerSoundProfile) -> Bool {
-        pointerResourceError = nil
-        guard let nextBuffers = makePointerBuffers(profile: pointerProfile) else {
-            return false
-        }
-        loadedPointerProfile = pointerProfile
-        pointerBuffers = nextBuffers
-        return true
-    }
-
     func play(
         keyCode: UInt16,
         phase: KeySoundPhase,
@@ -311,25 +267,6 @@ final class KeyboardAudioEngine {
             phase: phase,
             volume: volume,
             pitchVariation: pitchVariation
-        )
-    }
-
-    func play(
-        pointerButton: PointerButton,
-        phase: PointerSoundPhase,
-        volume: Double,
-        pitchVariation: Bool
-    ) {
-        let requestedKey = PointerBufferKey(phase: phase, sample: pointerButton.sample)
-        let fallbackKey = PointerBufferKey(phase: phase, sample: .primary)
-        guard let buffer = pointerBuffers[requestedKey] ?? pointerBuffers[fallbackKey] else {
-            return
-        }
-        playPointer(
-            buffer: buffer,
-            volume: volume,
-            pitchVariation: pitchVariation,
-            baseRate: pointerButton.playbackRate
         )
     }
 
@@ -406,35 +343,6 @@ final class KeyboardAudioEngine {
         PreparedKeyboardSample(buffer: buffer)
     }
 
-    private func makePointerBuffers(
-        profile: PointerSoundProfile
-    ) -> [PointerBufferKey: AVAudioPCMBuffer]? {
-        var nextBuffers: [PointerBufferKey: AVAudioPCMBuffer] = [:]
-        for phase in PointerSoundPhase.allCases {
-            let key = PointerBufferKey(phase: phase, sample: .primary)
-            if let buffer = loadPointerBuffer(
-                profile: profile,
-                phase: phase,
-                sample: .primary
-            ) {
-                nextBuffers[key] = buffer
-            }
-        }
-
-        guard nextBuffers.count == PointerSoundPhase.allCases.count else {
-            if pointerResourceError == nil {
-                pointerResourceError = L10n.format(
-                    "%@ 的点击音资源不完整（%@/%@）。",
-                    profile.displayName,
-                    "\(nextBuffers.count)",
-                    "\(PointerSoundPhase.allCases.count)"
-                )
-            }
-            return nil
-        }
-        return nextBuffers
-    }
-
     private func playKeyboard(
         sample: KeySoundSample,
         phase: KeySoundPhase,
@@ -475,29 +383,11 @@ final class KeyboardAudioEngine {
         baseRate: Float = 1
     ) {
         guard volume > 0, volume.isFinite,
-              let voiceIndex = nextVoiceIndex(allowsStealing: true) else { return }
+              let voiceIndex = nextVoiceIndex() else { return }
         schedule(
             buffer: buffer,
             voiceIndex: voiceIndex,
-            gainState: AudioVoiceGainState(domain: .keyboard, sampleGain: sampleGain),
-            masterGain: volume,
-            pitchVariation: pitchVariation,
-            baseRate: baseRate
-        )
-    }
-
-    private func playPointer(
-        buffer: AVAudioPCMBuffer,
-        volume: Double,
-        pitchVariation: Bool,
-        baseRate: Float = 1
-    ) {
-        guard volume > 0, volume.isFinite,
-              let voiceIndex = nextVoiceIndex(allowsStealing: false) else { return }
-        schedule(
-            buffer: buffer,
-            voiceIndex: voiceIndex,
-            gainState: AudioVoiceGainState(domain: .pointer, sampleGain: 1),
+            gainState: AudioVoiceGainState(sampleGain: sampleGain),
             masterGain: volume,
             pitchVariation: pitchVariation,
             baseRate: baseRate
@@ -554,9 +444,14 @@ final class KeyboardAudioEngine {
 
         // Configure the selected voice before resuming an idle engine so the first
         // render quantum cannot observe the previous gain or playback rate.
-        guard startEngineIfNeeded() else {
+        // Device changes can leave a started engine without an IO cycle or a compatible voice format.
+        // Scheduling or playing in that state can raise an Objective-C exception outside Swift's catch.
+        guard startEngineIfNeeded(),
+              engine.outputNode.lastRenderTime != nil,
+              voice.player.outputFormat(forBus: 0) == buffer.format else {
             voice.player.volume = previousVolume
             voice.speed.rate = previousRate
+            scheduleIdlePauseIfNeeded()
             return
         }
 
@@ -602,7 +497,7 @@ final class KeyboardAudioEngine {
         return true
     }
 
-    private func nextVoiceIndex(allowsStealing: Bool) -> Int? {
+    private func nextVoiceIndex() -> Int? {
         guard voiceCount > 0 else { return nil }
         if voices.isEmpty {
             // Accessing the mixer creates the device output, so defer it until an audible request.
@@ -622,7 +517,6 @@ final class KeyboardAudioEngine {
         guard let index = AudioVoiceSelector.nextIndex(
             count: voices.count,
             cursor: voiceCursor,
-            allowsStealing: allowsStealing,
             isActive: { voices[$0].isActive },
             lastScheduledEpoch: { voices[$0].lastScheduledEpoch }
         ) else { return nil }
@@ -641,14 +535,10 @@ final class KeyboardAudioEngine {
         scheduleIdlePauseIfNeeded()
     }
 
-    private func updateActiveVoiceVolumes(
-        masterGain: Double,
-        domain: AudioPlaybackDomain
-    ) {
+    private func updateActiveVoiceVolumes(masterGain: Double) {
         for voice in voices where voice.isActive {
             guard let nextVolume = voice.gainState?.outputVolume(
-                masterGain: masterGain,
-                updating: domain
+                masterGain: masterGain
             ) else { continue }
             voice.player.volume = nextVolume
         }
@@ -719,28 +609,7 @@ final class KeyboardAudioEngine {
         return loadBuffer(at: url)
     }
 
-    private func loadPointerBuffer(
-        profile: PointerSoundProfile,
-        phase: PointerSoundPhase,
-        sample: PointerSoundSample
-    ) -> AVAudioPCMBuffer? {
-        let directory = "Keyboard/Audio/pointer/\(profile.rawValue)/\(phase.rawValue)"
-        let supportedExtensions = ["wav", "mp3"]
-        guard let url = supportedExtensions.lazy.compactMap({ fileExtension in
-            Bundle.module.url(
-                forResource: sample.rawValue,
-                withExtension: fileExtension,
-                subdirectory: directory
-            )
-        }).first else { return nil }
-
-        return loadBuffer(at: url, resourceDomain: .pointer)
-    }
-
-    private func loadBuffer(
-        at url: URL,
-        resourceDomain: ResourceDomain = .keyboard
-    ) -> AVAudioPCMBuffer? {
+    private func loadBuffer(at url: URL) -> AVAudioPCMBuffer? {
         let didStartSecurityScope = url.startAccessingSecurityScopedResource()
         defer {
             if didStartSecurityScope { url.stopAccessingSecurityScopedResource() }
@@ -753,28 +622,13 @@ final class KeyboardAudioEngine {
             ) else { return nil }
             try file.read(into: buffer)
             guard let convertedBuffer = convertToPlaybackFormat(buffer) else {
-                setResourceError(
-                    L10n.format("无法将 %@ 预转换为 48 kHz。", url.lastPathComponent),
-                    domain: resourceDomain
-                )
+                resourceError = L10n.format("无法将 %@ 预转换为 48 kHz。", url.lastPathComponent)
                 return nil
             }
             return convertedBuffer
         } catch {
-            setResourceError(
-                L10n.format("无法预载 %@：%@", url.lastPathComponent, error.localizedDescription),
-                domain: resourceDomain
-            )
+            resourceError = L10n.format("无法预载 %@：%@", url.lastPathComponent, error.localizedDescription)
             return nil
-        }
-    }
-
-    private func setResourceError(_ message: String, domain: ResourceDomain) {
-        switch domain {
-        case .keyboard:
-            resourceError = message
-        case .pointer:
-            pointerResourceError = message
         }
     }
 

@@ -29,7 +29,7 @@ struct KeyboardSoundModuleViewTests {
         let suite = "KeyboardControlSize.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        for key in ["enabled", "pointerSoundEnabled", "typingStatsEnabled", "launchAtLoginEnabled"] {
+        for key in ["enabled", "typingStatsEnabled", "launchAtLoginEnabled"] {
             defaults.set(false, forKey: key)
         }
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
@@ -84,7 +84,7 @@ struct KeyboardSoundModuleViewTests {
             value($0, "accessibilityRole") as? String == NSAccessibility.Role.popUpButton.rawValue
                 && value($0, "accessibilityIdentifier") as? String != "reference-menu"
         }
-        #expect(menus.count == 4, "The production keyboard menu must expose sound, pointer sound, language and appearance selectors")
+        #expect(menus.count == 3, "The production keyboard menu must expose sound, language and appearance selectors")
         for menu in menus {
             let element = try #require(menu as? any NSAccessibilityElementProtocol)
             #expect(abs(element.accessibilityFrame().height - referenceMenu.accessibilityFrame().height) < 0.5,
@@ -94,7 +94,7 @@ struct KeyboardSoundModuleViewTests {
             value($0, "accessibilitySubrole") as? String == "AXToggle"
                 && value($0, "accessibilityIdentifier") as? String != "reference-switch"
         }.compactMap { $0 as? any NSAccessibilityElementProtocol }
-        #expect(switches.count == 4)
+        #expect(switches.count == 3)
         for control in switches {
             #expect(abs(control.accessibilityFrame().height - referenceSwitch.accessibilityFrame().height) < 0.5)
         }

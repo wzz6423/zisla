@@ -1,6 +1,5 @@
 /* Keyboard UI localizations. Source keys are Simplified Chinese. */
 
-"键盘与点击监听未启动" = "Keyboard and click monitoring isn't running";
 "暂不开启" = "Not Now";
 "顺滑、奶油" = "Smooth and Creamy";
 "段落" = "Tactile";
@@ -38,7 +37,6 @@
 "轻薄、利落" = "Light and Crisp";
 "需要输入监控权限" = "Input Monitoring Required";
 "好" = "OK";
-"正在监听键盘与点击 · 统计已开启" = "Monitoring keyboard and clicks · Stats on";
 "软件更新" = "Software Update";
 "还没有输入记录" = "No typing records yet";
 "正在读取本地统计…" = "Loading local stats…";
@@ -48,7 +46,6 @@
 "启用键盘声音" = "Enable keyboard sounds";
 "按下" = "Press";
 "保存 DIY 音色的更改吗？" = "Save changes to the DIY sound pack?";
-"键盘在四种轻微变化间轮换；点击音使用轻微随机音高" = "Keyboard sounds cycle through four subtle variations; click sounds use slight random pitch changes.";
 "已经登记，但仍需在系统设置的“登录项”中允许。" = "Added, but still needs approval in Login Items in System Settings.";
 "高 ≥%@" = "High ≥%@";
 "没有可安装的新版本。" = "No installable update is available.";
@@ -56,16 +53,12 @@
 "键盘映射" = "Keyboard mapping";
 "导航、功能、数字键盘与国际键" = "Navigation, Function, Keypad, and International Keys";
 "Z 行" = "Z row";
-"经典微动" = "Classic Click";
 "回车" = "Return";
 "发现新版本 %@" = "New version available: %@";
 "输入节律变化" = "Typing Rhythm";
-"静音鼠标" = "Silent Mouse";
 "取消" = "Cancel";
 "时间范围" = "Time Range";
 "尚未成功加入系统登录项，请重试。" = "Couldn't add Keyboard to Login Items yet. Try again.";
-"短促、明亮" = "Short and Bright";
-"键盘与点击监听已停止" = "Keyboard and click monitoring stopped";
 "已导出到 %@" = "Exported to %@";
 "Mac US ANSI 紧凑型" = "Mac US ANSI (Compact)";
 "静音" = "Mute";
@@ -79,7 +72,6 @@
 "正在读取统计" = "Loading statistics";
 "干净、柔和" = "Clean and Soft";
 "清脆、经典" = "Crisp and Classic";
-"通用鼠标" = "General Mouse";
 "Keyboard 尚未退出。请先关闭正在编辑的窗口，然后重试安装。" = "Keyboard hasn't quit yet. Close any editing windows first, then try installing again.";
 "数字行" = "Number row";
 "系统登录项仍然开启，请重试或在系统设置中关闭 Keyboard。" = "Login Items is still enabled. Try again or turn off Keyboard in System Settings.";
@@ -88,16 +80,12 @@
 "开始打字后，曲线会立即出现。" = "Start typing and the graph will appear right away.";
 "前往 GitHub 下载" = "Download from GitHub";
 "正在处理音频" = "Processing audio";
-"柔和、低调" = "Soft and Subtle";
-"干净、通透" = "Clean and Airy";
 "正在统计输入 · 声音已暂停" = "Recording typing stats · Sounds paused";
 "输入时间线" = "Typing Timeline";
 "这个阶段不播放声音。" = "No sound is played for this phase.";
 "点击一个键，再在右侧设置继承、静音或独立音频。" = "Click a key, then set it to inherit, mute, or use custom audio on the right.";
 "覆盖方式" = "Override mode";
 "当前安装版本高于公开版本 %@" = "Installed version is newer than the public release %@";
-"静音微动" = "Silent Click";
-"办公鼠标" = "Office Mouse";
 "键盘声音" = "Keyboard Sounds";
 "复古、锐利" = "Retro and Sharp";
 "新增" = "New";
@@ -110,8 +98,6 @@
 "这个版本需要前往 GitHub 手动下载安装。" = "This version must be downloaded and installed manually from GitHub.";
 "历史" = "History";
 "如果系统开关已经打开但这里仍显示等待，请选中旧的 Zisla 条目，点列表下方“−”删除，再重新添加 /Applications/Zisla.app。完成后退出并重新打开应用。" = "If Input Monitoring is already enabled but Zisla still shows waiting, remove the old Zisla entry with the “−” button, then add /Applications/Zisla.app again. After that, quit and reopen the app.";
-"自然音色变化（键盘轮换 / 点击音高）" = "Natural variation (keyboard rotation / click pitch)";
-"玻璃触控板" = "Glass Trackpad";
 "轻快、圆润" = "Light and Rounded";
 "活跃日期" = "Active Days";
 "区间概览" = "Range Overview";
@@ -134,7 +120,6 @@
 "已加入系统登录项，下次登录会自动启动。" = "Added to Login Items. Keyboard will launch the next time you sign in.";
 "统计页面" = "Statistics section";
 "回弹" = "Release";
-"键盘与点击监听启动失败" = "Couldn't start keyboard and click monitoring";
 "线性" = "Linear";
 "Keyboard 使用按键编号播放声音，并可在你主动开启后于本机统计字符数量、物理按键次数和前台应用；不读取或保存文字、点击位置或输入内容。" = "Keyboard uses key codes to play sounds. If you turn stats on, it stores character counts, physical key presses, and the frontmost app locally on this Mac. It does not read or save typed text, click locations, or input content.";
 "未设置的位置会继承 %@" = "Unassigned slots will inherit from %@";
@@ -148,7 +133,6 @@
 "周六" = "Sat";
 "打开系统设置" = "Open System Settings";
 "允许打开菜单时检查更新？" = "Check for updates when the menu opens?";
-"电竞脆响" = "Esports Click";
 "按 R1–R4、功能/其他键与空格、回车、退格分配，声音更自然。" = "Assign separate sounds to R1–R4, function/other keys, and Space, Return, and Delete for a more natural result.";
 "正在监听键盘 · 统计已暂停" = "Monitoring keyboard · Stats paused";
 "周四" = "Thu";
@@ -171,7 +155,6 @@
 "周一" = "Mon";
 "输入统计" = "Typing Stats";
 "日均" = "Daily Avg";
-"清晰、均衡" = "Clear and Balanced";
 "节律显示方式" = "Rhythm display mode";
 "启用或暂停键盘声音" = "Enable or pause keyboard sounds";
 "已有音频" = "Existing audio";
@@ -188,9 +171,6 @@
 "最近 24 小时" = "Last 24 Hours";
 "屈曲弹簧" = "Buckling Spring";
 "沿用特殊键、所在行、通用音或基础音色。" = "Inherits from the special key, row, generic sound, or base sound pack.";
-"鼠标与触控板" = "Mouse & Trackpad";
-"正在监听键盘与点击 · 统计已暂停" = "Monitoring keyboard and clicks · Stats paused";
-"点击音已开启 · 统计已暂停" = "Click sounds on · Stats paused";
 "等待输入监控授权" = "Waiting for Input Monitoring access";
 "应用变化" = "App Changes";
 "跟随用户登录" = "Launch at login";
@@ -218,7 +198,6 @@
 "清除全部统计" = "Clear all statistics";
 "今日、历史、应用排行和全部逐键累计都将从本机删除，且无法恢复。" = "Today's stats, history, app rankings, and all per-key totals will be deleted from this Mac and can't be restored.";
 "DIY 音色" = "DIY Sound Packs";
-"厚重办公" = "Heavy Office";
 "暂时无法读取统计" = "Statistics are temporarily unavailable";
 "正在载入 Keyboard 的本地输入统计。" = "Loading Keyboard's local typing statistics.";
 "自动请求至少间隔 5 分钟，手动检查至少间隔 65 秒；不会上传按键、输入内容或音色设置。" = "Automatic checks are spaced at least 5 minutes apart, and manual checks at least 65 seconds apart. No key events, typed content, or sound-pack settings are uploaded.";
@@ -230,7 +209,6 @@
 "今天还没有按键记录；开始输入后键盘会逐键点亮。" = "No key presses yet today. Keys will light up as you type.";
 "关闭窗口会丢失尚未保存的音频映射。" = "Closing the window will discard unsaved audio mappings.";
 "每格 2 小时" = "2 hours per bucket";
-"轻快点击" = "Light Click";
 "薄脆、双向点击" = "Thin, Crisp, Dual-click";
 "低 %@ " = "Low %@";
 "键盘热力图" = "Keyboard Heatmap";
@@ -278,7 +256,6 @@
 "登录时自动启动" = "Launch at login";
 "打开菜单时自动检查" = "Check automatically when the menu opens";
 "%@ 小时 %@ 分" = "%@ hr %@ min";
-"正在统计输入 · 点击音已开启" = "Recording typing stats · Click sounds on";
 "总计" = "Total";
 "更换音频" = "Replace audio";
 "最近 6 小时" = "Last 6 Hours";
@@ -327,33 +304,20 @@
 "其他已识别键" = "Other Detected Keys";
 "%@" = "%@";
 "空白区间表示没有有效输入。" = "Blank intervals indicate no effective input.";
-"点击音量" = "Click Volume";
 "%@ · 每格一天，颜色按当前可见数据自动连续映射" = "%@ · One day per cell. Colors scale continuously based on the currently visible data.";
 "活跃 %@" = "Active %@";
 "正在整理过去一年的统计" = "Preparing statistics for the past year";
-"触控板轻点、物理点按和鼠标点击共用此配置；点击音量独立于键盘音量。" = "Trackpad taps, physical clicks, and mouse clicks all use this setting. Click volume is separate from keyboard volume.";
 "检查器" = "Inspector";
 "还没有可显示的年度统计" = "No yearly statistics to show yet";
 "先开启统计并输入一段文字，历史页面会在这里逐日积累。" = "Turn on statistics and type something first. The history page will start building up here day by day.";
 "请先在键盘上选择一个按键。" = "Select a key on the keyboard first.";
 "全年输入热力图" = "Yearly Typing Heatmap";
-"点击音色" = "Click Sound";
 "无法载入音色：%@" = "Couldn't load the sound: %@";
-"%@ 载入失败，已回退到经典微动：%@" = "%@ failed to load. Fell back to Classic Switch: %@";
-"无法启动全局键盘与点击监听。请退出并重新打开 Keyboard 后再试。" = "Couldn't start global keyboard and click monitoring. Quit and reopen Keyboard, then try again.";
 "音色载入失败，已回退到 %@：%@" = "Sound failed to load. Fell back to %@: %@";
-"%@ 载入失败：%@" = "%@ failed to load: %@";
-"启用鼠标与触控板点击音" = "Enable mouse and trackpad click sounds";
-"无法识别所选点击音，继续使用 %@。" = "Couldn't recognize the selected click sound. Continuing with %@.";
-"鼠标与触控板点击音量" = "Mouse and trackpad click volume";
 "自定义音频资源不完整。" = "Custom audio resources are incomplete.";
-"%@ 载入失败，继续使用 %@：%@" = "%@ failed to load. Continuing with %@: %@";
-"启用点击音" = "Enable click sounds";
 "%@ 连续写入失败，输入统计已暂停；打开统计页面刷新或清除数据后可重试。" = "%@ failed repeatedly to write. Typing Stats has been paused; open the stats window and refresh or clear data to try again.";
 "无法识别所选音色。" = "Couldn't recognize the selected sound.";
-"点击音资源不可用。" = "Click sound resources are unavailable.";
 "无法读取音色库：%@" = "Couldn't read the sound pack library: %@";
-"播放抬起音" = "Play release sounds";
 "音频数量超过 %@" = "Audio asset count exceeds %@";
 "音频为空" = "The audio file is empty";
 "Keyboard 本地统计数据库版本不兼容。" = "The local Keyboard stats database version is incompatible.";
@@ -452,7 +416,6 @@
 "转换后的音频帧数过多" = "Converted audio contains too many frames";
 "%@ 包含无效按键 ID：%@" = "%@ contains an invalid key ID: %@";
 "找不到音色包：%@" = "Sound pack not found: %@";
-"%@ 的点击音资源不完整（%@/%@）。" = "%@ click-audio resources are incomplete (%@/%@).";
 "必须为 48 kHz 单声道 16-bit PCM WAV" = "Audio must be a 48 kHz mono 16-bit PCM WAV";
 "未设置处继承 %@" = "Unassigned slots inherit from %@";
 "导入结果不是自定义音色包" = "The imported result is not a custom sound pack.";
