@@ -12,7 +12,7 @@ struct ClipboardHistorySourceAppLocalizationTests {
         let keys = Set(expression.matches(in: source, range: NSRange(source.startIndex..., in: source)).compactMap { match in
             Range(match.range(at: 1), in: source).map { String(source[$0]) }
         })
-        let callKeys: Set<String> = ["分组", "搜索内容或应用", "未知应用"]
+        let callKeys: Set<String> = ["按应用", "搜索内容或应用", "未知应用"]
         #expect(callKeys.isSubset(of: keys), "The checked labels must be used by the clipboard view")
         let groupingKeys = ClipboardHistoryGrouping.allCases.map(\.title)
         #expect(AppLanguage.allCases.count == 17)

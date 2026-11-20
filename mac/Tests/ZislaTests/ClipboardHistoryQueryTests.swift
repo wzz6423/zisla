@@ -246,7 +246,7 @@ struct ClipboardHistoryQueryTests {
     }
 
     @Test(.serialized, arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
-    func nativeGroupingMenuCommitsSourceSectionsAndPreservesDynamicNames(language: AppLanguage) async throws {
+    func nativeGroupingButtonSharesTheCategoryRowAndPreservesDynamicNames(language: AppLanguage) async throws {
         let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
         var arguments = previous
         arguments[AppLocalization.defaultsKey] = language.rawValue
@@ -288,24 +288,27 @@ struct ClipboardHistoryQueryTests {
         #expect(groupHeadings(in: host).isEmpty)
         #expect(accessibilityText(in: host).contains { $0.contains("Renamed Tool · ") })
         for grouping in [ClipboardHistoryGrouping.sourceApp, .none] {
-            let picker = try #require(accessibilityObjects(in: host).first {
+            let button = try #require(accessibilityObjects(in: host).first {
                 $0.responds(to: NSSelectorFromString("accessibilityIdentifier"))
                     && $0.value(forKey: "accessibilityIdentifier") as? String == "clipboardHistory.grouping"
             })
-            let selection = MenuSelection(title: AppLocalization.text(grouping.title))
-            NotificationCenter.default.addObserver(selection, selector: #selector(MenuSelection.began(_:)),
-                name: NSMenu.didBeginTrackingNotification, object: nil)
-            defer { NotificationCenter.default.removeObserver(selection) }
-            try #require(picker.responds(to: NSSelectorFromString("accessibilityPerformPress")))
-            let selected = selection.waitForSelection {
-                picker.performSelector(onMainThread: NSSelectorFromString("accessibilityPerformPress"), with: nil, waitUntilDone: true)
-            }
-            try #require(selected)
-            #expect(selection.titles == ClipboardHistoryGrouping.allCases.map { AppLocalization.text($0.title) })
+            let category = try #require(accessibilityObjects(in: host).first {
+                $0.responds(to: NSSelectorFromString("accessibilityIdentifier"))
+                    && $0.value(forKey: "accessibilityIdentifier") as? String == "clipboardHistory.category." + FileShelfCategory.all.rawValue
+            })
+            #expect(button.value(forKey: "accessibilityRole") as? String == NSAccessibility.Role.button.rawValue)
+            #expect(button.value(forKey: "accessibilityLabel") as? String == AppLocalization.text("按应用"))
+            let buttonFrame = try #require(button as? any NSAccessibilityElementProtocol).accessibilityFrame()
+            let categoryFrame = try #require(category as? any NSAccessibilityElementProtocol).accessibilityFrame()
+            #expect(buttonFrame.height > 0 && abs(buttonFrame.midY - categoryFrame.midY) < 1,
+                "Application grouping must share the content category row")
+            try #require(button.responds(to: NSSelectorFromString("accessibilityPerformPress")))
+            _ = button.perform(NSSelectorFromString("accessibilityPerformPress"))
             try await waitUntil { fixture.store.currentQuery.grouping == grouping }
             await fixture.store.waitUntilLoaded()
             await layout(host)
             #expect(fixture.store.displayedQuery.grouping == grouping)
+            #expect(button.value(forKey: "accessibilityValue") as? String == AppLocalization.text(grouping.title))
             if grouping == .sourceApp {
                 #expect(groupHeadings(in: host) == ["删除", "删除", "Unicode Tool", "Unicode Tool", AppLocalization.text("未知应用")],
                     "App names are user data, and same-named bundles must have separate source headings")

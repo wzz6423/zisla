@@ -154,18 +154,6 @@ struct ClipboardHistoryModuleView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 6)
 
-            Picker(AppLocalization.text("分组"), selection: $grouping) {
-                ForEach(ClipboardHistoryGrouping.allCases) { option in
-                    Text(AppLocalization.text(option.title)).tag(option)
-                }
-            }
-            .pickerStyle(.menu)
-            .controlSize(.small)
-            .font(.system(size: 11))
-            .accessibilityIdentifier("clipboardHistory.grouping")
-            .padding(.horizontal, 10)
-            .padding(.top, 6)
-
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
@@ -583,6 +571,16 @@ struct ClipboardHistoryModuleView: View {
     private var categoryFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                Button {
+                    grouping = grouping == .sourceApp ? .none : .sourceApp
+                } label: {
+                    filterBarLabel(AppLocalization.text("按应用"), symbol: "app", isSelected: grouping == .sourceApp)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("clipboardHistory.grouping")
+                .accessibilityLabel(AppLocalization.text("按应用"))
+                .accessibilityValue(AppLocalization.text(grouping.title))
+
                 ForEach(FileShelfCategory.clipboardCases) { category in
                     let count = categoryCount(for: category)
                     let isSelected = categoryFilter == category
@@ -591,34 +589,40 @@ struct ClipboardHistoryModuleView: View {
                     Button {
                         categoryFilter = category
                     } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: category.symbol)
-                                .font(.system(size: 10, weight: .medium))
-                            Text(category.title)
-                                .font(.system(size: 10, weight: .medium))
-                            if category != .all {
-                                Text("\(count)")
-                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background {
-                            if isSelected {
-                                RoundedRectangle(cornerRadius: 999, style: .continuous)
-                                    .fill(Color.fillCard)
-                                    .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
-                            }
-                        }
+                        filterBarLabel(category.title, symbol: category.symbol,
+                            count: category == .all ? nil : count, isSelected: isSelected)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(hasItems ? .primary : .tertiary)
                     .disabled(!hasItems)
+                    .accessibilityIdentifier("clipboardHistory.category." + category.rawValue)
                 }
             }
         }
         .frame(height: 28)
+    }
+
+    private func filterBarLabel(_ title: String, symbol: String, count: Int? = nil, isSelected: Bool) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .medium))
+            Text(title)
+                .font(.system(size: 10, weight: .medium))
+            if let count {
+                Text("\(count)")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 999, style: .continuous)
+                    .fill(Color.fillCard)
+                    .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
+            }
+        }
     }
 
     private func categoryCount(for category: FileShelfCategory) -> Int {
