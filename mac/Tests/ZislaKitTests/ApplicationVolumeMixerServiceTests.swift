@@ -7,11 +7,13 @@ import ZislaCore
 
 @MainActor
 struct ApplicationVolumeMixerServiceTests {
+    private let preferenceDefaults = ApplicationVolumeDefaultsFixture()
+
     @Test
     func listingSourcesDoesNotRequestAudioCapture() {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101, 102])])
         let backend = ApplicationVolumeBackendStub()
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
 
         service.start()
@@ -31,7 +33,7 @@ struct ApplicationVolumeMixerServiceTests {
             Self.source("music", pids: [101, 102]), Self.source("video", pids: [201]),
         ])
         let backend = ApplicationVolumeBackendStub()
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
 
@@ -50,7 +52,7 @@ struct ApplicationVolumeMixerServiceTests {
     func mutingPreservesVolumeAndUnityReleasesTheApplication() {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
         let backend = ApplicationVolumeBackendStub()
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
         service.setVolume(0.4, for: "music")
@@ -74,7 +76,7 @@ struct ApplicationVolumeMixerServiceTests {
     func finiteVolumesStayWithinTheSupportedRange(value: Double) {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
         let backend = ApplicationVolumeBackendStub()
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
 
@@ -88,7 +90,7 @@ struct ApplicationVolumeMixerServiceTests {
     func nonfiniteVolumesAndUnknownApplicationsHaveNoSideEffects(value: Double) {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
         let backend = ApplicationVolumeBackendStub()
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
         let original = service.applications
@@ -111,7 +113,7 @@ struct ApplicationVolumeMixerServiceTests {
             Self.source("empty", pids: []),
         ])
         let backend = ApplicationVolumeBackendStub()
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
 
@@ -124,7 +126,7 @@ struct ApplicationVolumeMixerServiceTests {
     func replacingHelpersAndChangingOutputReconcilesTheCurrentGain() {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
         let backend = ApplicationVolumeBackendStub()
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
         service.setVolume(0.3, for: "music")
@@ -149,7 +151,7 @@ struct ApplicationVolumeMixerServiceTests {
             Self.source("music", pids: [101]), Self.source("video", pids: [201]),
         ])
         let backend = ApplicationVolumeBackendStub()
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
         service.setVolume(0.5, for: "music")
@@ -177,7 +179,7 @@ struct ApplicationVolumeMixerServiceTests {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
         let backend = ApplicationVolumeBackendStub()
         backend.completesImmediately = false
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
         service.setVolume(0.2, for: "music")
@@ -192,11 +194,11 @@ struct ApplicationVolumeMixerServiceTests {
     }
 
     @Test
-    func stopResetsControlsAndRejectsPreviousSessionCallbacks() {
+    func stopRestoresPlaybackButPreservesPreferencesAndRejectsPreviousSessionCallbacks() {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
         let backend = ApplicationVolumeBackendStub()
         backend.completesImmediately = false
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
         defer { service.stop() }
         service.start()
         service.setVolume(0.2, for: "music")
@@ -216,10 +218,183 @@ struct ApplicationVolumeMixerServiceTests {
 
         service.start()
         backend.complete(at: 1, failures: ["music": .permissionDenied])
-        #expect(service.applications.first?.volume == 1)
-        #expect(service.applications.first?.isMuted == false)
+        #expect(service.applications.first?.volume == 0.2)
+        #expect(service.applications.first?.isMuted == true)
         #expect(service.applications.first?.isControlled == false)
         #expect(service.errorMessage == nil)
+        #expect(backend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "music", processIdentifiers: [102], gain: 0),
+        ])
+    }
+
+    @Test
+    func pausingAndRelaunchingAnApplicationRetainsItsVolumeAndMute() {
+        let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        defer { service.stop() }
+        service.start()
+        service.setVolume(0.35, for: "music")
+        service.toggleMute(for: "music")
+
+        monitor.publish([])
+        #expect(service.applications.isEmpty)
+        #expect(backend.appliedRequests.last == [])
+
+        monitor.publish([Self.source("music", pids: [101])])
+        #expect(service.applications.first?.volume == 0.35)
+        #expect(service.applications.first?.isMuted == true)
+        #expect(backend.appliedRequests.last?.first?.gain == 0)
+
+        monitor.publish([])
+        monitor.publish([Self.source("music", pids: [201, 202])])
+        service.toggleMute(for: "music")
+        #expect(service.applications.first?.volume == 0.35)
+        #expect(backend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "music", processIdentifiers: [201, 202], gain: 0.35),
+        ])
+    }
+
+    @Test
+    func aNewMixerRestoresSavedVolumesOnlyWhenTheApplicationsPlay() {
+        let monitor = ApplicationVolumeMonitorStub(sources: [
+            Self.source("music", pids: [101]), Self.source("video", pids: [201]),
+        ])
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        service.start()
+        service.setVolume(0.35, for: "music")
+        service.setVolume(0.6, for: "video")
+        service.toggleMute(for: "video")
+        service.stop()
+        monitor.publish([])
+
+        let restoredBackend = ApplicationVolumeBackendStub()
+        let restored = makeService(monitor, restoredBackend)
+        defer { restored.stop() }
+        restored.start()
+        #expect(restored.applications.isEmpty)
+        #expect(restoredBackend.appliedRequests.last == [])
+
+        monitor.publish([
+            Self.source("music", pids: [102]), Self.source("video", pids: [202, 203]),
+        ])
+        #expect(restored.applications.map(\.volume) == [0.35, 0.6])
+        #expect(restored.applications.map(\.isMuted) == [false, true])
+        #expect(restoredBackend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "music", processIdentifiers: [102], gain: 0.35),
+            ApplicationVolumeRequest(id: "video", processIdentifiers: [202, 203], gain: 0),
+        ])
+    }
+
+    @Test
+    func changedVolumesAndMuteAreSavedBeforeTheMixerStops() throws {
+        let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        defer { service.stop() }
+        service.start()
+        service.setVolume(0.4, for: "music")
+        let volumeRecord = try #require(preferenceDefaults.store.dictionary(
+            forKey: ApplicationVolumeMixerService.preferencesKey
+        )?["music"] as? [String: Any])
+        #expect(volumeRecord["volume"] as? Double == 0.4)
+        #expect(volumeRecord["isMuted"] as? Bool == false)
+
+        service.toggleMute(for: "music")
+        let mutedRecord = try #require(preferenceDefaults.store.dictionary(
+            forKey: ApplicationVolumeMixerService.preferencesKey
+        )?["music"] as? [String: Any])
+        #expect(mutedRecord["volume"] as? Double == 0.4)
+        #expect(mutedRecord["isMuted"] as? Bool == true)
+
+        service.setVolume(1, for: "music")
+        let resetRecord = try #require(preferenceDefaults.store.dictionary(
+            forKey: ApplicationVolumeMixerService.preferencesKey
+        )?["music"] as? [String: Any])
+        #expect(resetRecord["volume"] as? Double == 1)
+        #expect(resetRecord["isMuted"] as? Bool == false)
+        #expect(backend.appliedRequests.last == [])
+    }
+
+    @Test
+    func malformedPreferencesDoNotDiscardValidApplications() {
+        preferenceDefaults.store.set([
+            "music": ["volume": 0.4, "isMuted": true],
+            "negative": ["volume": -0.1, "isMuted": true],
+            "large": ["volume": 1.1, "isMuted": true],
+            "notFinite": ["volume": Double.nan, "isMuted": true],
+            "infinite": ["volume": Double.infinity, "isMuted": true],
+            "wrongType": ["volume": "0.3", "isMuted": true],
+            "wrongMute": ["volume": 0.2, "isMuted": "true"],
+            "missingMute": ["volume": 0.2],
+            "notARecord": "invalid",
+            "pid:301": ["volume": 0, "isMuted": true],
+        ] as [String: Any], forKey: ApplicationVolumeMixerService.preferencesKey)
+        let ids = ["music", "negative", "large", "notFinite", "infinite", "wrongType", "wrongMute", "missingMute", "notARecord", "pid:301"]
+        let monitor = ApplicationVolumeMonitorStub(sources: ids.enumerated().map {
+            Self.source($0.element, pids: [pid_t($0.offset + 101)])
+        })
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        defer { service.stop() }
+        service.start()
+
+        #expect(service.applications.first?.volume == 0.4)
+        #expect(service.applications.first?.isMuted == true)
+        #expect(service.applications.dropFirst().allSatisfy { $0.volume == 1 && !$0.isMuted })
+        #expect(backend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "music", processIdentifiers: [101], gain: 0),
+        ])
+    }
+
+    @Test
+    func aMalformedArchiveLoadsDefaultOutput() {
+        preferenceDefaults.store.set("invalid", forKey: ApplicationVolumeMixerService.preferencesKey)
+        let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        defer { service.stop() }
+        service.start()
+
+        #expect(service.applications.first?.volume == 1)
+        #expect(service.applications.first?.isMuted == false)
+        #expect(backend.appliedRequests.last == [])
+    }
+
+    @Test
+    func pidOnlyPreferencesCannotBeAppliedToAnUnrelatedRelaunchedProcess() {
+        let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("pid:101", pids: [101])])
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        service.start()
+        service.setVolume(0.2, for: "pid:101")
+        service.toggleMute(for: "pid:101")
+        #expect(preferenceDefaults.store.dictionary(forKey: ApplicationVolumeMixerService.preferencesKey)?["pid:101"] == nil)
+        service.stop()
+
+        let restoredBackend = ApplicationVolumeBackendStub()
+        let restored = makeService(monitor, restoredBackend)
+        defer { restored.stop() }
+        restored.start()
+        #expect(restored.applications.first?.volume == 1)
+        #expect(restored.applications.first?.isMuted == false)
+        #expect(restoredBackend.appliedRequests.last == [])
+    }
+
+    @Test
+    func restartingTheSameMixerDoesNotReusePidOnlyPreferences() {
+        let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("pid:101", pids: [101])])
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        defer { service.stop() }
+        service.start()
+        service.setVolume(0.2, for: "pid:101")
+        service.stop()
+        service.start()
+
+        #expect(service.applications.first?.volume == 1)
+        #expect(service.applications.first?.isMuted == false)
         #expect(backend.appliedRequests.last == [])
     }
 
@@ -228,7 +403,7 @@ struct ApplicationVolumeMixerServiceTests {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
         let backend = ApplicationVolumeBackendStub()
         backend.isSupported = false
-        let service = Self.service(monitor, backend)
+        let service = makeService(monitor, backend)
 
         service.start()
         service.setVolume(0.5, for: "music")
@@ -243,11 +418,12 @@ struct ApplicationVolumeMixerServiceTests {
         #expect(backend.stopCount == 0)
     }
 
-    private static func service(
+    private func makeService(
         _ monitor: ApplicationVolumeMonitorStub, _ backend: ApplicationVolumeBackendStub
     ) -> ApplicationVolumeMixerService {
         ApplicationVolumeMixerService(
-            monitor: monitor, backend: backend, ownProcessIdentifier: 999, ownBundleIdentifier: "fixture.zisla"
+            monitor: monitor, backend: backend, ownProcessIdentifier: 999, ownBundleIdentifier: "fixture.zisla",
+            defaults: preferenceDefaults.store
         )
     }
 
@@ -298,4 +474,14 @@ private final class ApplicationVolumeBackendStub: ApplicationVolumeMixing {
         if completesImmediately { completion(failures) }
     }
     func complete(at index: Int, failures: [String: ApplicationVolumeFailure]) { completions[index](failures) }
+}
+
+@MainActor
+private final class ApplicationVolumeDefaultsFixture {
+    private let suite = "Zisla.ApplicationVolume.\(UUID().uuidString)"
+    let store: UserDefaults
+
+    init() { store = UserDefaults(suiteName: suite)! }
+
+    isolated deinit { store.removePersistentDomain(forName: suite) }
 }

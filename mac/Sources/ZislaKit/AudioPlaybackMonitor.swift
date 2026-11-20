@@ -192,6 +192,14 @@ final class ApplicationIconDataCache {
 
 @MainActor
 final class AudioPlaybackMonitor {
+    typealias SourceReading = @MainActor () -> (objects: [AudioObjectID], sources: [AudioPlaybackSource])
+    typealias PropertyRegistration = @MainActor (
+        AudioObjectID, AudioObjectPropertyAddress, @escaping AudioObjectPropertyListenerBlock, Bool
+    ) -> OSStatus
+    typealias RefreshScheduling = @MainActor (
+        @escaping @MainActor @Sendable () -> Void
+    ) -> @MainActor () -> Void
+
     private(set) var sources: [AudioPlaybackSource] = []
     var onSourcesChanged: (@MainActor ([AudioPlaybackSource]) -> Void)?
 
@@ -204,55 +212,89 @@ final class AudioPlaybackMonitor {
     private var observedProcesses: Set<AudioObjectID> = []
     private var applicationActivationObserver: NSObjectProtocol?
     private var preferredSourceID: String?
+    private let readSources: SourceReading
+    private let registerProperty: PropertyRegistration
+    private let applicationNotifications: NotificationCenter
+    private let scheduleRefresh: RefreshScheduling
+    private var listener: AudioObjectPropertyListenerBlock?
+    private var cancelRefresh: (@MainActor () -> Void)?
+    private var session: UInt64 = 0
 
-    private lazy var listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-        MainActor.assumeIsolated {
-            self?.refresh()
+    init(
+        readSources: @escaping SourceReading = AudioPlaybackMonitor.currentSources,
+        registerProperty: @escaping PropertyRegistration = { object, address, listener, adding in
+            var address = address
+            if adding { return AudioObjectAddPropertyListenerBlock(object, &address, .main, listener) }
+            return AudioObjectRemovePropertyListenerBlock(object, &address, .main, listener)
+        },
+        applicationNotifications: NotificationCenter = NSWorkspace.shared.notificationCenter,
+        scheduleRefresh: @escaping RefreshScheduling = { refresh in
+            let timer = Timer(timeInterval: 1, repeats: true) { _ in
+                MainActor.assumeIsolated { refresh() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            return { timer.invalidate() }
         }
+    ) {
+        self.readSources = readSources
+        self.registerProperty = registerProperty
+        self.applicationNotifications = applicationNotifications
+        self.scheduleRefresh = scheduleRefresh
     }
+
+    isolated deinit { stop() }
 
     func start() {
         guard !isRunning, #available(macOS 14.4, *) else { return }
         isRunning = true
+        session &+= 1
+        let currentSession = session
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isRunning, self.session == currentSession else { return }
+                self.refresh()
+            }
+        }
+        self.listener = listener
 
-        var address = Self.address(kAudioHardwarePropertyProcessObjectList)
-        _ = AudioObjectAddPropertyListenerBlock(
+        _ = registerProperty(
             AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            .main,
-            listener
+            Self.address(kAudioHardwarePropertyProcessObjectList), listener, true
         )
-        applicationActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+        applicationActivationObserver = applicationNotifications.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self else { return }
+                guard let self, self.isRunning, self.session == currentSession else { return }
                 self.refresh()
                 self.prioritizeSource(for: NSWorkspace.shared.frontmostApplication)
             }
+        }
+        // HAL notifications can miss a stopped or replaced audio process.
+        cancelRefresh = scheduleRefresh { [weak self] in
+            guard let self, self.isRunning, self.session == currentSession else { return }
+            self.refresh()
         }
         refresh()
     }
 
     func stop() {
-        guard isRunning, #available(macOS 14.4, *) else { return }
+        guard let listener, #available(macOS 14.4, *) else { return }
         isRunning = false
+        cancelRefresh?()
+        cancelRefresh = nil
 
-        var address = Self.address(kAudioHardwarePropertyProcessObjectList)
-        _ = AudioObjectRemovePropertyListenerBlock(
+        _ = registerProperty(
             AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            .main,
-            listener
+            Self.address(kAudioHardwarePropertyProcessObjectList), listener, false
         )
+        for object in observedProcesses { removeListener(from: object, listener: listener) }
+        self.listener = nil
         if let applicationActivationObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(applicationActivationObserver)
+            applicationNotifications.removeObserver(applicationActivationObserver)
             self.applicationActivationObserver = nil
-        }
-        for object in observedProcesses {
-            removeListener(from: object)
         }
         observedProcesses.removeAll()
         preferredSourceID = nil
@@ -261,19 +303,22 @@ final class AudioPlaybackMonitor {
 
     func refresh() {
         guard #available(macOS 14.4, *) else { return }
-        let objects = Self.processList()
-        if isRunning { rebuildListeners(for: Set(objects)) }
-
-        let ownPID = ProcessInfo.processInfo.processIdentifier
-        let activePIDs = objects.compactMap { object -> pid_t? in
-            guard Self.isRunningOutput(object), let pid = Self.pid(of: object), pid != ownPID else {
-                return nil
-            }
-            return pid
-        }
-        var resolved = Self.resolveSources(for: activePIDs)
+        let (objects, current) = readSources()
+        if let listener { rebuildListeners(for: Set(objects), listener: listener) }
+        var resolved = current
         applyPreferredSource(to: &resolved)
         updateSources(resolved)
+    }
+
+    private static func currentSources() -> (objects: [AudioObjectID], sources: [AudioPlaybackSource]) {
+        guard #available(macOS 14.4, *) else { return ([], []) }
+        let objects = processList()
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let activePIDs = objects.compactMap { object -> pid_t? in
+            guard isRunningOutput(object), let pid = pid(of: object), pid != ownPID else { return nil }
+            return pid
+        }
+        return (objects, resolveSources(for: activePIDs))
     }
 
     private func prioritizeSource(for application: NSRunningApplication?) {
@@ -330,24 +375,21 @@ final class AudioPlaybackMonitor {
     }
 
     @available(macOS 14.4, *)
-    private func rebuildListeners(for current: Set<AudioObjectID>) {
+    private func rebuildListeners(for current: Set<AudioObjectID>, listener: @escaping AudioObjectPropertyListenerBlock) {
         for object in current.subtracting(observedProcesses) {
-            var address = Self.address(kAudioProcessPropertyIsRunningOutput)
-            guard AudioObjectHasProperty(object, &address) else { continue }
-            if AudioObjectAddPropertyListenerBlock(object, &address, .main, listener) == noErr {
+            if registerProperty(object, Self.address(kAudioProcessPropertyIsRunningOutput), listener, true) == noErr {
                 observedProcesses.insert(object)
             }
         }
         for object in observedProcesses.subtracting(current) {
-            removeListener(from: object)
+            removeListener(from: object, listener: listener)
             observedProcesses.remove(object)
         }
     }
 
     @available(macOS 14.4, *)
-    private func removeListener(from object: AudioObjectID) {
-        var address = Self.address(kAudioProcessPropertyIsRunningOutput)
-        _ = AudioObjectRemovePropertyListenerBlock(object, &address, .main, listener)
+    private func removeListener(from object: AudioObjectID, listener: @escaping AudioObjectPropertyListenerBlock) {
+        _ = registerProperty(object, Self.address(kAudioProcessPropertyIsRunningOutput), listener, false)
     }
 
     @available(macOS 14.4, *)
