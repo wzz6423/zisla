@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import CoreMedia
 import CoreVideo
 import ScreenCaptureKit
@@ -143,6 +144,199 @@ struct WindowPreviewLifecycleTests {
         #expect(system.activatedWindowIDs == [12])
         #expect(system.solePreviewActivations == [false])
         #expect(controller.windows.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func contextClickCancelsAPendingDockPreview(controlClick: Bool) async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+        let hover = try #require(system.timers.last)
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(
+            controlClick ? .leftMouseDown : .rightMouseDown, modifiers: controlClick ? .control : []
+        ))
+        hover.fire()
+        await controller.captureTask?.value
+
+        #expect(!hover.isValid, "Opening a context menu must cancel the pending hover")
+        #expect(controller.windows.isEmpty, "A pending preview must not cover the Dock context menu")
+        #expect(controller.appName.isEmpty)
+        #expect(system.presentationAnchors.allSatisfy { $0 == nil })
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved, timestamp: 2))
+        try #require(system.timers.last).fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [1], "A context click must not impose the left-click restoration delay")
+    }
+
+    @Test(arguments: [false, true])
+    func contextClickImmediatelyHidesAnExistingDockPreview(controlClick: Bool) async throws {
+        let system = PreviewSystem()
+        let controller = WindowPreviewController(dependencies: system.dependencies())
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [1])
+        let refresh = try #require(system.timers.first { $0.timeInterval == 1 })
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(
+            controlClick ? .leftMouseDown : .rightMouseDown, modifiers: controlClick ? .control : []
+        ))
+
+        #expect(controller.windows.isEmpty, "An existing preview must hide before the context menu opens")
+        #expect(controller.appName.isEmpty)
+        #expect((system.presentationAnchors.last ?? nil) == nil)
+        #expect(!refresh.isValid)
+        #expect(controller.captureTask == nil)
+    }
+
+    @Test
+    func anOpenDockMenuBlocksHoverAndClosingItRestoresPreviews() async throws {
+        let system = PreviewSystem()
+        system.dockMenuIsOpen = true
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+        system.timers.forEach { $0.fire() }
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty, "Pointer movement over a Dock icon must not cover an open menu")
+        #expect(controller.appName.isEmpty)
+        #expect(system.presentationAnchors.allSatisfy { $0 == nil })
+
+        system.dockMenuIsOpen = false
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved, timestamp: 2))
+        try #require(system.timers.last).fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [1], "Normal hover must resume after the menu closes")
+    }
+
+    @Test
+    func openingADockMenuDuringTheHoverDelayPreventsPresentation() async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+        let hover = try #require(system.timers.last)
+
+        system.dockMenuIsOpen = true
+        hover.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty, "The delayed hover must recheck whether a menu has opened")
+        #expect(controller.appName.isEmpty)
+        #expect(system.presentationAnchors.allSatisfy { $0 == nil })
+    }
+
+    @Test
+    func movingAcrossAnOpenDockMenuHidesTheExistingPreview() async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+
+        system.dockMenuIsOpen = true
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+        #expect(controller.windows.isEmpty, "A menu detected without its opening click must hide the existing preview")
+        #expect((system.presentationAnchors.last ?? nil) == nil)
+    }
+
+    @Test
+    func aHoverCancelledByAnOpenDockMenuCannotReappearAfterItCloses() async throws {
+        let system = PreviewSystem()
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(1, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved))
+
+        system.dockMenuIsOpen = true
+        system.globalHandler?(try PreviewSystem.mouseEvent(.mouseMoved, timestamp: 2))
+        system.dockMenuIsOpen = false
+        system.timers.forEach { $0.fire() }
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty, "Closing a menu must not revive the hover it cancelled")
+        #expect(controller.appName.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func contextClickRejectsALateDockCaptureCompletion(fails: Bool) async throws {
+        let system = PreviewSystem()
+        let capture = PreviewCaptureGate()
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { try await capture.capture($0) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        let task = try #require(controller.captureTask)
+        await capture.waitForRequests(1)
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(.rightMouseDown))
+        #expect(task.isCancelled, "Opening a menu must cancel the preview capture already in flight")
+        capture.finish(0, fails: fails)
+        await task.value
+        #expect(controller.windows.isEmpty)
+        #expect(controller.appName.isEmpty)
+        #expect(system.presentationAnchors.allSatisfy { $0 == nil })
+    }
+
+    @Test(arguments: [false, true])
+    func contextClickPreservesCommandTabPreviews(controlClick: Bool) async throws {
+        let system = PreviewSystem()
+        system.switcher = PreviewSystem.selection(2, source: .switcher)
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(2, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.beginSwitcher()
+        await controller.captureTask?.value
+
+        system.globalHandler?(try PreviewSystem.mouseEvent(
+            controlClick ? .leftMouseDown : .rightMouseDown, modifiers: controlClick ? .control : []
+        ))
+        #expect(controller.windows.map(\.id) == [2], "Dock context-click handling must preserve the active switcher")
+        #expect(!controller.showsAppHeader)
+    }
+
+    @Test(arguments: [pid_t?.none, pid_t(42)], ["missing", "invalid", "empty", "list", "menu", "missing-role", "invalid-role"])
+    func dockMenuDetectionRequiresAnAccessibleMenu(processIdentifier: pid_t?, state: String) {
+        let child = AXUIElementCreateApplication(42)
+        let result = WindowPreviewController.dockMenuIsOpen(processIdentifier: processIdentifier) { name, _ in
+            if name == kAXChildrenAttribute {
+                switch state {
+                case "missing": return nil
+                case "invalid": return NSNumber(value: 42)
+                case "empty": return [] as CFArray
+                default: return [child] as CFArray
+                }
+            }
+            switch state {
+            case "menu": return kAXMenuRole as CFString
+            case "missing-role": return nil
+            case "invalid-role": return NSNumber(value: 42)
+            default: return kAXListRole as CFString
+            }
+        }
+        #expect(result == (processIdentifier != nil && state == "menu"),
+                "Only a Dock child with the menu role may suppress hover; missing or invalid AX data must not")
     }
 
     @Test
@@ -1296,6 +1490,382 @@ struct WindowPreviewLifecycleTests {
         #expect(controller.windows.isEmpty, "A closed window must not survive through the cached fallback")
     }
 
+    @Test(arguments: [WindowPreviewSource.dock, .switcher], [false, true])
+    func reopeningAPreviewDropsClosedRetainedWindowsAndKeepsAMinimizedWindow(
+        source: WindowPreviewSource, captureFails: Bool
+    ) async throws {
+        let system = PreviewSystem()
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let mainFrame = CGRect(x: 114, y: 164, width: 1285, height: 765)
+        let videoFrame = CGRect(x: 188, y: 227, width: 1136, height: 640)
+        let main = WindowPreviewSnapshot(id: 11, title: "Home", frame: mainFrame,
+                                         image: PreviewSystem.snapshot(11).image)
+        let video = WindowPreviewSnapshot(id: 12, title: "Video", frame: videoFrame,
+                                          image: PreviewSystem.snapshot(12).image)
+        var accessibleWindows = [WindowPreviewAccessibleWindow(id: 11, frame: mainFrame),
+                                 WindowPreviewAccessibleWindow(id: 12, frame: videoFrame)]
+        let retainedWindows = [
+            PreviewSystem.windowInfo(11, frame: CGRect(x: 230, y: 53, width: 1285, height: 765)),
+            PreviewSystem.windowInfo(12, frame: CGRect(x: 188, y: 115, width: 1136, height: 640)),
+        ]
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.presentWindowIDs = { pid in
+            WindowPreviewWindowMatch.presentWindowIDs(
+                processIdentifier: pid, windowInfo: retainedWindows,
+                accessibleWindows: accessibleWindows, screenFrames: [screen], mainScreenTop: screen.maxY
+            )
+        }
+        dependencies.captureWindows = { pid in
+            guard pid == 1 else { return [] }
+            captures += 1
+            if captures == 1 { return [main, video] }
+            if captureFails { throw PreviewCaptureGate.Failure.unavailable }
+            return []
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: source))
+        await controller.captureTask?.value
+        try #require(controller.windows.map(\.id) == [11, 12])
+
+        accessibleWindows = [WindowPreviewAccessibleWindow(id: 11, frame: mainFrame)]
+        controller.select(PreviewSystem.selection(2, source: source))
+        await controller.captureTask?.value
+        controller.select(PreviewSystem.selection(1, source: source))
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [11],
+                "Reopening a preview must discard the closed video surface while retaining the minimized main window")
+        #expect(controller.windows.first?.image === main.image)
+
+        accessibleWindows = []
+        try #require(system.timers.last { $0.timeInterval == 1 }).fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty, "Closing the last manageable window must remove every retained preview")
+        #expect(system.presentations.last == [])
+    }
+
+    @Test(arguments: [WindowPreviewSource.dock, .switcher])
+    func aClosedSameFrameWindowCannotBorrowAnotherWindowsAccessibilityIdentity(source: WindowPreviewSource) async throws {
+        let system = PreviewSystem()
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        let accessibleFrame = WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: screen.maxY)
+        let home = PreviewSystem.snapshot(11)
+        let video = PreviewSystem.snapshot(12)
+        var accessible = [WindowPreviewAccessibleWindow(id: 11, frame: accessibleFrame),
+                          WindowPreviewAccessibleWindow(id: 12, frame: accessibleFrame)]
+        let retained = [PreviewSystem.windowInfo(11, frame: frame), PreviewSystem.windowInfo(12, frame: frame)]
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.presentWindowIDs = { pid in
+            WindowPreviewWindowMatch.presentWindowIDs(
+                processIdentifier: pid, windowInfo: retained, accessibleWindows: accessible,
+                screenFrames: [screen], mainScreenTop: screen.maxY
+            )
+        }
+        dependencies.captureWindows = { _ in
+            captures += 1
+            return captures == 1 ? [home, video] : [home]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: source))
+        await controller.captureTask?.value
+        try #require(controller.windows.map(\.id) == [11, 12])
+
+        accessible = [WindowPreviewAccessibleWindow(id: 11, frame: accessibleFrame)]
+        try #require(system.timers.last { $0.timeInterval == 1 }).fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [11],
+                "A closed window must not reappear through the live window's identical Accessibility frame")
+        #expect(controller.windows.first?.image === home.image)
+    }
+
+    @Test
+    func unavailableAccessibilityPreservesTheMinimizedImageUntilLivenessRecovers() throws {
+        var cache = WindowPreviewImageCache()
+        let snapshot = PreviewSystem.snapshot(11)
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        let retained = [PreviewSystem.windowInfo(11, frame: frame)]
+        let accessible = [WindowPreviewAccessibleWindow(
+            id: 11, frame: WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: screen.maxY)
+        )]
+        _ = cache.reconcile([snapshot], processIdentifier: 1, presentWindowIDs: { _ in [11] })
+        let unknown = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: retained, accessibleWindows: nil,
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        #expect(cache.reconcile([], processIdentifier: 1, presentWindowIDs: { _ in unknown }).isEmpty,
+                "Unknown liveness must not display an unconfirmed cached window")
+
+        let live = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: retained, accessibleWindows: accessible,
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        let recovered = cache.reconcile([], processIdentifier: 1, presentWindowIDs: { _ in live })
+        #expect(recovered.map(\.id) == [11])
+        #expect(recovered.first?.image === snapshot.image,
+                "An AX query failure must not discard the minimized window's recoverable image")
+
+        let closed = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: retained, accessibleWindows: [],
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        #expect(cache.reconcile([], processIdentifier: 1, presentWindowIDs: { _ in closed }).isEmpty)
+        let missingImage = PreviewSystem.snapshot(11, alpha: nil)
+        #expect(cache.reconcile([missingImage], processIdentifier: 1, presentWindowIDs: { _ in [11] }).first?.image == nil,
+                "Confirmed closure must evict the old image")
+    }
+
+    @Test(arguments: ["normal", "other-owner", "other-layer", "small", "strip", "missing-id", "invalid-bounds"])
+    func cachedWindowLivenessUsesOnlyManageableApplicationWindows(metadata: String) {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = switch metadata {
+        case "small": CGRect(x: 20, y: 20, width: 79, height: 49)
+        case "strip": CGRect(x: 20, y: 20, width: 1200, height: 81)
+        default: CGRect(x: 20, y: 20, width: 300, height: 200)
+        }
+        var info = PreviewSystem.windowInfo(
+            11, processIdentifier: metadata == "other-owner" ? 2 : 1, frame: frame,
+            isOnScreen: true, layer: metadata == "other-layer" ? 3 : 0
+        )
+        if metadata == "missing-id" { info.removeValue(forKey: kCGWindowNumber as String) }
+        if metadata == "invalid-bounds" { info[kCGWindowBounds as String] = "invalid" }
+        let accessible = [WindowPreviewAccessibleWindow(
+            id: 11, frame: WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: screen.maxY)
+        )]
+        let ids = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: [info], accessibleWindows: accessible,
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        #expect(ids == (metadata == "normal" ? [11] : []),
+                "Cache liveness must reject non-application windows, auxiliary layers and unusable metadata")
+        #expect(WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: [], accessibleWindows: accessible,
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        ) == [])
+    }
+
+    @Test(arguments: [false, true])
+    func cachedWindowLivenessKeepsAXOmittedFullscreenWindowsWithSeparateToolbar(browser: Bool) {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let ordinary = PreviewSystem.snapshot(11)
+        let fullscreen = CGRect(x: 0, y: browser ? 114 : 33, width: 1512, height: browser ? 868 : 949)
+        var windows = [PreviewSystem.windowInfo(12, frame: fullscreen)]
+        if browser {
+            windows += [PreviewSystem.windowInfo(13, frame: CGRect(x: 0, y: 33, width: 1512, height: 81)),
+                        PreviewSystem.windowInfo(14, frame: CGRect(x: 0, y: 0, width: 1512, height: 33))]
+        }
+        let ids = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: windows,
+            accessibleWindows: [WindowPreviewAccessibleWindow(id: 11, frame: ordinary.frame)],
+            screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        #expect(ids == [12], "AX omissions off-Space must retain the fullscreen preview without retaining toolbar surfaces")
+    }
+
+    @Test(arguments: [AXError.success, .failure, .notImplemented])
+    func accessibilityWindowIdentityFailureDiscardsItsOutputAndKeepsGeometryFallback(result: AXError) {
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        let window = WindowPreviewAccessibleWindow(
+            element: AXUIElementCreateApplication(1), frame: frame,
+            copyWindowID: { _, identifier in
+                identifier.pointee = 11
+                return result
+            }
+        )
+        #expect(window.id == (result == .success ? 11 : nil))
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: frame, isOnScreen: false, accessibleWindows: [frame],
+            windowID: 11, accessibleWindowIdentities: [window]
+        ), "Unavailable AX window IDs must preserve the existing geometry match")
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: frame.offsetBy(dx: 116, dy: 0), isOnScreen: false, accessibleWindows: [frame],
+            windowID: 11, accessibleWindowIdentities: [window]
+        ) == (result == .success), "Only a successful identity lookup may establish a moved or minimized target")
+    }
+
+    @Test
+    func anUnavailableNativeWindowIDReaderKeepsTheGeometryFallback() {
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        let window = WindowPreviewAccessibleWindow(
+            element: AXUIElementCreateApplication(1), frame: frame, copyWindowID: nil
+        )
+        #expect(window.id == nil)
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: frame, isOnScreen: false, accessibleWindows: [frame],
+            windowID: 11, accessibleWindowIdentities: [window]
+        ), "Unavailable private symbols must preserve the existing geometry fallback")
+    }
+
+    @Test(arguments: [true, false])
+    func unavailableAccessibilityReportsUnknownWindowLiveness(isOnScreen: Bool) {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let ids = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1,
+            windowInfo: [PreviewSystem.windowInfo(11, frame: CGRect(x: 20, y: 20, width: 300, height: 200),
+                                                  isOnScreen: isOnScreen)],
+            accessibleWindows: nil, screenFrames: [screen], mainScreenTop: screen.maxY
+        )
+        #expect(ids == nil, "A failed AX query must remain distinguishable from confirmed closure")
+    }
+
+    @Test(arguments: [WindowPreviewSource.dock, .switcher])
+    func qqMusicPreviewShowsOneCurrentPageAndRecoversFromWindowOrderFailure(source: WindowPreviewSource) async throws {
+        let system = PreviewSystem()
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 163, y: 122, width: 1180, height: 722)
+        let home = WindowPreviewSnapshot(id: 11, title: "Home", frame: frame,
+                                         image: PreviewSystem.snapshot(11).image)
+        let playback = WindowPreviewSnapshot(id: 12, title: "Playback", frame: frame,
+                                             image: PreviewSystem.snapshot(12, alpha: 0.5).image)
+        let accessible = [WindowPreviewAccessibleWindow(id: 11, frame: frame, isMain: true),
+                          WindowPreviewAccessibleWindow(id: 12, frame: frame)]
+        let retained = [PreviewSystem.windowInfo(11, frame: frame, isOnScreen: true),
+                        PreviewSystem.windowInfo(12, frame: frame, isOnScreen: true)]
+        var frontOrder: [CGWindowID]? = nil
+        var dependencies = system.dependencies()
+        let currentIDs = {
+            WindowPreviewWindowMatch.presentWindowIDs(
+                processIdentifier: 1, windowInfo: retained, accessibleWindows: accessible,
+                screenFrames: [screen], mainScreenTop: screen.maxY,
+                bundleIdentifier: "com.tencent.QQMusicMac", frontmostWindowIDs: { frontOrder }
+            )
+        }
+        dependencies.presentWindowIDs = { _ in currentIDs() }
+        dependencies.captureWindows = { _ in
+            let ids = currentIDs()
+            return [home, playback].filter { ids?.contains($0.id) == true }
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: source))
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [11], "A failed order query must use the one confirmed main page")
+        #expect(controller.windows.first?.image === home.image)
+        let refresh = try #require(system.timers.last { $0.timeInterval == 1 })
+
+        frontOrder = [12, 11]
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [12], "The current playback surface must replace the covered homepage")
+        #expect(controller.windows.first?.image === playback.image)
+
+        frontOrder = [11, 12]
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [11], "The cached playback surface must not reappear after returning home")
+        #expect(controller.windows.first?.image === home.image)
+
+        frontOrder = [12, 11]
+        refresh.fire()
+        await controller.captureTask?.value
+        controller.activate(playback)
+        #expect(system.activatedWindowIDs == [12])
+        #expect(system.solePreviewActivations == [true])
+        #expect(controller.windows.isEmpty)
+    }
+
+    @Test(arguments: [Optional([CGWindowID(12), 11]), [CGWindowID(11), 12], [], nil])
+    func qqMusicGroupingKeepsTheFrontPageAndSeparateSettings(frontOrder: [CGWindowID]?) {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 163, y: 122, width: 1180, height: 722)
+        let settings = CGRect(x: 300, y: 200, width: 640, height: 480)
+        let windows = [PreviewSystem.windowInfo(11, frame: frame, isOnScreen: true),
+                       PreviewSystem.windowInfo(12, frame: frame, isOnScreen: true),
+                       PreviewSystem.windowInfo(13, frame: settings, isOnScreen: true)]
+        let accessible = [WindowPreviewAccessibleWindow(id: 11, frame: frame, isMain: true),
+                          WindowPreviewAccessibleWindow(id: 12, frame: frame),
+                          WindowPreviewAccessibleWindow(id: 13, frame: settings)]
+        let ids = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: windows, accessibleWindows: accessible,
+            screenFrames: [screen], mainScreenTop: screen.maxY,
+            bundleIdentifier: "com.tencent.QQMusicMac", frontmostWindowIDs: { frontOrder }
+        )
+        #expect(ids == Set([frontOrder?.first ?? 11, 13]),
+                "QQ Music's overlapping pages form one preview, while a separate settings window remains independent")
+    }
+
+    @Test(arguments: ["other-app", "no-bundle", "different-frame", "no-identity", "single-window"])
+    func independentWindowsDoNotRequestOrUseQQMusicPageGrouping(scenario: String) {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 163, y: 122, width: 1180, height: 722)
+        let secondFrame = scenario == "different-frame" ? frame.offsetBy(dx: 1, dy: 0) : frame
+        let windows = [PreviewSystem.windowInfo(11, frame: frame, isOnScreen: true)]
+            + (scenario == "single-window" ? [] : [PreviewSystem.windowInfo(12, frame: secondFrame, isOnScreen: true)])
+        let accessible = [WindowPreviewAccessibleWindow(
+            id: scenario == "no-identity" ? nil : 11,
+            frame: WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: screen.maxY)
+        ), WindowPreviewAccessibleWindow(
+            id: scenario == "no-identity" ? nil : 12,
+            frame: WindowPreviewLayout.appKitFrame(for: secondFrame, mainScreenTop: screen.maxY)
+        )]
+        let bundle: String? = scenario == "no-bundle" ? nil
+            : (scenario == "other-app" ? "com.example.documents" : "com.tencent.QQMusicMac")
+        let ids = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: windows, accessibleWindows: accessible,
+            screenFrames: [screen], mainScreenTop: screen.maxY, bundleIdentifier: bundle,
+            frontmostWindowIDs: {
+                Issue.record("Independent or unconfirmed windows must not trigger QQ Music's order query")
+                return [12, 11]
+            }
+        )
+        #expect(ids == (scenario == "single-window" ? [11] : [11, 12]),
+                "Identical geometry alone must not collapse independent application windows")
+    }
+
+    @Test(arguments: ["one-live", "one-main", "two-live", "two-main"])
+    func unavailableQQMusicWindowOrderUsesOnlyUnambiguousIdentity(scenario: String) {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 163, y: 122, width: 1180, height: 722)
+        let windows = [PreviewSystem.windowInfo(11, frame: frame), PreviewSystem.windowInfo(12, frame: frame)]
+        let accessible = [WindowPreviewAccessibleWindow(id: 11, frame: frame,
+                                                        isMain: scenario == "one-main" || scenario == "two-main")]
+            + (scenario == "one-live" ? [] : [WindowPreviewAccessibleWindow(id: 12, frame: frame,
+                                                                            isMain: scenario == "two-main")])
+        let ids = WindowPreviewWindowMatch.presentWindowIDs(
+            processIdentifier: 1, windowInfo: windows, accessibleWindows: accessible,
+            screenFrames: [screen], mainScreenTop: screen.maxY, bundleIdentifier: "com.tencent.QQMusicMac",
+            frontmostWindowIDs: { nil }
+        )
+        #expect(ids == (scenario == "one-live" || scenario == "one-main" ? [11] : [11, 12]),
+                "A failed order query must not choose arbitrarily among multiple equally live QQ Music windows")
+    }
+
+    @Test(arguments: [true, false])
+    func qqMusicPageGroupingQueriesWindowOrderAtMostOnceForTheWholeBatch(orderFails: Bool) {
+        let firstFrame = CGRect(x: 163, y: 122, width: 1180, height: 722)
+        let secondFrame = firstFrame.offsetBy(dx: 1200, dy: 0)
+        let candidates: [(id: CGWindowID, frame: CGRect)] = [
+            (11, firstFrame), (12, firstFrame), (13, secondFrame), (14, secondFrame),
+        ]
+        let accessible = candidates.map {
+            WindowPreviewAccessibleWindow(id: $0.id, frame: $0.frame, isMain: $0.id == 11 || $0.id == 13)
+        }
+        var requests = 0
+        let ids = WindowPreviewWindowMatch.previewWindowIDs(
+            candidates: candidates, accessibleWindows: accessible, bundleIdentifier: "com.tencent.QQMusicMac",
+            frontmostWindowIDs: {
+                requests += 1
+                return orderFails ? nil : [99, 12, 14, 11, 13]
+            }
+        )
+        #expect(ids == (orderFails ? [11, 13] : [12, 14]))
+        #expect(requests == 1, "Grouping a batch may issue one Window Server query, including when that query fails")
+        #expect(WindowPreviewWindowMatch.previewWindowIDs(
+            candidates: [], accessibleWindows: [], bundleIdentifier: "com.tencent.QQMusicMac",
+            frontmostWindowIDs: {
+                Issue.record("An empty preview batch must not query the Window Server")
+                return nil
+            }
+        ).isEmpty)
+    }
+
     @Test(arguments: [Optional(Set<CGWindowID>([11])), Set<CGWindowID>(), nil])
     func missingCaptureCandidatesOnlyUseCacheWhenWindowLivenessIsConfirmed(liveIDs: Set<CGWindowID>?) {
         var cache = WindowPreviewImageCache()
@@ -1401,6 +1971,7 @@ private final class PreviewSystem {
     var workspaceObservers: [NSObject] = []
     var timers: [Timer] = []
     var timerDelays: [TimeInterval] = []
+    var dockMenuIsOpen = false
     var switcher: WindowPreviewSelection?
     var commandPressed = true
     var presentations: [[CGWindowID]] = []
@@ -1460,6 +2031,7 @@ private final class PreviewSystem {
         }
         value.captureWindows = { [Self.snapshot($0)] }
         value.dockSelection = { nil }
+        value.dockMenuIsOpen = { self.dockMenuIsOpen }
         value.switcherSelection = { self.switcher }
         value.commandPressed = { self.commandPressed }
         value.present = { controller, selection in
@@ -1472,6 +2044,17 @@ private final class PreviewSystem {
             self.solePreviewActivations.append(isOnlyPreview)
         }
         return value
+    }
+
+    static func mouseEvent(
+        _ type: NSEvent.EventType,
+        modifiers: NSEvent.ModifierFlags = [],
+        timestamp: TimeInterval = 1
+    ) throws -> NSEvent {
+        try #require(NSEvent.mouseEvent(
+            with: type, location: .zero, modifierFlags: modifiers, timestamp: timestamp,
+            windowNumber: 0, context: nil, eventNumber: 1, clickCount: 1, pressure: 1
+        ))
     }
 
     static func selection(
@@ -1491,6 +2074,20 @@ private final class PreviewSystem {
             frame: CGRect(x: 20, y: 20, width: 300, height: 200),
             image: alpha.map { image(alpha: $0) }
         )
+    }
+
+    static func windowInfo(
+        _ identifier: CGWindowID,
+        processIdentifier: pid_t = 1,
+        frame: CGRect,
+        isOnScreen: Bool = false,
+        layer: Int = 0
+    ) -> [String: Any] {
+        [kCGWindowNumber as String: identifier,
+         kCGWindowOwnerPID as String: processIdentifier,
+         kCGWindowBounds as String: frame.dictionaryRepresentation,
+         kCGWindowIsOnscreen as String: isOnScreen,
+         kCGWindowLayer as String: layer]
     }
 
     static func videoSampleBuffer(alpha: CGFloat = 1, size: CGSize = CGSize(width: 16, height: 10)) throws -> CMSampleBuffer {

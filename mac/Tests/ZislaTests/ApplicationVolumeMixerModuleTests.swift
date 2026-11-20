@@ -35,9 +35,12 @@ struct ApplicationVolumeMixerModuleTests {
     @Test(arguments: [false, true], [160.0, 300.0]) @MainActor
     func unavailableMessagesStayCenteredWithoutAPageHeading(isSupported: Bool, height: Double) throws {
         let backend = VolumeLayoutBackend(isSupported: isSupported)
+        let suite = "Zisla.ApplicationVolumeLayout.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
         let service = ApplicationVolumeMixerService(
             monitor: VolumeLayoutMonitor(), backend: backend,
-            ownProcessIdentifier: -1, ownBundleIdentifier: "fixture.zisla"
+            ownProcessIdentifier: -1, ownBundleIdentifier: "fixture.zisla", defaults: defaults
         )
         let actual = try renderedContentBounds(ApplicationVolumeMixerModuleView(service: service), height: height)
         let reference = EmptyState(
@@ -64,9 +67,12 @@ struct ApplicationVolumeMixerModuleTests {
             )
         }
         let backend = VolumeLayoutBackend(isSupported: true)
+        let suite = "Zisla.ApplicationVolumeLayout.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
         let service = ApplicationVolumeMixerService(
             monitor: monitor, backend: backend,
-            ownProcessIdentifier: -1, ownBundleIdentifier: "fixture.zisla"
+            ownProcessIdentifier: -1, ownBundleIdentifier: "fixture.zisla", defaults: defaults
         )
         service.start()
         defer { service.stop() }

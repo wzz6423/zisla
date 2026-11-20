@@ -84,8 +84,11 @@ public final class ApplicationVolumeMixerService: ObservableObject {
         var isMuted = false
     }
 
+    static let preferencesKey = "application-volume-preferences-v1"
+
     private let monitor: any ApplicationVolumeSourceMonitoring
     private let backend: any ApplicationVolumeMixing
+    private let defaults: UserDefaults
     private let ownProcessIdentifier: pid_t
     private let ownBundleIdentifier: String?
     private var preferences: [String: Preference] = [:]
@@ -93,22 +96,29 @@ public final class ApplicationVolumeMixerService: ObservableObject {
     private var isRunning = false
     private var generation: UInt64 = 0
 
-    public convenience init() {
+    public convenience init(defaults: UserDefaults = .standard) {
         self.init(
             monitor: AudioPlaybackMonitor(), backend: CoreAudioApplicationVolumeBackend(),
             ownProcessIdentifier: ProcessInfo.processInfo.processIdentifier,
-            ownBundleIdentifier: Bundle.main.bundleIdentifier
+            ownBundleIdentifier: Bundle.main.bundleIdentifier, defaults: defaults
         )
     }
 
     init(
         monitor: any ApplicationVolumeSourceMonitoring, backend: any ApplicationVolumeMixing,
-        ownProcessIdentifier: pid_t, ownBundleIdentifier: String?
+        ownProcessIdentifier: pid_t, ownBundleIdentifier: String?, defaults: UserDefaults
     ) {
         self.monitor = monitor
         self.backend = backend
+        self.defaults = defaults
         self.ownProcessIdentifier = ownProcessIdentifier
         self.ownBundleIdentifier = ownBundleIdentifier
+        for (id, value) in defaults.dictionary(forKey: Self.preferencesKey) ?? [:] {
+            guard !id.hasPrefix("pid:"), let record = value as? [String: Any],
+                  let volume = record["volume"] as? Double, (0...1).contains(volume),
+                  let isMuted = record["isMuted"] as? Bool else { continue }
+            preferences[id] = Preference(volume: volume, isMuted: isMuted)
+        }
         monitor.onSourcesChanged = { [weak self] in self?.updateSources($0) }
         backend.onOutputChanged = { [weak self] in self?.reconcile() }
         backend.onControlFailure = { [weak self] id, failure in
@@ -134,7 +144,7 @@ public final class ApplicationVolumeMixerService: ObservableObject {
         generation &+= 1
         monitor.stop()
         backend.stop()
-        preferences.removeAll()
+        preferences = preferences.filter { !$0.key.hasPrefix("pid:") }
         sources = []
         applications = []
         errorMessage = nil
@@ -146,6 +156,7 @@ public final class ApplicationVolumeMixerService: ObservableObject {
         preference.volume = min(1, max(0, value))
         preference.isMuted = false
         preferences[id] = preference
+        persistPreferences()
         reconcile(retryingApplication: id)
     }
 
@@ -154,7 +165,16 @@ public final class ApplicationVolumeMixerService: ObservableObject {
         var preference = preferences[id] ?? Preference()
         preference.isMuted.toggle()
         preferences[id] = preference
+        persistPreferences()
         reconcile(retryingApplication: id)
+    }
+
+    private func persistPreferences() {
+        // PID-only identities can belong to a different process after a relaunch.
+        let saved = preferences.filter { !$0.key.hasPrefix("pid:") }.mapValues {
+            ["volume": $0.volume, "isMuted": $0.isMuted] as [String: Any]
+        }
+        defaults.set(saved, forKey: Self.preferencesKey)
     }
 
     private func updateSources(_ next: [AudioPlaybackSource]) {

@@ -31,14 +31,10 @@ final class KeyboardMonitor {
     struct EventInterest: Equatable, Sendable {
         let keyboardPresses: Bool
         let keyboardReleases: Bool
-        let pointerPresses: Bool
-        let pointerReleases: Bool
 
         static let all = EventInterest(
             keyboardPresses: true,
-            keyboardReleases: true,
-            pointerPresses: true,
-            pointerReleases: true
+            keyboardReleases: true
         )
 
         var eventTypes: [CGEventType] {
@@ -48,12 +44,6 @@ final class KeyboardMonitor {
             // Modifier keys arrive only as flagsChanged, which represents both
             // transitions even when a future caller asks only for releases.
             if keyboardPresses || keyboardReleases { types.append(.flagsChanged) }
-            if pointerPresses { types.append(.leftMouseDown) }
-            if pointerReleases { types.append(.leftMouseUp) }
-            if pointerPresses { types.append(.rightMouseDown) }
-            if pointerReleases { types.append(.rightMouseUp) }
-            if pointerPresses { types.append(.otherMouseDown) }
-            if pointerReleases { types.append(.otherMouseUp) }
             return types
         }
 
@@ -81,7 +71,7 @@ final class KeyboardMonitor {
     }
 
     private var runState: RunState?
-    private var handler: (@MainActor (GlobalInputEvent) -> Void)?
+    private var handler: (@MainActor (KeyboardEvent) -> Void)?
     private var pressedModifierKeyCodes: Set<UInt16> = []
     private var functionKeyDeduplicator = FunctionKeyDeduplicator()
 
@@ -91,7 +81,7 @@ final class KeyboardMonitor {
     @discardableResult
     func start(
         interest: EventInterest = .all,
-        handler: @escaping @MainActor (GlobalInputEvent) -> Void
+        handler: @escaping @MainActor (KeyboardEvent) -> Void
     ) -> Bool {
         stop()
         guard !interest.isEmpty else { return true }
@@ -169,7 +159,7 @@ final class KeyboardMonitor {
         return Unmanaged.passUnretained(event)
     }
 
-    static func decodedInputEvent(rawEventType: UInt32, event: CGEvent) -> GlobalInputEvent? {
+    static func decodedInputEvent(rawEventType: UInt32, event: CGEvent) -> KeyboardEvent? {
         if rawEventType == AuxiliaryControlKey.eventTypeRawValue {
             guard let systemEvent = NSEvent(cgEvent: event) else { return nil }
             return decodedSystemDefinedEvent(systemEvent)
@@ -180,21 +170,20 @@ final class KeyboardMonitor {
 
     /// Only the aux-control buttons that map onto F1-F12 become keyboard events; every other
     /// system-defined event (caps lock, power, eject, aux mouse buttons…) is left alone.
-    static func decodedSystemDefinedEvent(_ event: NSEvent) -> GlobalInputEvent? {
+    static func decodedSystemDefinedEvent(_ event: NSEvent) -> KeyboardEvent? {
         guard event.type == .systemDefined else { return nil }
-        guard let keyboardEvent = AuxiliaryControlKey.keyboardEvent(
+        return AuxiliaryControlKey.keyboardEvent(
             subtype: event.subtype.rawValue,
             data1: event.data1,
             isShortcutModified: event.modifierFlags.contains(.command)
                 || event.modifierFlags.contains(.control)
-        ) else { return nil }
-        return .keyboard(keyboardEvent)
+        )
     }
 
-    static func decodedInputEvent(type: CGEventType, event: CGEvent) -> GlobalInputEvent? {
+    static func decodedInputEvent(type: CGEventType, event: CGEvent) -> KeyboardEvent? {
         switch type {
         case .keyDown, .keyUp:
-            let keyboardEvent = KeyboardEvent(
+            return KeyboardEvent(
                 kind: type == .keyDown ? .keyDown : .keyUp,
                 keyCode: AuxiliaryControlKey.standardFunctionKeyCode(
                     for: UInt16(event.getIntegerValueField(.keyboardEventKeycode))
@@ -203,24 +192,6 @@ final class KeyboardMonitor {
                 isShortcutModified: event.flags.contains(.maskCommand)
                     || event.flags.contains(.maskControl)
             )
-            return .keyboard(keyboardEvent)
-        case .leftMouseDown, .leftMouseUp:
-            return .pointer(PointerEvent(
-                phase: type == .leftMouseDown ? .press : .release,
-                button: .primary
-            ))
-        case .rightMouseDown, .rightMouseUp:
-            return .pointer(PointerEvent(
-                phase: type == .rightMouseDown ? .press : .release,
-                button: .secondary
-            ))
-        case .otherMouseDown, .otherMouseUp:
-            return .pointer(PointerEvent(
-                phase: type == .otherMouseDown ? .press : .release,
-                button: PointerButton(
-                    mouseButtonNumber: event.getIntegerValueField(.mouseEventButtonNumber)
-                )
-            ))
         default:
             return nil
         }
@@ -233,22 +204,21 @@ final class KeyboardMonitor {
     }
 
     private func receive(
-        _ payload: GlobalInputEvent,
+        _ event: KeyboardEvent,
         from source: FunctionKeyDeduplicator.Source = .standardKey,
         at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime,
         processID: Int64 = 0
     ) {
         guard let handler else { return }
-        if case let .keyboard(keyboardEvent) = payload,
-           functionKeyDeduplicator.isDuplicate(
-               keyboardEvent,
-               from: source,
-               at: timestamp,
-               processID: processID
-           ) {
+        if functionKeyDeduplicator.isDuplicate(
+            event,
+            from: source,
+            at: timestamp,
+            processID: processID
+        ) {
             return
         }
-        handler(payload)
+        handler(event)
     }
 
     private static let deviceModifierMasks: [(keyCode: UInt16, mask: UInt64)] = [
@@ -281,7 +251,7 @@ final class KeyboardMonitor {
             pressedModifierKeyCodes.remove(keyCode)
         }
         let kind: KeyboardEvent.Kind = isDown ? .keyDown : .keyUp
-        receive(.keyboard(KeyboardEvent(kind: kind, keyCode: keyCode, isRepeat: false)))
+        receive(KeyboardEvent(kind: kind, keyCode: keyCode, isRepeat: false))
     }
 
     static func modifierIsDown(

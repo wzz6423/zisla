@@ -1031,9 +1031,144 @@ struct RichNoteEditorTests {
     }
 
     @Test
-    func createsNewNoteWithExplicitBodyFontSize() {
+    func createsNewNoteWithNativeBodyDefaults() {
         #expect(RichNoteEditor.newNoteHTML.contains("<h1>"))
-        #expect(RichNoteEditor.newNoteHTML.contains("font-size: 11px"))
+        #expect(!RichNoteEditor.newNoteHTML.contains("font-size"), "New notes must inherit Notes' native body size")
+        #expect(!RichNoteEditor.newNoteHTML.contains("color"), "New notes must inherit Notes' appearance-aware text color")
+    }
+
+    @Test(arguments: [
+        "<div><span style='color: white; font-size: 9px; font-family: Helvetica'>粘贴正文</span></div>",
+        "<div><font color='#ffffff' size='1' face='Helvetica'>粘贴正文</font></div>",
+        "<style>.source { color: white; font-size: 9px; font-family: Helvetica; }</style><div class='source'>粘贴正文</div>",
+    ])
+    func pastedTextUsesNativeBodyDefaults(html: String) async throws {
+        let literal = try javaScriptStringLiteral(html)
+        try await withCopyEditor(html: "<div><br></div>", pasteboard: RejectingRichNotePasteboard(), onCopy: {}) { webView, changes in
+            let result = try #require(await webView.evaluateJavaScript("""
+                (() => {
+                  const editor = document.getElementById('editor');
+                  editor.focus();
+                  const range = document.createRange(); range.selectNodeContents(editor.firstElementChild); range.collapse(true);
+                  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+                  const data = new DataTransfer(); data.setData('text/html', \(literal)); data.setData('text/plain', '粘贴正文');
+                  const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
+                  editor.dispatchEvent(event);
+                  // Synthetic paste events do not run WebKit's native clipboard insertion.
+                  if (!event.defaultPrevented) document.execCommand('insertHTML', false, data.getData('text/html'));
+                  return { prevented: event.defaultPrevented, size: getComputedStyle(editor.lastElementChild).fontSize };
+                })()
+                """) as? [String: Any])
+            #expect(result["prevented"] as? Bool == true, "HTML paste must match the destination style instead of retaining the source's white/small text")
+            let saved = try await waitForChange(in: changes) { $0.1.contains("粘贴正文") }
+            #expect(result["size"] as? String == "13px")
+            #expect(!saved.1.contains("font-size"), "Pasted body text must inherit Notes' native size: \(saved.1)")
+            #expect(!saved.1.contains("color"), "Source white must not become a persisted text color: \(saved.1)")
+            #expect(!saved.1.contains("font-family"))
+            #expect(!saved.1.contains("<style"))
+            #expect(!saved.1.contains("face="))
+            #expect(!saved.1.contains("size="))
+            #expect(!saved.1.contains("data-zisla-"))
+        }
+    }
+
+    @Test
+    func pastePreservesRichContentAndExistingNoteFormatting() async throws {
+        let source = """
+        <h2 style='color: white; font-size: 9px'>小标题</h2>
+        <div><b onclick='window.zislaCompromised = true'>粗体</b><i>斜体</i><u>下划线</u><a href='https://example.com' style='color: white'>链接</a></div>
+        <ul><li>列表</li></ul><table><tr><td>单元格</td></tr></table><hr size='4'>
+        <img src='data:image/png;base64,AAAA' alt='图片'>
+        <script>window.zislaCompromised = true</script><img src='invalid' onerror='window.zislaCompromised = true'>
+        <form action='https://example.com'><input name='secret'></form><a href='javascript:window.zislaCompromised = true'>不安全链接</a>
+        """
+        let literal = try javaScriptStringLiteral(source)
+        let existing = "<div><span id='existing' style='color: red; font-size: 18px'>原文</span></div><div id='target'><br></div>"
+        try await withCopyEditor(html: existing, pasteboard: RejectingRichNotePasteboard(), onCopy: {}) { webView, changes in
+            _ = try await webView.evaluateJavaScript("""
+                (() => {
+                  const editor = document.getElementById('editor'); editor.focus();
+                  const range = document.createRange(); range.selectNodeContents(document.getElementById('target')); range.collapse(true);
+                  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+                  const data = new DataTransfer(); data.setData('text/html', \(literal));
+                  editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+                })()
+                """)
+            let saved = try await waitForChange(in: changes) { $0.1.contains("单元格") }
+            let savedLiteral = try javaScriptStringLiteral(saved.1)
+            let result = try #require(await webView.evaluateJavaScript("""
+                (() => {
+                  const template = document.createElement('template'); template.innerHTML = \(savedLiteral);
+                  const root = template.content;
+                  const original = root.querySelector('#existing');
+                  return {
+                    color: original.style.color, size: original.style.fontSize,
+                    richContent: ['h2', 'b', 'i', 'u', 'a[href="https://example.com"]', 'ul li', 'table td', 'hr[size="4"]', 'img[src="data:image/png;base64,AAAA"]'].every(selector => root.querySelector(selector)),
+                    unsafeContent: Boolean(root.querySelector('script, form, [onclick], [onerror], a[href^="javascript:"]')) || Boolean(window.zislaCompromised)
+                  };
+                })()
+                """) as? [String: Any])
+            #expect(result["color"] as? String == "red")
+            #expect(result["size"] as? String == "18px")
+            #expect(result["richContent"] as? Bool == true, "Matching paste typography must preserve headings, emphasis, links, lists, tables, and images")
+            #expect(result["unsafeContent"] as? Bool == false, "Pasted HTML must use the editor's existing active-content filter")
+            #expect(!saved.1.contains("color: white"))
+            #expect(!saved.1.contains("font-size: 9px"))
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func emptyAndPlainTextPasteKeepTheNativeClipboardPath(isEditable: Bool) async throws {
+        try await withCopyEditor(html: "<div>原文</div>", isEditable: isEditable,
+                                 pasteboard: RejectingRichNotePasteboard(), onCopy: {}) { webView, changes in
+            let result = try #require(await webView.evaluateJavaScript("""
+                (() => {
+                  const editor = document.getElementById('editor');
+                  const original = editor.innerHTML;
+                  return ['', '粘贴正文'].map(text => {
+                    const data = new DataTransfer(); data.setData('text/plain', text);
+                    const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
+                    editor.dispatchEvent(event);
+                    return !event.defaultPrevented && editor.innerHTML === original;
+                  });
+                })()
+                """) as? [Bool])
+            #expect(result == [true, true], "Empty and plain-text clipboard data must retain WebKit's native paste behavior")
+            #expect(changes.changes.isEmpty)
+            if !isEditable {
+                let unchanged = try await webView.evaluateJavaScript("""
+                    (() => {
+                      const editor = document.getElementById('editor'); const original = editor.innerHTML;
+                      const data = new DataTransfer(); data.setData('text/html', '<div style="color: white">不应插入</div>');
+                      editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+                      return editor.innerHTML === original;
+                    })()
+                    """) as? Bool
+                #expect(unchanged == true)
+            }
+        }
+    }
+
+    @Test
+    func imagePasteKeepsTheAttachmentPathWhenHTMLIsAlsoPresent() async throws {
+        let image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZuoAAAAASUVORK5CYII="
+        try await withCopyEditor(html: "<div><br></div>", pasteboard: RejectingRichNotePasteboard(), onCopy: {}) { webView, changes in
+            _ = try await webView.evaluateJavaScript("""
+                (() => {
+                  const editor = document.getElementById('editor'); editor.focus();
+                  const range = document.createRange(); range.selectNodeContents(editor.firstElementChild); range.collapse(true);
+                  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+                  const data = new DataTransfer(); data.setData('text/html', '<div>不应插入</div>');
+                  const bytes = Uint8Array.from(atob('\(image)'), char => char.charCodeAt(0));
+                  data.items.add(new File([bytes], 'pixel.png', {type: 'image/png'}));
+                  editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+                })()
+                """)
+            let saved = try await waitForChange(in: changes) { $0.1.contains("<img") }
+            #expect(saved.1.contains("data:image/png;base64,\(image)"))
+            #expect(saved.1.contains("alt=\"pixel.png\""))
+            #expect(!saved.1.contains("不应插入"), "Image clipboard items must retain priority over the HTML representation")
+        }
     }
 
     @Test

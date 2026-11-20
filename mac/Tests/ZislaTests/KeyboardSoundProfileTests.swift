@@ -9,6 +9,43 @@ import ZislaKit
 
 @MainActor
 struct KeyboardSoundProfileTests {
+    @Test(arguments: [false, true])
+    func retiredPointerSettingsAreIgnoredWithoutChangingKeyboardPreferences(hasLegacyValues: Bool) throws {
+        let suiteName = "KeyboardSoundProfileTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(false, forKey: "enabled")
+        defaults.set(SwitchProfile.blackInk.rawValue, forKey: "selectedProfile")
+        defaults.set(0.25, forKey: "volume")
+        defaults.set(KeyboardVolumeCurve.currentVersion, forKey: "keyboardVolumeCurveVersion")
+        defaults.set(false, forKey: "releaseSound")
+        defaults.set(false, forKey: "pitchVariation")
+        defaults.set(true, forKey: "typingStatsEnabled")
+        let legacyValues: [String: Any] = [
+            "pointerSoundEnabled": true,
+            "selectedPointerProfile": "retired-profile",
+            "pointerVolume": -10.0,
+            "pointerReleaseSound": false,
+        ]
+        if hasLegacyValues {
+            for (key, value) in legacyValues { defaults.set(value, forKey: key) }
+        }
+
+        let settings = AppSettings(defaults: defaults)
+
+        #expect(!settings.isEnabled)
+        #expect(settings.selectedProfile == .blackInk)
+        #expect(settings.volume == 0.25)
+        #expect(settings.keyboardPlaybackGain == 0.015625)
+        #expect(!settings.playsReleaseSound)
+        #expect(!settings.usesPitchVariation)
+        #expect(settings.isTypingStatsEnabled)
+        let storedLegacyValues = legacyValues.keys.reduce(into: [String: Any]()) { values, key in
+            if let value = defaults.object(forKey: key) { values[key] = value }
+        }
+        #expect(NSDictionary(dictionary: storedLegacyValues).isEqual(to: hasLegacyValues ? legacyValues : [:]))
+    }
+
     @Test(arguments: [true, false])
     func settingsProfilesFollowAvailableLibraryWhileKeyboardServicesAreDisabled(hasBundledRecordings: Bool) async throws {
         let directory = FileManager.default.temporaryDirectory

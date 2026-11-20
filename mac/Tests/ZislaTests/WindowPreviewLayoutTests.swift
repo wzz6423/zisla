@@ -468,6 +468,47 @@ struct WindowPreviewWindowMatchTests {
         ) == nil)
     }
 
+    @Test(arguments: [CGWindowID(11), CGWindowID(12)])
+    func overlappingPagesActivateTheirExactAccessibilityWindow(windowID: CGWindowID) {
+        let frame = CGRect(x: 163, y: 122, width: 1180, height: 722)
+        let candidates: [(title: String?, frame: CGRect?)] = [("Player", frame), ("Player", frame)]
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Player", frame: frame, candidates: candidates,
+            windowID: windowID, candidateWindowIDs: [11, 12]
+        ) == (windowID == 11 ? 0 : 1), "The retained preview must activate its exact page despite overlapping titles and geometry")
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Player", frame: frame, candidates: candidates,
+            windowID: windowID, candidateWindowIDs: [nil, nil]
+        ) == nil, "An unavailable identity must not arbitrarily activate another overlapping page")
+    }
+
+    @Test(arguments: [Optional(CGWindowID(11)), nil])
+    func activationFallbackOnlyUsesWindowsWithUnavailableIdentity(candidateWindowID: CGWindowID?) {
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Player", frame: frame, candidates: [("Player", frame)],
+            windowID: 12, candidateWindowIDs: [candidateWindowID]
+        ) == (candidateWindowID == nil ? 0 : nil),
+                "A known different ID must not become the clicked preview's geometry fallback")
+
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Player", frame: screen, candidates: [("Player", nil)],
+            screenFrames: [screen], isOnlyPreview: true,
+            windowID: 12, candidateWindowIDs: [candidateWindowID]
+        ) == (candidateWindowID == nil ? 0 : nil),
+                "Fullscreen fallback must not activate a known different window either")
+    }
+
+    @Test
+    func geometryFallbackKeepsTheOriginalIndexOfAnUnknownIdentity() {
+        let frame = CGRect(x: 20, y: 20, width: 300, height: 200)
+        #expect(WindowPreviewWindowMatch.index(
+            title: "Player", frame: frame, candidates: [("Player", frame), ("Player", frame)],
+            windowID: 12, candidateWindowIDs: [11, nil]
+        ) == 1, "Excluding a known different identity must not change the remaining window's index")
+    }
+
     @Test
     func aSingleUnmeasurableFullscreenWindowCanBeActivatedWithoutGuessingAmongOthers() {
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
