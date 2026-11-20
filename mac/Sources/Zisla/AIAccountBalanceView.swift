@@ -200,7 +200,7 @@ struct CompactAIAccountBalanceBar: View {
 
     private var lines: [String] { (0..<2).compactMap { notice.metadata?["quotaLine\($0)"] } }
     private var severity: AIAccountQuotaSeverity {
-        AIAccountQuotaSeverity(rawValue: Int(notice.metadata?["quotaSeverity"] ?? "") ?? 0) ?? .normal
+        quotaSeverity(key: "quotaSeverity") ?? .normal
     }
     private var provider: AIProvider? { notice.metadata?["quotaProviderID"].flatMap(AIProvider.init(rawValue:)) }
     private var fraction: Double? { notice.metadata?["quotaRemainingFraction"].flatMap(Double.init) }
@@ -241,7 +241,7 @@ struct CompactAIAccountBalanceBar: View {
                         ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                             VerticalStatusText(text: line, availableWidth: valueWidth,
                                 availableHeight: valueHeight, scrollsAutomatically: true)
-                                .foregroundStyle((quotaSeverity(key: "quotaLineSeverity\(index)") ?? severity).balanceColor)
+                                .foregroundStyle(textColor(index: index))
                         }
                     }
                     .environment(\.layoutDirection, direction)
@@ -273,7 +273,7 @@ struct CompactAIAccountBalanceBar: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                 MarqueeText(line, font: .system(size: lines.count > 1 ? 9 : 11).monospacedDigit(),
-                    textColor: (quotaSeverity(key: "quotaLineSeverity\(index)") ?? severity).balanceColor,
+                    textColor: textColor(index: index),
                     fontWeight: lines.count > 1 ? .medium : .semibold,
                     pointsPerSecond: CompactPillStatusPresentation.accountBalanceScrollSpeed,
                     scrollDirection: direction == .rightToLeft ? .right : .left,
@@ -285,6 +285,12 @@ struct CompactAIAccountBalanceBar: View {
     }
 
     private func quotaSeverity(key: String) -> AIAccountQuotaSeverity? {
-        notice.metadata?[key].flatMap(Int.init).flatMap(AIAccountQuotaSeverity.init(rawValue:))
+        let severity = notice.metadata?[key].flatMap(Int.init).flatMap(AIAccountQuotaSeverity.init(rawValue:))
+        return severity == .critical ? .warning : severity
+    }
+
+    private func textColor(index: Int) -> Color {
+        let severity = quotaSeverity(key: "quotaLineSeverity\(index)") ?? severity
+        return severity == .exhausted ? .red : severity.balanceColor
     }
 }
