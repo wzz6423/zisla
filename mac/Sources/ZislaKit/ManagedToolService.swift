@@ -24,6 +24,9 @@ public final class ManagedToolService: ObservableObject {
     private var automaticUpdateTask: Task<Void, Never>?
     private var automaticUpdateTools: [ManagedTool] = []
     private var automaticUpdatePassInProgress = false
+    #if DEBUG
+    private var debugHomebrewErrors: [String: String] = [:]
+    #endif
 
     private static let dependencyTools: Set<ManagedTool> = [.ytDLP, .ffmpeg, .libreOffice, .libvips, .libavif]
     private static let cacheKey = "managed-tool-state-cache-v1"
@@ -43,7 +46,8 @@ public final class ManagedToolService: ObservableObject {
         homebrewRunner: (([String], [String: String]) async throws -> String)? = nil,
         automaticUpdateSleep: @escaping @Sendable (Duration) async throws -> Void = {
             try await Task.sleep(for: $0)
-        }
+        },
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.toolsDirectory = toolsDirectory
         self.applicationsDirectory = applicationsDirectory
@@ -58,6 +62,28 @@ public final class ManagedToolService: ObservableObject {
         self.automaticUpdateSleep = automaticUpdateSleep
         for tool in ManagedTool.allCases { states[tool] = ManagedToolState() }
         restoreCachedStates()
+        #if DEBUG
+        if environment["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS"] == "1" {
+            for tool in [ManagedTool.pipx, .uv] {
+                let diagnostic = """
+                Warning: The following taps are not trusted:
+                  carvel-dev/carvel
+                Homebrew is currently ignoring formulae, casks and commands from these taps.
+                ==> Downloading bottle manifests
+                \u{001B}[31mError: Failed to download resource "\(tool.displayName)"\u{001B}[0m
+                Download failed: https://example.com/\(tool.executableName)
+                curl: (35) TLS connect error
+                ==> Fetching downloads for: \(tool.executableName)
+                Error: Failed to download resource "\(tool.displayName)"
+                curl: (35) TLS connect error
+                """
+                let output = AIAgentProcessOutput(status: 1, standardOutput: Data(), standardError: diagnostic, didTimeout: false)
+                let summary = Self.homebrewFailureSummary(output, executable: URL(fileURLWithPath: "/usr/bin/brew"))
+                debugHomebrewErrors[tool.executableName] = summary
+                states[tool]?.errorMessage = ManagedToolError.homebrewFailed(summary).message
+            }
+        }
+        #endif
     }
 
     deinit {
@@ -552,14 +578,50 @@ public final class ManagedToolService: ObservableObject {
     }
 
     private func runHomebrew(_ arguments: [String]) async throws -> String {
+        #if DEBUG
+        if let name = arguments.last, let error = debugHomebrewErrors[name] {
+            throw ManagedToolError.homebrewFailed(error)
+        }
+        #endif
         if let homebrewRunner { return try await homebrewRunner(arguments, processEnvironment) }
         guard let homebrewExecutable else { throw ManagedToolError.homebrewUnavailable }
-        switch await Self.runProcess(homebrewExecutable, arguments: arguments, environment: processEnvironment) {
-        case .success(let output):
-            return output
-        case .failure(let error):
-            throw ManagedToolError.homebrewFailed(error.message)
+        let output: AIAgentProcessOutput
+        do {
+            output = try await AIAgentProcessRunner.run(
+                executableURL: homebrewExecutable,
+                arguments: arguments,
+                environment: processEnvironment,
+                timeout: nil,
+                maximumOutputBytes: 256 * 1024,
+                maximumErrorBytes: 64 * 1024,
+                maximumErrorTailBytes: 16 * 1024
+            )
+        } catch {
+            throw ManagedToolError.homebrewFailed(error.localizedDescription)
         }
+        guard output.status == 0 else {
+            throw ManagedToolError.homebrewFailed(Self.homebrewFailureSummary(output, executable: homebrewExecutable))
+        }
+        return String(decoding: output.standardOutput, as: UTF8.self)
+    }
+
+    private static func homebrewFailureSummary(_ output: AIAgentProcessOutput, executable: URL) -> String {
+        let lines = [output.standardError, String(decoding: output.standardOutput, as: UTF8.self)]
+            .flatMap { diagnostic in
+                diagnostic.replacingOccurrences(of: #"\x1B\[[0-?]*[ -/]*[@-~]"#, with: "", options: .regularExpression)
+                    .components(separatedBy: .newlines)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+            }
+        let errors = lines.filter { $0.hasPrefix("Error:") || $0.hasPrefix("curl: (") }
+        var seen = Set<String>()
+        let summary = (errors.isEmpty ? lines : errors)
+            .filter { seen.insert($0).inserted }
+            .prefix(2)
+            .joined(separator: "\n")
+        return summary.isEmpty
+            ? AppLocalization.text("%@ 退出码 %ld", executable.lastPathComponent, Int(output.status))
+            : summary
     }
 
     private func installGitHubRelease(_ tool: ManagedTool, repository: String, updatingExisting: URL? = nil) async throws {
