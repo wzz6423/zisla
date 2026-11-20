@@ -618,7 +618,8 @@ final class WindowPreviewController: ObservableObject {
                 clearSelection()
                 return
             }
-            if event.type == .leftMouseDown, let clicked = dependencies.dockSelection() {
+            if event.type == .leftMouseDown, !event.modifierFlags.contains(.control),
+               let clicked = dependencies.dockSelection() {
                 deferCaptures(for: clicked.processIdentifier)
             }
             if switcherTimer == nil && panel?.frame.contains(NSEvent.mouseLocation) != true {

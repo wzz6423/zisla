@@ -301,7 +301,9 @@ struct WindowPreviewLifecycleTests {
     func contextClickPreservesCommandTabPreviews(controlClick: Bool) async throws {
         let system = PreviewSystem()
         system.switcher = PreviewSystem.selection(2, source: .switcher)
-        let controller = WindowPreviewController(dependencies: system.dependencies())
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { PreviewSystem.selection(2, source: .dock) }
+        let controller = WindowPreviewController(dependencies: dependencies)
         defer { controller.stop() }
         controller.configure(enabled: true)
         controller.beginSwitcher()
