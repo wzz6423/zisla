@@ -34,12 +34,16 @@ struct ContextNoteScreenshotWindowTests {
         let image = try #require(window.contentView as? NSImageView)
         #expect(image.image === screenshot.image)
         #expect(image.accessibilityLabel() == AppLocalization.text("截图"))
-        for width in [image.bounds.width, 960, 480] {
+        // AppKit clamps oversized windows to the screen and rounds dimensions independently.
+        let maximumScale = min(image.bounds.width / imageSize.width, image.bounds.height / imageSize.height).rounded(.down)
+        for scale in [maximumScale, maximumScale / 2, maximumScale / 3].map({ $0.rounded(.down) }) {
+            let width = imageSize.width * scale
             window.orderOut(nil)
             window.setContentSize(CGSize(width: width, height: width * imageSize.height / imageSize.width))
             window.setFrameOrigin(CGPoint(x: -100_000, y: -100_000))
             #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) })
             window.orderFrontRegardless()
+            #expect(image.bounds.size == CGSize(width: width, height: width * imageSize.height / imageSize.width))
             #expect(abs(image.bounds.width / image.bounds.height - imageSize.width / imageSize.height) < 0.001)
             #expect(abs(image.bounds.height - window.contentLayoutRect.height) < 0.01)
             #expect(abs(image.bounds.width - window.contentLayoutRect.width) < 0.01)

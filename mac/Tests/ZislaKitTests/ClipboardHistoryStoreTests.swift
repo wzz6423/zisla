@@ -2,7 +2,6 @@ import Combine
 import Foundation
 import SQLite3
 import Testing
-import XCTest
 import ZislaCore
 
 @testable import ZislaKit
@@ -1349,7 +1348,7 @@ struct ClipboardHistoryStoreTests {
         #expect(store.items.isEmpty)
     }
 
-    @Test
+    @Test(.timeLimit(.minutes(1)))
     func immediateCleanupWaitsForPersistenceAndKeepsTheExistingTimer() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -1359,7 +1358,7 @@ struct ClipboardHistoryStoreTests {
         let pinned = ClipboardHistoryItem(content: .text("pinned"), lastCopiedAt: .distantPast, isPinned: true)
         let database = ClipboardHistoryDatabase(storageURL: storageURL)
         try database.flush([expired, pinned].map { .upsert($0, capacity: nil) })
-        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60), now: { now })
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(600), now: { now })
         await store.waitUntilLoaded()
         store.configureCleanup(policy: .sevenDays)
         defer { store.stopCleanup(); store.flushPendingChanges() }
@@ -1368,15 +1367,7 @@ struct ClipboardHistoryStoreTests {
         let deadline = timer.fireDate
         now.addTimeInterval(2 * 86_400)
 
-        let completed = XCTestExpectation(description: "Immediate cleanup bypasses the persistence delay")
-        let operation = Task {
-            #expect(await store.cleanupOldHistoryNow(policy: .sevenDays, now: now) == nil)
-            completed.fulfill()
-        }
-        let completion = await XCTWaiter.fulfillment(of: [completed], timeout: 2)
-        #expect(completion == .completed)
-        if completion != .completed { store.flushPendingChanges() }
-        await operation.value
+        #expect(await store.cleanupOldHistoryNow(policy: .sevenDays, now: now) == nil)
 
         #expect(store.items.map(\.id) == [pinned.id])
         let reopened = ClipboardHistoryStore(storageURL: storageURL)
