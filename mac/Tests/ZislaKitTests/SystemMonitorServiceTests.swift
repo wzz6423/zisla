@@ -24,6 +24,9 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     var temporaryDirectory: URL = URL(fileURLWithPath: "/private/var/folders/test/T")
     var searchPathResults: [FileManager.SearchPathDirectory: [URL]] = [:]
     var fileContentsData: [String: Data] = [:]
+    var applicationProcesses: Set<String>? = []
+
+    func applicationExecutablePaths() -> Set<String>? { applicationProcesses }
 
     func fileExists(atPath path: String) -> Bool {
         existingPaths.contains(path)

@@ -3767,3 +3767,7 @@
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Không thể đọc cookie từ trình duyệt mặc định. Hãy dán thủ công hoặc kiểm tra quyền truy cập.";
 "按应用" = "Theo ứng dụng";
 "搜索内容或应用" = "Tìm nội dung hoặc ứng dụng";
+
+"重复安装 · 版本 %@ · %@ · 保留：%@" = "Cài đặt trùng lặp · Phiên bản %@ · %@ · Giữ lại: %@";
+"更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Tệp còn lại sau cập nhật · Phiên bản cũ %@ · %@ · Phiên bản hiện tại: %@";
+"应用副本或当前版本状态已变化，已保留目标" = "Bản sao ứng dụng hoặc phiên bản hiện tại đã thay đổi. Mục được giữ lại.";

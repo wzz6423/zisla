@@ -3766,3 +3766,7 @@
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Cannot read default browser cookies. Paste cookies manually or check access permissions.";
 "按应用" = "By app";
 "搜索内容或应用" = "Search content or apps";
+
+"重复安装 · 版本 %@ · %@ · 保留：%@" = "Duplicate installation · Version %@ · %@ · Keep: %@";
+"更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Update leftover · Old version %@ · %@ · Current version: %@";
+"应用副本或当前版本状态已变化，已保留目标" = "The application copy or current version has changed. The item was kept.";
