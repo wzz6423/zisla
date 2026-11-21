@@ -3755,3 +3755,5 @@
 "正在清理" = "Limpiando";
 "清理完成" = "Limpieza completada";
 "清理失败：%@" = "Error al limpiar: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "La limpieza ha fallado. Consulta los detalles en Ajustes > Monitor del Sistema y Limpieza.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "La limpieza ha fallado parcialmente. Consulta los detalles en Ajustes > Monitor del Sistema y Limpieza.";

@@ -3755,3 +3755,5 @@
 "正在清理" = "Đang dọn dẹp";
 "清理完成" = "Dọn dẹp hoàn tất";
 "清理失败：%@" = "Dọn dẹp thất bại: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Dọn dẹp thất bại. Xem chi tiết tại Cài đặt > Giám sát Hệ thống và Dọn dẹp.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Một phần thao tác dọn dẹp thất bại. Xem chi tiết tại Cài đặt > Giám sát Hệ thống và Dọn dẹp.";

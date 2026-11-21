@@ -2232,6 +2232,51 @@ struct SystemMonitorServiceTests {
         #expect(result.failures.isEmpty)
     }
 
+    @Test(arguments: [false, true])
+    func trashFailuresPreservePermissionMetadataWithoutDeletingFiles(useCandidates: Bool) {
+        let cocoaRead = NSError(domain: NSCocoaErrorDomain, code: NSFileReadNoPermissionError,
+            userInfo: [NSLocalizedDescriptionKey: "diagnostic report access denied"])
+        let cocoaWrite = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError,
+            userInfo: [NSLocalizedDescriptionKey: "cache write access denied"])
+        let posixAccess = NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES), userInfo: nil)
+        let posixOperation = NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM), userInfo: nil)
+        let cases: [(NSError, Bool)] = [
+            (cocoaRead, true),
+            (cocoaWrite, true),
+            (posixAccess, true),
+            (posixOperation, true),
+            (NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError,
+                userInfo: [NSUnderlyingErrorKey: posixAccess]), true),
+            (NSError(domain: "wrapper", code: 1, userInfo: [NSUnderlyingErrorKey: cocoaRead]), true),
+            (NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError, userInfo: nil), false),
+            (NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError, userInfo: nil), false),
+            (NSError(domain: NSPOSIXErrorDomain, code: Int(ENOENT), userInfo: nil), false),
+            (NSError(domain: NSPOSIXErrorDomain, code: Int(EIO), userInfo: nil), false),
+            (NSError(domain: "unrelated", code: Int(EACCES),
+                userInfo: [NSLocalizedDescriptionKey: "Permission denied"]), false),
+        ]
+        for (error, permissionDenied) in cases {
+            let mock = MockFileManager()
+            let file = mock.homeDirectory.appendingPathComponent("Library/Caches/com.example.cache")
+            mock.existingPaths = [file.path]
+            mock.trashResults[file] = .failure(error)
+            let result: DiskCleanupResult
+            if useCandidates {
+                result = SystemDiskCleanup.trashSelected(candidates: [DiskCleanupCandidate(
+                    url: file, kind: .appCache, byteSize: 128, displayName: "fixture cache"
+                )], fileManager: mock)
+            } else {
+                result = SystemDiskCleanup.trashSelected(urls: [file], fileManager: mock)
+            }
+
+            #expect(result.successCount == 0 && result.freedBytes == 0)
+            #expect(result.failures == [DiskCleanupFailure(url: file, message: error.localizedDescription,
+                isPermissionDenied: permissionDenied)], "Unexpected metadata for \(error.domain):\(error.code)")
+            #expect(mock.existingPaths == [file.path])
+            #expect(mock.trashedURLs == [file], "A failed item must not be retried or sent to another deletion path")
+        }
+    }
+
     @Test
     func trashSelectedRejectsPathOutsideAllowedRoots() {
         let mock = MockFileManager()
@@ -2253,6 +2298,7 @@ struct SystemMonitorServiceTests {
         #expect(result.failures.count == 1)
         #expect(result.failures[0].url == outside.standardizedFileURL)
         #expect(result.failures[0].message.contains("允许清理的用户目录"))
+        #expect(!result.failures[0].isPermissionDenied)
     }
 
     @Test
@@ -2282,6 +2328,7 @@ struct SystemMonitorServiceTests {
 
         #expect(result.successCount == 0)
         #expect(result.failures.first?.message.contains("本地文件路径") == true)
+        #expect(result.failures.first?.isPermissionDenied == false)
     }
 
     @Test
@@ -2298,6 +2345,7 @@ struct SystemMonitorServiceTests {
 
         #expect(result.successCount == 0)
         #expect(result.failures.first?.message.contains("不存在") == true)
+        #expect(result.failures.first?.isPermissionDenied == false)
     }
 
     // MARK: SystemMonitorService

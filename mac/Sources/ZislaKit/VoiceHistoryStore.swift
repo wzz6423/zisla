@@ -447,9 +447,9 @@ public final class VoiceHistoryStore: ObservableObject {
     public func cleanupOldRecordings(
         policy: VoiceRecordingCleanupPolicy,
         now: Date = Date()
-    ) -> String? {
-        guard let daysThreshold = policy.daysThreshold else { return nil }
-        guard beginAccess() else { return errorDescription }
+    ) -> (successCount: Int, error: String?) {
+        guard let daysThreshold = policy.daysThreshold else { return (0, nil) }
+        guard beginAccess() else { return (0, errorDescription) }
         defer { finishAccess() }
         let cutoffDate = now.addingTimeInterval(-Double(daysThreshold) * 24 * 60 * 60)
         var candidate = entries
@@ -464,13 +464,13 @@ public final class VoiceHistoryStore: ObservableObject {
             candidate[index].audioFileName = nil
             audioDeletions.append((candidate[index].id, audioURL))
         }
-        guard candidate != entries else { return nil }
+        guard candidate != entries else { return (0, nil) }
         let stagedAudioFiles: [StagedAudioFile]
         do {
             stagedAudioFiles = try stageAudioFiles(audioDeletions.map(\.url))
         } catch {
             errorDescription = error.localizedDescription
-            return errorDescription
+            return (0, errorDescription)
         }
         guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else {
             let persistenceError = errorDescription
@@ -479,7 +479,7 @@ public final class VoiceHistoryStore: ObservableObject {
             } else {
                 errorDescription = persistenceError
             }
-            return errorDescription
+            return (0, errorDescription)
         }
         let removal = removeStagedAudioFiles(stagedAudioFiles)
         if let removalError = removal.error {
@@ -495,10 +495,10 @@ public final class VoiceHistoryStore: ObservableObject {
             let restorationError = rollbackSucceeded ? restoreStagedAudioFiles(removal.remaining) : nil
             entries = rollbackSucceeded ? fallback : candidate
             errorDescription = (restorationError ?? removalError).localizedDescription
-            return errorDescription
+            return (stagedAudioFiles.count - removal.remaining.count, errorDescription)
         }
         entries = candidate
-        return nil
+        return (stagedAudioFiles.count, nil)
     }
 
     @discardableResult

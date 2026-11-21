@@ -3751,3 +3751,5 @@
 "正在清理" = "Nettoyage en cours";
 "清理完成" = "Nettoyage terminé";
 "清理失败：%@" = "Échec du nettoyage : %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Le nettoyage a échoué. Consultez les détails dans Réglages > Moniteur système et nettoyage.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Le nettoyage a partiellement échoué. Consultez les détails dans Réglages > Moniteur système et nettoyage.";

@@ -1388,6 +1388,45 @@ struct ClipboardHistoryStoreTests {
     }
 
     @Test
+    func changingAutomaticCleanupDoesNotCancelTheManualDeletion() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let expired = ClipboardHistoryItem(content: .text("manual cleanup"), lastCopiedAt: now.addingTimeInterval(-8 * 86_400))
+        let pinned = ClipboardHistoryItem(content: .text("pinned"), lastCopiedAt: .distantPast, isPinned: true)
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        try database.flush([expired, pinned].map { .upsert($0, capacity: nil) })
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60), now: { now })
+        await store.waitUntilLoaded()
+        store.configureCleanup(policy: .thirtyDays)
+        store.flushPendingChanges()
+        defer { store.stopCleanup(); store.flushPendingChanges() }
+        var connection: OpaquePointer?
+        #expect(sqlite3_open(storageURL.path, &connection) == SQLITE_OK)
+        let blocker = try #require(connection)
+        defer { sqlite3_close(blocker) }
+        #expect(sqlite3_exec(blocker, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK)
+        defer { sqlite3_exec(blocker, "ROLLBACK", nil, nil, nil) }
+        let (started, continuation) = AsyncStream<Void>.makeStream()
+        let manual = Task {
+            continuation.yield(())
+            continuation.finish()
+            return await store.cleanupOldHistoryNow(policy: .sevenDays, now: now)
+        }
+        var iterator = started.makeAsyncIterator()
+        _ = await iterator.next()
+        store.configureCleanup(policy: .never)
+        #expect(sqlite3_exec(blocker, "ROLLBACK", nil, nil, nil) == SQLITE_OK)
+
+        #expect(await manual.value == nil)
+        let reopened = ClipboardHistoryStore(storageURL: storageURL)
+        await reopened.waitUntilLoaded()
+        #expect(reopened.items.map(\.id) == [pinned.id])
+        #expect(store.cleanupTimer == nil)
+    }
+
+    @Test
     func immediateCleanupFailureReturnsWithoutLosingHistoryAndCanRetry() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

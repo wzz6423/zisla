@@ -3754,3 +3754,5 @@
 "正在清理" = "Cleaning";
 "清理完成" = "Cleanup complete";
 "清理失败：%@" = "Cleanup failed: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Cleanup failed. For details, go to Settings > System Monitor and Cleanup.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Cleanup partially failed. For details, go to Settings > System Monitor and Cleanup.";

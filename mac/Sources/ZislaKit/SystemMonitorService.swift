@@ -558,10 +558,12 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
 public struct DiskCleanupFailure: Equatable, Sendable {
     public var url: URL
     public var message: String
+    public var isPermissionDenied: Bool
 
-    public init(url: URL, message: String) {
+    public init(url: URL, message: String, isPermissionDenied: Bool = false) {
         self.url = url
         self.message = message
+        self.isPermissionDenied = isPermissionDenied
     }
 }
 
@@ -3584,8 +3586,23 @@ public enum SystemDiskCleanup {
             _ = try fileManager.trashItem(at: standardized)
             return DiskCleanupResult(successCount: 1, freedBytes: size, failures: [])
         } catch {
-            return failure(standardized, message: error.localizedDescription)
+            return DiskCleanupResult(successCount: 0, freedBytes: 0, failures: [DiskCleanupFailure(
+                url: standardized, message: error.localizedDescription,
+                isPermissionDenied: isPermissionDenied(error as NSError)
+            )])
         }
+    }
+
+    private static func isPermissionDenied(_ error: NSError) -> Bool {
+        if error.domain == NSCocoaErrorDomain,
+           error.code == NSFileReadNoPermissionError || error.code == NSFileWriteNoPermissionError {
+            return true
+        }
+        if error.domain == NSPOSIXErrorDomain, error.code == Int(EACCES) || error.code == Int(EPERM) {
+            return true
+        }
+        guard let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError else { return false }
+        return isPermissionDenied(underlying)
     }
 
     private static func candidatePathIsEligibleForTrash(

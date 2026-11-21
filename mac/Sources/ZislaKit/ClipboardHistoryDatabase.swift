@@ -22,7 +22,7 @@ enum ClipboardHistoryMutation: Sendable {
     case upsert(ClipboardHistoryItem, capacity: Int?)
     case remove(UUID)
     case removeHistory
-    case removeHistoryBefore(Date, generation: Int)
+    case removeHistoryBefore(Date, generation: Int?)
 }
 
 final class ClipboardHistoryDatabase: @unchecked Sendable {
@@ -722,7 +722,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 case .removeHistory:
                     try execute("DELETE FROM clipboard_history WHERE is_pinned = 0", on: database)
                 case .removeHistoryBefore(let cutoff, let generation):
-                    guard generation == cleanupGeneration else { continue }
+                    if let generation, generation != cleanupGeneration { continue }
                     let statement = try prepare(
                         "DELETE FROM clipboard_history WHERE is_pinned = 0 AND last_copied_at < ?",
                         on: database

@@ -9,35 +9,161 @@ import ZislaCore
 
 @MainActor
 struct ImmediateCleanupTests {
+    @Test(arguments: [false, true], [false, true])
+    func outcomesSeparateSuccessPartialFailureAndTotalFailure(succeeded: Bool, failed: Bool) {
+        let outcome = ImmediateCleanupController.Outcome(didSucceed: succeeded, errors: failed ? ["fixture failure"] : [])
+        #expect(outcome.noticeKey == (failed
+            ? (succeeded ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
+                : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看")
+            : "清理完成"))
+    }
+
     @Test
-    func progressAndResultsFollowLanguageChangesWithoutRepeatingCleanup() {
-        for (status, english, chinese, arabic) in [
-            (AppModel.CleanupStatus.cleaning, "Cleaning", "正在清理", "جارٍ التنظيف"),
-            (.completed, "Cleanup complete", "清理完成", "اكتمل التنظيف"),
-            (.failed("fixture error"), "Cleanup failed: fixture error", "清理失败：fixture error", "فشل التنظيف: \u{2068}fixture error\u{2069}"),
-        ] {
-            #expect(status.message(locale: AppLanguage.english.locale) == english)
-            #expect(status.message(locale: AppLanguage.simplifiedChinese.locale) == chinese)
-            #expect(status.message(locale: AppLanguage.arabic.locale) == arabic)
+    func mountingSettingsDoesNotRunCleanupAndClosingItKeepsTheBackgroundTask() async throws {
+        let gate = ImmediateCleanupGate()
+        var settings = FeatureSettings(systemCleanupPolicy: .sevenDays)
+        var notices: [String?] = []
+        var choices: [FeatureSettings] = []
+        let controller = ImmediateCleanupController(operation: { settings in
+            choices.append(settings)
+            await gate.wait()
+            return .init(didSucceed: true, errors: [])
+        }, onMessage: { notices.append($0) }, requestPermission: { _ in Issue.record("No permission request on success"); return false })
+        let publisher = controller.objectWillChange.sink { _ in }
+        #expect(controller.task == nil && !controller.isRunning && controller.errors.isEmpty && notices.isEmpty)
+        let original = settings
+        controller.start(settings: settings)
+        let task = try #require(controller.task)
+        await gate.waitUntilStarted()
+        #expect(controller.isRunning && notices == [AppLocalization.text("正在清理")])
+        controller.start(settings: settings)
+        settings.systemCleanupPolicy = .never
+        controller.start(settings: settings)
+        publisher.cancel()
+        await gate.release()
+        await task.value
+        #expect(choices == [original])
+        #expect(!controller.isRunning && controller.task == nil && controller.errors.isEmpty)
+        #expect(notices == [AppLocalization.text("正在清理"), AppLocalization.text("清理完成")])
+    }
+
+    @Test
+    func cleanupWithoutEnabledItemsDoesNotEmitANotice() {
+        let controller = ImmediateCleanupController(operation: { _ in
+            Issue.record("Disabled cleanup cannot start")
+            return nil
+        }, onMessage: { _ in Issue.record("Disabled cleanup cannot emit progress or completion") }, requestPermission: { _ in false })
+        controller.start(settings: FeatureSettings.default)
+        #expect(controller.task == nil && !controller.isRunning && controller.errors.isEmpty)
+    }
+
+    @Test(arguments: [true, false])
+    func failureDetailsStayInSettingsAndPermissionRequestsOccurOnce(opened: Bool) async throws {
+        var notices: [String?] = []
+        var requests: [OnboardingPermissionID] = []
+        let controller = ImmediateCleanupController(operation: { _ in
+            .init(didSucceed: true, errors: ["fixture file: permission denied"], permissions: [.fullDiskAccess])
+        }, onMessage: { notices.append($0) }, requestPermission: { permission in requests.append(permission); return opened })
+        controller.start(settings: FeatureSettings(systemCleanupPolicy: .sevenDays))
+        await (try #require(controller.task)).value
+        #expect(requests == [.fullDiskAccess])
+        #expect(controller.errors.first == "fixture file: permission denied")
+        #expect(controller.errors.count == (opened ? 1 : 2))
+        #expect(notices.last == AppLocalization.text("清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"))
+        #expect(notices.allSatisfy { $0?.contains("fixture file") != true })
+    }
+
+    @Test
+    func cancellingCleanupClearsProgressAndDoesNotReportSuccess() async throws {
+        let gate = ImmediateCleanupGate()
+        var notices: [String?] = []
+        let controller = ImmediateCleanupController(operation: { _ in
+            await gate.wait()
+            return .init(didSucceed: true, errors: [])
+        }, onMessage: { notices.append($0) }, requestPermission: { _ in false })
+        controller.start(settings: FeatureSettings(systemCleanupPolicy: .sevenDays))
+        let task = try #require(controller.task)
+        await gate.waitUntilStarted()
+        controller.cancel()
+        await gate.release()
+        await task.value
+        #expect(notices == [AppLocalization.text("正在清理"), nil])
+        #expect(!controller.isRunning && controller.task == nil)
+    }
+
+    @Test(arguments: [0, 1])
+    func voiceCleanupReportsPartialDeletionAsPartialFailure(failedIndex: Int) async throws {
+        let fixture = try ImmediateCleanupFixture()
+        defer { fixture.removeFiles() }
+        let recordings = fixture.directory.appendingPathComponent("recordings")
+        let fileManager = ImmediateCleanupVoiceFileManager()
+        let voice = VoiceHistoryStore(storageURL: fixture.directory.appendingPathComponent("voice.json"),
+            recordingsDirectory: recordings, fileManager: fileManager)
+        for id in [UUID(), UUID()] {
+            let url = voice.recordingURL(for: id)
+            try FileManager.default.createDirectory(at: recordings, withIntermediateDirectories: true)
+            try Data("fixture audio".utf8).write(to: url)
+            #expect(voice.record(VoiceRecordingResult(id: id, audioFileURL: url, transcript: "retained text",
+                duration: 1, createdAt: .distantPast)))
         }
+        fileManager.deniedAudioName = voice.entries[failedIndex].audioFileName
+        let service = fixture.makeService()
+        defer { service.stop() }
+        let clipboard = ClipboardHistoryStore(storageURL: fixture.directory.appendingPathComponent("clipboard.sqlite"))
+        await clipboard.waitUntilLoaded()
+        var settings = FeatureSettings.default
+        settings.voiceRecordingCleanupPolicy = .sevenDays
+        let outcome = try #require(await ImmediateCleanupController.cleanConfiguredItems(settings: settings,
+            systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice))
+        #expect(outcome.didSucceed == (failedIndex > 0))
+        #expect(outcome.errors.count == 1 && outcome.errors[0].contains("voice deletion fixture failure"))
+        #expect(outcome.noticeKey == (failedIndex > 0
+            ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
+            : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看"))
+        #expect(voice.entries.filter { $0.audioFileName != nil }.count == 2 - failedIndex)
+        #expect(voice.entries.allSatisfy { $0.rawTranscript == "retained text" })
+    }
+
+    @Test(arguments: [0, 1])
+    func systemOnlyCleanupReportsAllFailedOrPartialFailed(successes: Int) async throws {
+        let fixture = try ImmediateCleanupFixture()
+        defer { fixture.removeFiles() }
+        let failedURL = fixture.directory.appendingPathComponent("protected.log")
+        let service = SystemAutoCleanupService(defaults: fixture.defaults, scan: { _, _ in [] }, trash: { _ in
+            DiskCleanupResult(successCount: successes, freedBytes: 0,
+                failures: [DiskCleanupFailure(url: failedURL, message: "permission fixture", isPermissionDenied: true)])
+        }, emptyTrash: { Issue.record("Disabled Trash cannot run"); return .success(()) })
+        defer { service.stop() }
+        let clipboard = ClipboardHistoryStore(storageURL: fixture.directory.appendingPathComponent("clipboard.sqlite"))
+        await clipboard.waitUntilLoaded()
+        let voice = VoiceHistoryStore(storageURL: fixture.directory.appendingPathComponent("voice.json"),
+            recordingsDirectory: fixture.directory.appendingPathComponent("recordings"))
+        let outcome = try #require(await ImmediateCleanupController.cleanConfiguredItems(
+            settings: FeatureSettings(systemCleanupPolicy: .sevenDays), systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice))
+        #expect(outcome.didSucceed == (successes > 0))
+        #expect(outcome.permissions == [.fullDiskAccess])
+        #expect(outcome.errors == [failedURL.path + ": permission fixture"])
+        #expect(outcome.noticeKey == (successes > 0
+            ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
+            : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看"))
     }
 
     @Test(arguments: [false, true], [false, true])
     func availabilityFollowsEnabledCleanupItems(systemEnabled: Bool, clipboardEnabled: Bool) {
         var settings = FeatureSettings(systemMonitorEnabled: systemEnabled, clipboardHistoryEnabled: clipboardEnabled)
-        #expect(!AppModel.canCleanNow(settings: settings))
+        #expect(!ImmediateCleanupController.canCleanNow(settings: settings))
         settings.systemCleanupPolicy = .sevenDays
-        #expect(AppModel.canCleanNow(settings: settings) == systemEnabled)
+        #expect(ImmediateCleanupController.canCleanNow(settings: settings) == systemEnabled)
         settings.systemCleanupPolicy = .never
         settings.clipboardHistoryCleanupPolicy = .sevenDays
-        #expect(AppModel.canCleanNow(settings: settings) == clipboardEnabled)
+        #expect(ImmediateCleanupController.canCleanNow(settings: settings) == clipboardEnabled)
         settings.clipboardHistoryCleanupPolicy = .never
         settings.trashCleanupPolicy = .sevenDays
-        #expect(AppModel.canCleanNow(settings: settings))
+        #expect(ImmediateCleanupController.canCleanNow(settings: settings))
         settings.trashCleanupPolicy = .never
         settings.voiceInputEnabled = false
         settings.voiceRecordingCleanupPolicy = .sevenDays
-        #expect(AppModel.canCleanNow(settings: settings))
+        #expect(ImmediateCleanupController.canCleanNow(settings: settings))
     }
 
     @Test(arguments: ["all", "disabled", "never", "clipboard-failure", "voice-failure", "system-failure", "trash-failure"])
@@ -91,13 +217,17 @@ struct ImmediateCleanupTests {
         let storedSystemDate = fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date
         let storedTrashDate = fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date
 
-        let message = await AppModel.cleanConfiguredItems(settings: settings, systemCleanup: service,
+        let message = await ImmediateCleanupController.cleanConfiguredItems(settings: settings, systemCleanup: service,
             clipboardHistory: clipboard, voiceHistory: voice, now: now)
 
+        let outcome = try #require(message)
         let expectsFailure = mode.hasSuffix("failure")
-        if case .failed(let error) = message {
-            #expect(expectsFailure && error.contains("fixture failure"))
-        } else { #expect(!expectsFailure && message == .completed) }
+        #expect(!outcome.errors.isEmpty == expectsFailure)
+        #expect(outcome.didSucceed == (mode != "never"))
+        if expectsFailure {
+            #expect(outcome.noticeKey == "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看")
+            #expect(outcome.errors.contains { $0.contains("fixture failure") })
+        } else { #expect(outcome.noticeKey == "清理完成") }
         #expect(fixture.moved.count == (["never", "disabled"].contains(mode) ? 0 : 1))
         #expect(fixture.emptied == (mode == "never" ? 0 : 1))
         let keepClipboard = ["never", "disabled", "clipboard-failure"].contains(mode)
@@ -126,7 +256,7 @@ struct ImmediateCleanupTests {
         await clipboard.waitUntilLoaded()
         let voice = VoiceHistoryStore(storageURL: fixture.directory.appendingPathComponent("voice.json"),
             recordingsDirectory: fixture.directory.appendingPathComponent("recordings"))
-        let task = Task { await AppModel.cleanConfiguredItems(settings: FeatureSettings(trashCleanupPolicy: .sevenDays),
+        let task = Task { await ImmediateCleanupController.cleanConfiguredItems(settings: FeatureSettings(trashCleanupPolicy: .sevenDays),
             systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice) }
         task.cancel()
         #expect(await task.value == nil)
@@ -156,7 +286,7 @@ struct ImmediateCleanupTests {
         defer { service.stop() }
         var settings = FeatureSettings(clipboardHistoryCleanupPolicy: .sevenDays)
         settings.voiceRecordingCleanupPolicy = .sevenDays
-        let task = Task { await AppModel.cleanConfiguredItems(settings: settings, systemCleanup: service,
+        let task = Task { await ImmediateCleanupController.cleanConfiguredItems(settings: settings, systemCleanup: service,
             clipboardHistory: clipboard, voiceHistory: voice) }
         let observation = clipboard.$isLoading.dropFirst().filter { $0 }.sink { _ in task.cancel() }
         defer { observation.cancel() }
@@ -166,6 +296,42 @@ struct ImmediateCleanupTests {
         #expect(clipboard.items.isEmpty, "The clipboard transaction completed before cancellation")
         #expect(FileManager.default.fileExists(atPath: audioURL.path), "Cancellation must skip remaining cleanup items")
         #expect(voice.entries.first?.audioFileName == audioURL.lastPathComponent)
+    }
+}
+
+private final class ImmediateCleanupVoiceFileManager: FileManager {
+    var deniedAudioName: String?
+
+    override func removeItem(at url: URL) throws {
+        if url.lastPathComponent.hasPrefix(".zisla-deleting-"), let deniedAudioName,
+           url.lastPathComponent.hasSuffix(deniedAudioName) {
+            throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError,
+                userInfo: [NSLocalizedDescriptionKey: "voice deletion fixture failure"])
+        }
+        try super.removeItem(at: url)
+    }
+}
+
+private actor ImmediateCleanupGate {
+    private var pending: CheckedContinuation<Void, Never>?
+    private var started: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            pending = continuation
+            started?.resume()
+            started = nil
+        }
+    }
+
+    func waitUntilStarted() async {
+        if pending != nil { return }
+        await withCheckedContinuation { started = $0 }
+    }
+
+    func release() {
+        pending?.resume()
+        pending = nil
     }
 }
 

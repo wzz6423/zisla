@@ -8,6 +8,7 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var settingsStore: FeatureSettingsStore
     @ObservedObject private var clipboardAssistant: ClipboardAssistantController
+    @ObservedObject private var immediateCleanup: ImmediateCleanupController
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var networkProxyMonitor = NetworkProxyAvailabilityMonitor()
@@ -44,6 +45,7 @@ struct SettingsView: View {
         self.model = model
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         _clipboardAssistant = ObservedObject(wrappedValue: model.clipboardAssistant)
+        _immediateCleanup = ObservedObject(wrappedValue: model.immediateCleanup)
         _aiUsageHistory = StateObject(wrappedValue: AIUsageHistoryController(monitor: model.aiMonitor))
     }
 
@@ -205,11 +207,11 @@ struct SettingsView: View {
                         if input.selection == .scheduledCleanup {
                             Spacer()
                             Button(AppLocalization.string("立即清理", locale: locale)) {
-                                model.runCleanupNow()
+                                immediateCleanup.start(settings: settingsStore.settings)
                             }
                             .buttonStyle(.bordered)
                             .keepsIntrinsicWidth()
-                            .disabled(model.isCleaningNow || !AppModel.canCleanNow(settings: settingsStore.settings))
+                            .disabled(immediateCleanup.isRunning || !ImmediateCleanupController.canCleanNow(settings: settingsStore.settings))
                         }
                     }
                     DeferredMount {
@@ -314,11 +316,6 @@ struct SettingsView: View {
 
     private var scheduledCleanupContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if let status = model.cleanupStatus {
-                Text(status.message(locale: locale))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
             if settingsStore.settings.systemMonitorEnabled && settingsStore.settings.automaticPowerModeEnabled {
                 settingsGroup("电源模式") {
                     settingRow(
@@ -461,7 +458,12 @@ struct SettingsView: View {
                     .keepsIntrinsicWidth()
                 }
             }
-            .disabled(model.isCleaningNow)
+            if !immediateCleanup.errors.isEmpty {
+                Text(immediateCleanup.errors.joined(separator: "\n"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
         }
         .alert(AppLocalization.string("启用定时倾倒废纸篓？", locale: locale), isPresented: Binding(
             get: { input.pendingTrashCleanupPolicy != nil },

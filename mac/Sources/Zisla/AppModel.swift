@@ -563,10 +563,10 @@ final class AppModel: ObservableObject {
     return SystemAutoCleanupService(
       scan: { await monitor.scanCleanupCandidates(kinds: $0, options: $1) },
       trash: { await monitor.trashSelected($0) },
-      emptyTrash: { [weak self] in
+      emptyTrash: { @MainActor [weak self] in
         let result = await DesktopOrganizer.emptyTrash()
-        if case .failure(let error) = result {
-          self?.transientMessage = error.message
+        if case .failure(let error) = result, let self, !immediateCleanup.isRunning {
+          transientMessage = error.message
         }
         return result
       },
@@ -575,9 +575,24 @@ final class AppModel: ObservableObject {
       }
     )
   }()
-  @Published private(set) var isCleaningNow = false
-  @Published private(set) var cleanupStatus: CleanupStatus?
-  private var cleanupNowTask: Task<Void, Never>?
+  private(set) lazy var immediateCleanup: ImmediateCleanupController = {
+    let systemCleanup = systemAutoCleanup
+    let clipboardHistory = clipboardHistory
+    let voiceHistory = voiceHistory
+    let permissions = OnboardingPermissionCoordinator()
+    return ImmediateCleanupController(
+      operation: { settings in
+        await ImmediateCleanupController.cleanConfiguredItems(settings: settings, systemCleanup: systemCleanup,
+          clipboardHistory: clipboardHistory, voiceHistory: voiceHistory)
+      },
+      onMessage: { [weak self] message in
+        guard let self else { return }
+        transientMessage = message
+        if immediateCleanup.isRunning { transientMessageDismissTask?.cancel() }
+      },
+      requestPermission: { permissions.openSettings(for: $0) }
+    )
+  }()
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   private(set) lazy var automaticPowerMode = AutomaticPowerModeService(onFailure: { [weak self] error in
@@ -1253,7 +1268,7 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
-    cleanupNowTask?.cancel()
+    immediateCleanup.cancel()
     meetingCountdown.stop()
     automaticPowerModeLifecycleActive = false
     automaticPowerMode.stop()
@@ -1407,65 +1422,6 @@ final class AppModel: ObservableObject {
   }
 
   // MARK: - Trash
-
-  enum CleanupStatus: Equatable {
-    case cleaning
-    case completed
-    case failed(String)
-
-    func message(locale: Locale) -> String {
-      switch self {
-      case .cleaning: AppLocalization.string("正在清理", locale: locale)
-      case .completed: AppLocalization.string("清理完成", locale: locale)
-      case .failed(let error): AppLocalization.format("清理失败：%@", locale: locale, [error])
-      }
-    }
-  }
-
-  static func canCleanNow(settings: FeatureSettings) -> Bool {
-    (settings.systemMonitorEnabled && settings.systemCleanupPolicy != .never)
-      || settings.trashCleanupPolicy != .never
-      || (settings.clipboardHistoryEnabled && settings.clipboardHistoryCleanupPolicy != .never)
-      || settings.voiceRecordingCleanupPolicy != .never
-  }
-
-  func runCleanupNow() {
-    guard !isCleaningNow else { return }
-    isCleaningNow = true
-    cleanupStatus = .cleaning
-    let settings = settingsStore.settings
-    cleanupNowTask = Task { [weak self] in
-      guard let self else { return }
-      defer { isCleaningNow = false; cleanupNowTask = nil }
-      cleanupStatus = await Self.cleanConfiguredItems(settings: settings,
-        systemCleanup: systemAutoCleanup, clipboardHistory: clipboardHistory, voiceHistory: voiceHistory)
-    }
-  }
-
-  static func cleanConfiguredItems(
-    settings: FeatureSettings,
-    systemCleanup: SystemAutoCleanupService,
-    clipboardHistory: ClipboardHistoryStore,
-    voiceHistory: VoiceHistoryStore,
-    now: Date = Date()
-  ) async -> CleanupStatus? {
-    guard !Task.isCancelled else { return nil }
-    systemCleanup.apply(settings: settings)
-    let result = await systemCleanup.runNow()
-    guard !Task.isCancelled else { return nil }
-    var failures = result.system?.failures.map(\.message) ?? []
-    if case .failure(let error) = result.trash { failures.append(error.message) }
-    if settings.clipboardHistoryEnabled && settings.clipboardHistoryCleanupPolicy != .never,
-      let error = await clipboardHistory.cleanupOldHistoryNow(policy: settings.clipboardHistoryCleanupPolicy, now: now) {
-      failures.append(error)
-    }
-    guard !Task.isCancelled else { return nil }
-    if settings.voiceRecordingCleanupPolicy != .never,
-      let error = voiceHistory.cleanupOldRecordings(policy: settings.voiceRecordingCleanupPolicy, now: now) {
-      failures.append(error)
-    }
-    return failures.isEmpty ? .completed : .failed(failures.joined(separator: "\n"))
-  }
 
   /// Empties the Trash. Irreversible — shows a confirmation dialog with the item count first.
   func emptyTrash() {

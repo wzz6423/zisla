@@ -11,18 +11,23 @@ struct SystemAutoCleanupLocalizationTests {
     ] + SystemCleanupScope.allCases.map(\.menuTitle) + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle)
 
     @Test(arguments: AppLanguage.allCases)
-    func immediateCleanupCopyRendersAndKeepsItsErrorPlaceholder(language: AppLanguage) throws {
+    func immediateCleanupCopyRendersInEveryLanguage(language: AppLanguage) throws {
         let table = try Self.table(language)
         let english = try Self.table(.english)
         let view = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
-        let model = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/AppModel.swift"), encoding: .utf8)
+        let controller = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/ImmediateCleanupController.swift"), encoding: .utf8)
         #expect(view.contains("AppLocalization.string(\"立即清理\", locale: locale)"))
-        for key in ["立即清理", "正在清理", "清理完成", "清理失败：%@"] {
-            #expect(view.contains("\"\(key)\"") || model.contains("\"\(key)\""))
+        for key in ["立即清理", "正在清理", "清理完成",
+            "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看",
+            "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"] {
+            #expect(view.contains("\"\(key)\"") || controller.contains("\"\(key)\""))
             let value = try #require(table[key], "Missing \(language.rawValue) translation: \(key)")
             #expect(!value.isEmpty)
             #expect(value.components(separatedBy: "%@").count == (key.contains("%@") ? 2 : 1))
             #expect(AppLocalization.string(key, locale: language.locale) == value)
+            if key.contains("系统状态与清理页面") {
+                #expect(value.contains(AppLocalization.string("系统状态与清理", locale: language.locale)))
+            }
             if ![.simplifiedChinese, .traditionalChinese, .english].contains(language) {
                 #expect(value != key && value != english[key])
             }

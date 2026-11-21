@@ -3755,3 +3755,5 @@
 "正在清理" = "Temizleniyor";
 "清理完成" = "Temizlik tamamlandı";
 "清理失败：%@" = "Temizlik başarısız: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Temizlik başarısız. Ayrıntılar için Ayarlar > Sistem İzleme ve Temizlik bölümüne gidin.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Bazı öğeler temizlenemedi. Ayrıntılar için Ayarlar > Sistem İzleme ve Temizlik bölümüne gidin.";

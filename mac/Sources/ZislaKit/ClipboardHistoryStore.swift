@@ -93,7 +93,9 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
 
     public func cleanupOldHistoryNow(policy: VoiceRecordingCleanupPolicy, now: Date) async -> String? {
-        cleanupOldHistory(policy: policy, now: now)
+        guard let days = policy.daysThreshold else { return nil }
+        let cutoff = now.addingTimeInterval(-Double(days) * 24 * 60 * 60)
+        schedulePersistence(.removeHistoryBefore(cutoff, generation: nil))
         while !pendingMutations.isEmpty || inFlightPersistenceGeneration != nil {
             schedulePendingPersistence(immediately: true)
             await persistenceTask?.value

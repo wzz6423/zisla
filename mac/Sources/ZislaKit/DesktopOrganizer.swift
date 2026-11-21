@@ -9,10 +9,17 @@ import ZislaCore
 /// the user to authorize Zisla to control Finder.
 public enum DesktopOrganizerError: Error, Sendable, Equatable {
     case failed(String)
+    case automationPermissionDenied(String)
 
     public var message: String {
-        if case .failed(let value) = self { return value }
-        return "未知错误"
+        switch self {
+        case .failed(let value), .automationPermissionDenied(let value): value
+        }
+    }
+
+    public var isPermissionDenied: Bool {
+        if case .automationPermissionDenied = self { return true }
+        return false
     }
 }
 
@@ -171,11 +178,12 @@ public enum DesktopOrganizer {
     }
 }
 
-private extension DesktopOrganizerError {
+extension DesktopOrganizerError {
     static func failureMessage(from errorInfo: NSDictionary) -> DesktopOrganizerError {
         let message = (errorInfo[NSAppleScript.errorMessage] as? String)
             ?? (errorInfo[NSLocalizedDescriptionKey] as? String)
             ?? AppLocalization.text("访达操作失败，请检查自动化授权")
-        return .failed(message)
+        return (errorInfo[NSAppleScript.errorNumber] as? NSNumber)?.intValue == -1743
+            ? .automationPermissionDenied(message) : .failed(message)
     }
 }
