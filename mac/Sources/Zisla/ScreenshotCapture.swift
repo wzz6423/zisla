@@ -944,7 +944,7 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
             }
             panel.contentView = ScreenshotSelectionHostingView(
                 rootView: ScreenshotSelectionView(
-                    image: capture.image,
+                    image: capture.hdrCGImage.map { NSImage(cgImage: $0, size: capture.image.size) } ?? capture.image,
                     cgImage: capture.cgImage,
                     onCancel: { [weak self] in self?.cancel() },
                     onSelection: { [weak self] rect in
@@ -1139,7 +1139,7 @@ struct ScreenshotSelectionView: View {
             ZStack(alignment: .topLeading) {
                 Group {
                     if let image {
-                        ScreenshotBackingImage(image: image)
+                        ScreenshotBackingImage(image: image, preservesHDR: true)
                             .frame(width: proxy.size.width, height: proxy.size.height)
                     } else {
                         Color.black
@@ -1148,7 +1148,7 @@ struct ScreenshotSelectionView: View {
                     Color.black.opacity(0.44)
 
                     if displayedSelection.width > 1, displayedSelection.height > 1, let image {
-                        ScreenshotBackingImage(image: image)
+                        ScreenshotBackingImage(image: image, preservesHDR: true)
                             .frame(width: proxy.size.width, height: proxy.size.height)
                             .mask(selectionMask(displayedSelection, in: proxy.size))
 

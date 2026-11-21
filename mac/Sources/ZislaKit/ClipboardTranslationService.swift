@@ -37,14 +37,14 @@ public struct ClipboardTranslationService: Sendable {
         guard !candidates.isEmpty else { throw ClipboardTranslationError.unavailable }
         let (events, continuation) = AsyncStream<Event>.makeStream()
         // A provider that ignores cancellation must not hold up the winning result.
-        let tasks = candidates.map { provider in
+        let tasks = candidates.enumerated().map { index, provider in
             Task {
                 do {
                     let result = try await provider(text, targetLanguage)
                     continuation.yield(result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        ? .failed : .translated(result))
+                        ? .failed(index, ClipboardTranslationError.unavailable) : .translated(result))
                 } catch {
-                    continuation.yield(.failed)
+                    continuation.yield(.failed(index, error))
                 }
             }
         }
@@ -62,14 +62,21 @@ public struct ClipboardTranslationService: Sendable {
             continuation.finish()
         }
         var remaining = candidates.count
+        var failures = [Int: any Error]()
         for await event in events {
             try Task.checkCancellation()
             switch event {
             case .translated(let result): return result
-            case .failed:
+            case .failed(let index, let error):
+                failures[index] = error
                 remaining -= 1
-                if remaining == 0 { throw ClipboardTranslationError.unavailable }
-            case .timedOut: throw ClipboardTranslationError.unavailable
+                if remaining == 0 {
+                    let failure = candidates.indices.compactMap { failures[$0] }.first {
+                        !($0 is ClipboardTranslationError) && !($0 is CancellationError)
+                    }
+                    throw failure ?? ClipboardTranslationError.unavailable
+                }
+            case .timedOut: throw URLError(.timedOut)
             }
         }
         throw CancellationError()
@@ -191,7 +198,7 @@ public struct ClipboardTranslationService: Sendable {
 
     private enum Event: Sendable {
         case translated(String)
-        case failed
+        case failed(Int, any Error)
         case timedOut
     }
 }

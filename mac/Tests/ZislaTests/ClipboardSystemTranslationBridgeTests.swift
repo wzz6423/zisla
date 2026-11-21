@@ -1,12 +1,118 @@
 import Combine
 import Foundation
+import Translation
 import Testing
 import XCTest
+import ZislaKit
 
 @testable import Zisla
 
 @MainActor
 struct ClipboardSystemTranslationBridgeTests {
+    @available(macOS 15.0, *)
+    @Test
+    func installedAutomaticDetectionKeepsTheSystemSourceSelection() async throws {
+        let request = ClipboardSystemTranslationBridge.Request(id: UUID(), text: "Hello world.", targetLanguage: "zh-CN")
+        let configuration = try await ClipboardSystemTranslationBridge.installedConfiguration(
+            for: request,
+            statusForText: { text, target in
+                #expect(text == request.text)
+                #expect(target == Locale.Language(identifier: request.targetLanguage))
+                return .installed
+            },
+            statusForLanguages: { _, _ in
+                Issue.record("Successful automatic detection must not need a language hint")
+                return .unsupported
+            }
+        )
+        #expect(configuration.source == nil)
+        #expect(configuration.target == Locale.Language(identifier: "zh-CN"))
+    }
+
+    @available(macOS 15.0, *)
+    @Test
+    func aShortEnglishDetectionFailureUsesTheInstalledExplicitLanguagePair() async throws {
+        let request = ClipboardSystemTranslationBridge.Request(id: UUID(), text: "Hello world.", targetLanguage: "zh-CN")
+        let configuration = try await ClipboardSystemTranslationBridge.installedConfiguration(
+            for: request,
+            statusForText: { _, _ in throw TranslationError.unableToIdentifyLanguage },
+            statusForLanguages: { source, target in
+                #expect(source == Locale.Language(identifier: "en"))
+                #expect(target == Locale.Language(identifier: "zh-CN"))
+                return .installed
+            }
+        )
+        #expect(configuration.source == Locale.Language(identifier: "en"))
+        #expect(configuration.target == Locale.Language(identifier: "zh-CN"))
+    }
+
+    @available(macOS 15.0, *)
+    @Test(arguments: [false, true])
+    func languagePackagesThatAreNotInstalledNeverStartASystemSession(useHint: Bool) async {
+        let request = ClipboardSystemTranslationBridge.Request(id: UUID(), text: "Hello world.", targetLanguage: "zh-CN")
+        for status in [LanguageAvailability.Status.supported, .unsupported] {
+            do {
+                _ = try await ClipboardSystemTranslationBridge.installedConfiguration(
+                    for: request,
+                    statusForText: { _, _ in
+                        if useHint { throw TranslationError.unableToIdentifyLanguage }
+                        return status
+                    },
+                    statusForLanguages: { _, _ in status }
+                )
+                Issue.record("A missing language package must not configure a system session")
+            } catch {
+                #expect(error as? ClipboardTranslationError == .unavailable)
+            }
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test
+    func otherSystemFailuresAndTextWithoutALanguageNeverGuessASource() async {
+        for error in [TranslationError.internalError, .unableToIdentifyLanguage] {
+            let text = error ~= TranslationError.unableToIdentifyLanguage ? "123 + 456" : "Hello world."
+            let request = ClipboardSystemTranslationBridge.Request(id: UUID(), text: text, targetLanguage: "zh-CN")
+            do {
+                _ = try await ClipboardSystemTranslationBridge.installedConfiguration(
+                    for: request,
+                    statusForText: { _, _ in throw error },
+                    statusForLanguages: { _, _ in
+                        Issue.record("A failure without a detected source must not request a language pair")
+                        return .installed
+                    }
+                )
+                Issue.record("The system failure must be preserved")
+            } catch let received {
+                #expect(error ~= received)
+            }
+        }
+    }
+
+    @available(macOS 15.0, *)
+    @Test(arguments: [false, true])
+    func cancellationNeverConfiguresAnInstalledSystemSession(useHint: Bool) async {
+        let request = ClipboardSystemTranslationBridge.Request(id: UUID(), text: "Hello world.", targetLanguage: "zh-CN")
+        let task = Task {
+            _ = try await ClipboardSystemTranslationBridge.installedConfiguration(
+                for: request,
+                statusForText: { _, _ in
+                    if useHint { throw TranslationError.unableToIdentifyLanguage }
+                    withUnsafeCurrentTask { $0?.cancel() }
+                    return .installed
+                },
+                statusForLanguages: { _, _ in
+                    withUnsafeCurrentTask { $0?.cancel() }
+                    return .installed
+                }
+            )
+        }
+        switch await task.result {
+        case .success: Issue.record("Cancelled translation must not configure a system session")
+        case .failure(let error): #expect(error is CancellationError)
+        }
+    }
+
     @available(macOS 15.0, *)
     @Test
     func automaticTranslationIncludesTheInstalledSystemProvider() async throws {
