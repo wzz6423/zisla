@@ -3682,18 +3682,26 @@ enum ScreenshotToolbarLayout {
         contentWidth(forControlCount: controlCount)
     }
 
-    static func contentWidth(forControlCount count: Int) -> CGFloat {
+    static func contentWidth(forControlCount count: Int, statusMessage: String? = nil) -> CGFloat {
         horizontalPadding * 2
             + dragHandleWidth
             + CGFloat(count) * controlWidth
             + CGFloat(count) * spacing
+            + (statusMessage.map { statusWidth(for: $0) + spacing } ?? 0)
+    }
+
+    static func statusWidth(for message: String) -> CGFloat {
+        min(240, ceil((message as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: 11)
+        ]).width))
     }
 
     static func viewportWidth(
         availableWidth: CGFloat,
-        controlCount: Int = controlCount
+        controlCount: Int = controlCount,
+        statusMessage: String? = nil
     ) -> CGFloat {
-        min(contentWidth(forControlCount: controlCount), max(0, availableWidth - 24))
+        min(contentWidth(forControlCount: controlCount, statusMessage: statusMessage), max(0, availableWidth - 24))
     }
 
     /// Every label the 60pt cells host, in the same order `toolbar(viewportWidth:popoverEdge:)` builds
@@ -5327,7 +5335,8 @@ struct ScreenshotEditorView: View {
             let toolbarSize = CGSize(
                 width: ScreenshotToolbarLayout.viewportWidth(
                     availableWidth: proxy.size.width,
-                    controlCount: toolbarControlCount
+                    controlCount: toolbarControlCount,
+                    statusMessage: model.statusMessage
                 ),
                 height: ScreenshotToolbarLayout.height
             )
@@ -5359,7 +5368,8 @@ struct ScreenshotEditorView: View {
             let toolbarSize = CGSize(
                 width: ScreenshotToolbarLayout.viewportWidth(
                     availableWidth: proxy.size.width,
-                    controlCount: toolbarControlCount
+                    controlCount: toolbarControlCount,
+                    statusMessage: model.statusMessage
                 ),
                 height: ScreenshotToolbarLayout.height
             )
@@ -5430,19 +5440,6 @@ struct ScreenshotEditorView: View {
                     bounds: proxy.size,
                     cornerRadius: model.cornerRadius
                 )
-
-                if let message = statusMessage ?? model.statusMessage {
-                    Text(message)
-                        .font(.system(size: 11))
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(8)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
-                        .frame(maxWidth: min(600, proxy.size.width - 16))
-                        .padding(8)
-                        .frame(maxWidth: .infinity)
-                        .allowsHitTesting(false)
-                }
             }
             .background(Color.black)
         }
@@ -6454,6 +6451,13 @@ struct ScreenshotEditorView: View {
                     iconButton("arrow.uturn.forward", title: AppLocalization.text("重做")) { model.redo() }
                 }
                 recognitionMenu
+                if let message = model.statusMessage {
+                    Text(message)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                        .frame(width: ScreenshotToolbarLayout.statusWidth(for: message), alignment: .leading)
+                        .help(message)
+                }
                 if mode == .screenshot {
                     iconButton(
                         model.isLongCapturePreviewing
@@ -6500,7 +6504,7 @@ struct ScreenshotEditorView: View {
                 iconButton("xmark", title: AppLocalization.text("关闭")) { onClose() }
             }
             .frame(
-                width: ScreenshotToolbarLayout.contentWidth(forControlCount: toolbarControlCount)
+                width: ScreenshotToolbarLayout.contentWidth(forControlCount: toolbarControlCount, statusMessage: model.statusMessage)
                     - ScreenshotToolbarLayout.horizontalPadding * 2,
                 height: ScreenshotToolbarLayout.height
             )
@@ -8835,7 +8839,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         let visibleFrame = screen.visibleFrame.insetBy(dx: 12, dy: 12)
         let width = ScreenshotToolbarLayout.viewportWidth(
             availableWidth: screen.visibleFrame.width,
-            controlCount: controlCount
+            controlCount: controlCount,
+            statusMessage: model.statusMessage
         )
         let selectionFrame = ScreenshotLongCaptureRangeGeometry.windowFrame(
             selection: captureRect,

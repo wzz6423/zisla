@@ -171,13 +171,14 @@ struct ScreenshotRecognitionTests {
         let fixture = try Fixture(image: makeImage())
         defer { fixture.close() }
         let window = try #require(fixture.controller.window)
+        window.setContentSize(CGSize(width: 1_600, height: 600))
         let frame = window.frame
         let host = try #require(window.contentView)
         let localizationRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/Localization")
         let translations = try #require(NSDictionary(contentsOf: localizationRoot
             .appendingPathComponent("\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
-        let keys = ["正在识别...", "识别失败：%@", "未识别到文字", "翻译失败，请重试或使用浏览器翻译", "表格已保存：%@"]
+        let keys = ["正在识别...", "正在翻译…", "识别失败：%@", "未识别到文字", "翻译失败，请重试或使用浏览器翻译", "表格已保存：%@"]
         for key in keys {
             let translation = try #require(translations[key], "Missing \(language.rawValue) recognition status: \(key)")
             #expect(!translation.isEmpty)
@@ -196,8 +197,131 @@ struct ScreenshotRecognitionTests {
                     object.responds(to: NSSelectorFromString(key)) && object.value(forKey: key) as? String == message
                 }
             }, "The screenshot overlay must expose its \(language.rawValue) status: \(message)")
+            try Self.expectStatusBesideRecognition(message, in: host)
         }
         #expect(window.frame == frame && fixture.model.annotations.isEmpty && !fixture.model.canUndo)
+    }
+
+    @Test(arguments: ["正在识别...", "正在翻译…"])
+    func recognitionStatusMovesWithItsToolbarAndDisappearsWhenCleared(key: String) async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let fixture = try Fixture(image: makeImage())
+        defer { fixture.close() }
+        let window = try #require(fixture.controller.window)
+        window.setContentSize(CGSize(width: 1_600, height: 600))
+        let host = try #require(window.contentView)
+        let message = AppLocalization.text(key)
+        fixture.model.statusMessage = message
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let handle = try #require(Self.dragHandle(in: host))
+        let toolbar = try #require(handle.superview)
+        let originalFrame = toolbar.convert(toolbar.bounds, to: host)
+        let start = handle.convert(CGPoint(x: 10, y: ScreenshotToolbarLayout.height / 2), to: nil)
+        let finish = CGPoint(x: start.x + 100, y: start.y - 100)
+        for (type, point) in [(NSEvent.EventType.leftMouseDown, start), (.leftMouseDragged, finish), (.leftMouseUp, finish)] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
+                windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+            switch type {
+            case .leftMouseDown: handle.mouseDown(with: event)
+            case .leftMouseDragged: handle.mouseDragged(with: event)
+            default: handle.mouseUp(with: event)
+            }
+        }
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let movedFrame = toolbar.convert(toolbar.bounds, to: host)
+        #expect(abs(movedFrame.midY - originalFrame.midY) >= 90)
+        try Self.expectStatusBesideRecognition(message, in: host)
+        fixture.model.statusMessage = nil
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        #expect(!Self.accessibilityObjects(host).contains {
+            $0.responds(to: NSSelectorFromString("accessibilityValue"))
+                && $0.value(forKey: "accessibilityValue") as? String == message
+        }, "Clearing the operation status must remove its toolbar label")
+        #expect(!fixture.model.isRecognizing && fixture.model.annotations.isEmpty && !fixture.model.canUndo)
+    }
+
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [CGFloat(800), 1_600])
+    func longRecognitionStatusKeepsTheToolbarInsideItsViewport(language: AppLanguage, availableWidth: CGFloat) async throws {
+        let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previous
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previous, forName: UserDefaults.argumentDomain) }
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let fixture = try Fixture(image: makeImage())
+        defer { fixture.close() }
+        let window = try #require(fixture.controller.window)
+        window.setContentSize(CGSize(width: availableWidth, height: 600))
+        let host = try #require(window.contentView)
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let toolbar = try #require(Self.dragHandle(in: host)?.superview)
+        let originalWidth = toolbar.frame.width
+        let frame = window.frame
+        let message = AppLocalization.text("识别失败：%@", String(repeating: "Synthetic OCR ", count: 80))
+        fixture.model.statusMessage = message
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let statusObject = try #require(Self.accessibilityObjects(host).first {
+            $0.responds(to: NSSelectorFromString("accessibilityValue"))
+                && $0.value(forKey: "accessibilityValue") as? String == message
+        })
+        let status = try #require(statusObject as? any NSAccessibilityElementProtocol)
+        let statusFrame = status.accessibilityFrame()
+        #expect(statusFrame.width > 0 && statusFrame.width <= 240,
+            "A long recognition error must not consume an unbounded width in the toolbar")
+        #expect(statusFrame.height <= ScreenshotToolbarLayout.height,
+            "A long recognition error must remain on one toolbar row")
+        #expect(statusObject.value(forKey: "accessibilityHelp") as? String == message,
+            "Truncating the visible status must retain the complete error in its tooltip")
+        #expect(toolbar.frame.width <= availableWidth - 24)
+        #expect(toolbar.frame.width == min(originalWidth + 240 + ScreenshotToolbarLayout.spacing, availableWidth - 24),
+            "Showing status must reserve room within the available toolbar viewport")
+        if availableWidth == 1_600 { try Self.expectStatusBesideRecognition(message, in: host) }
+        fixture.model.statusMessage = nil
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        #expect(toolbar.frame.width == originalWidth && window.frame == frame)
+        #expect(fixture.model.annotations.isEmpty && !fixture.model.canUndo)
+    }
+
+    @Test
+    func longCaptureToolbarReservesSpaceForRecognitionStatus() throws {
+        let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previous
+        arguments[AppLocalization.defaultsKey] = AppLanguage.english.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previous, forName: UserDefaults.argumentDomain) }
+        let fixture = try Fixture(image: makeImage())
+        defer { fixture.close() }
+        let screen = try #require(NSScreen.screens.first)
+        let originalFrame = fixture.controller.longCaptureToolbarFrame(on: screen)
+        let message = AppLocalization.text("正在识别...")
+        fixture.model.statusMessage = message
+        let frame = fixture.controller.longCaptureToolbarFrame(on: screen)
+        #expect(frame.width == min(originalFrame.width + ScreenshotToolbarLayout.statusWidth(for: message)
+            + ScreenshotToolbarLayout.spacing, screen.visibleFrame.width - 24),
+            "The floating toolbar window must account for its inline recognition status")
+        #expect(screen.visibleFrame.contains(frame))
+        fixture.model.statusMessage = nil
+        #expect(fixture.controller.longCaptureToolbarFrame(on: screen) == originalFrame)
     }
 
     @Test(arguments: [ScreenshotRecognitionMode.text, .table, .translate])
@@ -1084,6 +1208,36 @@ struct ScreenshotRecognitionTests {
         let children = root.responds(to: NSSelectorFromString("accessibilityChildren"))
             ? root.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] : []
         return [root] + children.flatMap(accessibilityObjects)
+    }
+
+    private static func expectStatusBesideRecognition(_ message: String, in host: NSView) throws {
+        let objects = accessibilityObjects(host)
+        let status = try #require(objects.first { object in
+            ["accessibilityTitle", "accessibilityLabel", "accessibilityValue"].contains { key in
+                object.responds(to: NSSelectorFromString(key)) && object.value(forKey: key) as? String == message
+            }
+        } as? any NSAccessibilityElementProtocol)
+        let recognition = try #require(objects.first {
+            $0.responds(to: NSSelectorFromString("accessibilityHelp"))
+                && $0.value(forKey: "accessibilityHelp") as? String == AppLocalization.text("识别图片中的文字或表格")
+        } as? any NSAccessibilityElementProtocol)
+        let window = try #require(host.window)
+        let statusFrame = host.convert(window.convertFromScreen(status.accessibilityFrame()), from: nil)
+        let recognitionFrame = host.convert(window.convertFromScreen(recognition.accessibilityFrame()), from: nil)
+        let handle = try #require(dragHandle(in: host))
+        let toolbar = try #require(handle.superview)
+        let toolbarFrame = toolbar.convert(toolbar.bounds, to: host)
+        #expect(toolbarFrame.insetBy(dx: -1, dy: -1).contains(statusFrame),
+            "Recognition status must stay within the toolbar instead of the screen's notch area")
+        #expect(abs(statusFrame.midY - recognitionFrame.midY) <= 2,
+            "OCR and translation status must share the recognition button's row")
+        let gap = min(abs(statusFrame.minX - recognitionFrame.maxX), abs(recognitionFrame.minX - statusFrame.maxX))
+        #expect(gap <= ScreenshotToolbarLayout.spacing + 2 && !statusFrame.intersects(recognitionFrame),
+            "The status must sit beside the recognition button in both text directions")
+    }
+
+    private static func dragHandle(in view: NSView) -> ScreenshotToolbarDragHandleView? {
+        (view as? ScreenshotToolbarDragHandleView) ?? view.subviews.lazy.compactMap { dragHandle(in: $0) }.first
     }
 
     private nonisolated static func recognizeSynthetic(
