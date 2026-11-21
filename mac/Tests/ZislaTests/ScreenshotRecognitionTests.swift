@@ -159,6 +159,95 @@ struct ScreenshotRecognitionTests {
         #expect(fragments == Self.fragments("normal result"))
     }
 
+    @Test(arguments: ["failure", "empty"], [false, true])
+    func deviceDiscoveryFailurePreservesTheOCROutcomeUnlessCancelled(outcome: String, cancel: Bool) throws {
+        let request = CancellationProbeRequest()
+        request.supportedDevicesError = RecognitionFailure()
+        let operation = ScreenshotRecognitionOperation(request: request)
+        if cancel { request.onSupportedDevices = { operation.cancel() } }
+        let image = try #require(makeImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        do {
+            let fragments = try operation.recognize(image) { _, _ in
+                if outcome == "failure" { throw Self.engineFailure }
+                return []
+            }
+            #expect(!cancel && outcome == "empty" && fragments.isEmpty,
+                "Unavailable device discovery must retain the original empty result")
+        } catch is CancellationError {
+            #expect(cancel && request.wasCancelled)
+        } catch {
+            #expect(!cancel && outcome == "failure" && (error as NSError) == Self.engineFailure,
+                "Unavailable device discovery must retain the original OCR error")
+        }
+        #expect(request.computeDevice(for: .main) == nil)
+    }
+
+    @Test(arguments: ["success", "failure", "cancelled"])
+    func CPURecoveryRestoresAutomaticDeviceSelectionForTheNextImage(outcome: String) throws {
+        let request = CancellationProbeRequest()
+        let operation = ScreenshotRecognitionOperation(request: request)
+        let image = try #require(makeImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        do {
+            let fragments = try operation.recognize(image) { _, request in
+                if request.computeDevice(for: .main) == nil { return [] }
+                #expect(Self.usesCPU(request))
+                if outcome == "failure" { throw RecognitionFailure() }
+                if outcome == "cancelled" { operation.cancel() }
+                return Self.fragments("recovered")
+            }
+            #expect(outcome == "success" && fragments == Self.fragments("recovered"))
+        } catch is CancellationError {
+            #expect(outcome == "cancelled")
+        } catch {
+            #expect(outcome == "failure" && error is RecognitionFailure)
+        }
+        #expect(request.computeDevice(for: .main) == nil,
+            "CPU recovery must not force later images in the batch to use the CPU")
+        if outcome != "cancelled" {
+            let next = try operation.recognize(image) { _, request in
+                #expect(request.computeDevice(for: .main) == nil,
+                    "The next image must start with Vision's automatic device selection")
+                return Self.fragments("next image")
+            }
+            #expect(next == Self.fragments("next image"))
+        }
+    }
+
+    @Test(arguments: ["Vision cancellation", "cancelled error", "ordinary error"])
+    func CPURecoveryChecksCancellationWhenItsAttemptThrows(outcome: String) throws {
+        let request = CancellationProbeRequest()
+        let operation = ScreenshotRecognitionOperation(request: request)
+        let image = try #require(makeImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        do {
+            _ = try operation.recognize(image) { _, request in
+                if request.computeDevice(for: .main) == nil { return [] }
+                if outcome == "Vision cancellation" {
+                    throw NSError(domain: VNErrorDomain, code: VNErrorCode.requestCancelled.rawValue)
+                }
+                if outcome == "cancelled error" { operation.cancel() }
+                throw RecognitionFailure()
+            }
+            Issue.record("An unsuccessful CPU attempt must not return a result")
+        } catch is CancellationError {
+            #expect(outcome != "ordinary error")
+        } catch {
+            #expect(outcome == "ordinary error" && error is RecognitionFailure,
+                "CPU attempts must distinguish cancellation from ordinary recognition failures")
+        }
+    }
+
+    @Test
+    func missingRecognitionMenuItemStillEndsTracking() throws {
+        let fixture = try Fixture(image: makeImage())
+        defer { fixture.close() }
+        let selection = RecognitionMenuSelection(title: "Synthetic missing item", model: fixture.model)
+        selection.began(Notification(name: NSMenu.didBeginTrackingNotification, object: NSMenu()))
+        RunLoop.main.run(mode: .eventTracking, before: Date(timeIntervalSinceNow: 0.05))
+        #expect(selection.selected && !selection.startedRecognition,
+            "A missing menu item must end tracking rather than block the test host")
+        #expect(!fixture.model.isRecognizing)
+    }
+
     @Test(arguments: AppLanguage.allCases)
     func screenshotOverlayShowsRecognitionAndExportStatusInEveryLanguage(language: AppLanguage) async throws {
         let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
@@ -1337,6 +1426,7 @@ struct ScreenshotRecognitionTests {
         var supportsCPU = true
         var onSupportedLanguages: (() -> Void)?
         var onSupportedDevices: (() -> Void)?
+        var supportedDevicesError: Error?
         override func cancel() { wasCancelled = true; super.cancel() }
         override func supportedRecognitionLanguages() throws -> [String] {
             onSupportedLanguages?()
@@ -1344,6 +1434,7 @@ struct ScreenshotRecognitionTests {
         }
         override func __supportedComputeStageDevices() throws -> [VNComputeStage: [any MLComputeDeviceProtocol]] {
             onSupportedDevices?()
+            if let supportedDevicesError { throw supportedDevicesError }
             return [.main: supportsCPU ? MLComputeDevice.allComputeDevices.compactMap {
                 if case let .cpu(device) = $0 { return device }
                 return nil
@@ -1400,13 +1491,13 @@ struct ScreenshotRecognitionTests {
         }
 
         @objc func began(_ notification: Notification) {
-            guard let menu = notification.object as? NSMenu,
-                  let index = menu.items.firstIndex(where: { $0.title == title }) else { return }
+            guard let menu = notification.object as? NSMenu else { return }
+            let index = menu.items.firstIndex(where: { $0.title == title })
             self.menu = menu
             RunLoop.main.perform(inModes: [.eventTracking]) {
                 MainActor.assumeIsolated {
                     self.menu?.cancelTrackingWithoutAnimation()
-                    self.menu?.performActionForItem(at: index)
+                    if let index { self.menu?.performActionForItem(at: index) }
                     self.startedRecognition = self.model.isRecognizing
                     self.model.cancelRecognition()
                     self.selected = true

@@ -3920,15 +3920,25 @@ final class ScreenshotRecognitionOperation: @unchecked Sendable {
         default: break
         }
         // Accurate OCR can fail or return no text when the Neural Engine cannot load its model.
-        guard let cpu = try request.supportedComputeStageDevices[.main]?.first(where: {
+        let devices = try? request.supportedComputeStageDevices
+        try checkCancellation()
+        guard let cpu = devices?[.main]?.first(where: {
             if case .cpu = $0 { return true }
             return false
         }) else { return try result.get() }
+        let previousDevice = request.computeDevice(for: .main)
+        defer { request.setComputeDevice(previousDevice, for: .main) }
         request.setComputeDevice(cpu, for: .main)
         try checkCancellation()
-        let fragments = try perform(image, request)
+        let retry = Result { try perform(image, request) }
         try checkCancellation()
-        return fragments
+        if case let .failure(error) = retry {
+            let visionError = error as NSError
+            if visionError.domain == VNErrorDomain && visionError.code == VNErrorCode.requestCancelled.rawValue {
+                throw CancellationError()
+            }
+        }
+        return try retry.get()
     }
 }
 
