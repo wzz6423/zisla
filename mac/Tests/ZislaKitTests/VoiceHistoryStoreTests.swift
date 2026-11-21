@@ -1619,7 +1619,7 @@ struct VoiceHistoryStoreTests {
                 createdAt: now.addingTimeInterval(-Double(days - 1) * day)
             )))
 
-            store.cleanupOldRecordings(policy: policy, now: now)
+            #expect(store.cleanupOldRecordings(policy: policy, now: now) == nil)
 
             #expect(!FileManager.default.fileExists(atPath: expiredURL.path))
             #expect(FileManager.default.fileExists(atPath: currentURL.path))
@@ -1645,13 +1645,17 @@ struct VoiceHistoryStoreTests {
         )))
         try fixture.blockMetadataWrites()
 
-        store.cleanupOldRecordings(
+        #expect(store.cleanupOldRecordings(
             policy: .sevenDays,
             now: Date(timeIntervalSince1970: 2_000_000_000)
-        )
+        )?.contains("injected metadata write failure") == true)
 
         #expect(store.entries.first?.audioFileName == audioURL.lastPathComponent)
         #expect(FileManager.default.fileExists(atPath: audioURL.path))
+        try fixture.executeSQL("DROP TRIGGER fail_voice_state_update")
+        #expect(store.cleanupOldRecordings(policy: .sevenDays, now: Date(timeIntervalSince1970: 2_000_000_000)) == nil)
+        #expect(store.entries.first?.audioFileName == nil)
+        #expect(!FileManager.default.fileExists(atPath: audioURL.path))
     }
 
     @Test
@@ -1670,7 +1674,7 @@ struct VoiceHistoryStoreTests {
             createdAt: Date(timeIntervalSince1970: 1)
         )))
 
-        store.cleanupOldRecordings(policy: .never, now: Date(timeIntervalSince1970: 2_000_000_000))
+        #expect(store.cleanupOldRecordings(policy: .never, now: Date(timeIntervalSince1970: 2_000_000_000)) == nil)
 
         #expect(FileManager.default.fileExists(atPath: audioURL.path))
     }

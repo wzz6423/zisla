@@ -199,9 +199,18 @@ struct SettingsView: View {
                 if input.isSearching {
                     searchResultsContent
                 } else {
-                    VStack(alignment: .leading, spacing: 3) {
+                    HStack {
                         AppLocalizedText(input.selection.title)
                             .font(.system(size: 23, weight: .semibold))
+                        if input.selection == .scheduledCleanup {
+                            Spacer()
+                            Button(AppLocalization.string("立即清理", locale: locale)) {
+                                model.runCleanupNow()
+                            }
+                            .buttonStyle(.bordered)
+                            .keepsIntrinsicWidth()
+                            .disabled(model.isCleaningNow || !AppModel.canCleanNow(settings: settingsStore.settings))
+                        }
                     }
                     DeferredMount {
                         AnyView(selectedContent)
@@ -305,6 +314,11 @@ struct SettingsView: View {
 
     private var scheduledCleanupContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            if let status = model.cleanupStatus {
+                Text(status.message(locale: locale))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
             if settingsStore.settings.systemMonitorEnabled && settingsStore.settings.automaticPowerModeEnabled {
                 settingsGroup("电源模式") {
                     settingRow(
@@ -447,6 +461,7 @@ struct SettingsView: View {
                     .keepsIntrinsicWidth()
                 }
             }
+            .disabled(model.isCleaningNow)
         }
         .alert(AppLocalization.string("启用定时倾倒废纸篓？", locale: locale), isPresented: Binding(
             get: { input.pendingTrashCleanupPolicy != nil },

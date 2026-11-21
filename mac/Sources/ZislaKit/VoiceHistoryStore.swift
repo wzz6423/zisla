@@ -443,12 +443,13 @@ public final class VoiceHistoryStore: ObservableObject {
         }
     }
 
+    @discardableResult
     public func cleanupOldRecordings(
         policy: VoiceRecordingCleanupPolicy,
         now: Date = Date()
-    ) {
-        guard let daysThreshold = policy.daysThreshold else { return }
-        guard beginAccess() else { return }
+    ) -> String? {
+        guard let daysThreshold = policy.daysThreshold else { return nil }
+        guard beginAccess() else { return errorDescription }
         defer { finishAccess() }
         let cutoffDate = now.addingTimeInterval(-Double(daysThreshold) * 24 * 60 * 60)
         var candidate = entries
@@ -463,13 +464,13 @@ public final class VoiceHistoryStore: ObservableObject {
             candidate[index].audioFileName = nil
             audioDeletions.append((candidate[index].id, audioURL))
         }
-        guard candidate != entries else { return }
+        guard candidate != entries else { return nil }
         let stagedAudioFiles: [StagedAudioFile]
         do {
             stagedAudioFiles = try stageAudioFiles(audioDeletions.map(\.url))
         } catch {
             errorDescription = error.localizedDescription
-            return
+            return errorDescription
         }
         guard persistCandidate(candidate, cumulativeWordCount: cumulativeWordCount, cumulativeDuration: cumulativeDuration) else {
             let persistenceError = errorDescription
@@ -478,7 +479,7 @@ public final class VoiceHistoryStore: ObservableObject {
             } else {
                 errorDescription = persistenceError
             }
-            return
+            return errorDescription
         }
         let removal = removeStagedAudioFiles(stagedAudioFiles)
         if let removalError = removal.error {
@@ -494,9 +495,10 @@ public final class VoiceHistoryStore: ObservableObject {
             let restorationError = rollbackSucceeded ? restoreStagedAudioFiles(removal.remaining) : nil
             entries = rollbackSucceeded ? fallback : candidate
             errorDescription = (restorationError ?? removalError).localizedDescription
-            return
+            return errorDescription
         }
         entries = candidate
+        return nil
     }
 
     @discardableResult

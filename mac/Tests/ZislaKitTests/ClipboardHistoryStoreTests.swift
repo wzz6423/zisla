@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import SQLite3
 import Testing
+import XCTest
 import ZislaCore
 
 @testable import ZislaKit
@@ -1348,6 +1349,78 @@ struct ClipboardHistoryStoreTests {
         #expect(store.items.isEmpty)
     }
 
+
+    @Test
+    func immediateCleanupWaitsForPersistenceAndKeepsTheExistingTimer() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        var now = Date(timeIntervalSince1970: 2_000_000_000)
+        let expired = ClipboardHistoryItem(content: .text("expired"), lastCopiedAt: now.addingTimeInterval(-6 * 86_400))
+        let pinned = ClipboardHistoryItem(content: .text("pinned"), lastCopiedAt: .distantPast, isPinned: true)
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        try database.flush([expired, pinned].map { .upsert($0, capacity: nil) })
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60), now: { now })
+        await store.waitUntilLoaded()
+        store.configureCleanup(policy: .sevenDays)
+        defer { store.stopCleanup(); store.flushPendingChanges() }
+        await store.waitUntilLoaded()
+        let timer = try #require(store.cleanupTimer)
+        let deadline = timer.fireDate
+        now.addTimeInterval(2 * 86_400)
+
+        let completed = XCTestExpectation(description: "Immediate cleanup bypasses the persistence delay")
+        let operation = Task {
+            #expect(await store.cleanupOldHistoryNow(policy: .sevenDays, now: now) == nil)
+            completed.fulfill()
+        }
+        let completion = await XCTWaiter.fulfillment(of: [completed], timeout: 2)
+        #expect(completion == .completed)
+        if completion != .completed { store.flushPendingChanges() }
+        await operation.value
+
+        #expect(store.items.map(\.id) == [pinned.id])
+        let reopened = ClipboardHistoryStore(storageURL: storageURL)
+        await reopened.waitUntilLoaded()
+        #expect(reopened.items.map(\.id) == [pinned.id])
+        #expect(store.cleanupTimer === timer)
+        #expect(timer.isValid && timer.fireDate == deadline)
+    }
+
+    @Test
+    func immediateCleanupFailureReturnsWithoutLosingHistoryAndCanRetry() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let expired = ClipboardHistoryItem(content: .text("keep on failure"), lastCopiedAt: .distantPast)
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        try database.flush([.upsert(expired, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL)
+        await store.waitUntilLoaded()
+        try executeSQL("""
+            CREATE TRIGGER reject_immediate_cleanup BEFORE DELETE ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected immediate cleanup failure'); END;
+            """, at: storageURL)
+
+        #expect(await store.cleanupOldHistoryNow(policy: .sevenDays, now: Date())?.contains("injected immediate cleanup failure") == true)
+        #expect(store.errorDescription?.contains("injected immediate cleanup failure") == true)
+        #expect(store.items.map(\.id) == [expired.id])
+        try executeSQL("DROP TRIGGER reject_immediate_cleanup", at: storageURL)
+        #expect(await store.cleanupOldHistoryNow(policy: .sevenDays, now: Date()) == nil)
+        #expect(store.items.isEmpty)
+        #expect(store.cleanupTimer == nil)
+    }
+
+    @Test(arguments: VoiceRecordingCleanupPolicy.allCases)
+    func immediateCleanupOnEmptyHistorySucceedsWithoutScheduling(policy: VoiceRecordingCleanupPolicy) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ClipboardHistoryStore(storageURL: directory.appendingPathComponent("clipboard-history.sqlite"))
+        await store.waitUntilLoaded()
+        #expect(await store.cleanupOldHistoryNow(policy: policy, now: Date()) == nil)
+        #expect(store.items.isEmpty && store.errorDescription == nil)
+        #expect(store.cleanupTimer == nil)
+    }
 
     @Test(arguments: [
         VoiceRecordingCleanupPolicy.sevenDays,

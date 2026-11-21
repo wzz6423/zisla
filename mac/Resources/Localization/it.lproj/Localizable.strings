@@ -3751,3 +3751,7 @@
 "自动更新依赖组件" = "Aggiorna automaticamente le dipendenze";
 "每天更新已安装的依赖组件" = "Aggiorna ogni giorno le dipendenze installate";
 "（默认）" = "(Predefinito)";
+"立即清理" = "Pulisci ora";
+"正在清理" = "Pulizia in corso";
+"清理完成" = "Pulizia completata";
+"清理失败：%@" = "Pulizia non riuscita: %@";

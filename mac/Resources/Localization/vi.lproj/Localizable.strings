@@ -3751,3 +3751,7 @@
 "自动更新依赖组件" = "Tự động cập nhật thành phần phụ thuộc";
 "每天更新已安装的依赖组件" = "Cập nhật các thành phần phụ thuộc đã cài đặt mỗi ngày";
 "（默认）" = "(Mặc định)";
+"立即清理" = "Dọn dẹp ngay";
+"正在清理" = "Đang dọn dẹp";
+"清理完成" = "Dọn dẹp hoàn tất";
+"清理失败：%@" = "Dọn dẹp thất bại: %@";

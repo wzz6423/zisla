@@ -3751,3 +3751,7 @@
 "自动更新依赖组件" = "Afhankelijkheden automatisch bijwerken";
 "每天更新已安装的依赖组件" = "Geïnstalleerde afhankelijkheden dagelijks bijwerken";
 "（默认）" = "(Standaard)";
+"立即清理" = "Nu opschonen";
+"正在清理" = "Bezig met opschonen";
+"清理完成" = "Opschonen voltooid";
+"清理失败：%@" = "Opschonen mislukt: %@";

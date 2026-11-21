@@ -75,6 +75,12 @@ public final class SystemAutoCleanupService {
     func runIfDue() -> Task<DiskCleanupResult?, Never>? {
         systemCleanup.runIfDue()
     }
+
+    public func runNow() async -> (system: DiskCleanupResult?, trash: Result<Void, DesktopOrganizerError>?) {
+        let system = await systemCleanup.runNow()
+        let trash = await trashCleanup.runNow()
+        return (system, trash)
+    }
 }
 
 @MainActor
@@ -160,16 +166,35 @@ final class CleanupSchedule<Outcome: Sendable> {
 
     @discardableResult
     func runIfDue() -> Task<Outcome?, Never>? {
-        guard let timer, let operation, task == nil, now() >= nextCleanupDate else { return nil }
+        guard now() >= nextCleanupDate else { return nil }
+        return startTask(reschedules: true)
+    }
+
+    func runNow() async -> Outcome? {
+        await task?.value
+        guard !Task.isCancelled, let task = startTask(reschedules: false) else { return nil }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    private func startTask(reschedules: Bool) -> Task<Outcome?, Never>? {
+        guard let timer, let operation, task == nil else { return nil }
         let generation = generation
         let interval = timer.timeInterval
         let referenceDate = now()
         let task = Task { [weak self] () -> Outcome? in
             guard let self, !Task.isCancelled else { return nil }
             defer {
-                if self.generation == generation { self.task = nil }
+                if self.generation == generation {
+                    self.task = nil
+                    // A repeating timer may advance while manual work runs; keep the scheduled deadline due.
+                    if !reschedules { timer.fireDate = nextCleanupDate }
+                }
             }
-            if let attemptKey {
+            if reschedules, let attemptKey {
                 defaults.set(referenceDate, forKey: attemptKey)
                 // This once-per-cycle barrier must finish before irreversible work can start.
                 guard defaults.synchronize() else {
@@ -179,6 +204,7 @@ final class CleanupSchedule<Outcome: Sendable> {
                 }
             }
             guard let result = await operation(referenceDate), !Task.isCancelled else { return nil }
+            guard reschedules else { return result }
             let completedAt = now()
             // Failed attempts also wait for the next interval instead of repeatedly retrying protected files.
             defaults.set(completedAt, forKey: lastRunKey)

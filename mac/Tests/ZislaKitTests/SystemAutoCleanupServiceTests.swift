@@ -7,6 +7,173 @@ import ZislaCore
 
 @MainActor
 struct SystemAutoCleanupServiceTests {
+    @Test
+    func cancellingTheImmediateCallerStopsScanningAndDoesNotStartTrashEmptying() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let gate = CleanupScanGate()
+        fixture.candidates = [fixture.candidate("cache", kind: .appCache)]
+        let service = fixture.makeService(scan: { kinds, options in
+            await gate.wait()
+            return fixture.scan(kinds, options: options)
+        })
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays, trashCleanupPolicy: .sevenDays))
+        let deadlines = fixture.timers.map(\.fireDate)
+        let manual = Task { await service.runNow() }
+        await gate.waitUntilScanning(1)
+        manual.cancel()
+        await gate.releaseOne()
+        let result = await manual.value
+        #expect(result.system == nil && result.trash == nil)
+        #expect(fixture.moved.isEmpty && fixture.emptiedCount == 0)
+        #expect(fixture.timers.map(\.fireDate) == deadlines)
+    }
+
+    @Test(arguments: SystemCleanupScope.allCases)
+    func immediateCleanupUsesTheSelectedScopeAndPreservesBothDeadlines(scope: SystemCleanupScope) async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let safe = fixture.candidate("cache", kind: .appCache)
+        let review = fixture.candidate("log", kind: .log)
+        let analysis = fixture.candidate("simulator", kind: .simulatorData, safetyLevel: .safeToClean)
+        fixture.candidates = [safe, review, analysis]
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays,
+            systemCleanupScope: scope, trashCleanupPolicy: .fifteenDays))
+        let deadlines = fixture.timers.map(\.fireDate)
+        let originalDate = fixture.date
+        fixture.date.addTimeInterval(86_400)
+
+        let result = await service.runNow()
+
+        #expect(result.system?.successCount == (scope == .all ? 2 : 1))
+        #expect(fixture.moved == (scope == .all ? [safe, review] : [safe]))
+        #expect(fixture.options?.referenceDate == fixture.date)
+        #expect(fixture.emptiedCount == 1)
+        #expect(fixture.timers.map(\.fireDate) == deadlines)
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date == originalDate)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == originalDate)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+        #expect(service.runIfDue() == nil)
+        #expect(service.trashCleanup.runIfDue() == nil)
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func immediateCleanupSkipsDisabledItemsAndAcceptsEmptyCandidates(systemEnabled: Bool, trashEnabled: Bool) async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(systemMonitorEnabled: systemEnabled,
+            systemCleanupPolicy: .sevenDays, trashCleanupPolicy: trashEnabled ? .sevenDays : .never))
+        let result = await service.runNow()
+        #expect((result.system != nil) == systemEnabled)
+        #expect(result.system?.successCount == (systemEnabled ? 0 : nil))
+        #expect((result.trash != nil) == trashEnabled)
+        #expect(fixture.emptiedCount == (trashEnabled ? 1 : 0))
+        #expect(fixture.moved.isEmpty)
+        #expect((fixture.options != nil) == systemEnabled)
+    }
+
+    @Test
+    func immediateFailuresAreReturnedWithoutChangingTheScheduleAndAllowRetry() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let candidate = fixture.candidate("protected", kind: .appCache)
+        fixture.candidates = [candidate]
+        fixture.result = DiskCleanupResult(successCount: 0, freedBytes: 0,
+            failures: [DiskCleanupFailure(url: candidate.url, message: "Permission denied")])
+        fixture.emptyResult = .failure(.failed("Automation permission denied"))
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays, trashCleanupPolicy: .sevenDays))
+        let deadlines = fixture.timers.map(\.fireDate)
+        let failed = await service.runNow()
+        #expect(failed.system == fixture.result)
+        if case .failure(let error) = failed.trash {
+            #expect(error == .failed("Automation permission denied"))
+        } else { Issue.record("Immediate Trash failure must be returned") }
+        #expect(fixture.timers.map(\.fireDate) == deadlines)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+        fixture.result = nil
+        fixture.emptyResult = .success(())
+        let retried = await service.runNow()
+        #expect(retried.system?.successCount == 1)
+        #expect(fixture.emptiedCount == 2)
+        #expect(fixture.timers.map(\.fireDate) == deadlines)
+    }
+
+    @Test
+    func aDeadlineReachedDuringImmediateCleanupStillRunsItsScheduledOperation() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let gate = CleanupScanGate()
+        let service = fixture.makeService(scan: { kinds, options in
+            await gate.wait()
+            return fixture.scan(kinds, options: options)
+        })
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays))
+        let timer = try #require(fixture.timers.first)
+        let deadline = timer.fireDate
+        let manual = Task { await service.runNow() }
+        await gate.waitUntilScanning(1)
+        fixture.date = deadline
+        timer.fireDate = deadline.addingTimeInterval(timer.timeInterval)
+        fixture.callbacks[0](timer)
+        await gate.releaseOne()
+        #expect(await manual.value.system != nil)
+        #expect(timer.fireDate == deadline, "An extra cleanup cannot defer the original deadline")
+        let scheduled = try #require(service.runIfDue())
+        await gate.waitUntilScanning(2)
+        await gate.releaseOne()
+        #expect(await scheduled.value != nil)
+        #expect(timer.fireDate == deadline.addingTimeInterval(timer.timeInterval))
+    }
+
+    @Test
+    func immediateCleanupWaitsForScheduledWorkInsteadOfOverlappingIt() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let gate = CleanupScanGate()
+        let service = fixture.makeService(scan: { kinds, options in
+            await gate.wait()
+            return fixture.scan(kinds, options: options)
+        })
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays))
+        fixture.date.addTimeInterval(7 * 86_400)
+        let scheduled = try #require(service.runIfDue())
+        await gate.waitUntilScanning(1)
+        let manual = Task { await service.runNow() }
+        await Task.yield()
+        await gate.releaseOne()
+        #expect(await scheduled.value != nil)
+        let deadline = try #require(fixture.timers.first).fireDate
+        await gate.waitUntilScanning(2)
+        await gate.releaseOne()
+        #expect(await manual.value.system != nil)
+        #expect(fixture.timers.first?.fireDate == deadline)
+    }
+
+    @Test
+    func stoppingImmediateCleanupDuringScanningKeepsFilesAndScheduleRecords() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let gate = CleanupScanGate()
+        fixture.candidates = [fixture.candidate("cache", kind: .appCache)]
+        let service = fixture.makeService(scan: { kinds, options in
+            await gate.wait()
+            return fixture.scan(kinds, options: options)
+        })
+        service.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays, trashCleanupPolicy: .sevenDays))
+        let originalDate = fixture.date
+        let manual = Task { await service.runNow() }
+        await gate.waitUntilScanning(1)
+        service.stop()
+        await gate.releaseOne()
+        #expect(await manual.value.system == nil)
+        #expect(fixture.moved.isEmpty)
+        #expect(fixture.emptiedCount == 0)
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date == originalDate)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == originalDate)
+    }
+
     @Test(arguments: [VoiceRecordingCleanupPolicy.sevenDays, .fifteenDays, .thirtyDays])
     func firstCleanupWaitsForTheSelectedIntervalAndReschedulesFromCompletion(policy: VoiceRecordingCleanupPolicy) async throws {
         let fixture = try SystemAutoCleanupFixture()

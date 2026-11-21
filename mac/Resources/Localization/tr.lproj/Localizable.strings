@@ -3751,3 +3751,7 @@
 "自动更新依赖组件" = "Bağımlılıkları Otomatik Güncelle";
 "每天更新已安装的依赖组件" = "Yüklü bağımlılıkları her gün güncelle";
 "（默认）" = "(Varsayılan)";
+"立即清理" = "Şimdi temizle";
+"正在清理" = "Temizleniyor";
+"清理完成" = "Temizlik tamamlandı";
+"清理失败：%@" = "Temizlik başarısız: %@";
