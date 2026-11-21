@@ -9,6 +9,107 @@ import ZislaCore
 @Suite(.serialized)
 struct PermissionSettingsAssistantTests {
     @Test
+    func settingsGeometryMustSettleBeforeTheHelperAppears() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        for frame in [CGRect(x: 50, y: 20, width: 300, height: 150),
+                      CGRect(x: 300, y: 80, width: 600, height: 400),
+                      CGRect(x: 900, y: 200, width: 500, height: 600)] {
+            fixture.settingsFrame = frame
+            fixture.tickSettings()
+            #expect(fixture.assistant.panel == nil, "A visible but animated Settings window is not ready for placement")
+        }
+        await fixture.settle()
+        let panel = try #require(fixture.assistant.panel)
+        #expect(panel.frame.maxX == fixture.settingsFrame!.minX - 12,
+            "Use the settled Settings frame, not an intermediate animation frame")
+        #expect(panel.frame.midY == fixture.settingsFrame!.midY)
+    }
+
+    @Test
+    func reactivatingSettingsMustNotMoveTheHelperDuringAnimation() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        await fixture.settle()
+        let panel = try #require(fixture.assistant.panel)
+        let original = panel.frame
+        fixture.settingsFrame = CGRect(x: 700, y: 60, width: 300, height: 200)
+        fixture.assistant.settingsDidActivate()
+        fixture.tickSettings()
+        #expect(panel.frame == original, "Keep the helper in place while Settings is animating")
+        fixture.settingsFrame = CGRect(x: 900, y: 200, width: 500, height: 600)
+        await fixture.settle()
+        #expect(fixture.assistant.panel === panel && fixture.presentations == 1)
+        #expect(panel.frame.maxX == fixture.settingsFrame!.minX - 12)
+        #expect(panel.frame.midY == fixture.settingsFrame!.midY)
+    }
+
+    @Test
+    func stablePlacementRequiresAContinuousQuietPeriod() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        fixture.tickSettings(after: 0)
+        for _ in 0..<10 {
+            fixture.assistant.settingsDidActivate()
+            fixture.tickSettings(after: 0)
+        }
+        #expect(fixture.assistant.panel == nil, "Repeated notifications must not count as elapsed animation time")
+        fixture.tickSettings(after: 0.39)
+        #expect(fixture.assistant.panel == nil)
+        fixture.settingsFrame?.size.height += 1
+        fixture.tickSettings(after: 0.02)
+        #expect(fixture.assistant.panel == nil, "A size change resets the quiet period")
+        fixture.tickSettings(after: 0.39)
+        #expect(fixture.assistant.panel == nil)
+        fixture.tickSettings(after: 0.02)
+        #expect(fixture.assistant.panel != nil)
+    }
+
+    @Test
+    func aDisappearingWindowAndScreenChangesResetPlacementStability() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        let frame = fixture.settingsFrame
+        fixture.tickSettings(after: 0)
+        fixture.tickSettings(after: 0.3)
+        fixture.settingsFrame = nil
+        fixture.tickSettings(after: 0.2)
+        fixture.settingsFrame = frame
+        fixture.tickSettings(after: 0)
+        #expect(fixture.assistant.panel == nil, "A window cannot inherit stability from before it disappeared")
+        fixture.tickSettings(after: 0.3)
+        fixture.visibleFrame.size.width = 900
+        fixture.tickSettings(after: 0.2)
+        #expect(fixture.assistant.panel == nil, "A changed display must settle before choosing the helper side")
+        fixture.tickSettings(after: 0.3)
+        #expect(fixture.assistant.panel == nil)
+        fixture.tickSettings(after: 0.2)
+        let panel = try #require(fixture.assistant.panel)
+        #expect(fixture.visibleFrame.contains(panel.frame))
+        #expect(fixture.settingsTimers.allSatisfy { !$0.isValid })
+    }
+
+    @Test
+    func cancelingASettlingRequestClearsItsPreviousGeometry() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.fullDiskAccess.settingsURL))
+        fixture.tickSettings(after: 0)
+        fixture.tickSettings(after: 0.3)
+        fixture.assistant.cancelPreparation()
+        fixture.uptime = 5
+        #expect(fixture.assistant.openSettings(OnboardingPermissionID.accessibility.settingsURL))
+        fixture.tickSettings(after: 0)
+        #expect(fixture.assistant.panel == nil, "A replacement request must wait for its own stable geometry")
+        await fixture.settle()
+        #expect(fixture.assistant.panel != nil && fixture.presentations == 1)
+    }
+
+    @Test
     func settingsWindowMustBeVisibleBeforeAssistantAppears() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
@@ -19,7 +120,7 @@ struct PermissionSettingsAssistantTests {
         fixture.assistant.settingsDidActivate()
         #expect(fixture.assistant.panel == nil)
         fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
-        fixture.tickSettings()
+        await fixture.settle()
         #expect(fixture.assistant.panel != nil)
         #expect(fixture.settingsTimers.allSatisfy { !$0.isValid }, "Stop watching Settings once the helper appears")
     }
@@ -38,8 +139,10 @@ struct PermissionSettingsAssistantTests {
             userInfo: [NSWorkspace.applicationUserInfoKey: NSRunningApplication.current])
         #expect(fixture.assistant.panel === panel, "Returning to the app must preserve the drag helper")
         fixture.assistant.settingsDidActivate()
+        await fixture.settle()
         #expect(fixture.assistant.panel === panel && panel.frame == frame,
             "A missing Settings window must not close or reposition the helper")
+        #expect(fixture.settingsTimers.allSatisfy { !$0.isValid }, "Stop relocation polling when Settings disappears")
     }
 
     @Test
@@ -141,6 +244,7 @@ struct PermissionSettingsAssistantTests {
         #expect(panel.frame.minX == fixture.settingsFrame!.maxX + 12)
         fixture.settingsFrame = CGRect(x: 900, y: 200, width: 500, height: 600)
         fixture.assistant.settingsDidActivate()
+        await fixture.settle()
         #expect(panel.frame.maxX == fixture.settingsFrame!.minX - 12)
         #expect(fixture.presentations == 1)
     }
@@ -191,6 +295,7 @@ struct PermissionSettingsAssistantTests {
         #expect(fixture.opened.isEmpty && fixture.assistant.panel == nil)
         NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
         fixture.assistant.settingsDidActivate()
+        await fixture.settle()
         #expect(fixture.assistant.panel != nil && fixture.presentations == 1)
         fixture.assistant.settingsDidActivate()
         #expect(fixture.presentations == 1)
@@ -214,7 +319,7 @@ struct PermissionSettingsAssistantTests {
         fixture.tickSettings()
         #expect(fixture.assistant.panel == nil)
         fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
-        fixture.tickSettings()
+        await fixture.settle()
         #expect(fixture.assistant.panel != nil && fixture.presentations == 1)
         #expect(fixture.opened.isEmpty)
         #expect(fixture.settingsTimers.allSatisfy { !$0.isValid })
@@ -251,8 +356,11 @@ struct PermissionSettingsAssistantTests {
         let timer = try #require(fixture.settingsTimers.first)
         #expect(timer.isValid && fixture.assistant.panel == nil)
         fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
+        fixture.uptime = 1
         timer.fireDate = .distantPast
-        let deadline = Date(timeIntervalSinceNow: 0.2)
+        fixture.tickSettings(after: 0)
+        fixture.uptime = 1.5
+        let deadline = Date(timeIntervalSinceNow: 0.5)
         while fixture.assistant.panel == nil && Date() < deadline {
             RunLoop.main.run(mode: .default, before: deadline)
         }
@@ -395,6 +503,8 @@ struct PermissionSettingsAssistantTests {
         var opened: [URL] = []
         var presentations = 0
         var settingsFrame: CGRect? = CGRect(x: 50, y: 200, width: 700, height: 600)
+        var visibleFrame = CGRect(x: 0, y: 0, width: 1600, height: 1000)
+        var uptime: TimeInterval = 0
         var settingsTimers: [Timer] = []
         var timerHandlers: [@Sendable (Timer) -> Void] = []
         lazy var assistant = makeAssistant(applicationURL: applicationURL)
@@ -409,7 +519,7 @@ struct PermissionSettingsAssistantTests {
             PermissionSettingsAssistant(applicationURL: applicationURL,
                 openURL: { [unowned self] in self.opened.append($0); return self.canOpen },
                 icon: { _ in NSImage(size: NSSize(width: 64, height: 64)) },
-                placement: { [unowned self] in (self.settingsFrame, CGRect(x: 0, y: 0, width: 1600, height: 1000)) },
+                placement: { [unowned self] in (self.settingsFrame, self.visibleFrame) },
                 orderFront: { [unowned self] _ in self.presentations += 1 },
                 language: { language },
                 timerFactory: { [unowned self] interval, block in
@@ -419,6 +529,7 @@ struct PermissionSettingsAssistantTests {
                     self.timerHandlers.append(block)
                     return timer
                 },
+                uptime: { [unowned self] in self.uptime },
                 workspaceNotificationCenter: workspaceCenter)
         }
 
@@ -428,10 +539,11 @@ struct PermissionSettingsAssistantTests {
                     DispatchQueue.main.async { continuation.resume() }
                 }
             }
-            tickSettings()
+            for _ in 0..<7 { tickSettings() }
         }
 
-        func tickSettings() {
+        func tickSettings(after interval: TimeInterval = 0.1) {
+            uptime += interval
             for timer in settingsTimers where timer.isValid { timer.fire() }
         }
 

@@ -13,7 +13,9 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
     private let orderFront: @MainActor (NSPanel) -> Void
     private let language: @MainActor () -> AppLanguage
     private let timerFactory: (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer
+    private let uptime: @MainActor () -> TimeInterval
     private var settingsTimer: Timer?
+    private var pendingPlacement: (settingsFrame: CGRect, visibleFrame: CGRect, since: TimeInterval)?
     private var awaitingSettings = false
     private(set) var panel: NSPanel?
 
@@ -27,6 +29,7 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         timerFactory: @escaping (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer = {
             Timer(timeInterval: $0, repeats: true, block: $1)
         },
+        uptime: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         workspaceNotificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter
     ) {
         self.applicationURL = applicationURL
@@ -36,6 +39,7 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         self.orderFront = orderFront
         self.language = language
         self.timerFactory = timerFactory
+        self.uptime = uptime
         super.init()
         workspaceNotificationCenter.addObserver(self, selector: #selector(workspaceDidActivate(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
@@ -77,6 +81,7 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         awaitingSettings = false
         settingsTimer?.invalidate()
         settingsTimer = nil
+        pendingPlacement = nil
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -94,34 +99,47 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
     }
 
     func settingsDidActivate() {
-        if awaitingSettings {
-            waitForSettingsWindow()
-            showPreparedAssistant()
-        } else { reposition() }
+        guard awaitingSettings || panel != nil else { return }
+        waitForSettingsWindow()
     }
 
     private func waitForSettingsWindow() {
         guard settingsTimer == nil else { return }
-        // Settings may activate before creating its window, so visibility must outlive the activation event.
+        // Settings can expose intermediate bounds during its opening and resizing animations.
         let timer = timerFactory(0.1) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
             let timerID = ObjectIdentifier(timer)
             MainActor.assumeIsolated {
                 guard let activeTimer = self.settingsTimer,
                       ObjectIdentifier(activeTimer) == timerID else { return }
-                self.showPreparedAssistant()
+                self.updateSettingsPlacement()
             }
         }
         settingsTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    private func showPreparedAssistant() {
-        guard awaitingSettings else { return }
+    private func updateSettingsPlacement() {
         let destination = placement()
-        guard let settingsFrame = destination.settingsFrame else { return }
+        guard let settingsFrame = destination.settingsFrame else {
+            pendingPlacement = nil
+            if panel != nil { cancelPreparation() }
+            return
+        }
+        let now = uptime()
+        guard let pendingPlacement, pendingPlacement.settingsFrame == settingsFrame,
+              pendingPlacement.visibleFrame == destination.visibleFrame else {
+            pendingPlacement = (settingsFrame, destination.visibleFrame, now)
+            return
+        }
+        guard now - pendingPlacement.since >= 0.4 else { return }
         cancelPreparation()
-        present(settingsFrame: settingsFrame, visibleFrame: destination.visibleFrame)
+        if let panel {
+            panel.setFrame(Self.frame(size: panel.frame.size, settingsFrame: settingsFrame,
+                visibleFrame: destination.visibleFrame), display: true)
+        } else {
+            present(settingsFrame: settingsFrame, visibleFrame: destination.visibleFrame)
+        }
     }
 
     private func present(settingsFrame: CGRect, visibleFrame: CGRect) {
@@ -178,14 +196,6 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         helper.setFrame(Self.frame(size: helper.frame.size, settingsFrame: settingsFrame,
             visibleFrame: visibleFrame), display: true)
         orderFront(helper)
-    }
-
-    func reposition() {
-        guard let panel else { return }
-        let destination = placement()
-        guard let settingsFrame = destination.settingsFrame else { return }
-        panel.setFrame(Self.frame(size: panel.frame.size, settingsFrame: settingsFrame,
-            visibleFrame: destination.visibleFrame), display: true)
     }
 
     static func frame(size: CGSize, settingsFrame: CGRect?, visibleFrame: CGRect) -> CGRect {
