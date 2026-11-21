@@ -3767,3 +3767,7 @@
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "De cookies van de standaardbrowser kunnen niet worden gelezen. Plak ze handmatig of controleer de toegangsrechten.";
 "按应用" = "Per app";
 "搜索内容或应用" = "Zoeken in inhoud of apps";
+
+"重复安装 · 版本 %@ · %@ · 保留：%@" = "Dubbele installatie · Versie %@ · %@ · Behouden: %@";
+"更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Update-restanten · Oude versie %@ · %@ · Huidige versie: %@";
+"应用副本或当前版本状态已变化，已保留目标" = "De app-kopie of de huidige versie is gewijzigd. Het item is behouden.";
