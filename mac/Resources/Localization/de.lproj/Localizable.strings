@@ -3759,6 +3759,12 @@
 "自动更新依赖组件" = "Abhängigkeiten automatisch aktualisieren";
 "每天更新已安装的依赖组件" = "Installierte Abhängigkeiten täglich aktualisieren";
 "（默认）" = "(Standard)";
+"立即清理" = "Jetzt bereinigen";
+"正在清理" = "Bereinigung läuft";
+"清理完成" = "Bereinigung abgeschlossen";
+"清理失败：%@" = "Bereinigung fehlgeschlagen: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Die Bereinigung ist fehlgeschlagen. Details finden Sie unter Einstellungen > Systemmonitor und Bereinigung.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Die Bereinigung ist teilweise fehlgeschlagen. Details finden Sie unter Einstellungen > Systemmonitor und Bereinigung.";
 
 "从默认浏览器导入" = "Aus Standardbrowser importieren";
 "正在读取默认浏览器 Cookie" = "Cookies des Standardbrowsers werden gelesen";

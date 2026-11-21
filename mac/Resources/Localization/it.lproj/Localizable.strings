@@ -3758,6 +3758,12 @@
 "自动更新依赖组件" = "Aggiorna automaticamente le dipendenze";
 "每天更新已安装的依赖组件" = "Aggiorna ogni giorno le dipendenze installate";
 "（默认）" = "(Predefinito)";
+"立即清理" = "Pulisci ora";
+"正在清理" = "Pulizia in corso";
+"清理完成" = "Pulizia completata";
+"清理失败：%@" = "Pulizia non riuscita: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "La pulizia non è riuscita. Consulta i dettagli in Impostazioni > Monitor Sistema e Pulizia.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "La pulizia è riuscita solo in parte. Consulta i dettagli in Impostazioni > Monitor Sistema e Pulizia.";
 
 "从默认浏览器导入" = "Importa dal browser predefinito";
 "正在读取默认浏览器 Cookie" = "Lettura dei cookie del browser predefinito";

@@ -3758,6 +3758,12 @@
 "自动更新依赖组件" = "Tự động cập nhật thành phần phụ thuộc";
 "每天更新已安装的依赖组件" = "Cập nhật các thành phần phụ thuộc đã cài đặt mỗi ngày";
 "（默认）" = "(Mặc định)";
+"立即清理" = "Dọn dẹp ngay";
+"正在清理" = "Đang dọn dẹp";
+"清理完成" = "Dọn dẹp hoàn tất";
+"清理失败：%@" = "Dọn dẹp thất bại: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Dọn dẹp thất bại. Xem chi tiết tại Cài đặt > Giám sát Hệ thống và Dọn dẹp.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Một phần thao tác dọn dẹp thất bại. Xem chi tiết tại Cài đặt > Giám sát Hệ thống và Dọn dẹp.";
 
 "从默认浏览器导入" = "Nhập từ trình duyệt mặc định";
 "正在读取默认浏览器 Cookie" = "Đang đọc cookie từ trình duyệt mặc định";

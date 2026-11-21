@@ -3758,6 +3758,12 @@
 "自动更新依赖组件" = "Bağımlılıkları Otomatik Güncelle";
 "每天更新已安装的依赖组件" = "Yüklü bağımlılıkları her gün güncelle";
 "（默认）" = "(Varsayılan)";
+"立即清理" = "Şimdi temizle";
+"正在清理" = "Temizleniyor";
+"清理完成" = "Temizlik tamamlandı";
+"清理失败：%@" = "Temizlik başarısız: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Temizlik başarısız. Ayrıntılar için Ayarlar > Sistem İzleme ve Temizlik bölümüne gidin.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Bazı öğeler temizlenemedi. Ayrıntılar için Ayarlar > Sistem İzleme ve Temizlik bölümüne gidin.";
 
 "从默认浏览器导入" = "Varsayılan tarayıcıdan içe aktar";
 "正在读取默认浏览器 Cookie" = "Varsayılan tarayıcı çerezleri okunuyor";

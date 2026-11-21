@@ -41,6 +41,30 @@ struct DesktopOrganizerTests {
     @Test
     func errorMessageUnwrapsTheFailureReason() {
         #expect(DesktopOrganizerError.failed("Finder 没有响应").message == "Finder 没有响应")
+        #expect(!DesktopOrganizerError.failed("Automation permission denied").isPermissionDenied)
+        #expect(DesktopOrganizerError.automationPermissionDenied("Finder denied access").message == "Finder denied access")
+        #expect(DesktopOrganizerError.automationPermissionDenied("Finder denied access").isPermissionDenied)
+    }
+
+    @Test(arguments: [-1743, -1744, -600, -128, 0])
+    func appleScriptFailureNumbersIdentifyAutomationDenialAndPreserveTheMessage(number: Int) {
+        let message = "Permission denied fixture"
+        let error = DesktopOrganizerError.failureMessage(from: [
+            NSAppleScript.errorNumber: NSNumber(value: number),
+            NSAppleScript.errorMessage: message,
+        ] as NSDictionary)
+
+        #expect(error.message == message)
+        #expect(error.isPermissionDenied == (number == -1743))
+        #expect(error == (number == -1743 ? .automationPermissionDenied(message) : .failed(message)))
+    }
+
+    @Test
+    func missingAppleScriptFailureNumberDoesNotInferAuthorizationFromTheMessage() {
+        let message = "Not authorized to send Apple events (-1743)"
+        let error = DesktopOrganizerError.failureMessage(from: [NSAppleScript.errorMessage: message] as NSDictionary)
+        #expect(error == .failed(message))
+        #expect(!error.isPermissionDenied)
     }
 
     @Test
@@ -107,10 +131,12 @@ struct DesktopOrganizerTests {
     @Test
     func injectedAutomationFailureIsReturnedWithoutReportingSuccess() async {
         let result = await DesktopOrganizer.emptyTrash(execute: { _ in
-            .failure(.failed("Automation permission denied"))
+            .failure(.automationPermissionDenied("Automation permission denied"))
         })
         if case .failure(let error) = result {
-            #expect(error == .failed("Automation permission denied"))
+            #expect(error == .automationPermissionDenied("Automation permission denied"))
+            #expect(error.isPermissionDenied)
+            #expect(error.message == "Automation permission denied")
         } else { Issue.record("Automation failure must reach the caller") }
     }
 

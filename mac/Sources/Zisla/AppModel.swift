@@ -571,16 +571,34 @@ final class AppModel: ObservableObject {
     return SystemAutoCleanupService(
       scan: { await monitor.scanCleanupCandidates(kinds: $0, options: $1) },
       trash: { await monitor.trashSelected($0) },
-      emptyTrash: { [weak self] in
+      emptyTrash: { @MainActor [weak self] in
         let result = await DesktopOrganizer.emptyTrash()
-        if case .failure(let error) = result {
-          self?.transientMessage = error.message
+        if case .failure(let error) = result, let self, !immediateCleanup.isRunning {
+          transientMessage = error.message
         }
         return result
       },
       onTrashReservationFailure: { [weak self] error in
         self?.transientMessage = error.message
       }
+    )
+  }()
+  private(set) lazy var immediateCleanup: ImmediateCleanupController = {
+    let systemCleanup = systemAutoCleanup
+    let clipboardHistory = clipboardHistory
+    let voiceHistory = voiceHistory
+    let permissions = OnboardingPermissionCoordinator()
+    return ImmediateCleanupController(
+      operation: { settings in
+        await ImmediateCleanupController.cleanConfiguredItems(settings: settings, systemCleanup: systemCleanup,
+          clipboardHistory: clipboardHistory, voiceHistory: voiceHistory)
+      },
+      onMessage: { [weak self] message in
+        guard let self else { return }
+        transientMessage = message
+        if immediateCleanup.isRunning { transientMessageDismissTask?.cancel() }
+      },
+      requestPermission: { permissions.openSettings(for: $0) }
     )
   }()
   let backgroundSounds = SystemBackgroundSoundService()
@@ -1258,6 +1276,7 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
+    immediateCleanup.cancel()
     meetingCountdown.stop()
     automaticPowerModeLifecycleActive = false
     automaticPowerMode.stop()

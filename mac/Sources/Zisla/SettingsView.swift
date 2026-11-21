@@ -8,6 +8,7 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var settingsStore: FeatureSettingsStore
     @ObservedObject private var clipboardAssistant: ClipboardAssistantController
+    @ObservedObject private var immediateCleanup: ImmediateCleanupController
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var networkProxyMonitor = NetworkProxyAvailabilityMonitor()
@@ -44,6 +45,7 @@ struct SettingsView: View {
         self.model = model
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         _clipboardAssistant = ObservedObject(wrappedValue: model.clipboardAssistant)
+        _immediateCleanup = ObservedObject(wrappedValue: model.immediateCleanup)
         _aiUsageHistory = StateObject(wrappedValue: AIUsageHistoryController(monitor: model.aiMonitor))
     }
 
@@ -199,9 +201,18 @@ struct SettingsView: View {
                 if input.isSearching {
                     searchResultsContent
                 } else {
-                    VStack(alignment: .leading, spacing: 3) {
+                    HStack {
                         AppLocalizedText(input.selection.title)
                             .font(.system(size: 23, weight: .semibold))
+                        if input.selection == .scheduledCleanup {
+                            Spacer()
+                            Button(AppLocalization.string("立即清理", locale: locale)) {
+                                immediateCleanup.start(settings: settingsStore.settings)
+                            }
+                            .buttonStyle(.bordered)
+                            .keepsIntrinsicWidth()
+                            .disabled(immediateCleanup.isRunning || !ImmediateCleanupController.canCleanNow(settings: settingsStore.settings))
+                        }
                     }
                     DeferredMount {
                         AnyView(selectedContent)
@@ -446,6 +457,12 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .keepsIntrinsicWidth()
                 }
+            }
+            if !immediateCleanup.errors.isEmpty {
+                Text(immediateCleanup.errors.joined(separator: "\n"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
         }
         .alert(AppLocalization.string("启用定时倾倒废纸篓？", locale: locale), isPresented: Binding(

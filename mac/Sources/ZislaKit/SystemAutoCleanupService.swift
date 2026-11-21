@@ -9,6 +9,7 @@ public final class SystemAutoCleanupService {
     private let trash: ([DiskCleanupCandidate]) async -> DiskCleanupResult
     private let emptyTrash: () async -> Result<Void, DesktopOrganizerError>
     private var scope: SystemCleanupScope = .trustedOnly
+    private var stopGeneration: UInt = 0
     var cleanupTask: Task<DiskCleanupResult?, Never>? { systemCleanup.task }
 
     public init(
@@ -42,12 +43,50 @@ public final class SystemAutoCleanupService {
 
     public func apply(settings: FeatureSettings) {
         let policy = settings.systemMonitorEnabled ? settings.systemCleanupPolicy : .never
-        if scope != settings.systemCleanupScope { systemCleanup.stop() }
+        if scope != settings.systemCleanupScope { systemCleanup.stopSchedule() }
         scope = settings.systemCleanupScope
-        let scope = scope
+        systemCleanup.apply(policy: policy, operation: systemCleanupOperation(scope: scope))
+        let emptyTrash = emptyTrash
+        if settings.trashCleanupPolicy == .never {
+            trashCleanup.discardSchedule()
+        } else {
+            trashCleanup.apply(policy: settings.trashCleanupPolicy) { _ in await emptyTrash() }
+        }
+    }
+
+    public func stop() {
+        stopGeneration &+= 1
+        systemCleanup.stop()
+        trashCleanup.stop()
+    }
+
+    @discardableResult
+    func runIfDue() -> Task<DiskCleanupResult?, Never>? {
+        systemCleanup.runIfDue()
+    }
+
+    public func runNow(settings: FeatureSettings) async -> (system: DiskCleanupResult?, trash: Result<Void, DesktopOrganizerError>?) {
+        let generation = stopGeneration
+        let operation = systemCleanupOperation(scope: settings.systemCleanupScope)
+        let cleanSystem = settings.systemMonitorEnabled && settings.systemCleanupPolicy != .never
+        let cleanTrash = settings.trashCleanupPolicy != .never
+        let emptyTrash = emptyTrash
+        let system = cleanSystem ? await systemCleanup.runNow { referenceDate in
+            guard self.stopGeneration == generation else { return nil }
+            return await operation(referenceDate)
+        } : nil
+        guard !Task.isCancelled, stopGeneration == generation else { return (system, nil) }
+        let trash = cleanTrash ? await trashCleanup.runNow { _ in
+            guard self.stopGeneration == generation else { return nil }
+            return await emptyTrash()
+        } : nil
+        return (system, trash)
+    }
+
+    private func systemCleanupOperation(scope: SystemCleanupScope) -> (Date) async -> DiskCleanupResult? {
         let scan = scan
         let trash = trash
-        systemCleanup.apply(policy: policy) { referenceDate in
+        return { referenceDate in
             let kinds = Set(DiskCleanupKind.allCases.filter {
                 scope == .all ? $0.safetyLevel != .analysisOnly : $0.safetyLevel == .safeToClean
             })
@@ -58,22 +97,6 @@ public final class SystemAutoCleanupService {
             }
             return await trash(selected)
         }
-        let emptyTrash = emptyTrash
-        if settings.trashCleanupPolicy == .never {
-            trashCleanup.discardSchedule()
-        } else {
-            trashCleanup.apply(policy: settings.trashCleanupPolicy) { _ in await emptyTrash() }
-        }
-    }
-
-    public func stop() {
-        systemCleanup.stop()
-        trashCleanup.stop()
-    }
-
-    @discardableResult
-    func runIfDue() -> Task<DiskCleanupResult?, Never>? {
-        systemCleanup.runIfDue()
     }
 }
 
@@ -91,6 +114,7 @@ final class CleanupSchedule<Outcome: Sendable> {
     private var generation: UInt = 0
     private var operation: ((Date) async -> Outcome?)?
     private(set) var task: Task<Outcome?, Never>?
+    private var manualTask: Task<Outcome?, Never>?
 
     init(
         defaults: UserDefaults,
@@ -110,7 +134,7 @@ final class CleanupSchedule<Outcome: Sendable> {
 
     func apply(policy: VoiceRecordingCleanupPolicy, operation: @escaping (Date) async -> Outcome?) {
         guard self.policy != policy else { return }
-        stop()
+        stopSchedule()
         self.policy = policy
         guard let days = policy.daysThreshold else { return }
         self.operation = operation
@@ -143,6 +167,11 @@ final class CleanupSchedule<Outcome: Sendable> {
     }
 
     func stop() {
+        manualTask?.cancel()
+        stopSchedule()
+    }
+
+    func stopSchedule() {
         generation &+= 1
         timer?.invalidate()
         timer = nil
@@ -153,14 +182,14 @@ final class CleanupSchedule<Outcome: Sendable> {
     }
 
     func discardSchedule() {
-        stop()
+        stopSchedule()
         defaults.removeObject(forKey: lastRunKey)
         if let attemptKey { defaults.removeObject(forKey: attemptKey) }
     }
 
     @discardableResult
     func runIfDue() -> Task<Outcome?, Never>? {
-        guard let timer, let operation, task == nil, now() >= nextCleanupDate else { return nil }
+        guard let timer, let operation, task == nil, manualTask == nil, now() >= nextCleanupDate else { return nil }
         let generation = generation
         let interval = timer.timeInterval
         let referenceDate = now()
@@ -189,5 +218,30 @@ final class CleanupSchedule<Outcome: Sendable> {
         }
         self.task = task
         return task
+    }
+
+    func runNow(operation: @escaping (Date) async -> Outcome?) async -> Outcome? {
+        while let active = manualTask ?? task {
+            _ = await active.value
+        }
+        guard !Task.isCancelled else { return nil }
+        let referenceDate = now()
+        let task = Task { [weak self] () -> Outcome? in
+            guard let self else { return nil }
+            defer {
+                manualTask = nil
+                // A repeating timer may advance while manual work runs; preserve the current schedule's deadline.
+                timer?.fireDate = nextCleanupDate
+            }
+            guard !Task.isCancelled else { return nil }
+            let result = await operation(referenceDate)
+            return Task.isCancelled ? nil : result
+        }
+        manualTask = task
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 }

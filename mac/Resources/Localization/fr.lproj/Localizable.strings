@@ -3754,6 +3754,12 @@
 "自动更新依赖组件" = "Mettre à jour automatiquement les dépendances";
 "每天更新已安装的依赖组件" = "Mettre à jour chaque jour les dépendances installées";
 "（默认）" = "(Par défaut)";
+"立即清理" = "Nettoyer maintenant";
+"正在清理" = "Nettoyage en cours";
+"清理完成" = "Nettoyage terminé";
+"清理失败：%@" = "Échec du nettoyage : %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Le nettoyage a échoué. Consultez les détails dans Réglages > Moniteur système et nettoyage.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Le nettoyage a partiellement échoué. Consultez les détails dans Réglages > Moniteur système et nettoyage.";
 
 "从默认浏览器导入" = "Importer depuis le navigateur par défaut";
 "正在读取默认浏览器 Cookie" = "Lecture des cookies du navigateur par défaut";

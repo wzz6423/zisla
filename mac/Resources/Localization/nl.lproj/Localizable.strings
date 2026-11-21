@@ -3758,6 +3758,12 @@
 "自动更新依赖组件" = "Afhankelijkheden automatisch bijwerken";
 "每天更新已安装的依赖组件" = "Geïnstalleerde afhankelijkheden dagelijks bijwerken";
 "（默认）" = "(Standaard)";
+"立即清理" = "Nu opschonen";
+"正在清理" = "Bezig met opschonen";
+"清理完成" = "Opschonen voltooid";
+"清理失败：%@" = "Opschonen mislukt: %@";
+"清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Opschonen is mislukt. Bekijk de details in Instellingen > Systeemmonitor en opschonen.";
+"清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Opschonen is gedeeltelijk mislukt. Bekijk de details in Instellingen > Systeemmonitor en opschonen.";
 
 "从默认浏览器导入" = "Importeren uit standaardbrowser";
 "正在读取默认浏览器 Cookie" = "Cookies van de standaardbrowser lezen";
