@@ -15,6 +15,7 @@
 "低额度提醒" = "Avvisi di quota bassa";
 "供应商未提供已验证的本地额度查询接口" = "Il fornitore non offre un’API locale di quota verificata";
 "其他位置常驻额度" = "Fissa la quota in altre posizioni";
+"常驻额度信息" = "Informazioni permanenti sulla quota";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Avvisa quando resta il 20% o meno, anche all’esaurimento";
 "可用预算" = "Budget disponibile";
 "可用额度" = "Quota disponibile";
@@ -92,6 +93,7 @@
 "设置" = "Impostazioni";
 "通用" = "Generale";
 "工作流" = "Workflow";
+"系统信息" = "Informazioni di sistema";
 "信息" = "Info";
 "模型" = "Modelli";
 "宠物" = "Pet";
@@ -3405,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Input %@ · Output %@";
 "AI 模型用量" = "Utilizzo dei modelli IA";
 
+"用量历史" = "Cronologia di utilizzo";
 "AI 用量历史" = "Cronologia di utilizzo dell’IA";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Esporta tutta la cronologia di utilizzo dell’IA come foglio di calcolo xlsx";
 "已清空 AI 用量历史" = "Cronologia di utilizzo dell’IA cancellata";
@@ -3756,5 +3759,11 @@
 "每天更新已安装的依赖组件" = "Aggiorna ogni giorno le dipendenze installate";
 "（默认）" = "(Predefinito)";
 
+"从默认浏览器导入" = "Importa dal browser predefinito";
+"正在读取默认浏览器 Cookie" = "Lettura dei cookie del browser predefinito";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Impossibile identificare il browser predefinito. Incolla i cookie manualmente.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "L’importazione dei cookie dal browser predefinito non è disponibile. Incollali manualmente.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Nessun cookie trovato per questo sito. Accedi dal browser predefinito o incolla i cookie manualmente.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Impossibile leggere i cookie del browser predefinito. Incollali manualmente o verifica i permessi di accesso.";
 "按应用" = "Per app";
 "搜索内容或应用" = "Cerca contenuti o app";

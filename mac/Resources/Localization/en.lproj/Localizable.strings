@@ -15,6 +15,7 @@
 "低额度提醒" = "Low quota alerts";
 "供应商未提供已验证的本地额度查询接口" = "The provider has no verified local quota API";
 "其他位置常驻额度" = "Pin quota at other positions";
+"常驻额度信息" = "Persistent quota information";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Alert when remaining quota is at or below 20%, including exhaustion";
 "可用预算" = "Available budget";
 "可用额度" = "Available quota";
@@ -96,6 +97,7 @@
 "设置" = "Settings";
 "通用" = "General";
 "工作流" = "Workflow";
+"系统信息" = "System Information";
 "信息" = "Info";
 "模型" = "Models";
 "宠物" = "Pet";
@@ -3404,6 +3406,7 @@
 "输入 %@ · 输出 %@" = "Input %@ · Output %@";
 "AI 模型用量" = "AI Model Usage";
 
+"用量历史" = "Usage History";
 "AI 用量历史" = "AI Usage History";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Export all AI usage history as an xlsx spreadsheet";
 "已清空 AI 用量历史" = "AI usage history cleared";
@@ -3755,5 +3758,11 @@
 "每天更新已安装的依赖组件" = "Update installed dependencies daily";
 "（默认）" = "(Default)";
 
+"从默认浏览器导入" = "Import from default browser";
+"正在读取默认浏览器 Cookie" = "Reading default browser cookies";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Cannot identify the default browser. Paste cookies manually.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Cookie import is unavailable for the default browser. Paste cookies manually.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "No cookies found for this website. Sign in using the default browser or paste cookies manually.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Cannot read default browser cookies. Paste cookies manually or check access permissions.";
 "按应用" = "By app";
 "搜索内容或应用" = "Search content or apps";

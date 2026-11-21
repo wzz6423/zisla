@@ -177,8 +177,8 @@ struct ScreenRecordingLocalizationTests {
         }
 
         let settings = try source("Sources/Zisla/SettingsView.swift")
-        let start = try #require(settings.range(of: "if input.selection == .features || input.selection == .recording {"))
-        let end = try #require(settings.range(of: "if input.selection == .features || input.selection == .screenshot {",
+        let start = try #require(settings.range(of: "if input.selection == .recording {"))
+        let end = try #require(settings.range(of: "if input.selection == .screenshot {",
                                               range: start.upperBound..<settings.endIndex))
         let group = String(settings[start.lowerBound..<end.lowerBound])
         keys.formUnion(try localizedKeys(group))

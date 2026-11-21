@@ -15,6 +15,7 @@
 "低额度提醒" = "Waarschuwingen bij laag quotum";
 "供应商未提供已验证的本地额度查询接口" = "De aanbieder heeft geen geverifieerde lokale quotum-API";
 "其他位置常驻额度" = "Quotum vastzetten op andere posities";
+"常驻额度信息" = "Permanente quotuminformatie";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Waarschuwen bij 20% of minder resterend quotum, ook wanneer het op is";
 "可用预算" = "Beschikbaar budget";
 "可用额度" = "Beschikbaar quotum";
@@ -92,6 +93,7 @@
 "设置" = "Instellingen";
 "通用" = "Algemeen";
 "工作流" = "Workflow";
+"系统信息" = "Systeeminformatie";
 "信息" = "Info";
 "模型" = "Modellen";
 "宠物" = "Huisdier";
@@ -3405,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Invoer %@ · Uitvoer %@";
 "AI 模型用量" = "AI-modelgebruik";
 
+"用量历史" = "Gebruiksgeschiedenis";
 "AI 用量历史" = "AI-gebruiksgeschiedenis";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Exporteer de volledige AI-gebruiksgeschiedenis als xlsx-spreadsheet";
 "已清空 AI 用量历史" = "AI-gebruiksgeschiedenis gewist";
@@ -3756,5 +3759,11 @@
 "每天更新已安装的依赖组件" = "Geïnstalleerde afhankelijkheden dagelijks bijwerken";
 "（默认）" = "(Standaard)";
 
+"从默认浏览器导入" = "Importeren uit standaardbrowser";
+"正在读取默认浏览器 Cookie" = "Cookies van de standaardbrowser lezen";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "De standaardbrowser kan niet worden vastgesteld. Plak de cookies handmatig.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Cookies importeren uit de standaardbrowser wordt niet ondersteund. Plak ze handmatig.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Geen cookies voor deze website gevonden. Meld u aan in de standaardbrowser of plak de cookies handmatig.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "De cookies van de standaardbrowser kunnen niet worden gelezen. Plak ze handmatig of controleer de toegangsrechten.";
 "按应用" = "Per app";
 "搜索内容或应用" = "Zoeken in inhoud of apps";

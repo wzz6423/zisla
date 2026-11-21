@@ -15,6 +15,7 @@
 "低额度提醒" = "Düşük kota uyarıları";
 "供应商未提供已验证的本地额度查询接口" = "Sağlayıcı doğrulanmış bir yerel kota API’si sunmuyor";
 "其他位置常驻额度" = "Diğer konumlarda kotayı sabitle";
+"常驻额度信息" = "Kalıcı kota bilgisi";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Kalan kota 20% veya altına düştüğünde, tükendiğinde de uyar";
 "可用预算" = "Kullanılabilir bütçe";
 "可用额度" = "Kullanılabilir kota";
@@ -92,6 +93,7 @@
 "设置" = "Ayarlar";
 "通用" = "Genel";
 "工作流" = "İş Akışı";
+"系统信息" = "Sistem Bilgileri";
 "信息" = "Bilgi";
 "模型" = "Modeller";
 "宠物" = "Evcil Hayvan";
@@ -3405,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Girdi %@ · Çıktı %@";
 "AI 模型用量" = "Yapay Zekâ Model Kullanımı";
 
+"用量历史" = "Kullanım geçmişi";
 "AI 用量历史" = "Yapay zekâ kullanım geçmişi";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Tüm yapay zekâ kullanım geçmişini xlsx elektronik tablosu olarak dışa aktar";
 "已清空 AI 用量历史" = "Yapay zekâ kullanım geçmişi temizlendi";
@@ -3756,5 +3759,11 @@
 "每天更新已安装的依赖组件" = "Yüklü bağımlılıkları her gün güncelle";
 "（默认）" = "(Varsayılan)";
 
+"从默认浏览器导入" = "Varsayılan tarayıcıdan içe aktar";
+"正在读取默认浏览器 Cookie" = "Varsayılan tarayıcı çerezleri okunuyor";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Varsayılan tarayıcı belirlenemedi. Çerezleri elle yapıştırın.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Varsayılan tarayıcıdan çerez içe aktarma desteklenmiyor. Elle yapıştırın.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Bu site için çerez bulunamadı. Varsayılan tarayıcıda oturum açın veya çerezleri elle yapıştırın.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Varsayılan tarayıcı çerezleri okunamadı. Elle yapıştırın veya erişim izinlerini kontrol edin.";
 "按应用" = "Uygulamaya göre";
 "搜索内容或应用" = "İçerik veya uygulama ara";

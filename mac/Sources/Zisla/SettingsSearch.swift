@@ -45,12 +45,17 @@ enum SettingsSearchIndex {
             }
         }
         let titleQuery = terms.joined(separator: " ")
-        func matchesExactTitle(_ item: SettingsSearchItem) -> Bool {
-            [item.title, AppLocalization.string(item.title, locale: locale)].contains {
-                $0.compare(titleQuery, options: options, locale: locale) == .orderedSame
+        func exactMatchRank(_ item: SettingsSearchItem) -> Int {
+            for key in [item.title] + item.keywords {
+                if [key, AppLocalization.string(key, locale: locale)].contains(where: {
+                    $0.compare(titleQuery, options: options, locale: locale) == .orderedSame
+                }) {
+                    return key == item.title ? 2 : 1
+                }
             }
+            return 0
         }
-        return matches.sorted { matchesExactTitle($0) && !matchesExactTitle($1) }
+        return matches.sorted { exactMatchRank($0) > exactMatchRank($1) }
     }
 
     /// Aliases stay attached to typed destinations so localized searches retain row targets and feature visibility.
@@ -77,7 +82,7 @@ enum SettingsSearchIndex {
             "每日简报",
             "显示推荐工具", "媒体播放", "Mac 未使用时关闭背景音", "中转站", "晃动唤出中转窗口",
             "链接下载", "剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
-            "侧翼通知", "锁屏信息", "专注倒计时", "工具箱提醒", "用户关怀", "AI 进度与用量", "AI 任务结果扫光",
+            "侧翼通知", "锁屏信息", "专注倒计时", "工具箱提醒", "用户关怀", "AI 进度与用量",
             "语音输入", "窗口预览", "小工具", "随记", "PDF 工具", "图片工具", "音频工具", "应用音量混音器",
             "键盘音效", "合盖动画", "预览动画", "启用截图", "鼠标移入展开", "显示 zisla 图标",
             "始终置顶", "提示条进度光效", "浏览器下载进度", "原生下载进度", "静音 Zisla 通知",
@@ -190,7 +195,20 @@ enum SettingsSearchIndex {
         rows(.recording, RecordingShortcutAction.allCases.map(\.title))
         rows(.recording, ["恢复默认快捷键"])
 
-        entry(.ai, "AI 用量历史", anchor: .group("AI 用量历史"), keywords: ["Token 消耗趋势", "每日模型用量", "查看历史记录", "导出", "清空"])
+        rows(.ai, ["低额度提醒", "收起态额度样式", "AI 任务结果扫光"])
+        if settings.supportsStatusIconsInIsland {
+            entry(.ai, "常驻额度信息", anchor: .row("常驻额度信息"), keywords: ["其他位置常驻额度"])
+        }
+        entry(.ai, "各供应商额度", anchor: .group("各供应商额度"),
+              keywords: ["监控额度", "展示额度", "Qoder 监控地区"] + AIAccountBalanceQoderRegion.allCases.map(\.title)
+                + AIProvider.allCases.map(AIAccountBalanceCatalog.providerName))
+        let websites = AIAccountBalanceWebsite.selected(for: settings.aiAccountBalanceMonitoredProviders,
+            qoderRegions: settings.aiAccountBalanceQoderRegions)
+        if !websites.isEmpty {
+            entry(.ai, "网站额度凭据", anchor: .group("网站额度凭据"),
+                  keywords: ["粘贴网站 Cookie", "从默认浏览器导入"] + websites.map(\.title))
+        }
+        entry(.ai, "用量历史", anchor: .group("用量历史"), keywords: ["AI 用量历史", "Token 消耗趋势", "每日模型用量", "查看历史记录", "导出", "清空"])
         entry(.ai, "CLI 与 Skills", anchor: .group("CLI 与 Skills"), keywords: ["自动更新 CLI", "下载命令", "更新命令"])
         rows(.voice, ["录音模式", "使用模型", "格式化整理", "保留原始录音", "记录目录", "自定义热词"])
         entry(.voice, "快捷键", anchor: .row("快捷键"), keywords: ["输入监控"])

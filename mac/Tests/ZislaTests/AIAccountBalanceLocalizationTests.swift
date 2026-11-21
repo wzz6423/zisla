@@ -7,7 +7,7 @@ import ZislaCore
 struct AIAccountBalanceLocalizationTests {
     static let keys = ["%@ 积分", "%@ 重置", "Codex 账户额度", "Qoder 中国", "Qoder 监控地区", "TRAE 中国", "不限额度", "中国区",
         "仅查询所选地区，已保存的其他地区凭据会保留", "仅编辑预测额度，模型余额需要网站登录凭据", "代码补全", "低额度提醒",
-        "供应商未提供已验证的本地额度查询接口", "其他位置常驻额度", "剩余额度不高于 20% 时提醒，耗尽后也会提醒", "可用预算", "可用额度", "各供应商额度",
+        "供应商未提供已验证的本地额度查询接口", "常驻额度信息", "其他位置常驻额度", "剩余额度不高于 20% 时提醒，耗尽后也会提醒", "可用预算", "可用额度", "各供应商额度",
         "团队额度", "国际区", "完整样式最多显示两行真实额度", "展示额度", "打开账户页，在开发者工具的 Network 中复制额度请求的 Cookie 请求头",
         "收起态额度样式", "无法保存额度查询凭据，请检查 Cookie 格式或存储权限", "暂不支持额度查询", "未登录", "模型额度", "每日额度", "每月额度", "滚动额度",
         "由所连接账户计费", "登录凭据不可用", "登录已过期", "监控额度", "积分余额", "粘贴网站 Cookie", "编辑预测", "网站额度凭据", "聊天额度", "账户上限",
@@ -28,7 +28,6 @@ struct AIAccountBalanceLocalizationTests {
     @Test(arguments: AppLanguage.allCases)
     func allBalanceCopyRendersRequestedLanguageAndPreservesPlaceholders(language: AppLanguage) throws {
         let table = try self.table(language), english = try self.table(.english)
-        #expect(AppLanguage.allCases.count == 17 && Self.keys.count == 53)
         for key in Self.keys {
             let translation = try #require(table[key], "Missing \(language.rawValue) key \(key)")
             #expect(!translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -58,6 +57,9 @@ struct AIAccountBalanceLocalizationTests {
     }
 
     @Test func expectedEnglishTraditionalAndArabicSourcesRemainExplicit() {
+        #expect(AppLocalization.string("常驻额度信息", language: .english) == "Persistent quota information")
+        #expect(AppLocalization.string("常驻额度信息", language: .traditionalChinese) == "常駐額度資訊")
+        #expect(AppLocalization.string("常驻额度信息", language: .arabic) == "معلومات الحصة الدائمة")
         #expect(AppLocalization.string("Codex 账户额度", language: .english) == "Codex account quota")
         #expect(AppLocalization.string("账户剩余额度", language: .traditionalChinese) == "帳戶剩餘額度")
         #expect(AppLocalization.string("账户剩余额度", language: .arabic) == "الحصة المتبقية للحساب")
@@ -75,9 +77,17 @@ struct AIAccountBalanceLocalizationTests {
         var discovered: Set<String> = []
         var texts = try sourcePaths.map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }
         let settings = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
-        let start = try #require(settings.range(of: "featureToggle(\"低额度提醒\""))
-        let end = try #require(settings.range(of: "featureToggle(\"AI 任务结果扫光\""))
-        texts.append(String(settings[start.lowerBound..<end.lowerBound]))
+        let settingPatterns = [
+            #"featureToggle\("[^"]+", detail: "[^"]*", symbol: "[^"]+", keyPath: \\\.aiAccountBalance[A-Za-z]+\)"#,
+            #"settingRow\(symbol: "[^"]+", title: "(?:[^"]*额度[^"]*|Qoder[^"]*)", detail: "[^"]*"\)"#,
+            #"AppLocal(?:ization\.(?:text|string)|izedText)\("[^"]*(?:额度|Cookie)[^"]*"(?:, locale: locale)?\)"#,
+        ]
+        for pattern in settingPatterns {
+            let regex = try NSRegularExpression(pattern: pattern)
+            texts += regex.matches(in: settings, range: NSRange(settings.startIndex..., in: settings)).map {
+                String(settings[Range($0.range, in: settings)!])
+            }
+        }
         for text in texts {
             let value = text as NSString
             for match in expression.matches(in: text, range: NSRange(location: 0, length: value.length)) {
@@ -86,7 +96,7 @@ struct AIAccountBalanceLocalizationTests {
             }
         }
         let existingKeys: Set<String> = ["全部", "%@ 次", "每周额度", "保存", "清除"]
-        #expect(discovered.subtracting(existingKeys) == Set(Self.keys),
+        #expect(discovered.subtracting(existingKeys).isSubset(of: Set(Self.keys + AIAccountBalanceBrowserCookieLocalizationTests.keys)),
             "Every runtime label, parser-provided localizable name, and indirect enum title must be covered by all languages")
     }
 

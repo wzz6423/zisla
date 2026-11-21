@@ -531,6 +531,14 @@ final class AppModel: ObservableObject {
   let settingsStore = FeatureSettingsStore()
   let languageStore = AppLanguageStore()
   let aiMonitor = AIStateMonitor()
+  let aiAccountBalanceCookieInputs = AppModel.makeAccountBalanceCookieInputs()
+
+  static func makeAccountBalanceCookieInputs(
+    makeInput: (AIAccountBalanceWebsite) -> AIAccountBalanceCookieInputModel = { AIAccountBalanceCookieInputModel(website: $0) }
+  ) -> [AIAccountBalanceWebsite: AIAccountBalanceCookieInputModel] {
+    Dictionary(uniqueKeysWithValues: AIAccountBalanceWebsite.allCases.map { ($0, makeInput($0)) })
+  }
+
   let notices = SideNoticeQueue()
   let aiResultSweep = AIResultSweepController()
   let media = NowPlayingService()
@@ -3370,7 +3378,7 @@ final class AppModel: ObservableObject {
     clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
     if settings.aiProgressEnabled {
       aiMonitor.configureAccountBalanceProviders(settings.aiAccountBalanceMonitoredProviders,
-        qoderRegion: settings.aiAccountBalanceQoderRegion)
+        qoderRegions: settings.aiAccountBalanceQoderRegions)
       aiMonitor.start()
       if selectedModule == .aiMonitor {
         aiMonitor.loadUsageHistory()

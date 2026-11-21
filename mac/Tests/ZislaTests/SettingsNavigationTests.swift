@@ -164,7 +164,7 @@ struct SettingsNavigationTests {
             "通用",
             "功能",
             "灵动岛布局",
-            "工作流",
+            "系统信息",
             "快捷操作",
             "通知与关怀",
             "每日简报",
@@ -344,6 +344,8 @@ struct SettingsNavigationTests {
     @Test
     func informationPagesAndMailNavigationAreLocalizedInEveryLanguage() throws {
         let mailSection = try #require(SettingsSection(rawValue: "mail"))
+        #expect(SettingsSection(rawValue: "workflow") == .workflow)
+        #expect(SettingsSection.workflow.title == "系统信息")
         #expect(SettingsSection.info.subtitle == "调整灵动岛功能顺序、模式与收起态展示优先级。")
         #expect(mailSection.title == "邮件")
         #expect(mailSection.subtitle == "读取已配置的 Mail.app 账户并提醒新邮件")
@@ -367,8 +369,12 @@ struct SettingsNavigationTests {
             }
             if language != .english {
                 #expect(table[SettingsSection.info.subtitle] != englishSubtitle)
+                #expect(table[SettingsSection.workflow.title] != "System Information")
             }
         }
+        #expect(AppLocalization.string("系统信息", language: .english) == "System Information")
+        #expect(AppLocalization.string("系统信息", language: .traditionalChinese) == "系統資訊")
+        #expect(AppLocalization.string("系统信息", language: .arabic) == "معلومات النظام")
     }
 
     @Test

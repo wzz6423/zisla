@@ -15,6 +15,7 @@
 "低额度提醒" = "Alertas de cota baixa";
 "供应商未提供已验证的本地额度查询接口" = "O provedor não oferece uma API local de cota verificada";
 "其他位置常驻额度" = "Fixar cota em outras posições";
+"常驻额度信息" = "Informações permanentes de cota";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Alertar quando restarem 20% ou menos, inclusive ao esgotar";
 "可用预算" = "Orçamento disponível";
 "可用额度" = "Cota disponível";
@@ -92,6 +93,7 @@
 "设置" = "Ajustes";
 "通用" = "Geral";
 "工作流" = "Fluxo de Trabalho";
+"系统信息" = "Informações do sistema";
 "信息" = "Informações";
 "模型" = "Modelos";
 "宠物" = "Pet";
@@ -3405,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Entrada %@ · Saída %@";
 "AI 模型用量" = "Uso de modelos de IA";
 
+"用量历史" = "Histórico de uso";
 "AI 用量历史" = "Histórico de uso de IA";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Exportar todo o histórico de uso de IA como uma planilha xlsx";
 "已清空 AI 用量历史" = "Histórico de uso de IA apagado";
@@ -3756,5 +3759,11 @@
 "每天更新已安装的依赖组件" = "Atualizar diariamente as dependências instaladas";
 "（默认）" = "(Padrão)";
 
+"从默认浏览器导入" = "Importar do navegador padrão";
+"正在读取默认浏览器 Cookie" = "Lendo cookies do navegador padrão";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Não foi possível identificar o navegador padrão. Cole os cookies manualmente.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "A importação de cookies do navegador padrão não está disponível. Cole-os manualmente.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Nenhum cookie encontrado para este site. Entre na conta pelo navegador padrão ou cole os cookies manualmente.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Não foi possível ler os cookies do navegador padrão. Cole-os manualmente ou verifique as permissões de acesso.";
 "按应用" = "Por aplicativo";
 "搜索内容或应用" = "Pesquisar conteúdo ou aplicativos";

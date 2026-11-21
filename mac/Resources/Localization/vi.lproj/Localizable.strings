@@ -15,6 +15,7 @@
 "低额度提醒" = "Cảnh báo hạn mức thấp";
 "供应商未提供已验证的本地额度查询接口" = "Nhà cung cấp chưa có API hạn mức cục bộ đã được xác minh";
 "其他位置常驻额度" = "Ghim hạn mức ở vị trí khác";
+"常驻额度信息" = "Thông tin hạn mức luôn hiển thị";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Cảnh báo khi còn 20% hoặc thấp hơn, kể cả khi hết";
 "可用预算" = "Ngân sách khả dụng";
 "可用额度" = "Hạn mức khả dụng";
@@ -92,6 +93,7 @@
 "设置" = "Cài đặt";
 "通用" = "Chung";
 "工作流" = "Quy trình";
+"系统信息" = "Thông tin hệ thống";
 "信息" = "Thông tin";
 "模型" = "Mô hình";
 "宠物" = "Thú cưng";
@@ -3405,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Đầu vào %@ · Đầu ra %@";
 "AI 模型用量" = "Mức sử dụng mô hình AI";
 
+"用量历史" = "Lịch sử sử dụng";
 "AI 用量历史" = "Lịch sử sử dụng AI";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Xuất toàn bộ lịch sử sử dụng AI thành bảng tính xlsx";
 "已清空 AI 用量历史" = "Đã xóa lịch sử sử dụng AI";
@@ -3756,5 +3759,11 @@
 "每天更新已安装的依赖组件" = "Cập nhật các thành phần phụ thuộc đã cài đặt mỗi ngày";
 "（默认）" = "(Mặc định)";
 
+"从默认浏览器导入" = "Nhập từ trình duyệt mặc định";
+"正在读取默认浏览器 Cookie" = "Đang đọc cookie từ trình duyệt mặc định";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Không thể xác định trình duyệt mặc định. Hãy dán cookie thủ công.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Chưa hỗ trợ nhập cookie từ trình duyệt mặc định. Hãy dán thủ công.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Không tìm thấy cookie của trang web này. Hãy đăng nhập bằng trình duyệt mặc định hoặc dán cookie thủ công.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Không thể đọc cookie từ trình duyệt mặc định. Hãy dán thủ công hoặc kiểm tra quyền truy cập.";
 "按应用" = "Theo ứng dụng";
 "搜索内容或应用" = "Tìm nội dung hoặc ứng dụng";

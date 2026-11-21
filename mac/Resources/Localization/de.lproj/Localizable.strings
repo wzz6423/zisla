@@ -15,6 +15,7 @@
 "低额度提醒" = "Warnung bei niedrigem Kontingent";
 "供应商未提供已验证的本地额度查询接口" = "Der Anbieter stellt keine bestätigte lokale Kontingent-API bereit";
 "其他位置常驻额度" = "Kontingent an anderen Positionen anheften";
+"常驻额度信息" = "Dauerhafte Kontingentinformationen";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Bei 20% oder weniger Restkontingent sowie bei Erschöpfung benachrichtigen";
 "可用预算" = "Verfügbares Budget";
 "可用额度" = "Verfügbares Kontingent";
@@ -92,6 +93,7 @@
 "设置" = "Einstellungen";
 "通用" = "Allgemein";
 "工作流" = "Workflow";
+"系统信息" = "Systeminformationen";
 "信息" = "Info";
 "模型" = "Modelle";
 "宠物" = "Haustier";
@@ -3406,6 +3408,7 @@
 "输入 %@ · 输出 %@" = "Eingabe %@ · Ausgabe %@";
 "AI 模型用量" = "KI-Modellnutzung";
 
+"用量历史" = "Nutzungsverlauf";
 "AI 用量历史" = "KI-Nutzungsverlauf";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Den gesamten KI-Nutzungsverlauf als xlsx-Tabelle exportieren";
 "已清空 AI 用量历史" = "KI-Nutzungsverlauf gelöscht";
@@ -3757,5 +3760,11 @@
 "每天更新已安装的依赖组件" = "Installierte Abhängigkeiten täglich aktualisieren";
 "（默认）" = "(Standard)";
 
+"从默认浏览器导入" = "Aus Standardbrowser importieren";
+"正在读取默认浏览器 Cookie" = "Cookies des Standardbrowsers werden gelesen";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Der Standardbrowser konnte nicht ermittelt werden. Fügen Sie die Cookies manuell ein.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Der Cookie-Import aus dem Standardbrowser wird nicht unterstützt. Fügen Sie die Cookies manuell ein.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Für diese Website wurden keine Cookies gefunden. Melden Sie sich im Standardbrowser an oder fügen Sie die Cookies manuell ein.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Die Cookies des Standardbrowsers konnten nicht gelesen werden. Fügen Sie sie manuell ein oder prüfen Sie die Zugriffsrechte.";
 "按应用" = "Nach App";
 "搜索内容或应用" = "Inhalte oder Apps suchen";

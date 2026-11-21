@@ -6,6 +6,126 @@ import ZislaKit
 @testable import Zisla
 
 struct SettingsSearchTests {
+    @Test(arguments: AppLanguage.allCases, [false, true]) @MainActor
+    func aiQuotaSearchNavigatesToAIWithoutDuplicateFeatureSettings(language: AppLanguage, aiEnabled: Bool) throws {
+        let settings = FeatureSettings(aiProgressEnabled: aiEnabled,
+            aiAccountBalanceMonitoredProviders: [.coder, .trae, .zed], aiAccountBalanceQoderRegions: [.global, .china])
+        let destinations: [(String, SettingsSearchAnchor)] = [
+            ("低额度提醒", .row("低额度提醒")),
+            ("收起态额度样式", .row("收起态额度样式")),
+            ("各供应商额度", .group("各供应商额度")),
+            ("监控额度", .group("各供应商额度")),
+            ("展示额度", .group("各供应商额度")),
+            ("网站额度凭据", .group("网站额度凭据")),
+            ("Qoder 监控地区", .group("各供应商额度")),
+            ("粘贴网站 Cookie", .group("网站额度凭据")),
+            ("从默认浏览器导入", .group("网站额度凭据")),
+            ("AI 任务结果扫光", .row("AI 任务结果扫光")),
+        ]
+        let input = SettingsInput()
+        input.weatherQuery = "synthetic location"
+        for (key, anchor) in destinations {
+            let query = AppLocalization.string(key, language: language)
+            let matches = results(query, settings: settings, locale: language.locale)
+            #expect(matches.allSatisfy { $0.section != .features }, "Moved AI controls must not lead back to Features: \(key)")
+            if aiEnabled {
+                let result = try #require(matches.first, "Missing AI setting: \(language.rawValue)/\(key)")
+                #expect(matches.filter { $0.section == .ai && $0.anchor == anchor }.count == 1)
+                #expect(result.section == .ai && result.anchor == anchor)
+                input.settingsQuery = query
+                input.select(result.section, searchTarget: result.anchor)
+                #expect(input.selection == .ai && input.searchTarget == anchor && !input.isSearching)
+            } else {
+                #expect(matches.allSatisfy { $0.section != .ai }, "A disabled AI page must not remain a search destination: \(key)")
+            }
+        }
+        for key in ["AI 进度与用量", "语音输入"] {
+            let matches = results(AppLocalization.string(key, language: language), settings: settings, locale: language.locale)
+            #expect(matches.contains { $0.section == .features && $0.title == key && $0.anchor == .row(key) })
+        }
+        #expect(input.weatherQuery == "synthetic location")
+        #expect(settings.aiProgressEnabled == aiEnabled)
+    }
+
+    @Test(arguments: AppLanguage.allCases, [Set<AIAccountBalanceQoderRegion>(), [.global], [.china], [.global, .china]])
+    func qoderRegionSearchStaysWithItsProviderAndCookieSearchRequiresSelectedWebsite(
+        language: AppLanguage, regions: Set<AIAccountBalanceQoderRegion>
+    ) throws {
+        for providers in [Set<AIProvider>(), [.coder], [.trae], [.zed]] {
+            let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: providers, aiAccountBalanceQoderRegions: regions)
+            let regionMatches = results(AppLocalization.string("Qoder 监控地区", language: language),
+                settings: settings, locale: language.locale)
+            #expect(regionMatches.count == 1 && regionMatches.first?.anchor == .group("各供应商额度"))
+            let websites = AIAccountBalanceWebsite.selected(for: providers, qoderRegions: regions)
+            for key in ["网站额度凭据", "粘贴网站 Cookie", "从默认浏览器导入"] {
+                let matches = results(AppLocalization.string(key, language: language), settings: settings, locale: language.locale)
+                #expect(matches.count == (websites.isEmpty ? 0 : 1),
+                    "Hidden credential inputs must not remain search destinations: \(language.rawValue)/\(key)")
+                #expect(matches.allSatisfy { $0.section == .ai && $0.anchor == .group("网站额度凭据") })
+            }
+        }
+    }
+
+    @Test(arguments: IslandLayoutStyle.allCases, IslandPlacementMode.allCases)
+    func pinnedQuotaSearchFollowsTheEffectiveIslandPlacement(style: IslandLayoutStyle, mode: IslandPlacementMode) {
+        var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
+        settings.islandLayoutStyle = style
+        settings.islandPlacement = IslandPlacement(mode: mode, edge: .left)
+        let saved = settings
+        let visible = style == .pill && mode == .custom
+        for key in ["常驻额度信息", "其他位置常驻额度"] {
+            let matches = results(key, settings: settings)
+            #expect(matches.count == (visible ? 1 : 0), "Persistent quota settings require the selected custom pill placement")
+            #expect(matches.allSatisfy { $0.section == .ai && $0.anchor == .row("常驻额度信息") })
+        }
+        #expect(settings == saved)
+    }
+
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func pinnedQuotaSearchNavigatesToAIInTheRequestedLanguage(language: AppLanguage) throws {
+        var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
+        settings.islandLayoutStyle = .pill
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        let saved = settings
+        let input = SettingsInput()
+        input.weatherQuery = "synthetic location"
+        for key in ["常驻额度信息", "其他位置常驻额度"] {
+            let query = AppLocalization.string(key, language: language)
+            let matches = results(query, settings: settings, locale: language.locale)
+            let result = try #require(matches.first, "Missing persistent quota control: \(language.rawValue)/\(key)")
+            #expect(matches.count == 1 && result.section == .ai && result.title == "常驻额度信息"
+                && result.anchor == .row("常驻额度信息"))
+            #expect(result.anchor.localized(locale: language.locale)
+                == .row(AppLocalization.string("常驻额度信息", language: language)))
+            input.settingsQuery = query
+            input.select(result.section, searchTarget: result.anchor)
+            #expect(input.selection == .ai && input.searchTarget == result.anchor && !input.isSearching)
+        }
+        #expect(input.weatherQuery == "synthetic location")
+        #expect(settings == saved)
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func pinnedQuotaSearchFollowsAIVisibilityForEveryCustomEdge(aiEnabled: Bool, noticesEnabled: Bool) {
+        var settings = FeatureSettings(aiProgressEnabled: aiEnabled, systemMonitorEnabled: false,
+            sideNoticesEnabled: noticesEnabled, aiAccountBalanceMonitoredProviders: [], aiAccountBalanceDisplayedProviders: [])
+        settings.mediaEnabled = false
+        settings.islandLayoutStyle = .pill
+        for edge in IslandEdge.allCases {
+            settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
+            let saved = settings
+            for key in ["常驻额度信息", "其他位置常驻额度"] {
+                let matches = results(key, settings: settings)
+                #expect(matches.count == (aiEnabled ? 1 : 0),
+                    "The quota setting follows the AI page visibility, regardless of notifications and provider selections")
+                #expect(matches.allSatisfy { $0.section == .ai && $0.anchor == .row("常驻额度信息") })
+            }
+            #expect(settings == saved)
+        }
+    }
+
     @Test(arguments: AppLanguage.allCases, [false, true])
     func batterySearchTargetsTheCombinedMonitorToggle(language: AppLanguage, systemEnabled: Bool) {
         let settings = FeatureSettings(systemMonitorEnabled: systemEnabled)
@@ -208,6 +328,10 @@ struct SettingsSearchTests {
     func findsSettingInTheRequestedLanguage(language: AppLanguage) {
         let title = AppLocalization.string("界面语言", language: language)
         #expect(results(title, locale: language.locale).contains { $0.section == .general && $0.title == "界面语言" })
+        let systemTitle = AppLocalization.string("系统信息", language: language)
+        let systemMatches = results(systemTitle, locale: language.locale).filter { $0.section == .workflow }
+        #expect(systemMatches.contains { $0.title == "播放来源" && $0.anchor == .row("播放来源") })
+        #expect(systemMatches.contains { $0.title == "记录历史" && $0.anchor == .row("记录历史") })
         let dependencyTitle = AppLocalization.string("依赖组件", language: language)
         let matches = results(dependencyTitle, locale: language.locale)
         let dependencies = matches.filter { $0.section == .download }

@@ -15,6 +15,7 @@
 "低额度提醒" = "Peringatan kuota rendah";
 "供应商未提供已验证的本地额度查询接口" = "Penyedia belum menawarkan API kuota lokal yang terverifikasi";
 "其他位置常驻额度" = "Sematkan kuota di posisi lain";
+"常驻额度信息" = "Informasi kuota yang selalu tampil";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Beri peringatan saat sisa kuota 20% atau kurang, termasuk saat habis";
 "可用预算" = "Anggaran tersedia";
 "可用额度" = "Kuota tersedia";
@@ -92,6 +93,7 @@
 "设置" = "Pengaturan";
 "通用" = "Umum";
 "工作流" = "Alur Kerja";
+"系统信息" = "Informasi Sistem";
 "信息" = "Info";
 "模型" = "Model";
 "宠物" = "Pet";
@@ -3405,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Masukan %@ · Keluaran %@";
 "AI 模型用量" = "Penggunaan Model AI";
 
+"用量历史" = "Riwayat penggunaan";
 "AI 用量历史" = "Riwayat penggunaan AI";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Ekspor seluruh riwayat penggunaan AI sebagai lembar kerja xlsx";
 "已清空 AI 用量历史" = "Riwayat penggunaan AI dihapus";
@@ -3756,5 +3759,11 @@
 "每天更新已安装的依赖组件" = "Perbarui dependensi yang terpasang setiap hari";
 "（默认）" = "(Default)";
 
+"从默认浏览器导入" = "Impor dari browser bawaan";
+"正在读取默认浏览器 Cookie" = "Membaca cookie dari browser bawaan";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Browser bawaan tidak dapat dikenali. Tempel cookie secara manual.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Impor cookie dari browser bawaan belum tersedia. Tempel secara manual.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Cookie untuk situs ini tidak ditemukan. Masuk melalui browser bawaan atau tempel cookie secara manual.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Cookie dari browser bawaan tidak dapat dibaca. Tempel secara manual atau periksa izin akses.";
 "按应用" = "Menurut aplikasi";
 "搜索内容或应用" = "Cari konten atau aplikasi";
