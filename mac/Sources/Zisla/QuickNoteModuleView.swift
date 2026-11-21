@@ -79,31 +79,7 @@ struct QuickNoteModuleView: View {
                 } else if service.notes.isEmpty, service.welcomeNote == nil {
                     EmptyState(symbol: "note.text", title: AppLocalization.text("备忘录暂无笔记"), detail: AppLocalization.text("点 + 新建一条"))
                 } else {
-                    ScrollView(.vertical) {
-                        LazyVStack(spacing: 0) {
-                            if let welcomeNote = service.welcomeNote {
-                                noteRow(welcomeNote)
-                            }
-                            if service.welcomeNote != nil && !service.regularNotes.isEmpty {
-                                Divider()
-                                    .overlay(Color.dividerSubtle)
-                                    .padding(.vertical, 3)
-                            }
-                            ForEach(Array(service.regularNotes.enumerated()), id: \.element.id) { index, note in
-                                if index < 9 {
-                                    noteRow(note, shortcutNumber: index + 1)
-                                        .keyboardShortcut(
-                                            KeyEquivalent(Character(String(index + 1))),
-                                            modifiers: .command
-                                        )
-                                } else {
-                                    noteRow(note)
-                                }
-                            }
-                        }
-                    }
-                    .scrollIndicators(.visible)
-                    .thinScrollChrome()
+                    QuickNoteListView(service: service, row: noteRow)
                 }
             }
         }
@@ -349,5 +325,89 @@ struct QuickNoteModuleView: View {
             return date.formatted(date: .omitted, time: .shortened)
         }
         return date.formatted(.dateTime.month(.abbreviated).day())
+    }
+}
+
+struct QuickNoteListView<Row: View>: View {
+    @ObservedObject var service: QuickNotesService
+    let row: (NotesAppBridge.NoteSummary, Int?) -> Row
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                LazyVStack(spacing: 0) {
+                    if let welcomeNote = service.welcomeNote {
+                        row(welcomeNote, nil)
+                            .id(welcomeNote.id)
+                    }
+                    if service.welcomeNote != nil && !service.regularNotes.isEmpty {
+                        Divider()
+                            .overlay(Color.dividerSubtle)
+                            .padding(.vertical, 3)
+                    }
+                    ForEach(Array(service.regularNotes.enumerated()), id: \.element.id) { index, note in
+                        Group {
+                            if index < 9 {
+                                row(note, index + 1)
+                                    .keyboardShortcut(
+                                        KeyEquivalent(Character(String(index + 1))),
+                                        modifiers: .command
+                                    )
+                            } else {
+                                row(note, nil)
+                            }
+                        }
+                    }
+                }
+            }
+            .scrollIndicators(.visible)
+            .thinScrollChrome()
+            .onChange(of: service.selectedID) { _, selectedID in
+                if let selectedID {
+                    proxy.scrollTo(selectedID)
+                }
+            }
+        }
+        .background {
+            QuickNoteNavigationShortcuts(service: service)
+        }
+    }
+}
+
+private struct QuickNoteNavigationShortcuts: NSViewRepresentable {
+    let service: QuickNotesService
+
+    func makeNSView(context: Context) -> KeyView {
+        KeyView(service: service)
+    }
+
+    func updateNSView(_ nsView: KeyView, context: Context) {
+        nsView.service = service
+    }
+
+    final class KeyView: NSView {
+        var service: QuickNotesService
+
+        init(service: QuickNotesService) {
+            self.service = service
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func performKeyEquivalent(with event: NSEvent) -> Bool {
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                .subtracting([.capsLock, .numericPad, .function])
+            guard event.window === window, modifiers == .command else { return false }
+            switch event.keyCode {
+            case 126: service.selectAdjacent(in: .previous)
+            case 125: service.selectAdjacent(in: .next)
+            default: return false
+            }
+            return true
+        }
     }
 }
