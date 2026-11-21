@@ -19,11 +19,11 @@ extension ClipboardAssistantDetector {
         guard !command.unicodeScalars.contains(where: {
             $0.properties.generalCategory == .control && $0 != "\n" && $0 != "\t"
         }) else { return nil }
-        command = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        command = String(command.drop(while: \.isWhitespace))
         let fence = "```"
         var explicitlyShell = false
         if command.hasPrefix(fence) {
-            let lines = command.components(separatedBy: "\n")
+            let lines = command.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "\n")
             guard lines.count >= 3, lines.last == fence,
                   ["sh", "bash", "zsh", "shell", "fish", "ksh", "dash"]
                     .contains(String(lines[0].dropFirst(3)).trimmingCharacters(in: .whitespaces).lowercased())
@@ -41,18 +41,138 @@ extension ClipboardAssistantDetector {
         }
         let hasPrompt = command.hasPrefix("$ ") || command.hasPrefix("% ")
         if hasPrompt { command.removeFirst(2) }
-        let lines = command.replacingOccurrences(of: "\\\n", with: " ")
-            .components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
-        guard !lines.isEmpty else { return nil }
-        // A declared shell block can contain loops and here-documents. Unlabelled text needs
-        // command evidence on every line so copied explanations and terminal output stay inert.
-        guard explicitlyShell || lines.allSatisfy({
-            guard let name = shellCommandName($0) else { return false }
-            return commandExists(name)
-        }) else { return nil }
-        return command
+        let lines = command.components(separatedBy: "\n")
+        if explicitlyShell {
+            return lines.contains(where: {
+                let line = $0.trimmingCharacters(in: .whitespaces)
+                return !line.isEmpty && !line.hasPrefix("#")
+            }) ? command.trimmingCharacters(in: .whitespacesAndNewlines) : nil
+        }
+        var hereDocuments: [(delimiter: String, stripsTabs: Bool, isQuoted: Bool)] = []
+        var invocation = ""
+        var hasCommand = false
+        var hasHereDocument = false
+        for (index, line) in lines.enumerated() {
+            if let document = hereDocuments.first {
+                invocation += line
+                if !document.isQuoted, index < lines.count - 1,
+                   line.reversed().prefix(while: { $0 == "\\" }).count % 2 == 1 {
+                    invocation.removeLast()
+                    continue
+                }
+                let ending = document.stripsTabs ? invocation.drop(while: { $0 == "\t" }) : invocation[...]
+                if ending == document.delimiter { hereDocuments.removeFirst() }
+                invocation = ""
+                continue
+            }
+            invocation += line
+            if index < lines.count - 1, line.hasSuffix("\\") {
+                invocation.removeLast()
+                invocation += " "
+                continue
+            }
+            let logicalLine = invocation.trimmingCharacters(in: .whitespaces)
+            invocation = ""
+            if logicalLine.isEmpty || logicalLine.hasPrefix("#") { continue }
+            guard let name = shellCommandName(logicalLine), commandExists(name) else { return nil }
+            hasCommand = true
+            // Only command lines are tokenized; embedded scripts remain opaque clipboard data.
+            if lines.count > 1 {
+                guard let documents = shellHereDocuments(in: logicalLine) else { return nil }
+                hereDocuments = documents
+                hasHereDocument = hasHereDocument || !documents.isEmpty
+            }
+        }
+        guard hasCommand, hereDocuments.isEmpty else { return nil }
+        return hasHereDocument ? command : command.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func shellHereDocuments(in line: String) -> [(delimiter: String, stripsTabs: Bool, isQuoted: Bool)]? {
+        let word = #"(?:[^\s;&|<>()'"\\]|'[^']*'|"(?:[^"\\]|\\.)*"|\\.)+"#
+        let pattern = word + #"|<<<|<<-|<<|[^\s]"#
+        let source = line as NSString
+        let tokens = (try! NSRegularExpression(pattern: pattern))
+            .matches(in: shellTokenSource(line), range: NSRange(location: 0, length: source.length))
+            .map { source.substring(with: $0.range) }
+        var documents: [(delimiter: String, stripsTabs: Bool, isQuoted: Bool)] = []
+        var index = 0
+        while index < tokens.count {
+            let token = tokens[index]
+            if token.hasPrefix("#") { break }
+            index += 1
+            guard token == "<<" || token == "<<-" else { continue }
+            guard index < tokens.count,
+                  tokens[index].range(of: "^" + word + "$", options: .regularExpression) != nil,
+                  !tokens[index].hasPrefix("#") else { return nil }
+            var delimiter = ""
+            var quote: Character?
+            var escaped = false
+            for character in tokens[index] {
+                if escaped {
+                    if quote == "\"", !"$`\"\\".contains(character) { delimiter.append("\\") }
+                    delimiter.append(character)
+                    escaped = false
+                } else if character == "\\", quote != "'" {
+                    escaped = true
+                } else if let currentQuote = quote {
+                    if character == currentQuote { quote = nil }
+                    else { delimiter.append(character) }
+                } else if character == "'" || character == "\"" {
+                    quote = character
+                } else {
+                    delimiter.append(character)
+                }
+            }
+            documents.append((delimiter, token == "<<-", tokens[index].contains(where: { "'\"\\".contains($0) })))
+            index += 1
+        }
+        return documents
+    }
+
+    private static func shellTokenSource(_ line: String) -> String {
+        var characters = Array(line.utf16)
+        var index = 0
+        while index < characters.count {
+            let character = characters[index]
+            if character == 92 {
+                index += 2
+                continue
+            }
+            let expansion = character == 36 && index + 1 < characters.count
+                && (characters[index + 1] == 40 || characters[index + 1] == 123)
+            guard expansion || character == 39 || character == 34 || character == 96 else {
+                index += 1
+                continue
+            }
+            let start = index
+            var endings: [UInt16] = [expansion ? (characters[index + 1] == 40 ? 41 : 125) : character]
+            index += expansion ? 2 : 1
+            while index < characters.count, let ending = endings.last {
+                let next = characters[index]
+                index += 1
+                let quoted = ending == 39 || ending == 34 || ending == 96
+                if next == 92, ending != 39 {
+                    index += 1
+                } else if next == ending {
+                    endings.removeLast()
+                } else if (!quoted || ending == 34), next == 36, index < characters.count,
+                          characters[index] == 40 || characters[index] == 123 {
+                    endings.append(characters[index] == 40 ? 41 : 125)
+                    index += 1
+                } else if !quoted, next == 39 || next == 34 || next == 96 {
+                    endings.append(next)
+                } else if ending == 34, next == 96 {
+                    endings.append(96)
+                } else if next == 40, ending == 41 {
+                    endings.append(41)
+                } else if next == 123, ending == 125 {
+                    endings.append(125)
+                }
+            }
+            // Keep UTF-16 offsets so token ranges still reference the original clipboard words.
+            for position in start..<min(index, characters.count) { characters[position] = 120 }
+        }
+        return String(decoding: characters, as: UTF16.self)
     }
 
     private static func shellCommandName(_ line: String) -> String? {

@@ -117,6 +117,139 @@ struct ClipboardAssistantShellCommandTests {
         #expect(detection.detail == .codeLines(3))
     }
 
+    @Test
+    func hereDocumentsKeepEmbeddedScriptsAndFollowingCommands() throws {
+        let command = #"""
+        cat > verify.py <<'VERIFY_REVIEW'
+        from pathlib import Path
+        import re
+        from PIL import Image, ImageOps, ImageDraw
+
+        stage = Path('visual')
+        pages = sorted(stage.glob('page-*.png'))
+        pdf_text = Path('review.txt').read_text()
+        segments = [page for page in pdf_text.split('\f') if page.strip()]
+        assert len(pages) == len(segments) > 0
+        assert not re.search(r'\\(?:frac|mathbf|mathrm)|\$\$|�|file:///|https?://', pdf_text)
+
+        for index, page in enumerate(segments, 1):
+            lines = [line.strip() for line in page.splitlines() if line.strip()]
+            if len(lines) < 15:
+                raise ValueError(f'Page {index} has only {len(lines)} lines: {lines}')
+            print(f'{index}: {len(lines)} 行  {lines[0][:66]}')
+        compact = re.sub(r'\s+', '', pdf_text)
+        for s in ['第12题', '五段指令流水线', '最低位密度', '根', '491520', '97.5',
+                  '3.75', '75%', 'S1关中断', 'S2设备服务', 'S3开中断', 'T1中断周期', 'T2中断服务']:
+            assert s in compact, s
+
+        for start in range(0, len(pages), 5):
+            sheet = Image.new('RGB', (1458, 1440), '#ededed')
+            draw = ImageDraw.Draw(sheet)
+            for index, page in enumerate(pages[start:start+5]):
+                im = ImageOps.contain(Image.open(page), (464, 656))
+                x = (index % 3) * 486 + 11
+                y = (index // 3) * 705 + 14
+                draw.text((x, y), str(start+index+1), fill='#333333')
+                sheet.paste(im, (x, y+19))
+            sheet.save(stage/f'overview-{start//5+1}.jpg', quality=93)
+        VERIFY_REVIEW
+        stat -f '%N %z' noto-*.otf
+        """#
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: command, enabledKinds: allKinds, shellCommandExists: commandExists
+        ))
+        #expect(detection.kind == .shellCommand)
+        #expect(detection.fullContent == command)
+        #expect(detection.actions == [
+            .runShellCommand(command), .runShellCommandInBackground(command), .search(command), .saveText(command),
+        ])
+        #expect(detection.detail == .codeLines(command.split(separator: "\n").count))
+    }
+
+    @Test(arguments: [
+        ("<<EOF", "EOF"), ("<< 'EOF'", "EOF"), ("<<\"EOF\"", "EOF"),
+        ("<<\\EOF", "EOF"), ("<<E\"OF\"", "EOF"), ("<<'END OF SCRIPT'", "END OF SCRIPT"),
+        ("<<-EOF", "\tEOF"), ("<<-'EOF'", "\t\tEOF"), ("<<''", ""),
+        ("<<\"E\\OF\"", "E\\OF"),
+    ])
+    func hereDocumentDelimitersFollowShellQuotingAndTabRules(header: String, ending: String) {
+        let command = "cat \(header)\n\tprint('hello')\n\n# payload\n\(ending)\npwd"
+        #expect(shellCommand(from: command) == command)
+    }
+
+    @Test
+    func hereDocumentsAreConsumedInOrderWithoutLookingUpTheirBodies() {
+        let command = "cat <<FIRST <<'SECOND'\ncat <<IGNORED\nFIRST\nprint('hello')\nSECOND\npwd"
+        var names: [String] = []
+        #expect(ClipboardAssistantDetector.shellCommand(from: command, commandExists: {
+            names.append($0)
+            return commandExists($0)
+        }) == command)
+        #expect(names == ["cat", "pwd"])
+        let continued = "cat > verify.py \\\n  <<'PY'\nprint('hello')\\\nPY\npwd"
+        #expect(shellCommand(from: continued) == continued)
+    }
+
+    @Test(arguments: [
+        "cat <<''\npayload\n\n", "cat <<'EOF '\npayload\nEOF ",
+        "cat <<'EOF'\nprint('hello')\nEOF\n", "cat <<EOF\nEO\\\nF\npwd",
+        "cat <<EOF\npayload\\\\\nEOF\npwd",
+        "cat <<-EOF\nEO\\\n\tF\nEOF\npwd",
+    ])
+    func hereDocumentEndingsKeepSignificantWhitespaceAndUnquotedContinuations(command: String) {
+        #expect(shellCommand(from: command) == command)
+    }
+
+    @Test(arguments: [
+        "cat <<EOF\necho payload", "cat <<EOF\necho payload\n EOF\npwd",
+        "cat <<EOF\necho payload\nEOF \npwd", "cat <<EOF\necho payload\n\tEOF\npwd",
+        "cat <<FIRST <<SECOND\necho payload\nFIRST", "cat <<EOF\nEOF\nmissing-command",
+        "missing-command <<EOF\nprint('hello')\nEOF", "cat <<\npwd",
+        "cat '<<EOF'\nprint('hello')\nEOF", "cat \"<<EOF\"\nprint('hello')\nEOF",
+        "cat \\<<EOF\nprint('hello')\nEOF", "cat # <<EOF\nprint('hello')\nEOF",
+        "cat <<<EOF\nprint('hello')\nEOF", "echo $((1 << 2))\nprint('hello')\nEOF",
+        "cat <<EOF\necho payload\u{0000}\nEOF", "cat <<;\npwd\n;\npwd",
+        "cat << #comment\necho payload\n#comment\npwd", "cat <<'EOF'\nEO\\\nF\npwd",
+        "cat <<EOF\nEO\\\\\nF\npwd",
+    ])
+    func incompleteOrQuotedHereDocumentLookalikesDoNotOfferExecution(command: String) {
+        #expect(shellCommand(from: command) == nil)
+    }
+
+    @Test(arguments: [
+        "echo '<<EOF'\npwd", "echo \"<<EOF\"\npwd", "echo \\<<EOF\npwd",
+        "echo value # <<EOF\npwd", "cat <<<EOF\npwd", "echo $((1 << 2))\npwd",
+        "echo result=$((1 << 2))\npwd", "echo $((1 << 2)).txt\npwd",
+        "echo $(((1 + (1 << 2)) << 3))\npwd", "echo ${value:-<<EOF}\npwd",
+        "echo ${value:-${other:-<<EOF}}\npwd", "echo $(echo '<<EOF')\npwd",
+        "echo `echo '<<EOF'`\npwd", "echo '$((1'\npwd", "echo '${value:-<<EOF}'\npwd",
+        "echo \"$(echo \"<<EOF\")\"\npwd", "echo \"${value:-\"<<EOF\"}\"\npwd",
+    ])
+    func quotedOperatorsCommentsAndHereStringsKeepOrdinaryCommandRecognition(command: String) {
+        #expect(shellCommand(from: command) == command)
+    }
+
+    @Test
+    func hereDocumentPayloadsStayOpaqueAcrossBoundedInputs() {
+        var seed: UInt64 = 0xD0C
+        let alphabet = Array("abc019 '\"$\\;&|<>()[]{}#\t中文")
+        for index in 0..<32 {
+            let payload = String((0..<48).map { _ in
+                seed = seed &* 1_664_525 &+ 1_013_904_223
+                return alphabet[Int(seed % UInt64(alphabet.count))]
+            })
+            let delimiter = "PAYLOAD_\(index)"
+            let command = "cat <<'\(delimiter)'\n\(payload)\n\(delimiter)\npwd"
+            #expect(shellCommand(from: command) == command)
+            #expect(shellCommand(from: command.replacingOccurrences(of: "\n\(delimiter)\n", with: "\nWRONG\n")) == nil)
+        }
+        let prefix = "cat <<'EOF'\n"
+        let suffix = "\nEOF\npwd"
+        let boundary = prefix + String(repeating: "x", count: 20_000 - prefix.utf8.count - suffix.utf8.count) + suffix
+        #expect(shellCommand(from: boundary) == boundary)
+        #expect(shellCommand(from: boundary + "x") == nil)
+    }
+
     @Test(arguments: [
         "", "   ", "hello world", "Please run git status", "git status\nOn branch main",
         "import Foundation", "print(\"hello\")", "printf(\"hello\")", "{\"command\":\"git status\"}",
@@ -219,7 +352,7 @@ struct ClipboardAssistantShellCommandTests {
 
     private func commandExists(_ name: String) -> Bool {
         // A deterministic shell fixture keeps parser tests independent of the machine's installed tools.
-        ["ls", "pwd", "git", "npm", "brew", "make", "curl", "cd", "open", "find", "printf", "echo",
+        ["ls", "pwd", "git", "npm", "brew", "make", "curl", "cd", "open", "find", "printf", "echo", "cat", "stat",
          "mkdir", "cmake", "z", "my-tool", "other-tool", "jump", "repo", "croot", "deploy", "custom-cli",
          "/usr/bin/printf", "./build.sh"].contains(name)
     }
