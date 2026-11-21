@@ -75,9 +75,9 @@ struct ScreenRecordingHDRTests {
         #expect(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_YCbCrMatrix) as? String
             == kCVImageBufferYCbCrMatrix_ITU_R_2020 as String)
         let pixels = try await Self.decode(asset)
-        #expect(pixels.count == 2 && pixels.allSatisfy { $0 > 3.7 }, "The saved capture must retain HDR luminance")
+        #expect(pixels.count == 2 && pixels.allSatisfy { $0 > 3.7 }, "The saved capture must retain HDR luminance: \(pixels)")
         let color = try await Self.decode(asset, point: .init(x: 8, y: 8))
-        #expect(color.allSatisfy { abs($0 - 3) < 0.1 }, "The capture must convert source primaries and YCbCr matrices correctly")
+        #expect(color.allSatisfy { abs($0 - 3) < 0.1 }, "The capture must convert source primaries and YCbCr matrices correctly: \(color)")
     }
 
     @available(macOS 15.0, *)
@@ -474,7 +474,20 @@ struct ScreenRecordingHDRTests {
         let files = try ScreenRecordingCaptureFiles(directory: fixture.directory)
         let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, preservesHDR: true),
                                                   width: 64, height: 48, onFailure: { _ in })
-        writer.receive(try Self.sample(time: 100, localDisplay: localDisplay))
+        let sample = try Self.sample(time: 100, localDisplay: localDisplay)
+        let source = CIImage(cvPixelBuffer: try #require(sample.buffer.imageBuffer))
+        var sourcePixels = [Float](repeating: 0, count: 8)
+        sourcePixels.withUnsafeMutableBytes { bytes in
+            let context = CIContext()
+            for (index, point) in [CGPoint(x: 32, y: 24), CGPoint(x: 8, y: 8)].enumerated() {
+                context.render(source, toBitmap: bytes.baseAddress!.advanced(by: index * 16), rowBytes: 16,
+                               bounds: .init(x: point.x, y: point.y, width: 1, height: 1), format: .RGBAf,
+                               colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
+            }
+        }
+        try #require(sourcePixels[0] > 3.8 && abs(sourcePixels[4] - 3) < 0.1,
+                     "The HDR source must contain the authored luminance and color before encoding (localDisplay=\(localDisplay)): \(sourcePixels)")
+        writer.receive(sample)
         await writer.flush()
         _ = try await writer.waitForFirstFrame()
         await writer.seal(at: 100.25)

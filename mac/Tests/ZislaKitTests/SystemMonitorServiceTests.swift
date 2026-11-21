@@ -2907,10 +2907,12 @@ struct SystemMonitorServiceTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func publicIPGateMissingFamilyTimesOutAndReleasesThePendingLookup() async {
+    func publicIPGateMissingFamilyTimesOutAndReleasesThePendingLookup() async throws {
         let provider = GatedPublicIPProvider(addresses: [.address("198.51.100.1")])
         defer { provider.releaseAll() }
         let pending = Task { await provider.publicIPAddress() }
+        await waitUntil(timeoutSeconds: 2) { provider.pendingCount == 1 }
+        try #require(provider.pendingCount == 1)
         do {
             try await provider.waitUntilStarted(1, timeout: .milliseconds(20))
             Issue.record("An omitted IPv6 request must fail the observer instead of hanging")
