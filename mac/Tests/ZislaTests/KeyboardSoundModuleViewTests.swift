@@ -5,7 +5,7 @@ import CoreGraphics
 import SwiftUI
 import Testing
 import ZislaCore
-import ZislaKit
+@testable import ZislaKit
 
 @testable import Zisla
 @testable import KeyboardKit
@@ -342,6 +342,132 @@ struct KeyboardSoundModuleViewTests {
         let aiIndex = try #require(modules.firstIndex(of: .aiMonitor))
         let keyboardIndex = try #require(modules.firstIndex(of: .keyboardSound))
         #expect(keyboardIndex == modules.index(after: aiIndex))
+    }
+
+    @Test(arguments: [
+        (CGFloat(560), false, false, false),
+        (CGFloat(560), true, false, false),
+        (CGFloat(560), true, true, false),
+        (CGFloat(560), true, true, true),
+        (CGFloat(752), true, true, true),
+        (CGFloat(980), true, true, true),
+    ], AppLanguage.allCases)
+    @MainActor
+    func statisticsStayWithinTheViewportWithoutHorizontalScrolling(
+        scenario: (width: CGFloat, hasSummary: Bool, hasInput: Bool, hasVoice: Bool),
+        language: AppLanguage
+    ) async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previousArguments
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previousArguments, forName: UserDefaults.argumentDomain) }
+
+        let date = Date(timeIntervalSince1970: 1_795_000_000)
+        let name = String(repeating: "Long application name ", count: 12)
+        let buckets = scenario.hasInput ? (0..<12).map { index in
+            KeyboardTypingStatsTrendPoint(id: index, start: date.addingTimeInterval(Double(index) * 300),
+                characterCount: Int64(index * 1_000))
+        } : []
+        let summary = scenario.hasSummary ? KeyboardTypingStatsSummary(
+            generatedAt: date, lastInputAt: scenario.hasInput ? date : nil,
+            todayCharacterCount: scenario.hasInput ? 9_999_999_999 : 0,
+            todayPeakCharactersPerSecond: scenario.hasInput ? 123 : 0,
+            todayActiveSeconds: scenario.hasInput ? 18_000 : 0,
+            todayActiveMinuteBuckets: scenario.hasInput ? 300 : 0,
+            todayTopApplication: scenario.hasInput ? name : nil,
+            todayKeyPressCount: scenario.hasInput ? 9_999_999_999 : 0,
+            allTimeKeyPressCount: scenario.hasInput ? 99_999_999_999 : 0,
+            applications: scenario.hasInput ? [KeyboardTypingStatsApplicationSummary(
+                id: "fixture", name: name, characterCount: 9_999_999_999,
+                activeMinuteBuckets: 300, peakCharactersPerSecond: 123
+            )] : [],
+            history: scenario.hasInput ? (0..<14).map { index in
+                KeyboardTypingStatsDaySummary(id: "day-\(index)",
+                    date: date.addingTimeInterval(-Double(index) * 86_400),
+                    characterCount: Int64(index * 1_000), peakCharactersPerSecond: 123, activeMinuteBuckets: 300)
+            } : [],
+            timelineRange: "1h", recentBuckets: buckets,
+            applicationTimelines: scenario.hasInput
+                ? [KeyboardTypingStatsApplicationTimeline(id: "fixture", name: name, buckets: buckets)] : [],
+            todayKeyCounts: scenario.hasInput ? [0: 123_456] : [:],
+            allTimeKeyCounts: scenario.hasInput ? [0: 999_999] : [:]
+        ) : nil
+        let voiceStatistics = scenario.hasVoice ? VoiceHistoryStatistics(
+            totalWordCount: 30_540, totalDuration: 13_680, wordsPerMinute: 133, savedTime: 32_040
+        ) : nil
+        let host = NSHostingView(rootView: KeyboardSoundModuleView.content(
+            summary: summary, voiceStatistics: voiceStatistics, environment: [:]
+        )
+        .environment(\.locale, language.locale)
+        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: scenario.width, height: 160),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+
+        func settle() async {
+            for _ in 0..<8 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+        }
+        await settle()
+        func descendants(_ view: NSView) -> [NSView] {
+            [view] + view.subviews.flatMap(descendants)
+        }
+        let scrolls = descendants(host).compactMap { $0 as? NSScrollView }
+        if !scenario.hasSummary {
+            #expect(scrolls.isEmpty, "Unavailable statistics must keep the centered empty state without a scroll area")
+            #expect(!window.isVisible && !window.isKeyWindow)
+            return
+        }
+        let scroll = try #require(scrolls.first)
+        let document = try #require(scroll.documentView)
+
+        for height: CGFloat in [160, 900, 160] {
+            scroll.scrollerStyle = .legacy
+            window.setContentSize(CGSize(width: scenario.width, height: height))
+            await settle()
+            #expect(document.frame.width <= scroll.contentView.bounds.width + 0.5,
+                "Statistics must fit the viewport at \(scenario.width)×\(height) in \(language.rawValue)")
+            for delta: CGFloat in [-80, 80] {
+                var shifted = scroll.contentView.bounds
+                shifted.origin.x += delta
+                #expect(abs(scroll.contentView.constrainBoundsRect(shifted).minX
+                    - scroll.contentView.bounds.minX) < 0.5,
+                    "Horizontal trackpad movement must not shift keyboard statistics")
+            }
+            #expect(scroll.horizontalScrollElasticity == .none)
+            if scenario.hasSummary && height == 160 {
+                try #require(document.frame.height > scroll.contentView.bounds.height)
+                scroll.contentView.scroll(to: CGPoint(x: 0,
+                    y: document.frame.height - scroll.contentView.bounds.height))
+                scroll.reflectScrolledClipView(scroll.contentView)
+                await settle()
+                #expect(scroll.contentView.bounds.minY > 0,
+                    "Vertical scrolling must still reach the complete keyboard statistics")
+                let heatmap = try #require(accessibilityObjects(host).first {
+                    value($0, "accessibilityLabel") as? String == AppLocalization.text("键盘按键热力图")
+                } as? any NSAccessibilityElementProtocol)
+                let frame = document.convert(window.convertFromScreen(heatmap.accessibilityFrame()), from: nil)
+                #expect(frame.minX >= -0.5 && frame.maxX <= scroll.contentView.bounds.width + 0.5,
+                    "The full keyboard heatmap must stay inside the horizontal viewport")
+                #expect(frame.maxY <= scroll.contentView.bounds.maxY + 0.5,
+                    "Vertical scrolling must reveal the bottom of the complete keyboard heatmap")
+                let scroller = try #require(scroll.verticalScroller)
+                let track = window.convertToScreen(scroller.convert(scroller.bounds, to: nil))
+                #expect(!heatmap.accessibilityFrame().intersects(track),
+                    "The vertical scrollbar must not cover the keyboard heatmap")
+            }
+        }
+        #expect(!window.isVisible && !window.isKeyWindow)
     }
 
     @Test

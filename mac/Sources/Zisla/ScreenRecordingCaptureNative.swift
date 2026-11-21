@@ -223,7 +223,8 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
         let bridge = ScreenRecordingCaptureBridge(writer: writer, onFailure: onFailure)
         self.bridge = bridge
 
-        let streamConfiguration = Self.streamConfiguration(width: width, height: height, frameRate: configuration.frameRate)
+        let streamConfiguration = Self.streamConfiguration(width: width, height: height, frameRate: configuration.frameRate,
+            includeHDR: configuration.preservesHDR)
         streamConfiguration.capturesAudio = configuration.systemAudio && systemAudioDisplay == nil
         if let sourceRect { streamConfiguration.sourceRect = sourceRect }
         let stream = SCStream(filter: filter, configuration: streamConfiguration, delegate: bridge)
@@ -281,16 +282,21 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
         return error
     }
 
-    private static func streamConfiguration(width: Int, height: Int, frameRate: Int) -> SCStreamConfiguration {
-        let value = SCStreamConfiguration()
+    static func streamConfiguration(width: Int, height: Int, frameRate: Int, includeHDR: Bool = false) -> SCStreamConfiguration {
+        let value: SCStreamConfiguration
+        if #available(macOS 15.0, *), includeHDR && ScreenshotCaptureService.supportsHDRCapture {
+            value = SCStreamConfiguration(preset: .captureHDRStreamLocalDisplay)
+        } else {
+            value = SCStreamConfiguration()
+            value.pixelFormat = kCVPixelFormatType_32BGRA
+            value.colorSpaceName = CGColorSpace.sRGB
+        }
         value.width = width
         value.height = height
         value.minimumFrameInterval = CMTime(value: 1, timescale: Int32(frameRate))
         value.queueDepth = 5
         value.showsCursor = false
         value.captureResolution = .best
-        value.pixelFormat = kCVPixelFormatType_32BGRA
-        value.colorSpaceName = CGColorSpace.sRGB
         value.ignoreShadowsSingleWindow = true
         value.sampleRate = 48_000
         value.channelCount = 2

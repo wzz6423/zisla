@@ -61,6 +61,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         scope: ClipboardHistoryScope,
         searchText: String,
         category: FileShelfCategory,
+        grouping: ClipboardHistoryGrouping = .none,
         offset: Int,
         limit: Int
     ) async throws -> ClipboardHistoryPage {
@@ -80,6 +81,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                         scope: scope,
                         searchText: searchText,
                         category: category,
+                        grouping: grouping,
                         offset: max(0, offset),
                         limit: max(1, limit)
                     ))
@@ -253,6 +255,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             ("file_display_name", "TEXT"),
             ("file_bookmark", "BLOB"),
             ("content_category", "TEXT"),
+            ("source_app_bundle_identifier", "TEXT"),
+            ("source_app_name", "TEXT"),
         ]
         for (name, type) in additions where !existing.contains(name) {
             try execute("ALTER TABLE clipboard_history ADD COLUMN \(name) \(type)", on: database)
@@ -538,6 +542,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         scope: ClipboardHistoryScope,
         searchText: String,
         category: FileShelfCategory,
+        grouping: ClipboardHistoryGrouping,
         offset: Int,
         limit: Int
     ) throws -> ClipboardHistoryPage {
@@ -559,14 +564,23 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             scope: scope,
             searchText: searchText
         )
+        let order: String
+        switch grouping {
+        case .none:
+            order = "is_pinned DESC, last_copied_at DESC"
+        case .sourceApp:
+            let source = "CASE WHEN source_app_name IS NOT NULL THEN source_app_bundle_identifier END"
+            order = "\(source) IS NULL, \(source) COLLATE BINARY, is_pinned DESC, last_copied_at DESC, id COLLATE BINARY"
+        }
 
         let statement = try prepare(
             """
             SELECT id, content_type, text_value, image_data, last_copied_at, is_pinned,
-                   file_url, file_display_name, file_bookmark
+                   file_url, file_display_name, file_bookmark,
+                   source_app_bundle_identifier, source_app_name
             FROM clipboard_history
             \(query.sql)
-            ORDER BY is_pinned DESC, last_copied_at DESC
+            ORDER BY \(order)
             LIMIT ? OFFSET ?
             """,
             on: database
@@ -624,7 +638,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         let statement = try prepare(
             """
             SELECT id, content_type, text_value, image_data, last_copied_at, is_pinned,
-                   file_url, file_display_name, file_bookmark
+                   file_url, file_display_name, file_bookmark,
+                   source_app_bundle_identifier, source_app_name
             FROM clipboard_history
             WHERE is_pinned = 1
                OR id IN (
@@ -766,11 +781,19 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         default:
             throw ClipboardHistoryDatabaseError(message: "剪贴板数据库包含未知内容类型")
         }
+        let sourceApp: ClipboardSourceApp?
+        if let bundleIdentifier = textColumn(statement, index: 9),
+           let name = textColumn(statement, index: 10) {
+            sourceApp = ClipboardSourceApp(bundleIdentifier: bundleIdentifier, name: name)
+        } else {
+            sourceApp = nil
+        }
         return ClipboardHistoryItem(
             id: id,
             content: content,
             lastCopiedAt: Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 4)),
-            isPinned: sqlite3_column_int(statement, 5) != 0
+            isPinned: sqlite3_column_int(statement, 5) != 0,
+            sourceApp: sourceApp
         )
     }
 
@@ -799,18 +822,22 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         if !trimmed.isEmpty {
             clauses.append(
                 """
-                CASE content_type
+                (CASE content_type
                     WHEN 0 THEN COALESCE(text_value, '')
                     WHEN 1 THEN '图片'
                     WHEN 2 THEN COALESCE(file_display_name, '')
                     ELSE ''
                 END LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR source_app_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR source_app_bundle_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE)
                 """
             )
             let escaped = trimmed
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "%", with: "\\%")
                 .replacingOccurrences(of: "_", with: "\\_")
+            values.append("%\(escaped)%")
+            values.append("%\(escaped)%")
             values.append("%\(escaped)%")
         }
         return (clauses.isEmpty ? "" : " WHERE " + clauses.joined(separator: " AND "), values)
@@ -929,8 +956,9 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             """
             INSERT INTO clipboard_history (
                 id, content_type, text_value, image_data, last_copied_at, is_pinned,
-                file_url, file_display_name, file_bookmark, content_category, content_digest
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                file_url, file_display_name, file_bookmark, content_category, content_digest,
+                source_app_bundle_identifier, source_app_name
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 content_type = excluded.content_type,
                 text_value = excluded.text_value,
@@ -941,7 +969,9 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 file_display_name = excluded.file_display_name,
                 file_bookmark = excluded.file_bookmark,
                 content_category = excluded.content_category,
-                content_digest = excluded.content_digest
+                content_digest = excluded.content_digest,
+                source_app_bundle_identifier = excluded.source_app_bundle_identifier,
+                source_app_name = excluded.source_app_name
             """,
             on: database
         )
@@ -974,6 +1004,13 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         try check(sqlite3_bind_int(statement, 6, item.isPinned ? 1 : 0), database: database)
         try bind(item.category.rawValue, to: statement, index: 10, database: database)
         try bind(digest, to: statement, index: 11, database: database)
+        if let sourceApp = item.sourceApp {
+            try bind(sourceApp.bundleIdentifier, to: statement, index: 12, database: database)
+            try bind(sourceApp.name, to: statement, index: 13, database: database)
+        } else {
+            try check(sqlite3_bind_null(statement, 12), database: database)
+            try check(sqlite3_bind_null(statement, 13), database: database)
+        }
         try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
     }
 

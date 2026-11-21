@@ -2916,6 +2916,16 @@ struct SettingsView: View {
                             [AppLocalization.string(location.title, locale: locale)]))
                 }
             }
+            HStack {
+                Spacer()
+                Button(AppLocalization.text("恢复默认位置")) {
+                    model.saveLocations.resetToDefaults()
+                }
+                .buttonStyle(.bordered)
+                .keepsIntrinsicWidth()
+                .settingsSearchAnchor(.row(AppLocalization.string("恢复默认位置", locale: locale)))
+            }
+            .padding(.top, 12)
         }
     }
 
@@ -3088,10 +3098,12 @@ struct SettingsView: View {
 
     private func recommendedToolRow(_ tool: ManagedTool) -> some View {
         let state = model.managedTools.states[tool] ?? ManagedToolState()
+        let detail = managedToolDetail(tool, state: state)
         return settingRow(
             symbol: recommendedToolSymbol(for: tool),
             title: tool.displayName,
-            detail: managedToolDetail(tool, state: state)
+            detail: detail,
+            detailLineLimit: 2
         ) {
             HStack(spacing: 8) {
                 if case .downloading(let fraction) = state.phase, fraction > 0 {
@@ -3116,6 +3128,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .help(detail)
     }
 
     private func recommendationActionButton(

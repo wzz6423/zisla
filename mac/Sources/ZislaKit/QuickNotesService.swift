@@ -16,6 +16,11 @@ public final class QuickNotesService: ObservableObject {
         case updated
     }
 
+    public enum SelectionDirection {
+        case previous
+        case next
+    }
+
     struct Operations {
         let listNotes: () async -> Result<[NotesAppBridge.NoteSummary], NotesAppError>
         let readNote: (String) async -> Result<NotesAppBridge.NoteContent, NotesAppError>
@@ -351,6 +356,14 @@ public final class QuickNotesService: ObservableObject {
             || notes.contains(where: { $0.id == id })
         else { return }
         selectedID = id
+    }
+
+    public func selectAdjacent(in direction: SelectionDirection) {
+        let displayedIDs = [welcomeNote?.id].compactMap { $0 } + regularNotes.map(\.id)
+        guard let selectedID, let index = displayedIDs.firstIndex(of: selectedID) else { return }
+        let adjacentIndex = index + (direction == .previous ? -1 : 1)
+        guard displayedIDs.indices.contains(adjacentIndex) else { return }
+        select(id: displayedIDs[adjacentIndex])
     }
 
     /// Reads the currently selected note for the editor and preview to load.

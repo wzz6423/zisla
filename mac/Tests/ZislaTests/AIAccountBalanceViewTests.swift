@@ -128,21 +128,21 @@ struct AIAccountBalanceViewTests {
         let bitmap = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: thickness, edge: edge)
             .foregroundStyle(.white).environment(\.colorScheme, .dark)
             .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight), size: size, reduceMotion: true)
-        var red = 0, green = 0
+        var yellow = 0, green = 0
         for y in 0..<bitmap.pixelsHigh {
             for x in 0..<bitmap.pixelsWide {
                 let axis = edge.isVertical ? y : x
                 guard CGFloat(axis) / (CGFloat(edge.isVertical ? bitmap.pixelsHigh : bitmap.pixelsWide) / length) > 46 else { continue }
                 let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
-                if color.redComponent > 0.5 && color.greenComponent < 0.3 { red += 1 }
+                if color.redComponent > 0.5 && color.greenComponent > 0.4 && color.blueComponent < 0.3 { yellow += 1 }
                 if color.greenComponent > 0.45 && color.greenComponent > color.redComponent * 1.4
                     && color.greenComponent > color.blueComponent * 1.15 { green += 1 }
             }
         }
-        #expect(red > 10 && green > 10, "Critical five-hour values must stay red while healthy weekly values are green")
+        #expect(yellow > 10 && green > 10, "Low five-hour values must be yellow while healthy weekly values are green")
 
         let expectedRing = try await renderOffscreen(AIAccountQuotaRing(provider: .gpt, fraction: 0.51,
-            severity: .normal, diameter: thickness - 8, innerFraction: 0.1, innerSeverity: .critical)
+            severity: .normal, diameter: thickness - 8, innerFraction: 0.1, innerSeverity: .warning)
             .foregroundStyle(.white).environment(\.colorScheme, .dark),
             size: CGSize(width: thickness - 8, height: thickness - 8))
         let scale = CGFloat(bitmap.pixelsWide) / size.width
@@ -215,6 +215,72 @@ struct AIAccountBalanceViewTests {
         }
         #expect(ringGreen > 20, "Healthy compact quota arcs must render green in both color schemes")
         #expect(lineGreen.allSatisfy { $0 > 10 }, "Both healthy remaining values must render green independently")
+    }
+
+    @Test(arguments: [(0.0, AIAccountQuotaSeverity.exhausted), (0.1, .warning), (10, .warning),
+        (10.1, .warning), (20, .warning), (20.1, .normal), (100, .normal)],
+        [(IslandEdge.top, true), (.bottom, true), (.left, true), (.right, true),
+            (.top, false), (.bottom, false), (.left, false), (.right, false)])
+    func compactQuotaTextAndRingsFollowRemainingThresholds(configuration: (Double, AIAccountQuotaSeverity), placement: (IslandEdge, Bool)) async throws {
+        let (percent, ringSeverity) = configuration
+        let (edge, twoWindows) = placement
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let windows: [AIAccountQuotaWindow] = twoWindows
+            ? [.init(id: "5h", kind: .fiveHours, remainingPercent: percent, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: percent, durationSeconds: 604_800)]
+            : [.init(id: "quota", kind: .all, remainingPercent: percent)]
+        let reading = AIAccountBalance(id: "threshold", providers: [.gpt], status: .available,
+            windows: windows)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
+            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
+            aiAccountBalanceDisplayedProviders: [.gpt])
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
+        controller.update(balances: [reading], settings: settings, language: .english)
+        let notice = try #require(queue.left.first)
+        let length = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
+            .length(thickness: 34, edge: edge)
+        let size = CGSize(width: edge.isVertical ? 34 : length, height: edge.isVertical ? length : 34)
+        let bitmap = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: 34, edge: edge)
+            .foregroundStyle(.white).environment(\.colorScheme, .dark), size: size, reduceMotion: true)
+        let scale = CGFloat(bitmap.pixelsWide) / size.width
+        var matchingTextPixels = twoWindows ? [0, 0] : [0]
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard CGFloat(edge.isVertical ? y : x) / scale > 44 else { continue }
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let matches: Bool
+                switch ringSeverity {
+                case .exhausted: matches = color.redComponent > 0.5 && color.greenComponent < 0.3
+                case .warning: matches = color.redComponent > 0.5 && color.greenComponent > 0.4 && color.blueComponent < 0.3
+                default: matches = color.greenComponent > 0.45 && color.greenComponent > color.redComponent * 1.4
+                    && color.greenComponent > color.blueComponent * 1.15
+                }
+                if matches {
+                    let line = !twoWindows ? 0 : edge.isVertical
+                        ? (x < bitmap.pixelsWide / 2 ? 0 : 1) : (y < bitmap.pixelsHigh / 2 ? 0 : 1)
+                    matchingTextPixels[line] += 1
+                }
+            }
+        }
+        #expect(matchingTextPixels.allSatisfy { $0 > 10 },
+            "Quota rows must be red at zero, yellow through 20%, and green above 20%")
+        let reference = try await renderOffscreen(AIAccountQuotaRing(provider: .gpt, fraction: percent / 100,
+            severity: ringSeverity, diameter: 26, innerFraction: twoWindows ? percent / 100 : nil,
+            innerSeverity: twoWindows ? ringSeverity : nil)
+            .foregroundStyle(.white).environment(\.colorScheme, .dark), size: CGSize(width: 26, height: 26))
+        let ringX = Int((edge.isVertical ? 4 : 12) * scale), ringY = Int((edge.isVertical ? 12 : 4) * scale)
+        var differentRingPixels = 0
+        for y in 0..<reference.pixelsHigh {
+            for x in 0..<reference.pixelsWide {
+                let actual = try #require(bitmap.colorAt(x: x + ringX, y: y + ringY)?.usingColorSpace(.sRGB))
+                let expected = try #require(reference.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if abs(actual.redComponent - expected.redComponent) > 0.02
+                    || abs(actual.greenComponent - expected.greenComponent) > 0.02
+                    || abs(actual.blueComponent - expected.blueComponent) > 0.02 { differentRingPixels += 1 }
+            }
+        }
+        #expect(differentRingPixels == 0, "Rings must keep their real fractions and the existing gray exhausted tracks")
     }
 
     @Test(arguments: [AIProvider.codex, .gpt])
@@ -383,7 +449,7 @@ struct AIAccountBalanceViewTests {
             reduceMotion: true)
         let reference = try await renderOffscreen(VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                Text(line).font(font).foregroundStyle((!weeklyOnly && index == 0 ? AIAccountQuotaSeverity.critical : .normal).balanceColor)
+                Text(line).font(font).foregroundStyle((!weeklyOnly && index == 0 ? AIAccountQuotaSeverity.warning : .normal).balanceColor)
                     .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: weeklyOnly ? 16 : 11).clipped()
             }

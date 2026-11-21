@@ -16,12 +16,13 @@ enum ScreenRecordingFFmpegTranscoder {
     }
 
     static func run(input: URL, output: URL, format: RecordingExportFormat, duration: Double,
-                    executable: URL, inputFormat: String = "mov",
+                    executable: URL, inputFormat: String = "mov", preservesHDR: Bool = false,
                     checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void,
                     progress: @escaping @Sendable (Double) async -> Void) async throws {
         let progressURL = output.deletingLastPathComponent().appendingPathComponent("ffmpeg-progress-\(UUID()).txt")
         defer { try? FileManager.default.removeItem(at: progressURL) }
-        let arguments = try arguments(input: input, output: output, format: format, progress: progressURL, inputFormat: inputFormat)
+        let arguments = try arguments(input: input, output: output, format: format, progress: progressURL,
+            inputFormat: inputFormat, preservesHDR: preservesHDR)
         try Task.checkCancellation()
         try checkpoint(.beforeTranscode)
         let worker = Task {
@@ -67,7 +68,8 @@ enum ScreenRecordingFFmpegTranscoder {
         await progress(1)
     }
 
-    static func arguments(input: URL, output: URL, format: RecordingExportFormat, progress: URL, inputFormat: String = "mov") throws -> [String] {
+    static func arguments(input: URL, output: URL, format: RecordingExportFormat, progress: URL,
+                          inputFormat: String = "mov", preservesHDR: Bool = false) throws -> [String] {
         let codec: [String]
         switch format {
         case .mkv: codec = ["-c:v", "copy", "-c:a", "copy", "-f", "matroska"]
@@ -85,7 +87,7 @@ enum ScreenRecordingFFmpegTranscoder {
         default: throw ScreenRecordingExportError.unsupportedFormat
         }
         let mapping = format.isAudioOnly ? ["-map", "0:a:0", "-vn"]
-            : ["-map", "0:v:0", "-map", "0:a:0?", "-pix_fmt", "yuv420p"]
+            : ["-map", "0:v:0", "-map", "0:a:0?", "-pix_fmt", preservesHDR ? "yuv420p10le" : "yuv420p"]
         return ["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-protocol_whitelist", "file", "-f", inputFormat,
                 "-i", input.path, "-threads", "2"] + mapping + codec + ["-progress", progress.path, "-nostats", output.path]
     }

@@ -43,7 +43,7 @@ struct KeyboardSoundModuleView: View {
                     }
                     .padding(12)
                 }
-                .thinScrollChrome()
+                .thinScrollChrome(scrollerStyle: .overlay)
             } else {
                 EmptyState(
                     symbol: "chart.xyaxis.line",

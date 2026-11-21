@@ -150,7 +150,7 @@ final class FirstLaunchOnboardingSession: ObservableObject {
         guard !isClosed, page == .permissions, permissions.requesting == nil else { return }
         switch item.status {
         case .granted, .requesting: break
-        case .denied, .restricted, .manual: _ = permissions.openSettings(for: item.id)
+        case .denied, .restricted, .manual, .unknown, .partiallyGranted: _ = permissions.openSettings(for: item.id)
         case .notDetermined, .unavailable: _ = permissions.request(item.id)
         }
     }

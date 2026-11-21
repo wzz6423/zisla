@@ -2752,6 +2752,9 @@
 "onboarding.unmute" = "Attiva audio";
 "onboarding.manual" = "Da attivare in Impostazioni di Sistema";
 "onboarding.unavailable" = "Non disponibile su questo sistema";
+"onboarding.unknown" = "Impossibile determinare lo stato del permesso";
+"onboarding.partially_granted" = "Parzialmente consentito";
+"permission.drag_app.body" = "Trascina questa icona nell’elenco delle app in Impostazioni di Sistema.";
 "onboarding.introduction.title" = "Scopri zisla";
 "onboarding.introduction.body" = "Tieni sempre a portata di mano le informazioni e gli strumenti di tutti i giorni.";
 "onboarding.feature.island.title" = "Il tuo assistente quotidiano nella parte superiore dello schermo";
@@ -2785,7 +2788,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Per visualizzare il livello della batteria dei dispositivi connessi.";
 "onboarding.permission.automation.title" = "Automazione";
-"onboarding.permission.automation.body" = "Per controllare le app multimediali supportate ed eseguire azioni tra app. macOS conferma il permesso per ogni app di destinazione.";
+"onboarding.permission.automation.body" = "Per controllare le app multimediali supportate ed eseguire azioni tra app. Lo stato viene verificato per le app di destinazione in esecuzione; macOS conferma il permesso per ogni app separatamente.";
 "onboarding.permission.files.title" = "Accesso ai file";
 "onboarding.permission.files.body" = "Seleziona i file o le cartelle che ti servono e macOS concederà i relativi permessi di accesso.";
 "onboarding.ready.title" = "Tutto pronto";
@@ -3386,6 +3389,7 @@
 "依赖组件" = "Componenti necessari";
 "管理下载与文档转换所需组件。" = "Gestire i componenti necessari per i download e la conversione di documenti.";
 "更改 %@ 的保存位置" = "Cambia la posizione di salvataggio di %@";
+"恢复默认位置" = "Ripristina posizioni predefinite";
 
 "本地优先的原生笔记应用" = "App nativa per le note che privilegia l’archiviazione locale";
 "AI 会话工作目录" = "Cartelle di lavoro delle sessioni IA";
@@ -3761,3 +3765,5 @@
 "默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "L’importazione dei cookie dal browser predefinito non è disponibile. Incollali manualmente.";
 "未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Nessun cookie trovato per questo sito. Accedi dal browser predefinito o incolla i cookie manualmente.";
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Impossibile leggere i cookie del browser predefinito. Incollali manualmente o verifica i permessi di accesso.";
+"按应用" = "Per app";
+"搜索内容或应用" = "Cerca contenuti o app";

@@ -2752,6 +2752,9 @@
 "onboarding.unmute" = "Bật âm thanh";
 "onboarding.manual" = "Cần bật trong Cài đặt hệ thống";
 "onboarding.unavailable" = "Không khả dụng trên hệ thống này";
+"onboarding.unknown" = "Không thể xác định trạng thái quyền";
+"onboarding.partially_granted" = "Đã cho phép một phần";
+"permission.drag_app.body" = "Kéo biểu tượng này vào danh sách ứng dụng trong Cài đặt hệ thống.";
 "onboarding.introduction.title" = "Làm quen với zisla";
 "onboarding.introduction.body" = "Luôn có sẵn thông tin và công cụ thường dùng trong tầm tay.";
 "onboarding.feature.island.title" = "Trợ lý hằng ngày ở phía trên màn hình";
@@ -2785,7 +2788,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Để xem mức pin của các thiết bị đã kết nối.";
 "onboarding.permission.automation.title" = "Tự động hóa";
-"onboarding.permission.automation.body" = "Để điều khiển các ứng dụng đa phương tiện được hỗ trợ và thực hiện thao tác giữa các ứng dụng. macOS xác nhận quyền riêng cho từng ứng dụng đích.";
+"onboarding.permission.automation.body" = "Để điều khiển ứng dụng đa phương tiện được hỗ trợ và thực hiện thao tác giữa các ứng dụng. Trạng thái được kiểm tra cho các ứng dụng đích đang chạy; macOS xác nhận quyền riêng cho từng ứng dụng.";
 "onboarding.permission.files.title" = "Truy cập tệp";
 "onboarding.permission.files.body" = "Chọn tệp hoặc thư mục cần sử dụng, macOS sẽ cấp quyền truy cập tương ứng.";
 "onboarding.ready.title" = "Đã sẵn sàng";
@@ -3386,6 +3389,7 @@
 "依赖组件" = "Thành phần phụ thuộc";
 "管理下载与文档转换所需组件。" = "Quản lý các thành phần cần thiết để tải xuống và chuyển đổi tài liệu.";
 "更改 %@ 的保存位置" = "Đổi vị trí lưu cho %@";
+"恢复默认位置" = "Khôi phục vị trí mặc định";
 
 "本地优先的原生笔记应用" = "Ứng dụng ghi chú gốc ưu tiên lưu trữ cục bộ";
 "AI 会话工作目录" = "Thư mục làm việc của phiên AI";
@@ -3761,3 +3765,5 @@
 "默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Chưa hỗ trợ nhập cookie từ trình duyệt mặc định. Hãy dán thủ công.";
 "未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Không tìm thấy cookie của trang web này. Hãy đăng nhập bằng trình duyệt mặc định hoặc dán cookie thủ công.";
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Không thể đọc cookie từ trình duyệt mặc định. Hãy dán thủ công hoặc kiểm tra quyền truy cập.";
+"按应用" = "Theo ứng dụng";
+"搜索内容或应用" = "Tìm nội dung hoặc ứng dụng";

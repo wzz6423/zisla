@@ -22,7 +22,7 @@ struct PermissionsSettingsView: View {
     private func performAction(_ item: OnboardingPermissionItem) {
         switch item.status {
         case .granted, .requesting: break
-        case .denied, .restricted, .manual:
+        case .denied, .restricted, .manual, .unknown, .partiallyGranted:
             settingsOpenFailure = coordinator.openSettings(for: item.id) ? nil : item.id
         case .notDetermined, .unavailable:
             coordinator.request(item.id)

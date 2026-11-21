@@ -19,7 +19,10 @@ struct ClipboardHistoryPasteboardTests {
         await store.waitUntilLoaded()
         defer { store.flushPendingChanges() }
         var captured: [ClipboardHistoryContent] = []
-        let monitor = ClipboardHistoryMonitor(pasteboard: pasteboard, pollInterval: 60) { content in
+        let monitor = ClipboardHistoryMonitor(
+            pasteboard: pasteboard, pollInterval: 60,
+            workspaceNotificationCenter: NotificationCenter(), sourceAppProvider: { _ in nil }, sourceAppResolver: { _ in nil }
+        ) { content, _ in
             captured.append(content)
             #expect(store.record(content))
         }
@@ -116,8 +119,11 @@ struct ClipboardHistoryPasteboardTests {
         let pasteboard = makePasteboard()
         defer { pasteboard.releaseGlobally() }
         var captured: [ClipboardHistoryContent] = []
-        let monitor = ClipboardHistoryMonitor(pasteboard: pasteboard, pollInterval: 10) {
-            captured.append($0)
+        let monitor = ClipboardHistoryMonitor(
+            pasteboard: pasteboard, pollInterval: 10,
+            workspaceNotificationCenter: NotificationCenter(), sourceAppProvider: { _ in nil }, sourceAppResolver: { _ in nil }
+        ) { content, _ in
+            captured.append(content)
         }
 
         monitor.setEnabled(true)

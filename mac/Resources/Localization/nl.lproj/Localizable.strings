@@ -2752,6 +2752,9 @@
 "onboarding.unmute" = "Geluid inschakelen";
 "onboarding.manual" = "Inschakelen in Systeeminstellingen";
 "onboarding.unavailable" = "Niet beschikbaar op dit systeem";
+"onboarding.unknown" = "De machtigingsstatus kon niet worden bepaald";
+"onboarding.partially_granted" = "Gedeeltelijk toegestaan";
+"permission.drag_app.body" = "Sleep dit pictogram naar de applijst in Systeeminstellingen.";
 "onboarding.introduction.title" = "Maak kennis met zisla";
 "onboarding.introduction.body" = "Houd alledaagse informatie en hulpmiddelen altijd binnen handbereik.";
 "onboarding.feature.island.title" = "Uw dagelijkse assistent bovenaan het scherm";
@@ -2785,7 +2788,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Voor het bekijken van het batterijniveau van verbonden apparaten.";
 "onboarding.permission.automation.title" = "Automatisering";
-"onboarding.permission.automation.body" = "Voor het bedienen van ondersteunde media-apps en het uitvoeren van acties tussen apps. macOS bevestigt de toestemming voor elke doel-app.";
+"onboarding.permission.automation.body" = "Voor het bedienen van ondersteunde media-apps en het uitvoeren van acties tussen apps. De status wordt gecontroleerd voor doel-apps die momenteel actief zijn; macOS bevestigt de toestemming voor elke app afzonderlijk.";
 "onboarding.permission.files.title" = "Bestandstoegang";
 "onboarding.permission.files.body" = "Selecteer de bestanden of mappen die u nodig hebt. macOS verleent de bijbehorende toegangsrechten.";
 "onboarding.ready.title" = "Alles is klaar";
@@ -3386,6 +3389,7 @@
 "依赖组件" = "Vereiste componenten";
 "管理下载与文档转换所需组件。" = "Beheer de componenten die nodig zijn voor downloads en documentconversie.";
 "更改 %@ 的保存位置" = "Opslaglocatie voor %@ wijzigen";
+"恢复默认位置" = "Standaardlocaties herstellen";
 
 "本地优先的原生笔记应用" = "Native notitie-app die lokale opslag vooropstelt";
 "AI 会话工作目录" = "Werkmappen van AI-sessies";
@@ -3761,3 +3765,5 @@
 "默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Cookies importeren uit de standaardbrowser wordt niet ondersteund. Plak ze handmatig.";
 "未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Geen cookies voor deze website gevonden. Meld u aan in de standaardbrowser of plak de cookies handmatig.";
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "De cookies van de standaardbrowser kunnen niet worden gelezen. Plak ze handmatig of controleer de toegangsrechten.";
+"按应用" = "Per app";
+"搜索内容或应用" = "Zoeken in inhoud of apps";

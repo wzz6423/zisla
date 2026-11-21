@@ -57,6 +57,21 @@ private final class OnboardingViewFixture {
 
 @MainActor
 struct FirstLaunchOnboardingViewTests {
+    @Test(arguments: [OnboardingPermissionStatus.unknown, .partiallyGranted])
+    func undeterminedAndPartialPermissionsOpenSettingsWithoutRequesting(status: OnboardingPermissionStatus) {
+        let fake = OnboardingViewFixture()
+        fake.statuses[.automation] = status
+        let session = fake.session()
+        defer { session.close() }
+        session.start(reduceMotion: true)
+        session.advance()
+        session.advance()
+        session.performPermissionAction(fake.item(.automation))
+        #expect(fake.openedSettings == [OnboardingPermissionID.automation.settingsURL])
+        #expect(fake.requests.isEmpty)
+        #expect(fake.item(.automation).status == status)
+    }
+
     @Test func greetingUsesExactlySupportedLanguagesAndRequiredOpening() {
         let languages = FirstLaunchOnboardingSession.greetingLanguages
         #expect(languages.count == 17)

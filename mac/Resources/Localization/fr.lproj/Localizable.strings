@@ -2748,6 +2748,9 @@
 "onboarding.unmute" = "Activer le son";
 "onboarding.manual" = "À activer dans les Réglages Système";
 "onboarding.unavailable" = "Indisponible sur ce système";
+"onboarding.unknown" = "Impossible de déterminer les autorisations";
+"onboarding.partially_granted" = "Partiellement autorisé";
+"permission.drag_app.body" = "Faites glisser cette icône dans la liste des apps des Réglages Système.";
 "onboarding.introduction.title" = "Découvrez zisla";
 "onboarding.introduction.body" = "Gardez vos informations et outils du quotidien à portée de main.";
 "onboarding.feature.island.title" = "Votre assistant du quotidien en haut de l’écran";
@@ -2781,7 +2784,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Pour afficher le niveau de batterie des appareils connectés.";
 "onboarding.permission.automation.title" = "Automatisation";
-"onboarding.permission.automation.body" = "Pour contrôler les applications multimédias compatibles et effectuer des actions entre applications. macOS confirme l’autorisation pour chaque application cible.";
+"onboarding.permission.automation.body" = "Pour contrôler les apps multimédias prises en charge et effectuer des actions entre apps. L’état est vérifié pour les apps cibles en cours d’exécution ; macOS confirme l’autorisation pour chaque app séparément.";
 "onboarding.permission.files.title" = "Accès aux fichiers";
 "onboarding.permission.files.body" = "Sélectionnez les fichiers ou dossiers à utiliser ; macOS accordera les autorisations d’accès correspondantes.";
 "onboarding.ready.title" = "Tout est prêt";
@@ -3382,6 +3385,7 @@
 "依赖组件" = "Composants requis";
 "管理下载与文档转换所需组件。" = "Gérer les composants nécessaires aux téléchargements et à la conversion de documents.";
 "更改 %@ 的保存位置" = "Changer l’emplacement de sauvegarde pour %@";
+"恢复默认位置" = "Rétablir les emplacements par défaut";
 
 "本地优先的原生笔记应用" = "Application de notes native privilégiant le stockage local";
 "AI 会话工作目录" = "Dossiers de travail des sessions IA";
@@ -3757,3 +3761,5 @@
 "默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "L’importation des cookies n’est pas disponible pour le navigateur par défaut. Collez-les manuellement.";
 "未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Aucun cookie trouvé pour ce site. Connectez-vous dans le navigateur par défaut ou collez les cookies manuellement.";
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Impossible de lire les cookies du navigateur par défaut. Collez-les manuellement ou vérifiez les autorisations d’accès.";
+"按应用" = "Par application";
+"搜索内容或应用" = "Rechercher du contenu ou une application";

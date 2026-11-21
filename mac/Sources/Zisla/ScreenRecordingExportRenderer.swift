@@ -89,6 +89,7 @@ final class RecordingExportRenderer {
     let screenRect: CGRect
     let sourceCrop: RecordingRect
     let context: CIContext
+    let preservesHDR: Bool
     private let project: ScreenRecordingProject
     private let effects: RecordingExportEffectTrack
     let background: CIImage
@@ -98,17 +99,18 @@ final class RecordingExportRenderer {
     private let cameraRect: CGRect
     private let cameraMask: CIImage
     private let cameraBorder: CIImage?
-    private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
     private let portrait: RecordingPortraitProcessor
     private let portraitLock = NSLock()
 
     init(project: ScreenRecordingProject, size: CGSize, fitSource: Bool = false, context: CIContext? = nil,
-         portraitProcessor: RecordingPortraitProcessor = RecordingPortraitProcessor()) throws {
+         portraitProcessor: RecordingPortraitProcessor = RecordingPortraitProcessor(), preservesHDR: Bool = false) throws {
         self.project = project
+        self.preservesHDR = preservesHDR
         portrait = portraitProcessor
         effects = RecordingExportEffectTrack(project: project)
         canvas = CGRect(origin: .zero, size: size)
-        self.context = context ?? CIContext(options: [.cacheIntermediates: false, .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
+        self.context = context ?? CIContext(options: [.cacheIntermediates: false, .workingColorSpace:
+            CGColorSpace(name: preservesHDR ? CGColorSpace.extendedLinearSRGB : CGColorSpace.sRGB)!])
         sourceCrop = project.edits.crop ?? RecordingRect(x: 0, y: 0, width: 1, height: 1)
         let shortSide = min(size.width, size.height)
         let padding = project.edits.background == .none && project.edits.backgroundColor == nil ? 0 : shortSide * project.edits.padding
@@ -254,10 +256,7 @@ final class RecordingExportRenderer {
     func image(screen: CIImage, camera: CIImage?, sourceTime: Double,
                slice: RecordingExportSlice? = nil) throws -> CGImage {
         let rendered = try render(screen: screen, camera: camera, sourceTime: sourceTime, slice: slice)
-        guard let image = context.createCGImage(rendered, from: canvas, format: .RGBA8, colorSpace: colorSpace) else {
-            throw ScreenRecordingExportError.cannotRender
-        }
-        return image
+        return try RecordingHDR.image(rendered, in: canvas, context: context, preservesHDR: preservesHDR)
     }
 
     static func normalized(_ image: CIImage) -> CIImage {

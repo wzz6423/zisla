@@ -3,6 +3,7 @@ import Combine
 import CoreImage
 import Darwin
 import Foundation
+import VideoToolbox
 import ZislaCore
 import ZislaKit
 
@@ -95,6 +96,11 @@ final class ScreenRecordingExporter: ObservableObject {
         videoComposition.customVideoCompositorClass = RecordingPlaybackCompositor.self
         videoComposition.renderSize = size
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        if media.video.preservesHDR {
+            videoComposition.colorPrimaries = AVVideoColorPrimaries_ITU_R_2020
+            videoComposition.colorTransferFunction = AVVideoTransferFunction_SMPTE_ST_2084_PQ
+            videoComposition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_2020
+        }
         videoComposition.instructions = [try RecordingPlaybackInstruction(
             project: project, media: media, cameraTrackID: cameraTrack?.trackID, size: size)]
         item.videoComposition = videoComposition
@@ -131,14 +137,16 @@ final class ScreenRecordingExporter: ObservableObject {
             let scale = min(1, min(maximumSize.width / original.width, maximumSize.height / original.height))
             let size = CGSize(width: max(2, (original.width * scale / 2).rounded(.down) * 2),
                               height: max(2, (original.height * scale / 2).rounded(.down) * 2))
-            let renderer = try RecordingExportRenderer(project: project, size: size)
             let time = CMTime(seconds: min(sourceTime, max(0, project.duration - 1.0 / 60_000)),
                               preferredTimescale: 60_000)
             let generator = AVAssetImageGenerator(asset: asset)
+            if #available(macOS 15.0, *) { generator.dynamicRangePolicy = .matchSource }
             generator.appliesPreferredTrackTransform = true
             generator.requestedTimeToleranceBefore = .zero
             generator.requestedTimeToleranceAfter = .zero
             let screen = try await generator.image(at: time).image
+            let renderer = try RecordingExportRenderer(project: project, size: size,
+                preservesHDR: ScreenshotImageRendering.isHDR(screen))
             let camera: CGImage?
             if let file = project.editingCameraFile {
                 let cameraAsset = AVURLAsset(url: try store.mediaURL(file, in: directory))
@@ -194,7 +202,8 @@ enum RecordingExportJob {
         let media = try await RecordingExportMedia.prepare(project: project, directory: directory, timeline: timeline)
         let size = try RecordingExportRenderer.outputSize(source: media.sourceSize, edits: project.edits,
                                                          resolution: configuration.resolution)
-        let renderer = try RecordingExportRenderer(project: project, size: size)
+        let renderer = try RecordingExportRenderer(project: project, size: size,
+            preservesHDR: media.video.preservesHDR && configuration.format.supportsHDR)
         let staging = target.deletingLastPathComponent()
             .appendingPathComponent(".zisla-recording-export-\(UUID())", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
@@ -211,11 +220,11 @@ enum RecordingExportJob {
             if let executable {
                 try await ScreenRecordingFFmpegTranscoder.run(input: rendered, output: temporary,
                     format: configuration.format, duration: timeline.duration, executable: executable,
-                    checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
+                    preservesHDR: renderer.preservesHDR, checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
             }
         } else if configuration.format == .gif {
             let primary = try RecordingExportFrameReader(media: media.video)
-            let camera = try media.camera.map(RecordingExportFrameReader.init)
+            let camera = try media.camera.map { try RecordingExportFrameReader(media: $0) }
             defer { primary.cancel(); camera?.cancel() }
             let writer = try RecordingExportGIFWriter(url: temporary, size: size, frameRate: schedule.frameRate,
                                                        duration: timeline.duration,
@@ -281,10 +290,10 @@ final class RecordingExportFrameReader {
     private var next: CMSampleBuffer?
     private var current: CVPixelBuffer?
 
-    init(media: RecordingExportMediaTrack) throws {
+    init(media: RecordingExportMediaTrack, preservesHDR: Bool = false) throws {
         reader = try AVAssetReader(asset: media.composition)
         output = AVAssetReaderTrackOutput(track: media.track, outputSettings: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferPixelFormatTypeKey as String: preservesHDR ? RecordingHDR.pixelFormat : kCVPixelFormatType_32BGRA,
         ])
         output.alwaysCopiesSampleData = false
         transform = media.transform
@@ -352,6 +361,7 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
     private let schedule: RecordingExportFrameSchedule
     private let checkpoint: @Sendable (RecordingExportCheckpoint) throws -> Void
     private let cancellation = RecordingExportCancellation()
+    private var preservesHDR: Bool { frames.preservesHDR }
 
     convenience init(url: URL, media: RecordingExportMedia, renderer: RecordingExportRenderer,
                      schedule: RecordingExportFrameSchedule,
@@ -373,20 +383,23 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
         self.duration = duration
         self.schedule = schedule
         self.checkpoint = checkpoint
+        let preservesHDR = frames.preservesHDR
         writer = try AVAssetWriter(outputURL: url, fileType: fileType)
         let width = Int(frames.canvas.width)
         let height = Int(frames.canvas.height)
+        var compression: [String: Any] = [
+            AVVideoAverageBitRateKey: min(80_000_000, max(250_000, width * height * schedule.frameRate / 5)),
+            AVVideoExpectedSourceFrameRateKey: schedule.frameRate,
+            AVVideoMaxKeyFrameIntervalKey: schedule.frameRate * 2,
+            AVVideoAllowFrameReorderingKey: false,
+        ]
+        if preservesHDR { compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel }
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: max(width, height) > 4_096 ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
+            AVVideoCodecKey: ScreenRecordingCaptureEncoding.codec(width: width, height: height, preservesHDR: preservesHDR),
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: min(80_000_000, max(250_000, width * height * schedule.frameRate / 5)),
-                AVVideoExpectedSourceFrameRateKey: schedule.frameRate,
-                AVVideoMaxKeyFrameIntervalKey: schedule.frameRate * 2,
-                AVVideoAllowFrameReorderingKey: false,
-            ],
-            AVVideoColorPropertiesKey: [
+            AVVideoCompressionPropertiesKey: compression,
+            AVVideoColorPropertiesKey: preservesHDR ? RecordingHDR.colorProperties : [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
                 AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
@@ -394,7 +407,7 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
         ])
         videoInput.expectsMediaDataInRealTime = false
         adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput, sourcePixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferPixelFormatTypeKey as String: preservesHDR ? RecordingHDR.pixelFormat : kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: width,
             kCVPixelBufferHeightKey as String: height,
             kCVPixelBufferIOSurfacePropertiesKey as String: [:],
@@ -460,7 +473,7 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
                               let buffer else { throw ScreenRecordingExportError.cannotRender }
                         let image = try frames.render(at: time)
                         frames.context.render(image, to: buffer, bounds: frames.canvas,
-                                                colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                            colorSpace: preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
                         guard adaptor.append(buffer, withPresentationTime: time) else {
                             throw ScreenRecordingExportError.encoderFailure
                         }

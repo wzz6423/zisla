@@ -2753,6 +2753,9 @@
 "onboarding.unmute" = "Ton einschalten";
 "onboarding.manual" = "In den Systemeinstellungen aktivieren";
 "onboarding.unavailable" = "Auf diesem System nicht verfügbar";
+"onboarding.unknown" = "Berechtigungsstatus konnte nicht ermittelt werden";
+"onboarding.partially_granted" = "Teilweise erlaubt";
+"permission.drag_app.body" = "Ziehe dieses Symbol in die App-Liste der Systemeinstellungen.";
 "onboarding.introduction.title" = "zisla kennenlernen";
 "onboarding.introduction.body" = "Häufig benötigte Informationen und Werkzeuge sind jederzeit griffbereit.";
 "onboarding.feature.island.title" = "Ihr Alltagshelfer am oberen Bildschirmrand";
@@ -2786,7 +2789,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Zum Anzeigen des Batteriestands verbundener Geräte.";
 "onboarding.permission.automation.title" = "Automation";
-"onboarding.permission.automation.body" = "Zum Steuern unterstützter Medien-Apps und für appübergreifende Aktionen. macOS bestätigt die Berechtigung für jede Ziel-App einzeln.";
+"onboarding.permission.automation.body" = "Zum Steuern unterstützter Medien-Apps und für appübergreifende Aktionen. Der Status wird für aktuell laufende Ziel-Apps geprüft; macOS bestätigt die Berechtigung für jede App einzeln.";
 "onboarding.permission.files.title" = "Dateizugriff";
 "onboarding.permission.files.body" = "Wählen Sie die benötigten Dateien oder Ordner aus. macOS erteilt die entsprechenden Zugriffsberechtigungen.";
 "onboarding.ready.title" = "Alles bereit";
@@ -3387,6 +3390,7 @@
 "依赖组件" = "Benötigte Komponenten";
 "管理下载与文档转换所需组件。" = "Die für Downloads und Dokumentkonvertierung erforderlichen Komponenten verwalten.";
 "更改 %@ 的保存位置" = "Speicherort für %@ ändern";
+"恢复默认位置" = "Standardspeicherorte wiederherstellen";
 
 "本地优先的原生笔记应用" = "Native Notiz-App mit vorrangig lokaler Speicherung";
 "AI 会话工作目录" = "Arbeitsordner der KI-Sitzungen";
@@ -3762,3 +3766,5 @@
 "默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Der Cookie-Import aus dem Standardbrowser wird nicht unterstützt. Fügen Sie die Cookies manuell ein.";
 "未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Für diese Website wurden keine Cookies gefunden. Melden Sie sich im Standardbrowser an oder fügen Sie die Cookies manuell ein.";
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Die Cookies des Standardbrowsers konnten nicht gelesen werden. Fügen Sie sie manuell ein oder prüfen Sie die Zugriffsrechte.";
+"按应用" = "Nach App";
+"搜索内容或应用" = "Inhalte oder Apps suchen";

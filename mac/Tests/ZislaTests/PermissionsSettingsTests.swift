@@ -84,8 +84,8 @@ struct PermissionsSettingsTests {
         var keys = Set([permissionSection.title, permissionSection.subtitle, permissionSection.group.title])
         keys.formUnion(OnboardingPermissionID.allCases.flatMap { [$0.titleKey, $0.bodyKey] })
         keys.formUnion([OnboardingPermissionStatus.notDetermined, .denied, .restricted, .granted,
-                        .requesting, .manual, .unavailable].map(\.localizationKey))
-        keys.formUnion(["onboarding.open_settings", "onboarding.grant", "onboarding.retry", "输入统计"])
+                        .requesting, .manual, .unavailable, .unknown, .partiallyGranted].map(\.localizationKey))
+        keys.formUnion(["onboarding.open_settings", "onboarding.grant", "onboarding.retry", "permission.drag_app.body", "输入统计"])
         let pattern = #"AppLocalizedText\("([^"]+)""#
         let expression = try NSRegularExpression(pattern: pattern)
         for file in ["PermissionsSettingsView.swift", "PermissionListView.swift", "AgendaModuleView.swift",
@@ -113,6 +113,7 @@ struct PermissionsSettingsTests {
         if language == .english {
             #expect(table[permissionSection.title] == "Permissions")
             #expect(table[OnboardingPermissionID.fullDiskAccess.bodyKey]?.contains("Screen Time") == true)
+            #expect(table[OnboardingPermissionID.automation.bodyKey]?.contains("currently running target apps") == true)
         }
         if language == .arabic { #expect(table[permissionSection.title] == "الأذونات") }
     }

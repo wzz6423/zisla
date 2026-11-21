@@ -2752,6 +2752,9 @@
 "onboarding.unmute" = "Sesi aç";
 "onboarding.manual" = "Sistem Ayarları’nda etkinleştirin";
 "onboarding.unavailable" = "Bu sistemde kullanılamıyor";
+"onboarding.unknown" = "İzin durumu belirlenemedi";
+"onboarding.partially_granted" = "Kısmen izin verildi";
+"permission.drag_app.body" = "Bu simgeyi Sistem Ayarları’ndaki uygulama listesine sürükleyin.";
 "onboarding.introduction.title" = "zisla ile tanışın";
 "onboarding.introduction.body" = "Günlük bilgileri ve araçları her zaman elinizin altında tutun.";
 "onboarding.feature.island.title" = "Ekranın üst kısmındaki günlük yardımcınız";
@@ -2785,7 +2788,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Bağlı aygıtların pil düzeylerini görüntülemek için kullanılır.";
 "onboarding.permission.automation.title" = "Otomasyon";
-"onboarding.permission.automation.body" = "Desteklenen medya uygulamalarını denetlemek ve uygulamalar arası işlemler yapmak için kullanılır. macOS, her hedef uygulama için izni ayrı ayrı onaylar.";
+"onboarding.permission.automation.body" = "Desteklenen medya uygulamalarını denetlemek ve uygulamalar arası işlemler yapmak için kullanılır. Durum, şu anda çalışan hedef uygulamalar için denetlenir; macOS her uygulamanın iznini ayrı ayrı onaylar.";
 "onboarding.permission.files.title" = "Dosya Erişimi";
 "onboarding.permission.files.body" = "Kullanmanız gereken dosya veya klasörleri seçin; macOS ilgili erişim izinlerini verir.";
 "onboarding.ready.title" = "Her şey hazır";
@@ -3386,6 +3389,7 @@
 "依赖组件" = "Gerekli bileşenler";
 "管理下载与文档转换所需组件。" = "İndirmeler ve belge dönüştürme için gereken bileşenleri yönetin.";
 "更改 %@ 的保存位置" = "%@ için kayıt konumunu değiştir";
+"恢复默认位置" = "Varsayılan konumları geri yükle";
 
 "本地优先的原生笔记应用" = "Yerel depolamayı önceliklendiren platforma özgü not uygulaması";
 "AI 会话工作目录" = "Yapay zekâ oturumlarının çalışma klasörleri";
@@ -3761,3 +3765,5 @@
 "默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Varsayılan tarayıcıdan çerez içe aktarma desteklenmiyor. Elle yapıştırın.";
 "未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Bu site için çerez bulunamadı. Varsayılan tarayıcıda oturum açın veya çerezleri elle yapıştırın.";
 "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Varsayılan tarayıcı çerezleri okunamadı. Elle yapıştırın veya erişim izinlerini kontrol edin.";
+"按应用" = "Uygulamaya göre";
+"搜索内容或应用" = "İçerik veya uygulama ara";
