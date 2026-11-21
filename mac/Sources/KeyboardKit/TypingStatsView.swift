@@ -25,12 +25,12 @@ struct TypingStatsView: View {
     let showsRecordingToggle: Bool
     @State private var selectedSection: TypingStatsSection = {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--stats-history") {
-            return .history
-        }
-        if ProcessInfo.processInfo.arguments.contains("--stats-keyboard") {
-            return .keyboard
-        }
+            if ProcessInfo.processInfo.arguments.contains("--stats-history") {
+                return .history
+            }
+            if ProcessInfo.processInfo.arguments.contains("--stats-keyboard") {
+                return .keyboard
+            }
         #endif
         return .today
     }()
@@ -241,17 +241,17 @@ struct TypingStatsView: View {
             L10n.format("刷新失败，正在显示上次成功的数据：%@", message),
             systemImage: "arrow.clockwise.circle"
         )
-            .font(.caption)
-            .foregroundStyle(.orange)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 7)
-            .background {
-                ZStack {
-                    KeyboardVisualStyle.surface
-                    Color.orange.opacity(0.08)
-                }
+        .font(.caption)
+        .foregroundStyle(.orange)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 7)
+        .background {
+            ZStack {
+                KeyboardVisualStyle.surface
+                Color.orange.opacity(0.08)
             }
+        }
     }
 
     private var statusPresentation: (title: String, symbol: String, color: Color) {
@@ -549,8 +549,8 @@ private struct TypingStatsAppsView: View {
                             ? L10n.tr("显示前 20 个应用")
                             : L10n.format("显示 %@ 个应用", "\(snapshot.apps.count)")
                     )
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
                 }
 
                 if snapshot.apps.isEmpty {

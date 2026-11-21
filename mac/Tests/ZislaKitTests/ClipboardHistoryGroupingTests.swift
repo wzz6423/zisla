@@ -132,7 +132,7 @@ struct ClipboardHistoryGroupingTests {
         #expect(fixture.store.items.map(\.content) == [.text("earlier copy"), second.content])
         fixture.store.flushPendingChanges()
         let page = try await fixture.database.loadPage(scope: .all, searchText: "", category: .all,
-            grouping: .sourceApp, offset: 0, limit: 2)
+                                                       grouping: .sourceApp, offset: 0, limit: 2)
         #expect(page.items == fixture.store.items, "Optimistic group ordering must agree with SQLite")
         #expect(page.totalCount == 5)
     }
@@ -156,7 +156,7 @@ struct ClipboardHistoryGroupingTests {
         #expect(fixture.store.items.map(\.content) == [.text("favorite"), .text("new history"), .text("middle history")])
         fixture.store.flushPendingChanges()
         let page = try await fixture.database.loadPage(scope: .all, searchText: "", category: .all,
-            grouping: .sourceApp, offset: 0, limit: 20)
+                                                       grouping: .sourceApp, offset: 0, limit: 20)
         #expect(page.items == fixture.store.items)
 
         let favorite = try #require(fixture.store.pinnedItems.first)
@@ -165,7 +165,7 @@ struct ClipboardHistoryGroupingTests {
         #expect(fixture.store.items.map(\.content) == [.text("favorite"), .text("new history")])
         fixture.store.flushPendingChanges()
         let history = try await fixture.database.loadPage(scope: .history, searchText: "", category: .all,
-            grouping: .sourceApp, offset: 0, limit: 20)
+                                                          grouping: .sourceApp, offset: 0, limit: 20)
         #expect(history.items == fixture.store.items)
     }
 
@@ -183,7 +183,7 @@ struct ClipboardHistoryGroupingTests {
         #expect(fixture.store.items.map(\.content) == [.text("new copy")])
         fixture.store.flushPendingChanges()
         let page = try await fixture.database.loadPage(scope: .all, searchText: "", category: .all,
-            grouping: .sourceApp, offset: 0, limit: 20)
+                                                       grouping: .sourceApp, offset: 0, limit: 20)
         #expect(page.items.map(\.content) == [favorite.content, .text("new copy")])
     }
 
@@ -218,7 +218,7 @@ struct ClipboardHistoryGroupingTests {
         #expect(fixture.store.items.map(\.content) == [hidden.content])
         #expect(fixture.store.totalItemCount == 2 && fixture.store.errorDescription == nil)
         let all = try await fixture.database.loadPage(scope: .all, searchText: "", category: .all,
-            grouping: .sourceApp, offset: 0, limit: 20)
+                                                      grouping: .sourceApp, offset: 0, limit: 20)
         #expect(all.items.map(\.content) == [hidden.content, .text("later copy")])
     }
 
@@ -247,10 +247,10 @@ struct ClipboardHistoryGroupingTests {
         defer { fixture.cleanup() }
         await fixture.store.waitUntilLoaded()
         try fixture.execute("""
-            INSERT INTO clipboard_history (id, content_type, text_value, last_copied_at, is_pinned,
-                content_category, source_app_bundle_identifier, source_app_name)
-            VALUES ('invalid-id', 0, 'invalid row', 20, 0, 'text', 'test.a', 'Invalid');
-            """)
+        INSERT INTO clipboard_history (id, content_type, text_value, last_copied_at, is_pinned,
+            content_category, source_app_bundle_identifier, source_app_name)
+        VALUES ('invalid-id', 0, 'invalid row', 20, 0, 'text', 'test.a', 'Invalid');
+        """)
         fixture.store.updateQuery(scope: .all, searchText: "", grouping: .sourceApp)
         #expect(fixture.store.displayedQuery.grouping == .none && fixture.store.isShowingHistoryPreview)
         await fixture.store.waitUntilLoaded()
@@ -283,14 +283,14 @@ struct ClipboardHistoryGroupingTests {
         #expect(fixture.store.record(.text("same time"), sourceApp: sources[0]))
         fixture.store.flushPendingChanges()
         let page = try await fixture.database.loadPage(scope: .all, searchText: "", category: .all,
-            grouping: .sourceApp, offset: 0, limit: 20)
+                                                       grouping: .sourceApp, offset: 0, limit: 20)
         #expect(page.items == fixture.store.items)
         #expect(page.items.map { $0.sourceApp?.bundleIdentifier } == ["test.A", "test.e\u{301}", "test.z", "test.z", "test.é", nil])
     }
 
     private func item(_ text: String, at timestamp: Double, pinned: Bool = false, source: ClipboardSourceApp? = nil) -> ClipboardHistoryItem {
         ClipboardHistoryItem(content: .text(text), lastCopiedAt: Date(timeIntervalSince1970: timestamp),
-            isPinned: pinned, sourceApp: source)
+                             isPinned: pinned, sourceApp: source)
     }
 }
 
@@ -311,7 +311,7 @@ private struct ClipboardGroupingFixture {
         clock = ClipboardGroupingClock()
         let clock = clock
         store = ClipboardHistoryStore(storageURL: storageURL, capacity: capacity, pageSize: pageSize,
-            persistenceDelay: .seconds(60), now: { clock.date })
+                                      persistenceDelay: .seconds(60), now: { clock.date })
     }
 
     func execute(_ sql: String) throws {

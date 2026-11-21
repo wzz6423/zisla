@@ -62,18 +62,20 @@ final class AIAccountBalanceCookieInputModel: ObservableObject {
         let saveCookie = saveCookie
         isSaving = true
         statusKey = action == .importBrowser ? "正在读取默认浏览器 Cookie" : nil
-        let failure = await Task.detached(priority: .utility) { () -> String? in
-            do {
-                switch action {
-                case .importBrowser: try importCookie(website)
-                case .save: try saveCookie(value, website, false)
-                case .remove: try saveCookie(value, website, true)
-                }
-                return nil
+        // Cookie database and Keychain calls can block; leave cooperative workers free for other websites.
+        let failure: String? = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                do {
+                    switch action {
+                    case .importBrowser: try importCookie(website)
+                    case .save: try saveCookie(value, website, false)
+                    case .remove: try saveCookie(value, website, true)
+                    }
+                    continuation.resume(returning: nil)
+                } catch let error as AIAccountBalanceBrowserCookieError { continuation.resume(returning: error.statusKey) }
+                catch { continuation.resume(returning: "无法保存额度查询凭据，请检查 Cookie 格式或存储权限") }
             }
-            catch let error as AIAccountBalanceBrowserCookieError { return error.statusKey }
-            catch { return "无法保存额度查询凭据，请检查 Cookie 格式或存储权限" }
-        }.value
+        }
         isSaving = false
         if let failure { statusKey = failure }
         else {

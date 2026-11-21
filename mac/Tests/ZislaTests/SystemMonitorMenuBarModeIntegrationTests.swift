@@ -63,9 +63,8 @@ struct SystemMonitorMenuBarModeIntegrationTests {
             }
             SystemMonitorMenuBarSettingsView(settingsStore: store)
         }
-            .environment(\.locale, language.locale)
-            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
-        )
+        .environment(\.locale, language.locale)
+        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let window = NSWindow(
             contentRect: NSRect(x: 20_000, y: 0, width: 560, height: 1_200),

@@ -79,21 +79,21 @@ public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
         // long-running sessions visible; SQLite's scalar MAX yields NULL when either side is NULL,
         // so the COALESCE guard stays.
         let sql = """
-            SELECT s.id,
-                   COALESCE(
-                       NULLIF(TRIM(s.custom_title), ''),
-                       NULLIF(TRIM(s.title), '')
-                   ),
-                   LOWER(s.status),
-                   s.model,
-                   s.created_at,
-                   MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at)
-            FROM sessions s
-            WHERE s.deleted_at IS NULL
-              AND LOWER(s.status) IN (\(Self.activeStatuses.map { "'\($0)'" }.joined(separator: ", ")))
-              AND MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at) >= ?
-            ORDER BY MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at) DESC, s.id ASC
-            """
+        SELECT s.id,
+               COALESCE(
+                   NULLIF(TRIM(s.custom_title), ''),
+                   NULLIF(TRIM(s.title), '')
+               ),
+               LOWER(s.status),
+               s.model,
+               s.created_at,
+               MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at)
+        FROM sessions s
+        WHERE s.deleted_at IS NULL
+          AND LOWER(s.status) IN (\(Self.activeStatuses.map { "'\($0)'" }.joined(separator: ", ")))
+          AND MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at) >= ?
+        ORDER BY MAX(COALESCE(s.last_activity_at, s.updated_at), s.updated_at) DESC, s.id ASC
+        """
 
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,

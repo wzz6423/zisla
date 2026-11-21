@@ -134,10 +134,10 @@ struct AIAccountBalanceBrowserCookieTests {
         let application = try fixture.application("org.mozilla.firefox")
         let database = fixture.support.appendingPathComponent("Firefox/Profiles/active.default/cookies.sqlite")
         try fixture.sql("""
-            PRAGMA user_version=17;
-            CREATE TABLE moz_cookies(host TEXT, name TEXT, value TEXT, path TEXT, expiry INTEGER, originAttributes TEXT);
-            INSERT INTO moz_cookies VALUES('.qoder.com', 'session', 'firefox', '/', 2000000000000, '');
-            """, database: database)
+        PRAGMA user_version=17;
+        CREATE TABLE moz_cookies(host TEXT, name TEXT, value TEXT, path TEXT, expiry INTEGER, originAttributes TEXT);
+        INSERT INTO moz_cookies VALUES('.qoder.com', 'session', 'firefox', '/', 2000000000000, '');
+        """, database: database)
         let resolver = AIAccountBalanceBrowserCookieSourceResolver(home: fixture.home, defaultApplication: { _ in application })
         let reader = AIAccountBalanceBrowserCookieReader(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil })
         try fixture.text("[Profile0]\nDefault=1\nIsRelative=1\nPath=Profiles/active.default\n", path: "Firefox/profiles.ini")
@@ -196,15 +196,15 @@ struct AIAccountBalanceBrowserCookieTests {
         defer { fixture.remove() }
         let database = fixture.support.appendingPathComponent("Firefox/Profiles/active/cookies.sqlite")
         try fixture.sql("""
-            PRAGMA user_version = 16;
-            CREATE TABLE moz_cookies(host TEXT, name TEXT, value TEXT, path TEXT, expiry INTEGER, isSecure INTEGER, originAttributes TEXT);
-            INSERT INTO moz_cookies VALUES
-            ('.trae.cn', 'session', 'trae-fixture', '/', 2000000000000, 1, ''),
-            ('www.trae.cn', 'hostOnly', 'wrong-host', '/', 2000000000000, 1, ''),
-            ('.trae.cn', 'container', 'other-account', '/', 2000000000000, 1, '^userContextId=2'),
-            ('.trae.cn', 'expired', 'too-old', '/', 1800000000000, 1, ''),
-            ('.trae.cn', 'path', 'not-both-endpoints', '/cloudide', 2000000000000, 1, '');
-            """, database: database)
+        PRAGMA user_version = 16;
+        CREATE TABLE moz_cookies(host TEXT, name TEXT, value TEXT, path TEXT, expiry INTEGER, isSecure INTEGER, originAttributes TEXT);
+        INSERT INTO moz_cookies VALUES
+        ('.trae.cn', 'session', 'trae-fixture', '/', 2000000000000, 1, ''),
+        ('www.trae.cn', 'hostOnly', 'wrong-host', '/', 2000000000000, 1, ''),
+        ('.trae.cn', 'container', 'other-account', '/', 2000000000000, 1, '^userContextId=2'),
+        ('.trae.cn', 'expired', 'too-old', '/', 1800000000000, 1, ''),
+        ('.trae.cn', 'path', 'not-both-endpoints', '/cloudide', 2000000000000, 1, '');
+        """, database: database)
         let reader = AIAccountBalanceBrowserCookieReader(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in
             Issue.record("Firefox must not read Keychain"); return nil
         })
@@ -267,8 +267,8 @@ struct AIAccountBalanceBrowserCookieTests {
         let store = AIAccountBalanceCookieStore(secrets: secrets)
         try store.setCookie("manual=global", for: .qoder)
         let importer = AIAccountBalanceBrowserCookieImporter(store: store,
-            source: .init(home: fixture.home, defaultApplication: { _ in application }),
-            reader: .init(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil }))
+                                                             source: .init(home: fixture.home, defaultApplication: { _ in application }),
+                                                             reader: .init(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil }))
         try importer.importCookie(for: .qoderChina)
         #expect(try store.cookie(for: .qoder) == "manual=global")
         #expect(try store.cookie(for: .qoderChina) == "session=china-imported")
@@ -300,15 +300,15 @@ struct AIAccountBalanceBrowserCookieTests {
         let application = try fixture.application("com.google.Chrome")
         let database = try fixture.chromium()
         try fixture.sql("""
-            WITH RECURSIVE records(id) AS (SELECT 1 UNION ALL SELECT id+1 FROM records WHERE id<\(count))
-            INSERT INTO cookies SELECT '.qoder.com','c'||id,'v',X'', '/',0,1,'',0,0 FROM records;
-            """, database: database)
+        WITH RECURSIVE records(id) AS (SELECT 1 UNION ALL SELECT id+1 FROM records WHERE id<\(count))
+        INSERT INTO cookies SELECT '.qoder.com','c'||id,'v',X'', '/',0,1,'',0,0 FROM records;
+        """, database: database)
         let secrets = BalanceBrowserMemorySecrets()
         let store = AIAccountBalanceCookieStore(secrets: secrets)
         try store.setCookie("saved=before", for: .qoder)
         let importer = AIAccountBalanceBrowserCookieImporter(store: store,
-            source: .init(home: fixture.home, defaultApplication: { _ in application }),
-            reader: .init(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil }))
+                                                             source: .init(home: fixture.home, defaultApplication: { _ in application }),
+                                                             reader: .init(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil }))
         if count == 256 {
             try importer.importCookie(for: .qoder)
             #expect(try store.cookie(for: .qoder)?.components(separatedBy: "; ").count == count)
@@ -345,8 +345,8 @@ struct AIAccountBalanceBrowserCookieTests {
         try store.setCookie("saved=manual", for: .qoder)
         let before = secrets.values
         let importer = AIAccountBalanceBrowserCookieImporter(store: store,
-            source: .init(home: fixture.home, defaultApplication: { _ in application }),
-            reader: .init(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil }))
+                                                             source: .init(home: fixture.home, defaultApplication: { _ in application }),
+                                                             reader: .init(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil }))
         let expected: AIAccountBalanceBrowserCookieError = failure == "empty-cookie" ? .accessFailed : .invalidData
         #expect(throws: expected) { try importer.importCookie(for: .qoder) }
         #expect(secrets.values == before)
@@ -375,7 +375,7 @@ struct AIAccountBalanceBrowserCookieTests {
         try store.setCookie("saved=manual", for: .qoder)
         let before = secrets.values
         let importer = AIAccountBalanceBrowserCookieImporter(store: store,
-            source: .init(home: fixture.home, defaultApplication: { _ in application }), reader: reader)
+                                                             source: .init(home: fixture.home, defaultApplication: { _ in application }), reader: reader)
         let expected: AIAccountBalanceBrowserCookieError = ["wrong-key", "unsupported-cipher"].contains(failure) ? .invalidData : .accessFailed
         #expect(throws: expected) { try importer.importCookie(for: .qoder) }
         #expect(secrets.values == before)
@@ -391,19 +391,19 @@ struct AIAccountBalanceBrowserCookieTests {
         try fixture.insertChrome(database, host: ".qoder.com", name: "session", value: "imported")
         let capture = BalanceBrowserReadCapture()
         let reader = AIAccountBalanceBrowserCookieReader(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil },
-            readFile: { descriptor, bytes, count in
-                capture.record(descriptor)
-                switch mode {
-                case "premature-eof": return 0
-                case "io-failure": errno = EIO; return -1
-                default: return Darwin.read(descriptor, bytes, min(count, 7))
-                }
-            })
+                                                         readFile: { descriptor, bytes, count in
+                                                             capture.record(descriptor)
+                                                             switch mode {
+                                                             case "premature-eof": return 0
+                                                             case "io-failure": errno = EIO; return -1
+                                                             default: return Darwin.read(descriptor, bytes, min(count, 7))
+                                                             }
+                                                         })
         let secrets = BalanceBrowserMemorySecrets()
         let store = AIAccountBalanceCookieStore(secrets: secrets)
         try store.setCookie("saved=manual", for: .qoder)
         let importer = AIAccountBalanceBrowserCookieImporter(store: store,
-            source: .init(home: fixture.home, defaultApplication: { _ in application }), reader: reader)
+                                                             source: .init(home: fixture.home, defaultApplication: { _ in application }), reader: reader)
         if mode == "short-chunks" {
             try importer.importCookie(for: .qoder)
             #expect(try store.cookie(for: .qoder) == "session=imported")
@@ -488,7 +488,7 @@ struct AIAccountBalanceBrowserCookieTests {
         if ["wal-replacement", "wal-disappears", "database-write-after-wal"].contains(change) {
             #expect(sqlite3_open(database.path, &connection) == SQLITE_OK)
             #expect(sqlite3_exec(connection,
-                "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE cookies SET value='wal';", nil, nil, nil) == SQLITE_OK)
+                                 "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE cookies SET value='wal';", nil, nil, nil) == SQLITE_OK)
         }
         defer { sqlite3_close(connection) }
         let observedFile = change == "database-write-after-wal" ? wal : database
@@ -525,10 +525,10 @@ struct AIAccountBalanceBrowserCookieTests {
         try store.setCookie("saved=china", for: .qoderChina)
         let before = secrets.values
         let reader = AIAccountBalanceBrowserCookieReader(temporaryDirectory: fixture.root, now: { [now] in now },
-            keychainRead: { _, _ in Issue.record("Unstable snapshots must fail before Keychain access"); return nil },
-            readFile: { mutation.read($0, $1, $2) })
+                                                         keychainRead: { _, _ in Issue.record("Unstable snapshots must fail before Keychain access"); return nil },
+                                                         readFile: { mutation.read($0, $1, $2) })
         let importer = AIAccountBalanceBrowserCookieImporter(store: store,
-            source: .init(home: fixture.home, defaultApplication: { _ in application }), reader: reader)
+                                                             source: .init(home: fixture.home, defaultApplication: { _ in application }), reader: reader)
         #expect(throws: AIAccountBalanceBrowserCookieError.accessFailed) { try importer.importCookie(for: .qoder) }
         #expect(mutation.didMutate, "Fixture must change the source at the copy boundary")
         #expect(secrets.values == before, "An unstable snapshot must not overwrite manual or other-region cookies")
@@ -569,20 +569,20 @@ struct AIAccountBalanceBrowserCookieTests {
         }
         let capture = BalanceBrowserReadCapture()
         let reader = AIAccountBalanceBrowserCookieReader(temporaryDirectory: fixture.root, now: { [now] in now }, keychainRead: { _, _ in nil },
-            readFile: { descriptor, bytes, count in
-                capture.record(descriptor)
-                switch mode {
-                case "premature-eof": return 0
-                case "io-failure": errno = EIO; return -1
-                case "short-chunks": return Darwin.read(descriptor, bytes, min(7, count))
-                default: return Darwin.read(descriptor, bytes, count)
-                }
-            })
+                                                         readFile: { descriptor, bytes, count in
+                                                             capture.record(descriptor)
+                                                             switch mode {
+                                                             case "premature-eof": return 0
+                                                             case "io-failure": errno = EIO; return -1
+                                                             case "short-chunks": return Darwin.read(descriptor, bytes, min(7, count))
+                                                             default: return Darwin.read(descriptor, bytes, count)
+                                                             }
+                                                         })
         let secrets = BalanceBrowserMemorySecrets()
         let store = AIAccountBalanceCookieStore(secrets: secrets)
         try store.setCookie("zed.session=saved", for: .zed)
         let importer = AIAccountBalanceBrowserCookieImporter(store: store,
-            source: .init(home: fixture.home, defaultApplication: { _ in application }), reader: reader)
+                                                             source: .init(home: fixture.home, defaultApplication: { _ in application }), reader: reader)
         if mode == "short-chunks" {
             try importer.importCookie(for: .zed)
             #expect(try store.cookie(for: .zed) == "zed.session=fixture")
@@ -693,11 +693,11 @@ private struct BalanceBrowserFixture: @unchecked Sendable {
     func chromium(version: Int = 24) throws -> URL {
         let file = support.appendingPathComponent("Google/Chrome/Default/Network/Cookies")
         try sql("""
-            CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
-            INSERT INTO meta VALUES ('version', '\(version)');
-            CREATE TABLE cookies(host_key TEXT, name TEXT, value TEXT, encrypted_value BLOB, path TEXT, expires_utc INTEGER,
-                is_secure INTEGER, top_frame_site_key TEXT, has_expires INTEGER, is_persistent INTEGER);
-            """, database: file)
+        CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
+        INSERT INTO meta VALUES ('version', '\(version)');
+        CREATE TABLE cookies(host_key TEXT, name TEXT, value TEXT, encrypted_value BLOB, path TEXT, expires_utc INTEGER,
+            is_secure INTEGER, top_frame_site_key TEXT, has_expires INTEGER, is_persistent INTEGER);
+        """, database: file)
         return file
     }
     func sql(_ sql: String, database: URL) throws {

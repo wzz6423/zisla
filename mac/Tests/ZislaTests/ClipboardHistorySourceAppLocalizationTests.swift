@@ -7,7 +7,8 @@ struct ClipboardHistorySourceAppLocalizationTests {
     @Test(arguments: AppLanguage.allCases)
     func clipboardSourceLabelsResolveInEveryLanguage(language: AppLanguage) throws {
         let source = try String(contentsOf: Self.packageRoot.appendingPathComponent(
-            "Sources/Zisla/ClipboardHistoryModuleView.swift"), encoding: .utf8)
+            "Sources/Zisla/ClipboardHistoryModuleView.swift"
+        ), encoding: .utf8)
         let expression = try NSRegularExpression(pattern: #"AppLocalization\.text\("([^"]+)""#)
         let keys = Set(expression.matches(in: source, range: NSRange(source.startIndex..., in: source)).compactMap { match in
             Range(match.range(at: 1), in: source).map { String(source[$0]) }
@@ -17,7 +18,8 @@ struct ClipboardHistorySourceAppLocalizationTests {
         let groupingKeys = ClipboardHistoryGrouping.allCases.map(\.title)
         #expect(AppLanguage.allCases.count == 17)
         let table = try #require(NSDictionary(contentsOf: Self.packageRoot.appendingPathComponent(
-            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
+            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
+        )) as? [String: String])
         for key in callKeys.union(groupingKeys).union(["无符合条件的内容"]) {
             let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
             #expect(!value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -30,7 +32,7 @@ struct ClipboardHistorySourceAppLocalizationTests {
         if language != .english, language != .simplifiedChinese {
             for key in ["按应用", "搜索内容或应用"] {
                 #expect(table[key] != AppLocalization.string(key, language: .english),
-                    "\(language.rawValue) copied the English translation for \(key)")
+                        "\(language.rawValue) copied the English translation for \(key)")
             }
         }
     }

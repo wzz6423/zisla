@@ -258,7 +258,6 @@ public enum CLIParser {
         ))
     }
 
-
     private static func parseMessage(_ options: [String: String], now: Date) throws -> CLICommand {
         let app = try require(options, "--app")
         let sender = try require(options, "--sender")

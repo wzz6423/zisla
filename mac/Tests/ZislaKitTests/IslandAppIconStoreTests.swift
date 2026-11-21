@@ -13,7 +13,7 @@ struct IslandAppIconStoreTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         if source != "fresh" {
             var payload: [String: Any] = ["mediaEnabled": false, "systemMonitorEnabled": false,
-                "menuBarAppIconEnabled": false, "statusIconDestination": "menuBar"]
+                                          "menuBarAppIconEnabled": false, "statusIconDestination": "menuBar"]
             if source == "null" { payload["islandAppIconEnabled"] = NSNull() }
             if source == "invalid" { payload["islandAppIconEnabled"] = "false" }
             defaults.set(try JSONSerialization.data(withJSONObject: payload), forKey: "feature-settings-v1")

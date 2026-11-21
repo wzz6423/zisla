@@ -36,7 +36,7 @@ struct DownloadModuleView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color.strokeCard, lineWidth: 1)
+                    .strokeBorder(Color.strokeCard, lineWidth: 1)
             }
 
             HStack(spacing: 10) {

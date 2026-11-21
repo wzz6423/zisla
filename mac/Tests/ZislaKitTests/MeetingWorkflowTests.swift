@@ -8,9 +8,9 @@ struct MeetingWorkflowTests {
 
     private func event(_ id: String, start: Double = 600, end: Double = 4_200) -> CalendarEventSnapshot {
         CalendarEventSnapshot(id: id, title: id, startDate: now.addingTimeInterval(start),
-            endDate: now.addingTimeInterval(end), isAllDay: false, calendarTitle: "Work",
-            eventURL: URL(string: "https://meet.google.com/abc-defg-hij"),
-            eventIdentity: CalendarEventIdentity(calendarIdentifier: "work", eventIdentifier: id))
+                              endDate: now.addingTimeInterval(end), isAllDay: false, calendarTitle: "Work",
+                              eventURL: URL(string: "https://meet.google.com/abc-defg-hij"),
+                              eventIdentity: CalendarEventIdentity(calendarIdentifier: "work", eventIdentifier: id))
     }
 
     @Test

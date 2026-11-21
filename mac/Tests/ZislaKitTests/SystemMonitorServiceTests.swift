@@ -652,7 +652,7 @@ struct SystemMonitorServiceTests {
         let gate = CleanupTrashGate()
         mock.beforeTrash = { if $0 == first { gate.beginMove() } }
         let service = SystemMonitorService(fileManager: mock,
-            publicIPProvider: StubPublicIPProvider(address: nil), hardwareInfoProvider: { .unavailable })
+                                           publicIPProvider: StubPublicIPProvider(address: nil), hardwareInfoProvider: { .unavailable })
         defer { service.stop() }
         let candidates = [first, second].map {
             DiskCleanupCandidate(url: $0, kind: .appCache, byteSize: 4_096, displayName: $0.lastPathComponent)
@@ -2238,9 +2238,9 @@ struct SystemMonitorServiceTests {
     @Test(arguments: [false, true])
     func trashFailuresPreservePermissionMetadataWithoutDeletingFiles(useCandidates: Bool) {
         let cocoaRead = NSError(domain: NSCocoaErrorDomain, code: NSFileReadNoPermissionError,
-            userInfo: [NSLocalizedDescriptionKey: "diagnostic report access denied"])
+                                userInfo: [NSLocalizedDescriptionKey: "diagnostic report access denied"])
         let cocoaWrite = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError,
-            userInfo: [NSLocalizedDescriptionKey: "cache write access denied"])
+                                 userInfo: [NSLocalizedDescriptionKey: "cache write access denied"])
         let posixAccess = NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES), userInfo: nil)
         let posixOperation = NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM), userInfo: nil)
         let cases: [(NSError, Bool)] = [
@@ -2249,14 +2249,14 @@ struct SystemMonitorServiceTests {
             (posixAccess, true),
             (posixOperation, true),
             (NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError,
-                userInfo: [NSUnderlyingErrorKey: posixAccess]), true),
+                     userInfo: [NSUnderlyingErrorKey: posixAccess]), true),
             (NSError(domain: "wrapper", code: 1, userInfo: [NSUnderlyingErrorKey: cocoaRead]), true),
             (NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError, userInfo: nil), false),
             (NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError, userInfo: nil), false),
             (NSError(domain: NSPOSIXErrorDomain, code: Int(ENOENT), userInfo: nil), false),
             (NSError(domain: NSPOSIXErrorDomain, code: Int(EIO), userInfo: nil), false),
             (NSError(domain: "unrelated", code: Int(EACCES),
-                userInfo: [NSLocalizedDescriptionKey: "Permission denied"]), false),
+                     userInfo: [NSLocalizedDescriptionKey: "Permission denied"]), false),
         ]
         for (error, permissionDenied) in cases {
             let mock = MockFileManager()
@@ -2274,7 +2274,7 @@ struct SystemMonitorServiceTests {
 
             #expect(result.successCount == 0 && result.freedBytes == 0)
             #expect(result.failures == [DiskCleanupFailure(url: file, message: error.localizedDescription,
-                isPermissionDenied: permissionDenied)], "Unexpected metadata for \(error.domain):\(error.code)")
+                                                           isPermissionDenied: permissionDenied)], "Unexpected metadata for \(error.domain):\(error.code)")
             #expect(mock.existingPaths == [file.path])
             #expect(mock.trashedURLs == [file], "A failed item must not be retried or sent to another deletion path")
         }
@@ -2472,7 +2472,6 @@ struct SystemMonitorServiceTests {
         #expect(firstSnapshot == secondSnapshot)
         #expect(hardwareProvider.callCount == 1)
     }
-
 
     @Test
     func scanCleanupCandidatesEmptyWithoutRoots() async {
@@ -2908,10 +2907,12 @@ struct SystemMonitorServiceTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func publicIPGateMissingFamilyTimesOutAndReleasesThePendingLookup() async {
+    func publicIPGateMissingFamilyTimesOutAndReleasesThePendingLookup() async throws {
         let provider = GatedPublicIPProvider(addresses: [.address("198.51.100.1")])
         defer { provider.releaseAll() }
         let pending = Task { await provider.publicIPAddress() }
+        await waitUntil(timeoutSeconds: 2) { provider.pendingCount == 1 }
+        try #require(provider.pendingCount == 1)
         do {
             try await provider.waitUntilStarted(1, timeout: .milliseconds(20))
             Issue.record("An omitted IPv6 request must fail the observer instead of hanging")
@@ -2949,7 +2950,7 @@ struct SystemMonitorServiceTests {
         #expect(service.isRefreshingPublicIPAddress)
         service.stop()
         #expect(!service.isRefreshingPublicIPAddress,
-            "Disabling monitoring must finish loading even when the provider ignores cancellation")
+                "Disabling monitoring must finish loading even when the provider ignores cancellation")
 
         provider.release(0)
         await pending.value
@@ -3008,7 +3009,7 @@ struct SystemMonitorServiceTests {
             await old.value
             #expect(service.publicIPAddress == nil && service.publicIPv6Address == nil)
             #expect(service.isRefreshingPublicIPAddress,
-                "An old request's defer must not finish the new manual refresh")
+                    "An old request's defer must not finish the new manual refresh")
         }
         provider.release(1)
         await current.value
@@ -3042,7 +3043,7 @@ struct SystemMonitorServiceTests {
         clock.advance(by: 1)
         await service.refreshPublicIPAddressIfNeeded()
         #expect(provider.callCount == 2,
-            "The next periodic lookup must not inherit a stopped lookup's ten-minute throttle")
+                "The next periodic lookup must not inherit a stopped lookup's ten-minute throttle")
         #expect(service.publicIPAddress == "198.51.100.2")
         #expect(!service.isRefreshingPublicIPAddress)
 
@@ -3105,13 +3106,13 @@ struct SystemMonitorServiceTests {
                 seed = seed &* 6_364_136_223_846_793_005 &+ 1
                 for _ in 0..<Int(1 + seed % 4) { service.stop() }
                 #expect(!service.isRefreshingPublicIPAddress,
-                    "Repeated stop events must be idle in cycle \(cycle)")
+                        "Repeated stop events must be idle in cycle \(cycle)")
                 provider.release(cycle)
                 await pending.value
                 #expect(service.publicIPAddress == nil && service.publicIPv6Address == nil,
-                    "A stopped request must not publish in cycle \(cycle)")
+                        "A stopped request must not publish in cycle \(cycle)")
                 #expect(provider.callCount == cycle + 1 && provider.pendingCount == 0,
-                    "Each cycle must issue one request and release every fixture continuation")
+                        "Each cycle must issue one request and release every fixture continuation")
             }
             #expect(service.snapshot == nil && !service.isSampling)
         }

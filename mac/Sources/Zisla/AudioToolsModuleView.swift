@@ -232,7 +232,7 @@ struct AudioToolsModuleView: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text(controller.total > 1 ? AppLocalization.text("已处理 %ld / %ld", controller.completed, controller.total)
-                         : AppLocalization.text("正在处理…"))
+                        : AppLocalization.text("正在处理…"))
                         .font(.system(size: 12)).monospacedDigit()
                     Spacer(minLength: 0)
                     Button(AppLocalization.text("取消")) { controller.cancel() }.buttonStyle(.bordered)
@@ -280,7 +280,7 @@ struct AudioToolsModuleView: View {
                     value.wrappedValue = (try? FloatingPointFormatStyle<Double>.number.locale(locale).parseStrategy.parse($0)) ?? .nan
                 }
             ))
-                .frame(width: 112).monospacedDigit().accessibilityLabel(AppLocalization.text(title))
+            .frame(width: 112).monospacedDigit().accessibilityLabel(AppLocalization.text(title))
         }
     }
 

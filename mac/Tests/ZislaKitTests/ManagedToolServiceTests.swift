@@ -30,18 +30,18 @@ struct ManagedToolServiceTests {
     @Test
     func quietMDMatchesOnlyTheAvailableMacOSArchive() throws {
         #if arch(arm64)
-        #expect(ManagedTool.quietMD.matchesAsset(name: "quiet-md-0.1.7-macos-arm64.zip"))
-        let release = try ManagedToolService.parseRelease(
-            releaseJSON(tag: "v0.1.7", assets: [
-                "quiet-md-0.1.7-windows-x64-setup.exe",
-                "quiet-md-0.1.7-macos-arm64.zip.sha256",
-                "quiet-md-0.1.7-macos-arm64.zip",
-            ]), tool: .quietMD
-        )
-        #expect(release.version == "0.1.7")
-        #expect(release.assetURL.lastPathComponent == "quiet-md-0.1.7-macos-arm64.zip")
+            #expect(ManagedTool.quietMD.matchesAsset(name: "quiet-md-0.1.7-macos-arm64.zip"))
+            let release = try ManagedToolService.parseRelease(
+                releaseJSON(tag: "v0.1.7", assets: [
+                    "quiet-md-0.1.7-windows-x64-setup.exe",
+                    "quiet-md-0.1.7-macos-arm64.zip.sha256",
+                    "quiet-md-0.1.7-macos-arm64.zip",
+                ]), tool: .quietMD
+            )
+            #expect(release.version == "0.1.7")
+            #expect(release.assetURL.lastPathComponent == "quiet-md-0.1.7-macos-arm64.zip")
         #else
-        #expect(!ManagedTool.quietMD.matchesAsset(name: "quiet-md-0.1.7-macos-arm64.zip"))
+            #expect(!ManagedTool.quietMD.matchesAsset(name: "quiet-md-0.1.7-macos-arm64.zip"))
         #endif
         for name in ["", "quiet-md-0.1.7-windows-x64-setup.exe", "quiet-md-0.1.7-macos-x64.zip",
                      "quiet-md-0.1.7-macos-arm64.zip.sha256", "other-macos-arm64.zip"] {
@@ -50,7 +50,7 @@ struct ManagedToolServiceTests {
     }
 
     @Test(arguments: ["{}", #"{"tag_name":"v0.1.7","assets":[]}"#,
-        #"{"tag_name":"v0.1.7","assets":[{"name":"quiet-md-0.1.7-macos-arm64.zip","browser_download_url":"https://evil.example/quiet.zip"}]}"#])
+                      #"{"tag_name":"v0.1.7","assets":[{"name":"quiet-md-0.1.7-macos-arm64.zip","browser_download_url":"https://evil.example/quiet.zip"}]}"#])
     func quietMDRejectsUnavailableOrUntrustedReleases(payload: String) {
         #expect(throws: ManagedToolError.self) {
             try ManagedToolService.parseRelease(Data(payload.utf8), tool: .quietMD)
@@ -794,50 +794,50 @@ struct ManagedToolServiceTests {
     }
 
     #if DEBUG
-    @Test
-    func debugRecommendedToolErrorsAppearImmediatelyAndBlockLiveHomebrew() async throws {
-        let suite = "brew-debug-error-\(UUID())"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        let service = ManagedToolService(
-            defaults: defaults, executableResolver: { _ in nil },
-            homebrewRunner: { _, _ in
-                Issue.record("Simulated tool failures must not execute live Homebrew commands")
-                return ""
-            },
-            environment: ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": "1"]
-        )
-        for tool in [ManagedTool.pipx, .uv] {
-            let expected = AppLocalization.text(
-                "Homebrew 执行失败：%@",
-                "Error: Failed to download resource \"\(tool.displayName)\"\ncurl: (35) TLS connect error"
+        @Test
+        func debugRecommendedToolErrorsAppearImmediatelyAndBlockLiveHomebrew() async throws {
+            let suite = "brew-debug-error-\(UUID())"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let service = ManagedToolService(
+                defaults: defaults, executableResolver: { _ in nil },
+                homebrewRunner: { _, _ in
+                    Issue.record("Simulated tool failures must not execute live Homebrew commands")
+                    return ""
+                },
+                environment: ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": "1"]
             )
-            #expect(service.states[tool]?.errorMessage == expected)
-            await service.checkLatest(tool, quietly: true)
-            #expect(service.states[tool]?.errorMessage == expected)
-            await service.install(tool)
-            #expect(service.states[tool]?.errorMessage == expected)
-            #expect(service.states[tool]?.phase == .idle)
-            #expect(service.states[tool]?.isInstalled == false)
+            for tool in [ManagedTool.pipx, .uv] {
+                let expected = AppLocalization.text(
+                    "Homebrew 执行失败：%@",
+                    "Error: Failed to download resource \"\(tool.displayName)\"\ncurl: (35) TLS connect error"
+                )
+                #expect(service.states[tool]?.errorMessage == expected)
+                await service.checkLatest(tool, quietly: true)
+                #expect(service.states[tool]?.errorMessage == expected)
+                await service.install(tool)
+                #expect(service.states[tool]?.errorMessage == expected)
+                #expect(service.states[tool]?.phase == .idle)
+                #expect(service.states[tool]?.isInstalled == false)
+            }
+            #expect(service.states[.fzf]?.errorMessage == nil)
+            #expect(defaults.data(forKey: "managed-tool-state-cache-v1") == nil)
         }
-        #expect(service.states[.fzf]?.errorMessage == nil)
-        #expect(defaults.data(forKey: "managed-tool-state-cache-v1") == nil)
-    }
 
-    @Test(arguments: [[:], ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": ""], ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": "0"]])
-    func disabledDebugRecommendedToolErrorsUseNormalHomebrew(environment: [String: String]) async throws {
-        let suite = "brew-debug-disabled-\(UUID())"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        let service = ManagedToolService(
-            defaults: defaults, executableResolver: { _ in nil },
-            homebrewRunner: { _, _ in #"{"formulae":[{"name":"uv","versions":{"stable":"0.9.5"}}]}"# },
-            environment: environment
-        )
-        #expect(service.states[.uv]?.errorMessage == nil)
-        #expect(await service.checkLatest(.uv) == "0.9.5")
-        #expect(service.states[.uv]?.errorMessage == nil)
-    }
+        @Test(arguments: [[:], ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": ""], ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": "0"]])
+        func disabledDebugRecommendedToolErrorsUseNormalHomebrew(environment: [String: String]) async throws {
+            let suite = "brew-debug-disabled-\(UUID())"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let service = ManagedToolService(
+                defaults: defaults, executableResolver: { _ in nil },
+                homebrewRunner: { _, _ in #"{"formulae":[{"name":"uv","versions":{"stable":"0.9.5"}}]}"# },
+                environment: environment
+            )
+            #expect(service.states[.uv]?.errorMessage == nil)
+            #expect(await service.checkLatest(.uv) == "0.9.5")
+            #expect(service.states[.uv]?.errorMessage == nil)
+        }
     #endif
 
     private static func homebrewFixture(directory: URL, standardOutput: String, standardError: String, status: Int = 1) throws -> URL {

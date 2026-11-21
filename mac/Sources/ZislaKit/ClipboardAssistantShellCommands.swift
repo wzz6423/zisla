@@ -26,7 +26,7 @@ extension ClipboardAssistantDetector {
             let lines = command.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "\n")
             guard lines.count >= 3, lines.last == fence,
                   ["sh", "bash", "zsh", "shell", "fish", "ksh", "dash"]
-                    .contains(String(lines[0].dropFirst(3)).trimmingCharacters(in: .whitespaces).lowercased())
+                      .contains(String(lines[0].dropFirst(3)).trimmingCharacters(in: .whitespaces).lowercased())
             else { return nil }
             command = lines.dropFirst().dropLast().joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -224,16 +224,16 @@ public enum ClipboardShellCommandResolver {
         checks.append("printf '\\036zisla-command-found\\037'")
         let shell = URL(fileURLWithPath: environment["SHELL"] ?? "/bin/zsh")
         guard let result = try? await AIAgentProcessRunner.run(
-            executableURL: shell,
-            arguments: detachedShellArguments(for: shell, command: checks.joined(separator: " && ")),
-            standardInput: Data(),
-            environment: environment,
-            workingDirectoryURL: workingDirectory,
-            timeout: timeout,
-            maximumOutputBytes: 4096,
-            maximumErrorBytes: 1
-        ), !result.didTimeout, result.status == 0,
-           result.standardOutput.suffix(marker.utf8.count) == Data(marker.utf8) else { return nil }
+                  executableURL: shell,
+                  arguments: detachedShellArguments(for: shell, command: checks.joined(separator: " && ")),
+                  standardInput: Data(),
+                  environment: environment,
+                  workingDirectoryURL: workingDirectory,
+                  timeout: timeout,
+                  maximumOutputBytes: 4096,
+                  maximumErrorBytes: 1
+              ), !result.didTimeout, result.status == 0,
+              result.standardOutput.suffix(marker.utf8.count) == Data(marker.utf8) else { return nil }
         return command
     }
 }

@@ -414,18 +414,18 @@ public final class NetworkBatteryMonitor: NSObject, ObservableObject {
 
             var unmanagedProperties: Unmanaged<CFMutableDictionary>?
             guard IORegistryEntryCreateCFProperties(
-                object,
-                &unmanagedProperties,
-                kCFAllocatorDefault,
-                0
-            ) == KERN_SUCCESS,
-                let properties = unmanagedProperties?.takeRetainedValue() as? [String: Any],
-                let device = magicAccessoryDevice(
-                    fromIORegistryProperties: properties,
-                    serviceClass: serviceClass,
-                    targets: targets,
-                    now: now
-                )
+                      object,
+                      &unmanagedProperties,
+                      kCFAllocatorDefault,
+                      0
+                  ) == KERN_SUCCESS,
+                  let properties = unmanagedProperties?.takeRetainedValue() as? [String: Any],
+                  let device = magicAccessoryDevice(
+                      fromIORegistryProperties: properties,
+                      serviceClass: serviceClass,
+                      targets: targets,
+                      now: now
+                  )
             else {
                 continue
             }
@@ -603,7 +603,7 @@ public final class NetworkBatteryMonitor: NSObject, ObservableObject {
             return "bluetooth:headphone-name:\(normalizedName(device.name))"
         }
         for prefix in ["bluetooth:", "ble:", "apple-headphone:"]
-        where device.identifier.hasPrefix(prefix) {
+            where device.identifier.hasPrefix(prefix) {
             return "bluetooth:\(device.identifier.dropFirst(prefix.count))"
         }
         return "bluetooth:\(device.identifier)"

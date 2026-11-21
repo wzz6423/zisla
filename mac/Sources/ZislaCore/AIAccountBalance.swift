@@ -248,7 +248,7 @@ public enum AIAccountBalanceCatalog {
 
     /// Live aliases require both monitoring and display; explicit debug aliases override those selections.
     public static func displayedBalances(_ balances: [AIAccountBalance], monitoredProviders: Set<AIProvider>,
-                                        displayedProviders: Set<AIProvider>) -> [AIAccountBalance] {
+                                         displayedProviders: Set<AIProvider>) -> [AIAccountBalance] {
         balances.compactMap { balance in
             guard balance.severity != nil else { return nil }
             var row = balance

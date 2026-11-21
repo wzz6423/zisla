@@ -34,28 +34,28 @@ struct ApplicationOpenRepairServiceTests {
         #expect(pid > 0, "The background fixture must execute after the real Launch Services request")
         if signature == "adhoc" {
             let verification = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/codesign"),
-                arguments: ["--verify", "--strict", fixture.app.path], standardInput: Data(), timeout: 30)
+                                                                  arguments: ["--verify", "--strict", fixture.app.path], standardInput: Data(), timeout: 30)
             #expect(!verification.didTimeout && verification.status == 0)
         }
         #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("marker").path))
     }
 
     #if arch(arm64)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_APP_REPAIR_SYSTEM_TESTS"] == "1"),
-          .timeLimit(.minutes(2)))
-    func unsignedArm64ExecutableReportsTheSystemLaunchFailure() async throws {
-        let fixture = try await Self.systemFixture(signature: "unsigned")
-        defer { fixture.remove() }
-        let executable = try Data(contentsOf: fixture.executable)
-        // Apple silicon requires a code signature even after quarantine is removed.
-        await #expect(throws: ApplicationOpenRepairError.openFailed) {
-            try await ApplicationOpenRepairService().repairAndOpen(at: fixture.app)
+        @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_APP_REPAIR_SYSTEM_TESTS"] == "1"),
+              .timeLimit(.minutes(2)))
+        func unsignedArm64ExecutableReportsTheSystemLaunchFailure() async throws {
+            let fixture = try await Self.systemFixture(signature: "unsigned")
+            defer { fixture.remove() }
+            let executable = try Data(contentsOf: fixture.executable)
+            // Apple silicon requires a code signature even after quarantine is removed.
+            await #expect(throws: ApplicationOpenRepairError.openFailed) {
+                try await ApplicationOpenRepairService().repairAndOpen(at: fixture.app)
+            }
+            #expect(Self.attribute("com.apple.quarantine", at: fixture.app) == nil)
+            #expect(Self.attribute("com.apple.quarantine", at: fixture.executable) == nil)
+            #expect(try Data(contentsOf: fixture.executable) == executable)
+            #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launched").path))
         }
-        #expect(Self.attribute("com.apple.quarantine", at: fixture.app) == nil)
-        #expect(Self.attribute("com.apple.quarantine", at: fixture.executable) == nil)
-        #expect(try Data(contentsOf: fixture.executable) == executable)
-        #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launched").path))
-    }
     #endif
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_APP_REPAIR_SYSTEM_TESTS"] == "1"),
@@ -80,18 +80,18 @@ struct ApplicationOpenRepairServiceTests {
         let image = fixture.directory.deletingLastPathComponent().appendingPathComponent("repair-\(UUID().uuidString).dmg")
         defer { try? FileManager.default.removeItem(at: image) }
         let created = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/hdiutil"),
-            arguments: ["create", "-srcfolder", fixture.directory.path, "-format", "UDRO", image.path],
-            standardInput: Data(), timeout: 30)
+                                                         arguments: ["create", "-srcfolder", fixture.directory.path, "-format", "UDRO", image.path],
+                                                         standardInput: Data(), timeout: 30)
         try #require(!created.didTimeout && created.status == 0, Comment(rawValue: created.standardError))
         let mount = fixture.directory.appendingPathComponent("mounted")
         try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: false)
         let attached = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/hdiutil"),
-            arguments: ["attach", "-nobrowse", "-readonly", "-mountpoint", mount.path, image.path],
-            standardInput: Data(), timeout: 30)
+                                                          arguments: ["attach", "-nobrowse", "-readonly", "-mountpoint", mount.path, image.path],
+                                                          standardInput: Data(), timeout: 30)
         defer {
             do {
                 let detached = try AIAgentProcessRunner.runSynchronously(executableURL: URL(fileURLWithPath: "/usr/bin/hdiutil"),
-                    arguments: ["detach", mount.path], standardInput: Data(), timeout: 30)
+                                                                         arguments: ["detach", mount.path], standardInput: Data(), timeout: 30)
                 #expect(!detached.didTimeout && detached.status == 0, Comment(rawValue: detached.standardError))
             } catch { Issue.record(error) }
         }
@@ -692,19 +692,19 @@ struct ApplicationOpenRepairServiceTests {
             }
             """.write(to: source, atomically: true, encoding: .utf8)
             let info: [String: Any] = ["CFBundleExecutable": "Example", "CFBundlePackageType": "APPL",
-                "CFBundleIdentifier": "dev.zisla.tests.repair." + UUID().uuidString,
-                "CFBundleName": "Repair Probe", "CFBundleVersion": "1", "LSBackgroundOnly": true]
+                                       "CFBundleIdentifier": "dev.zisla.tests.repair." + UUID().uuidString,
+                                       "CFBundleName": "Repair Probe", "CFBundleVersion": "1", "LSBackgroundOnly": true]
             try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
                 .write(to: fixture.app.appendingPathComponent("Contents/Info.plist"))
             let compile = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/xcrun"),
-                arguments: ["clang", source.path, "-o", fixture.executable.path], standardInput: Data(),
-                environment: ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"], timeout: 30)
+                                                             arguments: ["clang", source.path, "-o", fixture.executable.path], standardInput: Data(),
+                                                             environment: ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"], timeout: 30)
             try #require(!compile.didTimeout && compile.status == 0, Comment(rawValue: compile.standardError))
             if signature != "native" {
                 let arguments = signature == "unsigned" ? ["--remove-signature", fixture.executable.path]
                     : ["--force", "--sign", "-", fixture.app.path]
                 let signing = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/codesign"),
-                    arguments: arguments, standardInput: Data(), timeout: 30)
+                                                                 arguments: arguments, standardInput: Data(), timeout: 30)
                 try #require(!signing.didTimeout && signing.status == 0, Comment(rawValue: signing.standardError))
             }
             for url in [fixture.app, fixture.executable] {

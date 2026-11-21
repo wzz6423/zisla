@@ -86,7 +86,7 @@ struct AIAccountBalanceCredentials: Sendable {
             let auth = idClaims?["https://api.openai.com/auth"] as? [String: Any]
             let accountID = tokens["account_id"] as? String ?? auth?["chatgpt_account_id"] as? String
             return try Self.credential(token: token, accountID: accountID,
-                name: idClaims?["email"] as? String ?? claims["email"] as? String)
+                                       name: idClaims?["email"] as? String ?? claims["email"] as? String)
         case .claude:
             let path = directory("CLAUDE_CONFIG_DIR", fallback: ".claude").appendingPathComponent(".credentials.json")
             let file = try fileRead(path)
@@ -120,7 +120,7 @@ struct AIAccountBalanceCredentials: Sendable {
                 let token = entry["key"] as? String else { throw AIAccountBalanceError.invalidCredentials }
             let claims = try Self.claims(token, at: now)
             return try Self.credential(token: token, accountID: entry["user_id"] as? String ?? claims["sub"] as? String,
-                name: entry["email"] as? String)
+                                       name: entry["email"] as? String)
         case .kimi:
             guard environment["KIMI_CODE_BASE_URL"] == nil, environment["KIMI_CODE_OAUTH_HOST"] == nil,
                   environment["KIMI_OAUTH_HOST"] == nil else { throw AIAccountBalanceError.unsupportedLogin }
@@ -141,7 +141,7 @@ struct AIAccountBalanceCredentials: Sendable {
         case .cursor, .grokBot:
             guard let cookie = try cursorCookie(now) else { return nil }
             return try Self.credential(token: cookie,
-                accountID: cookie.components(separatedBy: "%3A%3A")[0].replacingOccurrences(of: "WorkosCursorSessionToken=", with: ""))
+                                       accountID: cookie.components(separatedBy: "%3A%3A")[0].replacingOccurrences(of: "WorkosCursorSessionToken=", with: ""))
         case .workbuddy, .workbuddyAI:
             let realm = provider == .workbuddyAI ? "ai" : "cn"
             let filename = provider == .workbuddyAI ? "workbuddy-desktop-ai.info" : "workbuddy-desktop.info"
@@ -165,7 +165,7 @@ struct AIAccountBalanceCredentials: Sendable {
             }
             let enterprise = account["enterpriseId"] as? String ?? ""
             var credential = try Self.credential(token: token, accountID: uid + ":" + enterprise,
-                name: account["name"] as? String, region: realm)
+                                                 name: account["name"] as? String, region: realm)
             credential.headers["X-User-Id"] = try Self.header(uid)
             if !enterprise.isEmpty {
                 credential.headers["X-Enterprise-Id"] = try Self.header(enterprise)

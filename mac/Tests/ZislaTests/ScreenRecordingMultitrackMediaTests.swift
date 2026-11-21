@@ -14,11 +14,11 @@ struct ScreenRecordingMultitrackMediaTests {
         defer { fixture.remove() }
         _ = try await fixture.createVideo(colors: [.init(red: 1, green: 0, blue: 0)])
         _ = try await fixture.createVideo("portrait.mp4", size: .init(width: 24, height: 48),
-            colors: [.init(red: 0, green: 1, blue: 0)])
+                                          colors: [.init(red: 0, green: 1, blue: 0)])
         var project = fixture.project()
         var timeline = RecordingMultitrackTimeline.migrating(project)
         let portrait = RecordingMediaAsset(name: "Portrait", file: "portrait.mp4", kind: .video,
-            duration: 2, width: 24, height: 48)
+                                           duration: 2, width: 24, height: 48)
         timeline.assets.append(portrait)
         let top = timeline.addTrack(.video)
         timeline.tracks[timeline.tracks.count - 1].kind = .audio
@@ -35,7 +35,7 @@ struct ScreenRecordingMultitrackMediaTests {
         for format in [RecordingExportFormat.mp4, .gif] {
             let destination = fixture.root.appendingPathComponent("mixed." + format.rawValue)
             try await exporter.export(project: project, directory: fixture.directory, to: destination,
-                configuration: .init(format: format, resolution: .source, frameRate: 4))
+                                      configuration: .init(format: format, resolution: .source, frameRate: 4))
             if format == .mp4 {
                 let decoded = try await RecordingMultitrackTestFixture.decode(AVURLAsset(url: destination))
                 #expect(decoded.count == 8)
@@ -52,7 +52,7 @@ struct ScreenRecordingMultitrackMediaTests {
         project.timeline = timeline
         let reordered = try await exporter.multitrackPreview(project: project, directory: fixture.directory, time: 0.5)
         #expect(try RecordingMultitrackTestFixture.pixel(reordered.image(project: project), x: 32, y: 24)[0] > 220,
-            "Reordering tracks must change the topmost rendered layer")
+                "Reordering tracks must change the topmost rendered layer")
         timeline.tracks[1].isHidden = true
         project.timeline = timeline
         let hidden = try await exporter.multitrackPreview(project: project, directory: fixture.directory, time: 0.5)
@@ -70,16 +70,16 @@ struct ScreenRecordingMultitrackMediaTests {
         project.edits.cornerRadius = 0
         project.edits.shadow = 0
         project.edits.annotations = [.init(kind: .text, start: 0, end: 2, x: 0.02, y: 0.02,
-            endX: 0.8, endY: 0.3, text: "TEXT", color: .init(red: 0, green: 0, blue: 1), fontSize: 0.2)]
+                                           endX: 0.8, endY: 0.3, text: "TEXT", color: .init(red: 0, green: 0, blue: 1), fontSize: 0.2)]
         project.captions = [.init(start: 0, end: 2, text: "CAP", layout: .init(x: 0.1, y: 0.6, width: 0.8, height: 0.4), fontSize: 0.15)]
         let image = RecordingMediaAsset(name: "Image", file: "picture.png", kind: .image, duration: 2, width: 64, height: 48)
         let audio = RecordingMediaAsset(name: "Sound", file: "tone.wav", kind: .audio, duration: 2)
         let source = RecordingMediaAsset(id: project.id, name: project.name, file: project.videoFile,
-            kind: .video, duration: 2, width: 64, height: 48)
+                                         kind: .video, duration: 2, width: 64, height: 48)
         project.timeline = .init(assets: [source, image, audio], tracks: [.init(id: "mixed", kind: .audio)], clips: [
             .init(id: "video", trackID: "mixed", content: .video(source.id), start: 0, sourceEnd: 2),
             .init(id: "image", trackID: "mixed", content: .image(image.id), start: 0, sourceEnd: 2,
-                layout: .init(x: 0.7, y: 0.3, width: 0.2, height: 0.2)),
+                  layout: .init(x: 0.7, y: 0.3, width: 0.2, height: 0.2)),
             .init(id: "text", trackID: "mixed", content: .annotation(project.edits.annotations![0].id), start: 0, sourceEnd: 2),
             .init(id: "caption", trackID: "mixed", content: .caption(project.captions[0].id), start: 0, sourceEnd: 2),
             .init(id: "audio", trackID: "mixed", content: .audio(audio.id), start: 0, sourceEnd: 2),
@@ -96,7 +96,7 @@ struct ScreenRecordingMultitrackMediaTests {
         for format in [RecordingExportFormat.mp4, .gif] {
             let destination = fixture.root.appendingPathComponent("mixed-content." + format.rawValue)
             try await exporter.export(project: project, directory: fixture.directory, to: destination,
-                configuration: .init(format: format, resolution: .source, frameRate: 4))
+                                      configuration: .init(format: format, resolution: .source, frameRate: 4))
             if format == .mp4 {
                 let asset = AVURLAsset(url: destination)
                 let frames = try await RecordingMultitrackTestFixture.decode(asset)
@@ -145,7 +145,7 @@ struct ScreenRecordingMultitrackMediaTests {
         }
         let destination = fixture.root.appendingPathComponent("cuts.mp4")
         try await exporter.export(project: project, directory: fixture.directory, to: destination,
-            configuration: .init(resolution: .source, frameRate: 8))
+                                  configuration: .init(resolution: .source, frameRate: 8))
         let exported = try await RecordingMultitrackTestFixture.decode(AVURLAsset(url: destination))
         #expect(exported.count == 16)
         for (time, image) in exported { try expectRepeatedCut(image, at: time) }
@@ -159,7 +159,7 @@ struct ScreenRecordingMultitrackMediaTests {
         project.videoFile = ""
         project.edits.segments = []
         project.edits.annotations = [.init(kind: .rectangle, start: 0, end: 1,
-            x: 0.2, y: 0.2, endX: 0.8, endY: 0.8, color: .init(red: 0, green: 1, blue: 0), lineWidth: 0.05)]
+                                           x: 0.2, y: 0.2, endX: 0.8, endY: 0.8, color: .init(red: 0, green: 1, blue: 0), lineWidth: 0.05)]
         project.timeline = .init(tracks: [.init(id: "text", kind: .text)], clips: [
             .init(trackID: "text", content: .annotation(project.edits.annotations![0].id), start: 0, sourceEnd: 1),
         ])
@@ -183,7 +183,7 @@ struct ScreenRecordingMultitrackMediaTests {
         #expect(frames.count == 30 && frames.allSatisfy { $0.1.width == 64 && $0.1.height == 48 })
         let destination = fixture.root.appendingPathComponent("text-only.gif")
         try await exporter.export(project: project, directory: fixture.directory, to: destination,
-            configuration: .init(format: .gif, resolution: .source, frameRate: 4))
+                                  configuration: .init(format: .gif, resolution: .source, frameRate: 4))
         #expect(CGImageSourceGetCount(try #require(CGImageSourceCreateWithURL(destination as CFURL, nil))) == 4)
         #expect(try fixture.files().isEmpty)
     }
@@ -201,7 +201,7 @@ struct ScreenRecordingMultitrackMediaTests {
         let exporter = ScreenRecordingExporter(checkpoint: { if $0 == checkpoint { throw CancellationError() } })
         await #expect(throws: CancellationError.self) {
             try await exporter.export(project: project, directory: fixture.directory, to: destination,
-                configuration: .init(format: .gif, resolution: .source, frameRate: 4))
+                                      configuration: .init(format: .gif, resolution: .source, frameRate: 4))
         }
         #expect(!exporter.isExporting && exporter.progress < 1)
         #expect(try Data(contentsOf: destination) == Data([4, 2]))
@@ -217,7 +217,7 @@ struct ScreenRecordingMultitrackMediaTests {
         for index in 0..<96 {
             seed = seed &* 6_364_136_223_846_793_005 &+ 1
             clips.append(.init(id: "clip\(index)", trackID: tracks[index % 8].id, content: .video(UUID()),
-                start: Double(seed % 100) / 4, sourceEnd: Double((seed >> 32) % 8 + 1) / 4))
+                               start: Double(seed % 100) / 4, sourceEnd: Double((seed >> 32) % 8 + 1) / 4))
         }
         let timeline = RecordingMultitrackTimeline(tracks: tracks, clips: clips)
         let index = RecordingTimelineClipIndex(timeline)
@@ -225,7 +225,7 @@ struct ScreenRecordingMultitrackMediaTests {
             for time in [clip.start, clip.start - clip.start.ulp * 2, clip.end, clip.end - clip.end.ulp * 2,
                          clip.end - clip.end.ulp * 8, clip.start + clip.duration / 2] {
                 #expect(index.clips(at: time) == timeline.visibleClips(at: time),
-                    "The optimized renderer index must preserve layer order and exact clip boundary selection")
+                        "The optimized renderer index must preserve layer order and exact clip boundary selection")
             }
         }
         let audio = RecordingTimelineClip(trackID: tracks[7].id, content: .audio(UUID()), start: 0, sourceEnd: 40)
@@ -244,7 +244,7 @@ struct ScreenRecordingMultitrackMediaTests {
         project.edits.segments = []
         project.timeline = .init(assets: [asset], tracks: [.init(id: "images", kind: .image)], clips: [
             .init(trackID: "images", content: .image(asset.id), start: 0, sourceEnd: 1,
-                layout: .init(x: 0.5, y: 0.5, width: 0.1, height: 0.000_1)),
+                  layout: .init(x: 0.5, y: 0.5, width: 0.1, height: 0.000_1)),
         ])
         try project.validate()
         let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: .init(width: 64, height: 48))
@@ -262,8 +262,8 @@ struct ScreenRecordingMultitrackMediaTests {
         var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try pixels.withUnsafeMutableBytes { bytes in
             let context = try #require(CGContext(data: bytes.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         #expect(stride(from: 0, to: pixels.count, by: 4).contains {
@@ -296,7 +296,7 @@ struct ScreenRecordingMultitrackMediaTests {
             #expect(camera[2] > 220 && camera[1] < 40, "A cached camera generator must not return its last frame beyond source duration")
         } else {
             #expect(center.allSatisfy { $0 < 40 } && camera.allSatisfy { $0 < 40 },
-                "Timeline gaps must stay blank instead of extending the previous decoded frame")
+                    "Timeline gaps must stay blank instead of extending the previous decoded frame")
         }
     }
 }

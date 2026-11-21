@@ -285,7 +285,7 @@ enum ScreenRecordingCaptionFormatter {
                 let separator = current.map { Self.separator(between: $0.text, and: chunk) } ?? ""
                 if let value = current,
                    value.text.count + separator.count + chunk.count > maximumCharacters
-                    || start - value.end >= 0.8 || end - value.start > 6 {
+                   || start - value.end >= 0.8 || end - value.start > 6 {
                     captions.append(value)
                     current = nil
                 }

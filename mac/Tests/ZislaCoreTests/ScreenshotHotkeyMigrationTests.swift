@@ -48,7 +48,7 @@ struct ScreenshotHotkeyMigrationTests {
     }
 
     @Test(arguments: ["legacy", "previous", "version1"],
-        ["screenshotHotkey", "screenshotPinHotkey", "screenshotLongHotkey", "screenshotStashHotkey", "screenshotEditorLongHotkey", "tool"])
+          ["screenshotHotkey", "screenshotPinHotkey", "screenshotLongHotkey", "screenshotStashHotkey", "screenshotEditorLongHotkey", "tool"])
     func partialLegacyCustomPreservesTheWholeExistingGroupAndAddsFreeShortcuts(layout: String, field: String) throws {
         var object = try oldObject(layout: layout)
         let custom = VoiceInputHotkeyPreset(keyCode: 15, carbonModifiers: 0x0800, keyDisplayName: "R")
@@ -63,13 +63,13 @@ struct ScreenshotHotkeyMigrationTests {
         let migrated = try decode(object)
         for key in ["screenshotHotkey", "screenshotPinHotkey", "screenshotLongHotkey"] {
             let expected = try JSONDecoder().decode(VoiceInputHotkeyPreset.self,
-                from: JSONSerialization.data(withJSONObject: try #require(object[key])))
+                                                    from: JSONSerialization.data(withJSONObject: try #require(object[key])))
             let actual = key == "screenshotHotkey" ? migrated.screenshotHotkey
                 : key == "screenshotPinHotkey" ? migrated.screenshotPinHotkey : migrated.screenshotLongHotkey
             #expect(actual == expected)
         }
         let oldTools = try JSONDecoder().decode([String: VoiceInputHotkeyPreset].self,
-            from: JSONSerialization.data(withJSONObject: try #require(object["screenshotToolHotkeys"])))
+                                                from: JSONSerialization.data(withJSONObject: try #require(object["screenshotToolHotkeys"])))
         for (id, hotkey) in oldTools {
             #expect(migrated.screenshotToolHotkeys[id] == hotkey, "Changed an existing shortcut for \(id)")
         }
@@ -79,7 +79,7 @@ struct ScreenshotHotkeyMigrationTests {
             let actual = key == "screenshotStashHotkey" ? migrated.screenshotStashHotkey : migrated.screenshotEditorLongHotkey
             if let stored = object[key] {
                 let expected = try JSONDecoder().decode(VoiceInputHotkeyPreset.self,
-                    from: JSONSerialization.data(withJSONObject: stored))
+                                                        from: JSONSerialization.data(withJSONObject: stored))
                 #expect(actual == expected)
             } else {
                 #expect(!occupied.contains { actual.conflicts(with: $0) })
@@ -117,7 +117,8 @@ struct ScreenshotHotkeyMigrationTests {
         object["voiceInputHotkeyPreset"] = try encoded(VoiceInputHotkeyPreset(keyCode: 0, carbonModifiers: 0x1000, keyDisplayName: "A"))
         object["clipboardAssistantEnabled"] = assistantEnabled
         object["clipboardAssistantTriggerConfiguration"] = try encoded(ClipboardAssistantTriggerConfiguration.hotkey(
-            .init(keyCode: 11, carbonModifiers: 0x1000, keyDisplayName: "B")))
+            .init(keyCode: 11, carbonModifiers: 0x1000, keyDisplayName: "B")
+        ))
         let migrated = try decode(object)
         let newTools = try ["highlighter", "extraction"].map { try #require(migrated.screenshotToolHotkeys[$0]) }
         let expected = voiceEnabled ? (assistantEnabled ? ["C", "D"] : ["B", "C"])
@@ -125,7 +126,7 @@ struct ScreenshotHotkeyMigrationTests {
         #expect(newTools.map(\.keyDisplayName) == expected)
         #expect(newTools.allSatisfy { $0.carbonModifiers == 0x1000 })
         expectNoCollisions([migrated.screenshotPinHotkey, migrated.screenshotStashHotkey,
-            migrated.screenshotEditorLongHotkey] + Array(migrated.screenshotToolHotkeys.values))
+                            migrated.screenshotEditorLongHotkey] + Array(migrated.screenshotToolHotkeys.values))
         #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(migrated)) == migrated)
     }
 
@@ -136,10 +137,11 @@ struct ScreenshotHotkeyMigrationTests {
         object["voiceInputHotkeyPreset"] = try encoded(VoiceInputHotkeyPreset(keyCode: 0, carbonModifiers: 0x1000, keyDisplayName: "A"))
         object["clipboardAssistantEnabled"] = assistantEnabled
         object["clipboardAssistantTriggerConfiguration"] = try encoded(ClipboardAssistantTriggerConfiguration.hotkey(
-            .init(keyCode: 11, carbonModifiers: 0x1000, keyDisplayName: "B")))
+            .init(keyCode: 11, carbonModifiers: 0x1000, keyDisplayName: "B")
+        ))
         let migrated = try decode(object)
         let editor = [migrated.screenshotPinHotkey, migrated.screenshotStashHotkey,
-            migrated.screenshotEditorLongHotkey] + Array(migrated.screenshotToolHotkeys.values)
+                      migrated.screenshotEditorLongHotkey] + Array(migrated.screenshotToolHotkeys.values)
         expectNoCollisions(editor)
         if voiceEnabled { #expect(!editor.contains { $0.conflicts(with: migrated.voiceInputHotkeyPreset) }) }
         if assistantEnabled {
@@ -149,7 +151,7 @@ struct ScreenshotHotkeyMigrationTests {
         #expect(migrated.screenshotToolHotkeys["highlighter"]?.keyDisplayName == "6")
         #expect(migrated.screenshotToolHotkeys["extraction"]?.keyDisplayName == (voiceEnabled ? (assistantEnabled ? "C" : "B") : "A"))
         #expect(migrated.screenshotEditorLongHotkey.keyDisplayName == (voiceEnabled && assistantEnabled ? "D"
-            : voiceEnabled || assistantEnabled ? "C" : "B"))
+                : voiceEnabled || assistantEnabled ? "C" : "B"))
         #expect(editor.allSatisfy { $0.carbonModifiers == 0x1000 })
         #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(migrated)) == migrated)
     }
@@ -191,7 +193,8 @@ struct ScreenshotHotkeyMigrationTests {
         object["screenshotToolHotkeys"] = try encoded(tools)
         object.removeValue(forKey: "screenshotStashHotkey")
         object["screenshotEditorLongHotkey"] = try encoded(
-            VoiceInputHotkeyPreset(keyCode: 19, carbonModifiers: 0x1000, keyDisplayName: "2", modifierSides: [.rightControl]))
+            VoiceInputHotkeyPreset(keyCode: 19, carbonModifiers: 0x1000, keyDisplayName: "2", modifierSides: [.rightControl])
+        )
         let migrated = try decode(object)
         #expect(migrated.screenshotStashHotkey.keyDisplayName == "3")
         #expect(migrated.screenshotToolHotkeys["highlighter"]?.keyDisplayName == "0")
@@ -204,7 +207,7 @@ struct ScreenshotHotkeyMigrationTests {
             #expect(!newHotkey.conflicts(with: try #require(tools["rectangle"])))
         }
         expectNoCollisions([migrated.screenshotPinHotkey, migrated.screenshotStashHotkey,
-            migrated.screenshotEditorLongHotkey] + Array(migrated.screenshotToolHotkeys.values))
+                            migrated.screenshotEditorLongHotkey] + Array(migrated.screenshotToolHotkeys.values))
     }
 
     @Test

@@ -59,7 +59,7 @@ final class RecordingVoiceMonitor: @unchecked Sendable {
                 throw ScreenRecordingCaptureError.writerUnavailable
             }
             let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sourceFormat.sampleRate,
-                interleaved: false, channelLayout: layout)
+                                             interleaved: false, channelLayout: layout)
             var converter: AudioConverterRef?
             guard AudioConverterNew(sourceFormat.streamDescription, targetFormat.streamDescription, &converter) == noErr,
                   let converter else { throw ScreenRecordingCaptureError.writerUnavailable }
@@ -82,9 +82,9 @@ final class RecordingVoiceMonitor: @unchecked Sendable {
             source.frameLength = frames
             result.frameLength = frames
             guard CMSampleBufferCopyPCMDataIntoAudioBufferList(sample, at: 0, frameCount: Int32(sample.numSamples),
-                into: source.mutableAudioBufferList) == noErr,
-                  AudioConverterConvertComplexBuffer(converter!, frames, source.audioBufferList,
-                result.mutableAudioBufferList) == noErr else { throw ScreenRecordingCaptureError.writerUnavailable }
+                                                               into: source.mutableAudioBufferList) == noErr,
+                AudioConverterConvertComplexBuffer(converter!, frames, source.audioBufferList,
+                                                   result.mutableAudioBufferList) == noErr else { throw ScreenRecordingCaptureError.writerUnavailable }
             try output!.append(result) { backlog.complete(token) }
         } catch {
             backlog.complete(token)

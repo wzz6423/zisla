@@ -76,11 +76,11 @@ enum RecordingMediaLibraryGrouping {
             }, by: { $0.0 })
             var result = known.keys.sorted(by: >).map { date in
                 RecordingMediaLibraryGroup(id: String(date.timeIntervalSinceReferenceDate), title: nil, date: date,
-                    assets: known[date]!.map { $0.1 })
+                                           assets: known[date]!.map { $0.1 })
             }
             if !unknown.isEmpty {
                 result.append(.init(id: "unknown", title: grouping == .importedAt ? "未知导入时间" : "未知拍摄时间",
-                    date: nil, assets: unknown))
+                                    date: nil, assets: unknown))
             }
             return result
         }

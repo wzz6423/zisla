@@ -38,9 +38,9 @@ struct ScreenRecordingInspectorLayoutTests {
         defer { releaseAccessibility() }
         let section = ScreenRecordingInspectorSection(AppLocalization.string("手动缩放", language: language), symbol: "plus.magnifyingglass") {
             ScreenRecordingNumberField(title: AppLocalization.string("起点（秒）", language: language),
-                value: .constant(12.375), identifier: "start")
+                                       value: .constant(12.375), identifier: "start")
             ScreenRecordingNumberField(title: AppLocalization.string("焦点水平位置", language: language),
-                value: .constant(0.125), identifier: "focus")
+                                       value: .constant(0.125), identifier: "focus")
         }
         let fixture = Fixture(section.frame(width: width), language: language)
         defer { fixture.window.close() }
@@ -104,7 +104,7 @@ struct ScreenRecordingInspectorLayoutTests {
             #expect(effects.host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(effects.frame(control)))
         }
         let controls = ScreenRecordingPortraitControls(model: model, target: effectsView.enhancementTarget.target,
-            showsPortrait: true, showsVoice: true)
+                                                       showsPortrait: true, showsVoice: true)
         try effects.press(try #require(effects.element("screenRecording.resetVoiceEffects")))
         await effects.settle()
         #expect(controls.voice == .init() && controls.portrait == project.edits.portraitEffects)
@@ -156,7 +156,7 @@ struct ScreenRecordingInspectorLayoutTests {
         project.edits.segments = []
         let kind: RecordingMediaKind = media == .image ? .image : media == .audio ? .audio : .video
         let asset = RecordingMediaAsset(name: "Imported", file: "imported.mp4", kind: kind, duration: 2,
-            width: 64, height: 48, hasAudio: media == .audio || media == .video)
+                                        width: 64, height: 48, hasAudio: media == .audio || media == .video)
         let track = RecordingTimelineTrack()
         var timeline = RecordingMultitrackTimeline(assets: [asset], tracks: [track])
         let added = timeline.addAssetClip(asset.id, at: 0, trackID: track.id)
@@ -172,12 +172,12 @@ struct ScreenRecordingInspectorLayoutTests {
         #expect((fixture.element("screenRecording.voicePreset") != nil) == (media == .audio || media == .video))
         let effectsView = ScreenRecordingEffectsView(model: model)
         let controls = ScreenRecordingPortraitControls(model: model, target: effectsView.enhancementTarget.target,
-            showsPortrait: media != .audio, showsVoice: media == .audio || media == .video)
+                                                       showsPortrait: media != .audio, showsVoice: media == .audio || media == .video)
         if media != .audio { controls.setPortrait(.init(brightening: 0.5)) }
         if media == .audio || media == .video { controls.setVoice(.init(preset: .bright, amount: 0.4)) }
         #expect(model.timeline?.clips.first { $0.id == id }?.portraitEffects == (media == .audio ? nil : .init(brightening: 0.5)))
         #expect(model.timeline?.clips.first { $0.id == id }?.voiceEffects == (media == .audio || media == .video
-            ? .init(preset: .bright, amount: 0.4) : nil))
+                ? .init(preset: .bright, amount: 0.4) : nil))
         #expect(model.project?.edits == project.edits, "Imported clip adjustments must not change recording defaults")
         model.selectTimelineTrack(track.id)
         await fixture.settle()
@@ -277,9 +277,9 @@ struct ScreenRecordingInspectorLayoutTests {
         let label = try #require((toggle as? NSObject)?.value(forKey: "accessibilityLabel") as? String)
         #expect(label == AppLocalization.string("鼠标轨迹", language: language))
         #expect(model.project == project && !model.isDirty && !model.canUndo,
-            "Presenting the cursor controls must not enable the trail or mark the project dirty")
+                "Presenting the cursor controls must not enable the trail or mark the project dirty")
         #expect(fixture.element("screenRecording.cursorTrailColor") == nil,
-            "The color picker must stay hidden until the trail is enabled")
+                "The color picker must stay hidden until the trail is enabled")
         try fixture.press(toggle)
         await model.previewTask?.value
         await fixture.settle()
@@ -287,9 +287,9 @@ struct ScreenRecordingInspectorLayoutTests {
         let picker = try #require(fixture.element("screenRecording.cursorTrailColor"))
         #expect(fixture.textValues().contains(AppLocalization.string("轨迹颜色", language: language)))
         #expect(fixture.host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(fixture.frame(picker)),
-            "The localized trail color control must fit inside the narrow inspector")
+                "The localized trail color control must fit inside the narrow inspector")
         #expect(model.project?.edits.cursorTrailColor == nil,
-            "Presenting the color picker must not save the default white color")
+                "Presenting the color picker must not save the default white color")
         let well = try #require(fixture.colorWells().first)
         let color = RecordingColor(red: 0.2, green: 0.7, blue: 0.4)
         well.color = NSColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: 1)
@@ -297,7 +297,7 @@ struct ScreenRecordingInspectorLayoutTests {
         await model.previewTask?.value
         await fixture.settle()
         #expect(model.project?.edits.cursorTrailColor == color,
-            "Changing the native color well must update the trail through the inspector binding")
+                "Changing the native color well must update the trail through the inspector binding")
         model.undo()
         await model.previewTask?.value
         await fixture.settle()
@@ -376,12 +376,13 @@ struct ScreenRecordingInspectorLayoutTests {
         var expanded = false
         var count = 0
         let section = ScreenRecordingInspectorSection("Canvas", symbol: "rectangle", isExpanded: Binding(
-            get: { expanded }, set: { expanded = $0 })) {
-                TextField("Value", text: .constant("Body")).accessibilityIdentifier("body")
-            } actions: {
-                Button("Add") { count += 1 }.buttonStyle(SettingsTintedButtonStyle())
-                    .accessibilityIdentifier("headerAction").disabled(disabled)
-            }
+            get: { expanded }, set: { expanded = $0 }
+        )) {
+            TextField("Value", text: .constant("Body")).accessibilityIdentifier("body")
+        } actions: {
+            Button("Add") { count += 1 }.buttonStyle(SettingsTintedButtonStyle())
+                .accessibilityIdentifier("headerAction").disabled(disabled)
+        }
         let fixture = Fixture(section.frame(width: 296), language: .english)
         defer { fixture.window.close() }
         fixture.window.setFrameOrigin(.init(x: -100_000, y: -100_000))
@@ -415,9 +416,9 @@ struct ScreenRecordingInspectorLayoutTests {
         try Data([1]).write(to: root.appendingPathComponent("screen.mp4"))
         let project = ScreenRecordingProject(name: "Header", videoFile: "screen.mp4", duration: 10, width: 64, height: 48)
         let model = ScreenRecordingStudioModel(projectStore: ScreenRecordingProjectStore(root: root),
-            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender }, aiCompletion: { _, _, _ in
-                #"{"version":1,"operations":[{"type":"cut","start":2,"end":4}]}"#
-            })
+                                               renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender }, aiCompletion: { _, _, _ in
+                                                   #"{"version":1,"operations":[{"type":"cut","start":2,"end":4}]}"#
+                                               })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         model.install(project, directory: root)
         let view: AnyView
@@ -449,7 +450,7 @@ struct ScreenRecordingInspectorLayoutTests {
         } else {
             let duration = layout.panel == .proposal ? try #require(model.pendingAIProject).outputDuration : project.outputDuration
             content = try #require(fixture.control(AppLocalization.text("输出时长：%@", ScreenRecordingStudioView.clock(duration)),
-                role: .staticText))
+                                                   role: .staticText))
         }
         let frames = [fixture.frame(primary), fixture.frame(secondary)]
         #expect(abs(frames[0].height - frames[1].height) < 0.5,
@@ -466,11 +467,11 @@ struct ScreenRecordingInspectorLayoutTests {
         let actionsFrame = frames[0].union(frames[1])
         let contentFrame = fixture.host.bounds.insetBy(dx: layout.panel == .timeline ? 0 : 12, dy: 0)
         #expect(abs(language.isRightToLeft ? actionsFrame.minX - contentFrame.minX
-            : actionsFrame.maxX - contentFrame.maxX) <= 0.5)
+                : actionsFrame.maxX - contentFrame.maxX) <= 0.5)
         if frames[0].maxY <= frames[1].minY {
             for frame in frames {
                 #expect(abs(language.isRightToLeft ? frame.minX - contentFrame.minX
-                    : frame.maxX - contentFrame.maxX) <= 0.5, "Stacked actions must each align to the trailing edge")
+                        : frame.maxX - contentFrame.maxX) <= 0.5, "Stacked actions must each align to the trailing edge")
             }
         }
         #expect(abs(fixture.host.fittingSize.width - layout.width) <= 0.5)
@@ -485,7 +486,7 @@ struct ScreenRecordingInspectorLayoutTests {
         try Data([1]).write(to: root.appendingPathComponent("screen.mp4"))
         let project = ScreenRecordingProject(name: "Header", videoFile: "screen.mp4", duration: 10, width: 64, height: 48)
         let model = ScreenRecordingStudioModel(projectStore: ScreenRecordingProjectStore(root: root),
-            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender })
+                                               renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         model.install(project, directory: root)
         model.seek(to: time)
@@ -526,7 +527,7 @@ struct ScreenRecordingInspectorLayoutTests {
         try Data([1]).write(to: root.appendingPathComponent("screen.mp4"))
         let project = ScreenRecordingProject(name: "Header", videoFile: "screen.mp4", duration: 10, width: 64, height: 48)
         let model = ScreenRecordingStudioModel(projectStore: ScreenRecordingProjectStore(root: root),
-            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender })
+                                               renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         model.install(project, directory: root)
         model.seek(to: time)
@@ -574,7 +575,7 @@ struct ScreenRecordingInspectorLayoutTests {
         canvasSelection.value = .caption(caption.id)
         await fixture.settle()
         let selectedInput = try #require(fixture.editableFields().first { $0.stringValue == caption.text },
-                                        "Selecting a caption on the canvas must reopen its collapsed inspector")
+                                         "Selecting a caption on the canvas must reopen its collapsed inspector")
         #expect(!selectedInput.isHiddenOrHasHiddenAncestor)
         model.undo()
         #expect(model.project == project && !model.canUndo)
@@ -698,8 +699,8 @@ struct ScreenRecordingInspectorLayoutTests {
             let point = window.convertPoint(fromScreen: CGPoint(x: frame.midX, y: frame.midY))
             for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
                 let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
-                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-                    eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                                                            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                                                            eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
                 window.sendEvent(event)
             }
         }

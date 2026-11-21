@@ -35,18 +35,18 @@ else { exit(64) }
 
 let outputURL = URL(fileURLWithPath: CommandLine.arguments[4])
 guard let bitmap = NSBitmapImageRep(
-    bitmapDataPlanes: nil,
-    pixelsWide: pixels,
-    pixelsHigh: pixels,
-    bitsPerSample: 8,
-    samplesPerPixel: 4,
-    hasAlpha: true,
-    isPlanar: false,
-    colorSpaceName: .deviceRGB,
-    bytesPerRow: 0,
-    bitsPerPixel: 0
-), let context = NSGraphicsContext(bitmapImageRep: bitmap),
-   let data = bitmap.bitmapData
+          bitmapDataPlanes: nil,
+          pixelsWide: pixels,
+          pixelsHigh: pixels,
+          bitsPerSample: 8,
+          samplesPerPixel: 4,
+          hasAlpha: true,
+          isPlanar: false,
+          colorSpaceName: .deviceRGB,
+          bytesPerRow: 0,
+          bitsPerPixel: 0
+      ), let context = NSGraphicsContext(bitmapImageRep: bitmap),
+      let data = bitmap.bitmapData
 else { exit(70) }
 
 bitmap.size = NSSize(width: pixels, height: pixels)

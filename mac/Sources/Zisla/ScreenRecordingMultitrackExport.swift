@@ -36,8 +36,8 @@ final class RecordingLegacyExportFrames: RecordingExportFrameProviding {
             throw ScreenRecordingExportError.unavailableMedia
         }
         return try renderer.render(screen: screen,
-            camera: camera?.frame(at: time, slice: slice, useFirstFrame: false),
-            sourceTime: slice.sourceTime(at: time.seconds), slice: slice)
+                                   camera: camera?.frame(at: time, slice: slice, useFirstFrame: false),
+                                   sourceTime: slice.sourceTime(at: time.seconds), slice: slice)
     }
 
     func cancel() { primary.cancel(); camera?.cancel() }
@@ -65,7 +65,7 @@ final class RecordingMultitrackExportFrames: RecordingExportFrameProviding {
         for clip in renderer.index.clips(at: time.seconds) where clip.content.trackKind == .video {
             for key in [clip.id, clip.id + ".camera"] {
                 if let layer = media.layers[key], let frame = try readers[layer.trackID]?.frame(at: time, layer: layer,
-                    allowsLeadingFrame: key == clip.id) { frames[key] = frame }
+                                                                                                allowsLeadingFrame: key == clip.id) { frames[key] = frame }
             }
         }
         return try renderer.render(frames: frames, at: time.seconds)
@@ -131,9 +131,9 @@ enum RecordingMultitrackExportJob {
         try checkpoint(.beforeRead)
         let media = try await RecordingMultitrackMedia.prepare(project: project, directory: directory)
         let size = try RecordingExportRenderer.outputSize(source: CGSize(width: project.width, height: project.height),
-            edits: project.edits, resolution: configuration.resolution)
+                                                          edits: project.edits, resolution: configuration.resolution)
         let frames = try RecordingMultitrackExportFrames(media: media, project: project, directory: directory, size: size,
-            preservesHDR: media.preservesHDR && configuration.format.supportsHDR)
+                                                         preservesHDR: media.preservesHDR && configuration.format.supportsHDR)
         defer { frames.cancel() }
         let staging = target.deletingLastPathComponent().appendingPathComponent(".zisla-recording-export-\(UUID())", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
@@ -145,29 +145,29 @@ enum RecordingMultitrackExportJob {
             let executable = configuration.format.requiresFFmpeg ? try resolveFFmpeg() : nil
             let rendered = executable == nil ? temporary : staging.appendingPathComponent("rendered.mp4")
             let writer = try RecordingExportMP4Writer(url: rendered, frames: frames,
-                audioComposition: media.composition, audioTracks: media.audioTracks, audioMix: media.audioMix,
-                duration: media.duration, adjustsSpeed: media.adjustsSpeed, schedule: schedule,
-                fileType: configuration.format.nativeVideoFileType, checkpoint: checkpoint)
+                                                      audioComposition: media.composition, audioTracks: media.audioTracks, audioMix: media.audioMix,
+                                                      duration: media.duration, adjustsSpeed: media.adjustsSpeed, schedule: schedule,
+                                                      fileType: configuration.format.nativeVideoFileType, checkpoint: checkpoint)
             try await writer.run { await progress($0 * (executable == nil ? 1 : 0.75)) }
             if let executable {
                 try await ScreenRecordingFFmpegTranscoder.run(input: rendered, output: temporary,
-                    format: configuration.format, duration: media.duration, executable: executable,
-                    preservesHDR: frames.preservesHDR, checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
+                                                              format: configuration.format, duration: media.duration, executable: executable,
+                                                              preservesHDR: frames.preservesHDR, checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
             }
         } else if configuration.format == .gif {
             let writer = try RecordingExportGIFWriter(url: temporary, size: size, frameRate: schedule.frameRate,
-                                                       duration: media.duration,
-                                                       preserveGrayscale: project.edits.showCursor && project.edits.cursorTrail == true
-                                                           && !project.pointers.isEmpty
-                                                           && project.edits.effectiveCursorTrailColor.red == project.edits.effectiveCursorTrailColor.green
-                                                           && project.edits.effectiveCursorTrailColor.green == project.edits.effectiveCursorTrailColor.blue)
+                                                      duration: media.duration,
+                                                      preserveGrayscale: project.edits.showCursor && project.edits.cursorTrail == true
+                                                          && !project.pointers.isEmpty
+                                                          && project.edits.effectiveCursorTrailColor.red == project.edits.effectiveCursorTrailColor.green
+                                                          && project.edits.effectiveCursorTrailColor.green == project.edits.effectiveCursorTrailColor.blue)
             for index in 0..<schedule.frameCount {
                 try Task.checkCancellation()
                 try checkpoint(.frame(index))
                 try autoreleasepool {
                     let rendered = try frames.render(at: schedule.time(at: index))
                     guard let image = frames.context.createCGImage(rendered, from: frames.canvas, format: .RGBA8,
-                        colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { throw ScreenRecordingExportError.cannotRender }
+                                                                   colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { throw ScreenRecordingExportError.cannotRender }
                     try writer.append(image)
                 }
                 if index.isMultiple(of: max(1, schedule.frameRate / 10)) {

@@ -24,7 +24,7 @@ struct ScreenRecordingCommonFormatTests {
         let output = fixture.root.appendingPathComponent("native." + format.fileExtension)
         let exporter = ScreenRecordingExporter(resolveFFmpeg: { throw ScreenRecordingExportError.missingFFmpeg })
         try await exporter.export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: format, resolution: .source, frameRate: 24))
+                                  configuration: .init(format: format, resolution: .source, frameRate: 24))
         #expect(!exporter.isExporting && exporter.progress == 1)
         let data = try Data(contentsOf: output)
         #expect(String(decoding: data[4..<8], as: UTF8.self) == "ftyp")
@@ -57,7 +57,7 @@ struct ScreenRecordingCommonFormatTests {
         let exporter = ScreenRecordingExporter(resolveFFmpeg: { throw ScreenRecordingExportError.missingFFmpeg })
         await #expect(throws: ScreenRecordingExportError.missingFFmpeg) {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: .mkv, resolution: .source))
+                                      configuration: .init(format: .mkv, resolution: .source))
         }
         #expect(try Data(contentsOf: output) == Data([7, 8]))
         #expect(!exporter.isExporting && exporter.progress < 1)
@@ -73,7 +73,7 @@ struct ScreenRecordingCommonFormatTests {
         try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
         #expect(try ScreenRecordingFFmpegTranscoder.resolveExecutable(bundle: fixture.root,
-            managedTools: managed, candidates: []) == executable)
+                                                                      managedTools: managed, candidates: []) == executable)
         try FileManager.default.setAttributes([.posixPermissions: 0o702], ofItemAtPath: executable.path)
         #expect(throws: ScreenRecordingExportError.missingFFmpeg) {
             try ScreenRecordingFFmpegTranscoder.resolveExecutable(bundle: fixture.root, managedTools: managed, candidates: [])
@@ -142,7 +142,7 @@ struct ScreenRecordingCommonFormatTests {
         try Data([1]).write(to: input)
         let fractions = FractionCollector()
         try await ScreenRecordingFFmpegTranscoder.run(input: input, output: output, format: .mkv, duration: 1,
-            executable: script, checkpoint: { _ in }) { await fractions.append($0) }
+                                                      executable: script, checkpoint: { _ in }) { await fractions.append($0) }
         let values = await fractions.values
         #expect(values == values.sorted())
         #expect(values.contains(0.25) && values.contains(0.75) && values.last == 1)
@@ -163,7 +163,7 @@ struct ScreenRecordingCommonFormatTests {
         let exporter = ScreenRecordingExporter(resolveFFmpeg: { script })
         await #expect(throws: ScreenRecordingExportError.transcodingFailure) {
             try await exporter.export(project: fixture.project(), directory: fixture.directory, to: output,
-                configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
+                                      configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
         }
         #expect(try Data(contentsOf: output) == Data([6, 5]))
         #expect(!exporter.isExporting && exporter.progress < 1)
@@ -180,7 +180,7 @@ struct ScreenRecordingCommonFormatTests {
         let exporter = ScreenRecordingExporter(resolveFFmpeg: { missing })
         await #expect(throws: CocoaError.self) {
             try await exporter.export(project: fixture.project(), directory: fixture.directory, to: output,
-                configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
+                                      configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
         }
         #expect(try Data(contentsOf: output) == Data([5]))
         #expect(!exporter.isExporting && exporter.progress < 1)
@@ -203,7 +203,7 @@ struct ScreenRecordingCommonFormatTests {
         let exporter = ScreenRecordingExporter(resolveFFmpeg: { script })
         await #expect(throws: ScreenRecordingExportError.transcodingFailure) {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
+                                      configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
         }
         #expect(try Data(contentsOf: output) == Data([4, 2]))
         #expect(try stagingFiles(fixture.root).isEmpty)
@@ -213,7 +213,7 @@ struct ScreenRecordingCommonFormatTests {
         })
         await #expect(throws: CancellationError.self) {
             try await cancelled.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
+                                       configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
         }
         #expect(try Data(contentsOf: output) == Data([4, 2]))
         #expect(try stagingFiles(fixture.root).isEmpty)
@@ -246,7 +246,7 @@ struct ScreenRecordingCommonFormatTests {
         let exporter = ScreenRecordingExporter(resolveFFmpeg: { script })
         let task = Task {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
+                                      configuration: .init(format: .mkv, resolution: .source, frameRate: 12))
         }
         let deadline = ContinuousClock.now + .seconds(15)
         while !FileManager.default.fileExists(atPath: pidFile.path) && ContinuousClock.now < deadline {
@@ -291,10 +291,10 @@ struct ScreenRecordingCommonFormatIntegrationTests {
         try #require(YTDLPResolver.isTrustedExecutable(probe))
         let exporter = ScreenRecordingExporter()
         try await exporter.export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: format, resolution: .source, frameRate: 30))
+                                  configuration: .init(format: format, resolution: .source, frameRate: 30))
         let result = try await AIAgentProcessRunner.run(executableURL: probe,
-            arguments: ["-v", "error", "-protocol_whitelist", "file", "-show_streams", "-show_format", "-of", "json", output.path],
-            timeout: 15, maximumOutputBytes: 32_768, maximumErrorBytes: 8_192)
+                                                        arguments: ["-v", "error", "-protocol_whitelist", "file", "-show_streams", "-show_format", "-of", "json", output.path],
+                                                        timeout: 15, maximumOutputBytes: 32_768, maximumErrorBytes: 8_192)
         #expect(result.status == 0 && !result.didTimeout)
         let json = try #require(JSONSerialization.jsonObject(with: result.standardOutput) as? [String: Any])
         let streams = try #require(json["streams"] as? [[String: Any]])
@@ -330,9 +330,9 @@ struct ScreenRecordingCommonFormatIntegrationTests {
         #expect(abs(duration - 0.75) < 0.15)
         for (time, blue) in [(0.1, true), (0.5, false)] {
             let decode = try await AIAgentProcessRunner.run(executableURL: executable,
-                arguments: ["-v", "error", "-protocol_whitelist", "file,pipe", "-i", output.path,
-                            "-ss", String(time), "-map", "0:v:0", "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "pipe:1"],
-                timeout: 15, maximumOutputBytes: 32 * 48 * 3 + 1, maximumErrorBytes: 8_192)
+                                                            arguments: ["-v", "error", "-protocol_whitelist", "file,pipe", "-i", output.path,
+                                                                        "-ss", String(time), "-map", "0:v:0", "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "pipe:1"],
+                                                            timeout: 15, maximumOutputBytes: 32 * 48 * 3 + 1, maximumErrorBytes: 8_192)
             #expect(decode.status == 0 && decode.standardOutput.count == 32 * 48 * 3)
             let offset = (24 * 32 + 16) * 3
             #expect(decode.standardOutput[offset + (blue ? 2 : 0)] > 170)

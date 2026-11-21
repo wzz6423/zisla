@@ -1367,9 +1367,9 @@ public enum EmojiNameCatalog {
         static func canonicalNames(from data: Data?) -> [String: [String]] {
             guard let data,
                   let propertyList = try? PropertyListSerialization.propertyList(
-                    from: data,
-                    options: [],
-                    format: nil
+                      from: data,
+                      options: [],
+                      format: nil
                   ),
                   let names = propertyList as? [String: String]
             else {

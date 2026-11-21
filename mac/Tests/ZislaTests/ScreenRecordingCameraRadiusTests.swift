@@ -11,11 +11,11 @@ struct ScreenRecordingCameraRadiusTests {
     @Test(arguments: [Double?(nil), 0.0, 0.125, 0.5])
     func changingCameraRatioPreservesRadiusAndTheLegacyProjectFlag(radius: Double?) async throws {
         let image = try #require(CIContext().createCGImage(CIImage(color: .black),
-            from: CGRect(x: 0, y: 0, width: 16, height: 16)))
+                                                           from: CGRect(x: 0, y: 0, width: 16, height: 16)))
         let model = ScreenRecordingStudioModel(renderPreview: { _, _, _ in image })
         defer { model.shutdown() }
         var project = ScreenRecordingProject(name: "Camera ratio", videoFile: "screen.mp4", cameraFile: "camera.mp4",
-                                            duration: 1, width: 16, height: 16)
+                                             duration: 1, width: 16, height: 16)
         project.edits.cameraRound = true
         project.edits.cameraCornerRadius = radius
         model.install(project, directory: URL(fileURLWithPath: "/synthetic-camera-radius"))
@@ -38,11 +38,11 @@ struct ScreenRecordingCameraRadiusTests {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let image = try #require(CIContext().createCGImage(CIImage(color: .black),
-            from: CGRect(x: 0, y: 0, width: 16, height: 16)))
+                                                           from: CGRect(x: 0, y: 0, width: 16, height: 16)))
         let model = ScreenRecordingStudioModel(renderPreview: { _, _, _ in image })
         defer { model.shutdown() }
         var project = ScreenRecordingProject(name: "Camera radius", videoFile: "screen.mp4", cameraFile: "camera.mp4",
-                                            duration: 1, width: 16, height: 16)
+                                             duration: 1, width: 16, height: 16)
         project.edits.cameraRound = true
         project.edits.cameraAspectRatio = .square
         project.edits.cameraCornerRadius = radius
@@ -71,7 +71,7 @@ struct ScreenRecordingCameraRadiusTests {
         let radiusSlider = try #require(controls.first {
             value($0, key: "accessibilityIdentifier") as? String == "screenRecording.cameraCornerRadius.slider"
         },
-            "The camera inspector must expose radius even for an old circular project")
+        "The camera inspector must expose radius even for an old circular project")
         #expect((value(radiusSlider, key: "accessibilityValue") as? NSNumber)?.doubleValue == (radius ?? 0.5))
         try perform(radius == 0 ? "accessibilityPerformIncrement" : "accessibilityPerformDecrement", on: radiusSlider)
         await settle(host)

@@ -12,9 +12,9 @@ struct HeadphoneConnectionNoticeTests {
     func customCompactConnectionUsesTheExistingHeadphoneGlyph(edge: IslandEdge, reduceMotion: Bool) throws {
         for symbol in [nil, "headphones"] as [String?] {
             for metadata in [nil, [HeadphoneConnection.productIDMetadataKey: "invalid"],
-                [HeadphoneConnection.productIDMetadataKey: String(UInt32.max)]] as [[String: String]?] {
+                             [HeadphoneConnection.productIDMetadataKey: String(UInt32.max)]] as [[String: String]?] {
                 let notice = IslandNotice(id: "headphone-connection", title: "AirPods Pro", style: .headphone,
-                    symbolName: symbol, metadata: metadata)
+                                          symbolName: symbol, metadata: metadata)
                 let presentation = CompactPillStatusPresentation(priority: .transient, notice: notice, text: "")
                 let size = edge.isVertical ? CGSize(width: 32, height: 48) : CGSize(width: 48, height: 32)
                 func bitmap(_ content: some View) throws -> NSBitmapImageRep {
@@ -27,12 +27,12 @@ struct HeadphoneConnectionNoticeTests {
                     return NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
                 }
                 let actual = try bitmap(CompactPillStatusContent(presentation: presentation, text: "",
-                    edge: edge, visualizationStyle: .waveform, item: nil, date: .now))
+                                                                 edge: edge, visualizationStyle: .waveform, item: nil, date: .now))
                 let expected = try bitmap(HeadphoneGlyph(productID: notice.headphoneProductID, isPresented: !reduceMotion,
-                    isSingleUnit: symbol == "headphones", reduceMotion: reduceMotion)
-                    .frame(width: 24, height: 24)
-                    .frame(width: edge.isVertical ? 32 : 24, height: edge.isVertical ? 24 : 32)
-                    .padding(edge.isVertical ? .vertical : .horizontal, 12))
+                                                         isSingleUnit: symbol == "headphones", reduceMotion: reduceMotion)
+                        .frame(width: 24, height: 24)
+                        .frame(width: edge.isVertical ? 32 : 24, height: edge.isVertical ? 24 : 32)
+                        .padding(edge.isVertical ? .vertical : .horizontal, 12))
                 var differences = 0
                 var foreground = 0
                 for y in 0..<actual.pixelsHigh {
@@ -48,7 +48,7 @@ struct HeadphoneConnectionNoticeTests {
                 }
                 #expect(foreground > 10, "A connection without a system asset must retain a visible headphone icon")
                 #expect(differences == 0,
-                    "The custom pill must reuse the headphone glyph for \(edge), symbol \(symbol ?? "nil"), metadata \(String(describing: metadata)), reduceMotion \(reduceMotion)")
+                        "The custom pill must reuse the headphone glyph for \(edge), symbol \(symbol ?? "nil"), metadata \(String(describing: metadata)), reduceMotion \(reduceMotion)")
             }
         }
     }
@@ -59,13 +59,13 @@ struct HeadphoneConnectionNoticeTests {
         let engine = SideNoticeLayoutEngine()
         for menuHeight in [CGFloat(18), 22, 24, 25, 28, 32, 34, 48] {
             let screen = ScreenSnapshot(displayID: 7,
-                frame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
-                visibleFrame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
-                menuBarHeightFallback: menuHeight)
+                                        frame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
+                                        visibleFrame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
+                                        menuBarHeightFallback: menuHeight)
             let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
             for scale in [CGFloat(1), 1.5, 2, 3] {
                 let bitmap = try Self.compactHeadphoneBitmap(notice: notice, size: frame.size, centerInset: 0, scale: scale,
-                    locale: Locale(identifier: "zh_Hans"))
+                                                             locale: Locale(identifier: "zh_Hans"))
                 let bounds = Self.batteryRingBounds(bitmap)
                 #expect(bounds.count == 3)
                 for ring in bounds {
@@ -80,7 +80,7 @@ struct HeadphoneConnectionNoticeTests {
     @Test @MainActor
     func defaultCompactWingHeightProvidesCompleteHeadphoneRings() throws {
         let bitmap = try Self.compactHeadphoneBitmap(notice: Self.headphoneNotice(),
-            size: CGSize(width: 240, height: 34), centerInset: 0, scale: 2)
+                                                     size: CGSize(width: 240, height: 34), centerInset: 0, scale: 2)
         let bounds = Self.batteryRingBounds(bitmap)
         #expect(bounds.count == 3)
         for ring in bounds {
@@ -96,11 +96,11 @@ struct HeadphoneConnectionNoticeTests {
             notice.title = "我的 AirPods Pro"
             notice.batteryLevels = Array(try #require(notice.batteryLevels).prefix(batteryCount))
             let screen = ScreenSnapshot(displayID: 42,
-                frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
-                visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 950),
-                safeAreaInsets: ScreenInsets(top: physical ? 32 : 0),
-                auxiliaryTopLeftArea: physical ? CGRect(x: 0, y: 950, width: 716, height: 32) : nil,
-                auxiliaryTopRightArea: physical ? CGRect(x: 796, y: 950, width: 716, height: 32) : nil)
+                                        frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
+                                        visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 950),
+                                        safeAreaInsets: ScreenInsets(top: physical ? 32 : 0),
+                                        auxiliaryTopLeftArea: physical ? CGRect(x: 0, y: 950, width: 716, height: 32) : nil,
+                                        auxiliaryTopRightArea: physical ? CGRect(x: 796, y: 950, width: 716, height: 32) : nil)
             let engine = SideNoticeLayoutEngine()
             let settings = FeatureSettings(islandLayoutStyle: style)
             let layout = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
@@ -118,10 +118,10 @@ struct HeadphoneConnectionNoticeTests {
             let naturalWidth = centerInset > 0 ? centerInset + (max(identityWidth, batteryWidth) + 6 + 4) * 2
                 : identityWidth + 8 + batteryWidth + 6 * 2
             try #require(naturalWidth < 480,
-                "The natural-font fixture must fit below the compact limit before comparing its pixels")
+                         "The natural-font fixture must fit below the compact limit before comparing its pixels")
             #expect(frame.width == naturalWidth)
             let bitmap = try Self.compactHeadphoneBitmap(notice: notice, size: frame.size,
-                centerInset: centerInset, scale: 2, locale: locale)
+                                                         centerInset: centerInset, scale: 2, locale: locale)
             let referenceRenderer = ImageRenderer(content: VStack(alignment: .leading, spacing: 1) {
                 Text(notice.title)
                     .font(.system(size: 10, weight: .semibold))
@@ -130,10 +130,10 @@ struct HeadphoneConnectionNoticeTests {
                     .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(.secondary)
             }
-                .frame(width: titleWidth, height: frame.height, alignment: .leading)
-                .background(.black)
-                .environment(\.colorScheme, .dark)
-                .environment(\.locale, locale))
+            .frame(width: titleWidth, height: frame.height, alignment: .leading)
+            .background(.black)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, locale))
             referenceRenderer.scale = 2
             let reference = NSBitmapImageRep(cgImage: try #require(referenceRenderer.cgImage))
             var differences = 0
@@ -146,7 +146,7 @@ struct HeadphoneConnectionNoticeTests {
                 }
             }
             #expect(differences == 0,
-                "The complete name must keep its natural font size before the compact limit is reached")
+                    "The complete name must keep its natural font size before the compact limit is reached")
             let lastRing = try #require(Self.batteryRingBounds(bitmap).last)
             let trailingInset = CGFloat(bitmap.pixelsWide) - lastRing.maxX
             #expect((10...13).contains(trailingInset), "The battery row must end about 6pt inside the island")
@@ -156,8 +156,8 @@ struct HeadphoneConnectionNoticeTests {
     @Test @MainActor
     func batteryCountChangesTheContinuousHeadphoneRowWidth() throws {
         let screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
+                                    frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+                                    visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
         let engine = SideNoticeLayoutEngine()
         var notice = Self.headphoneNotice()
         notice.title = "三年后的 AirPods Pro 第二代"
@@ -165,17 +165,17 @@ struct HeadphoneConnectionNoticeTests {
         notice.batteryLevels = Array(try #require(notice.batteryLevels).prefix(1))
         let one = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
         #expect(three.width - one.width == 48,
-            "The row must reserve two 20pt rings and their 4pt gaps only when they are present")
+                "The row must reserve two 20pt rings and their 4pt gaps only when they are present")
         let bitmap = try Self.compactHeadphoneBitmap(notice: notice, size: one.size, centerInset: 0,
-            scale: 2, locale: Locale(identifier: "zh-Hans"))
+                                                     scale: 2, locale: Locale(identifier: "zh-Hans"))
         #expect(Self.batteryRingBounds(bitmap).count == 1)
     }
 
     @Test @MainActor
     func missingBatteryLevelsAndSingleUnitOnlyReserveTheirDisplayedRings() throws {
         let screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
+                                    frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+                                    visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
         let engine = SideNoticeLayoutEngine()
         var notice = Self.headphoneNotice()
         notice.title = "三年后的 AirPods Pro 第二代"
@@ -192,13 +192,13 @@ struct HeadphoneConnectionNoticeTests {
         notice.batteryLevels = Self.headphoneNotice().batteryLevels
         notice.batteryLevels?.append(NoticeBatteryLevel(label: "Extra", level: 100))
         #expect(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()) == single,
-            "A single-unit headset must not reserve extra component slots")
+                "A single-unit headset must not reserve extra component slots")
         let bitmap = try Self.compactHeadphoneBitmap(notice: notice, size: single.size, centerInset: 0,
-            scale: 2, locale: Locale(identifier: "zh-Hans"))
+                                                     scale: 2, locale: Locale(identifier: "zh-Hans"))
         #expect(Self.batteryRingBounds(bitmap).count == 1)
         notice.symbolName = nil
         #expect(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()) == three,
-            "Only the three components rendered by the existing row may change its width")
+                "Only the three components rendered by the existing row may change its width")
     }
 
     @Test(arguments: AppLanguage.allCases) @MainActor
@@ -217,10 +217,10 @@ struct HeadphoneConnectionNoticeTests {
             Text("").font(.system(size: 10, weight: .semibold))
             Text(connected).font(.system(size: 8, weight: .medium)).foregroundStyle(.secondary)
         }
-            .frame(width: connectingWidth, height: size.height, alignment: .leading)
-            .background(.black)
-            .environment(\.colorScheme, .dark)
-            .environment(\.locale, locale))
+        .frame(width: connectingWidth, height: size.height, alignment: .leading)
+        .background(.black)
+        .environment(\.colorScheme, .dark)
+        .environment(\.locale, locale))
         referenceRenderer.scale = 2
         let reference = NSBitmapImageRep(cgImage: try #require(referenceRenderer.cgImage))
         var differences = 0
@@ -269,7 +269,7 @@ struct HeadphoneConnectionNoticeTests {
         )
 
         let notice = IslandNotice(id: "headphone-connection", title: "AirPods Pro", style: .headphone,
-            metadata: [HeadphoneConnection.productIDMetadataKey: String(0x2027)])
+                                  metadata: [HeadphoneConnection.productIDMetadataKey: String(0x2027)])
         #expect(notice.headphoneProductID == 0x2027)
         let asset = try #require(locator.asset(for: notice.headphoneProductID))
         #expect(asset.imageURL.lastPathComponent == "B788.icns")
@@ -280,25 +280,25 @@ struct HeadphoneConnectionNoticeTests {
 
     private static func headphoneNotice() -> IslandNotice {
         IslandNotice(id: "headphone-connection", title: "AirPods Pro", detail: "已连接", side: .left,
-            style: .headphone, batteryLevels: [
-                NoticeBatteryLevel(label: "左", level: 100),
-                NoticeBatteryLevel(label: "右", level: 100),
-                NoticeBatteryLevel(label: "盒", level: 100),
-            ])
+                     style: .headphone, batteryLevels: [
+                         NoticeBatteryLevel(label: "左", level: 100),
+                         NoticeBatteryLevel(label: "右", level: 100),
+                         NoticeBatteryLevel(label: "盒", level: 100),
+                     ])
     }
 
     @MainActor
     private static func compactHeadphoneBitmap(notice: IslandNotice, size: CGSize, centerInset: CGFloat,
-        scale: CGFloat, locale: Locale = Locale(identifier: "en_US_POSIX")) throws -> NSBitmapImageRep {
+                                               scale: CGFloat, locale: Locale = Locale(identifier: "en_US_POSIX")) throws -> NSBitmapImageRep {
         let renderer = ImageRenderer(content: CompactHeadphoneConnectionBar(
             notice: notice, height: size.height, centerInset: centerInset
         )
-            .frame(width: size.width, height: size.height)
-            .background(.black)
-            .clipped()
-            .transaction { $0.disablesAnimations = true }
-            .environment(\.colorScheme, .dark)
-            .environment(\.locale, locale))
+        .frame(width: size.width, height: size.height)
+        .background(.black)
+        .clipped()
+        .transaction { $0.disablesAnimations = true }
+        .environment(\.colorScheme, .dark)
+        .environment(\.locale, locale))
         renderer.scale = scale
         return NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
     }

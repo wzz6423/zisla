@@ -25,10 +25,10 @@ struct ScreenshotHDRTests {
         #expect(view.image == nil && !view.hdrLayer.isHidden)
         #expect(view.hdrLayer.frame == view.bounds && view.intrinsicContentSize == image.size)
         #expect(try Self.pixelValues(contents) == Self.pixelValues(source),
-            "A local-display capture's gray levels must reach the native layer unchanged")
+                "A local-display capture's gray levels must reach the native layer unchanged")
         if #available(macOS 15.0, *) {
             #expect(view.hdrLayer.toneMapMode == .never,
-                "Local-display HDR captures must not receive a second content-dependent tone curve")
+                    "Local-display HDR captures must not receive a second content-dependent tone curve")
         }
         if #available(macOS 26.0, *) {
             #expect(view.hdrLayer.preferredDynamicRange == .high)
@@ -85,16 +85,16 @@ struct ScreenshotHDRTests {
 
         #expect(detached.contentHeadroom > 3.99 && detached.contentHeadroom <= 4.01)
         #expect(detached.contentAverageLightLevel > 0,
-            "Floating screenshot previews need average light level metadata for constrained HDR presentation")
+                "Floating screenshot previews need average light level metadata for constrained HDR presentation")
         for (expected, actual) in zip(reference, copied) {
             #expect(abs(actual - expected) < 0.002,
-                "Measuring HDR statistics must not change reference white or amplify highlights")
+                    "Measuring HDR statistics must not change reference white or amplify highlights")
         }
         let preview = try Self.previewPixels(detached, targetHeadroom: 2)
         #expect(preview.allSatisfy { $0 <= 2.002 }, "HDR previews must fit the display's current headroom; got \(preview)")
         let visible = preview.map { min($0, 2) }
         #expect(visible[5] < visible[6] && visible[6] < visible[7],
-            "Distinct HDR highlights must roll off instead of clipping to the same display white; got \(visible)")
+                "Distinct HDR highlights must roll off instead of clipping to the same display white; got \(visible)")
     }
 
     @Test
@@ -106,18 +106,18 @@ struct ScreenshotHDRTests {
         #expect(detached.contentAverageLightLevel > 0)
         let cropped = try #require(detached.cropping(to: CGRect(x: 0, y: 0, width: 4, height: 8)))
         let edited = try #require(ScreenshotImageRendering.render(CIImage(cgImage: cropped), matching: detached,
-            context: Self.context))
+                                                                  context: Self.context))
         #expect(edited.contentHeadroom == detached.contentHeadroom)
         #expect(edited.contentAverageLightLevel > 0
             && edited.contentAverageLightLevel < detached.contentAverageLightLevel,
             "Cropped or obscured previews must use their own average brightness rather than the full capture's statistics")
         #expect(abs(try Self.pixel(edited, x: 3, y: 4)[0] - 1) < 0.002)
         let selection = try #require(ScreenshotCaptureService.image(from: detached,
-            cropInScreenPoints: CGRect(x: 0, y: 0, width: 4, height: 8), screenSize: CGSize(width: 8, height: 8)))
+                                                                    cropInScreenPoints: CGRect(x: 0, y: 0, width: 4, height: 8), screenSize: CGSize(width: 8, height: 8)))
         let selected = try #require(selection.cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(selected.contentHeadroom == detached.contentHeadroom)
         #expect(abs(selected.contentAverageLightLevel - edited.contentAverageLightLevel) < 0.01,
-            "The initial selection preview must measure the cropped pixels before any annotation is applied")
+                "The initial selection preview must measure the cropped pixels before any annotation is applied")
     }
 
     @Test(arguments: [Float(0), Float(1)], [Float(0), Float(4)])
@@ -129,7 +129,7 @@ struct ScreenshotHDRTests {
         #expect(detached.contentHeadroom == headroom)
         let sample = try Self.pixel(detached, x: 4, y: 4)
         #expect(sample[0] == 0 && sample[1] == 0 && sample[2] == 0 && sample[3] == alpha,
-            "HDR statistics must not drop black or fully transparent captures")
+                "HDR statistics must not drop black or fully transparent captures")
     }
 
     @Test(arguments: [false, true])
@@ -221,7 +221,7 @@ struct ScreenshotHDRTests {
         #expect(center[3] == 1)
         if preservesHDR {
             #expect(abs(center[0] - Float(highlight)) < 0.01 && abs(center[1] - Float(highlight / 2)) < 0.01,
-                "Encoding and decoding must preserve light levels above SDR white")
+                    "Encoding and decoding must preserve light levels above SDR white")
             #expect(decoded.bitsPerComponent == 16)
             #expect(decoded.colorSpace.map(CGColorSpaceUsesITUR_2100TF) == true)
         } else {
@@ -235,12 +235,12 @@ struct ScreenshotHDRTests {
         let model = ScreenshotEditorModel(image: NSImage(cgImage: hdr, size: CGSize(width: 40, height: 30)))
         model.preservesHDR = true
         let annotation = ScreenshotAnnotation(kind: .brush, points: [CGPoint(x: 12, y: 10), CGPoint(x: 24, y: 10)],
-            color: ScreenshotRGBA(red: 0, green: 0, blue: 0), lineWidth: 4)
+                                              color: ScreenshotRGBA(red: 0, green: 0, blue: 0), lineWidth: 4)
         model.updatePendingAnnotationDraft(annotation)
         let image = try #require(model.renderedImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
         let ink = try Self.pixel(image, x: 36, y: 40)
         #expect(ink[0] < 0.01 && ink[1] < 0.01 && ink[2] < 0.01 && ink[3] == 1,
-            "Point-space annotations must scale and keep their top-left origin on Retina HDR images; got \(ink)")
+                "Point-space annotations must scale and keep their top-left origin on Retina HDR images; got \(ink)")
         #expect(try Self.pixel(image, x: 36, y: 10)[0] == 4)
         #expect(model.pendingAnnotationDraft == nil && model.annotations == [annotation])
     }
@@ -248,10 +248,10 @@ struct ScreenshotHDRTests {
     @Test(arguments: [ScreenshotObscureEffect.blur, .pixelate])
     func obscureEffectsPreserveHDRInsideAndOutsideTheEditedRegion(effect: ScreenshotObscureEffect) throws {
         let model = ScreenshotEditorModel(image: NSImage(cgImage: try Self.hdrImage(width: 80, height: 60),
-            size: CGSize(width: 80, height: 60)))
+                                                         size: CGSize(width: 80, height: 60)))
         model.preservesHDR = true
         model.add(ScreenshotAnnotation(kind: .mosaic, rect: CGRect(x: 12, y: 12, width: 30, height: 30),
-            obscureEffect: effect, obscureStrength: 2))
+                                       obscureEffect: effect, obscureStrength: 2))
         let image = try #require(model.imageApplyingMosaics().cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(try Self.pixel(image, x: 24, y: 30)[0] > 3.9)
         #expect(try Self.pixel(image, x: 65, y: 30)[0] > 3.9)
@@ -263,7 +263,8 @@ struct ScreenshotHDRTests {
         let hdr = try Self.hdrImage()
         let mask = try #require(try ScreenshotImageExtraction.lassoMask(
             regions: [[CGPoint(x: 8, y: 4), CGPoint(x: 24, y: 4), CGPoint(x: 24, y: 20), CGPoint(x: 8, y: 20)]],
-            imageSize: CGSize(width: 32, height: 24), pixelWidth: 32, pixelHeight: 24))
+            imageSize: CGSize(width: 32, height: 24), pixelWidth: 32, pixelHeight: 24
+        ))
         let extracted = try ScreenshotImageExtraction.applying(mask: mask, to: hdr)
         #expect(try Self.pixel(extracted, x: 16, y: 12)[0] == 4)
         #expect(try Self.pixel(extracted, x: 0, y: 0)[3] == 0)
@@ -277,13 +278,13 @@ struct ScreenshotHDRTests {
     func croppingKeepsHDRAndRejectsEmptySelections() throws {
         let hdr = try Self.hdrImage()
         let crop = try #require(ScreenshotCaptureService.image(from: hdr,
-            cropInScreenPoints: CGRect(x: 2, y: 3, width: 8, height: 6), screenSize: CGSize(width: 16, height: 12)))
+                                                               cropInScreenPoints: CGRect(x: 2, y: 3, width: 8, height: 6), screenSize: CGSize(width: 16, height: 12)))
         let image = try #require(crop.cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(crop.size == CGSize(width: 8, height: 6) && image.width == 16 && image.height == 12)
         #expect(try Self.pixel(image, x: 8, y: 6)[0] == 4)
         for rect in [CGRect.zero, CGRect(x: 100, y: 100, width: 8, height: 6)] {
             #expect(ScreenshotCaptureService.image(from: hdr, cropInScreenPoints: rect,
-                screenSize: CGSize(width: 16, height: 12)) == nil)
+                                                   screenSize: CGSize(width: 16, height: 12)) == nil)
         }
     }
 
@@ -312,10 +313,10 @@ struct ScreenshotHDRTests {
         let second = try Self.hdrImage(width: 12, height: 8)
         let standard = try #require(ScreenshotImageRendering.sdrImage(from: first))
         let model = ScreenshotEditorModel(image: NSImage(cgImage: first, size: CGSize(width: 12, height: 10)),
-            sdrImage: NSImage(cgImage: standard, size: CGSize(width: 12, height: 10)))
+                                          sdrImage: NSImage(cgImage: standard, size: CGSize(width: 12, height: 10)))
         #expect(model.append(image: NSImage(cgImage: second, size: CGSize(width: 12, height: 8))))
         #expect(model.sdrImage == nil && model.displayImage.size == CGSize(width: 12, height: 18),
-            "Appending must replace the previous SDR image instead of exporting the first frame alone")
+                "Appending must replace the previous SDR image instead of exporting the first frame alone")
         model.preservesHDR = true
         let combined = try #require(model.renderedImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(combined.width == 12 && combined.height == 18)
@@ -341,13 +342,13 @@ struct ScreenshotHDRTests {
         let initial = try #require(ScreenshotCaptureService.image(from: sdr, cropInScreenPoints: rect, screenSize: screenSize))
         var requests: [Bool] = []
         let controller = ScreenshotEditorWindowController(image: initial,
-            screenImage: screenImage, screenCGImage: sdr, hdrScreenCGImage: hasHDR ? hdr : nil,
-            screen: screen, captureRect: rect, capturedApplication: nil, settingsStore: settings,
-            onStash: { _, _ in }, writeImageToPasteboard: { _ in false }, presentSavePanel: { _, _ in },
-            captureScreen: { _, includeHDR in
-                requests.append(includeHDR)
-                return (screenImage, sdr, hasHDR ? hdr : nil)
-            }, scheduleLongCaptureWork: { _, _ in }, onClose: {})
+                                                          screenImage: screenImage, screenCGImage: sdr, hdrScreenCGImage: hasHDR ? hdr : nil,
+                                                          screen: screen, captureRect: rect, capturedApplication: nil, settingsStore: settings,
+                                                          onStash: { _, _ in }, writeImageToPasteboard: { _ in false }, presentSavePanel: { _, _ in },
+                                                          captureScreen: { _, includeHDR in
+                                                              requests.append(includeHDR)
+                                                              return (screenImage, sdr, hasHDR ? hdr : nil)
+                                                          }, scheduleLongCaptureWork: { _, _ in }, onClose: {})
         defer { controller.close() }
         controller.window?.alphaValue = 0
         let host = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
@@ -359,7 +360,7 @@ struct ScreenshotHDRTests {
         await task.value
         #expect(requests == [hasHDR], "HDR capture follows the frozen frame's capability, including while its preview is disabled")
         #expect(model.lastLongCaptureFrameResult == .unchanged,
-            "The injected HDR frame must be compared with the frozen HDR pixels instead of its SDR representation")
+                "The injected HDR frame must be compared with the frozen HDR pixels instead of its SDR representation")
         #expect(model.image === frozen && model.canPreserveHDR == hasHDR && model.preservesHDR == preservesHDR)
         #expect(!model.canUndo && model.isLongCapturePreviewing)
     }
@@ -368,8 +369,8 @@ struct ScreenshotHDRTests {
     func PQImagesRemainHDRWhenReopenedAndUnknownHeadroomIsMeasuredWhenSupported() throws {
         let hdr = try Self.hdrImage()
         let pq = try #require(Self.context.createCGImage(CIImage(cgImage: hdr),
-            from: CGRect(x: 0, y: 0, width: hdr.width, height: hdr.height), format: .RGBA16,
-            colorSpace: CGColorSpace(name: CGColorSpace.itur_2100_PQ)!))
+                                                         from: CGRect(x: 0, y: 0, width: hdr.width, height: hdr.height), format: .RGBA16,
+                                                         colorSpace: CGColorSpace(name: CGColorSpace.itur_2100_PQ)!))
         let detached = try #require(ScreenshotCaptureService.detachedImage(from: pq))
         #expect(ScreenshotImageRendering.isHDR(pq) && ScreenshotImageRendering.isHDR(detached))
         #expect(try Self.pixel(detached, x: 16, y: 12)[0] > 3.99)
@@ -398,7 +399,7 @@ struct ScreenshotHDRTests {
         #expect(model.hasExtractedImage && model.canPreserveHDR && !model.preservesHDR && model.sdrImage == nil)
         model.preservesHDR = true
         #expect(try Self.pixel(try #require(model.renderedImage().cgImage(forProposedRect: nil, context: nil, hints: nil)),
-            x: 16, y: 12)[0] == 4)
+                               x: 16, y: 12)[0] == 4)
         model.undo()
         #expect(model.image === source && model.sdrImage === standard && model.preservesHDR)
         model.redo()
@@ -412,7 +413,7 @@ struct ScreenshotHDRTests {
         let hdr = try Self.hdrImage()
         let modal = try #require(ScreenshotImageRendering.sdrImage(from: Self.hdrImage(width: 4, height: 4)))
         let composited = try #require(ScreenshotModalWindowSnapshot.composite(modal,
-            in: CGRect(x: 4, y: 4, width: 4, height: 4), over: hdr, screenSize: CGSize(width: 32, height: 24)))
+                                                                              in: CGRect(x: 4, y: 4, width: 4, height: 4), over: hdr, screenSize: CGSize(width: 32, height: 24)))
         #expect(try Self.pixel(composited, x: 20, y: 12)[0] == 4)
         #expect(try Self.pixel(composited, x: 6, y: 18)[0] <= 1.001)
         #expect(composited.bitmapInfo.contains(.floatComponents))
@@ -442,7 +443,7 @@ struct ScreenshotHDRTests {
         let empty = ScreenshotEditorModel(image: NSImage(size: CGSize(width: 0, height: 0)))
         empty.preservesHDR = true
         #expect(empty.pngData() == nil && !empty.canUndo,
-            "An unresolved image must not generate a partial PNG or change editor history")
+                "An unresolved image must not generate a partial PNG or change editor history")
     }
 
     @Test
@@ -457,11 +458,11 @@ struct ScreenshotHDRTests {
         try ScreenshotImageExport.writePNG(data, to: destination)
         #expect(try Data(contentsOf: destination) == data)
         let source = ScreenshotSourceSnapshot(applicationName: nil, bundleIdentifier: nil, processIdentifier: nil,
-            capturedAt: Date(timeIntervalSince1970: 42))
+                                              capturedAt: Date(timeIntervalSince1970: 42))
         let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
         let item = try store.stashScreenshot(png: data, metadata: ShelfScreenshotMetadata(source: source,
-            isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero, screenFrame: nil,
-            displayIdentifier: nil, pixelWidth: 32, pixelHeight: 24))
+                                                                                          isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero, screenFrame: nil,
+                                                                                          displayIdentifier: nil, pixelWidth: 32, pixelHeight: 24))
         #expect(try store.screenshotData(id: item.id) == data)
         let reloaded = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
         #expect(try reloaded.screenshotData(id: item.id) == data)
@@ -499,9 +500,9 @@ struct ScreenshotHDRTests {
         let rect = CGRect(x: 0, y: 0, width: screenSize.width / 2, height: screenSize.height / 2)
         let image = try #require(ScreenshotCaptureService.image(from: sdr, cropInScreenPoints: rect, screenSize: screenSize))
         let controller = ScreenshotEditorWindowController(image: image,
-            screenImage: screenImage, screenCGImage: sdr, hdrScreenCGImage: hasHDR ? hdr : nil,
-            screen: screen, captureRect: rect, capturedApplication: nil, settingsStore: settings,
-            onStash: { _, _ in }, onClose: {})
+                                                          screenImage: screenImage, screenCGImage: sdr, hdrScreenCGImage: hasHDR ? hdr : nil,
+                                                          screen: screen, captureRect: rect, capturedApplication: nil, settingsStore: settings,
+                                                          onStash: { _, _ in }, onClose: {})
         defer { controller.close() }
         let host = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
         for _ in 0..<3 {
@@ -515,7 +516,7 @@ struct ScreenshotHDRTests {
         let background = try #require(configuration.backgroundImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(ScreenshotImageRendering.isHDR(background) == hasHDR)
         #expect(try Self.pixel(background, x: 40, y: 30) == Self.pixel(hasHDR ? hdr : sdr, x: 40, y: 30),
-            "Confirming a selection must retain the frozen screen's light levels even while HDR export is disabled")
+                "Confirming a selection must retain the frozen screen's light levels even while HDR export is disabled")
         let backdrops = Self.backingViews(in: host)
         #expect(!backdrops.isEmpty)
         for backdrop in backdrops {
@@ -523,7 +524,7 @@ struct ScreenshotHDRTests {
                 let contents = try #require(backdrop.hdrLayer.contents) as! CGImage
                 #expect(!backdrop.hdrLayer.isHidden && backdrop.image == nil)
                 #expect(try Self.pixel(contents, x: 40, y: 30)[0] == 4,
-                    "The full-screen and selected-area backdrops must present HDR through the native layer")
+                        "The full-screen and selected-area backdrops must present HDR through the native layer")
             } else {
                 #expect(backdrop.hdrLayer.isHidden && backdrop.hdrLayer.contents == nil)
                 #expect(backdrop.image === screenImage)
@@ -542,12 +543,14 @@ struct ScreenshotHDRTests {
         #expect(hasHDR ? selectedHighlight == 4 : selectedHighlight <= 1.001)
         editor.model.beginLongCapturePreview()
         #expect(controller.longCaptureToolbarFrame(on: screen).width == ScreenshotToolbarLayout.viewportWidth(
-            availableWidth: screen.visibleFrame.width, controlCount: ScreenshotToolbarLayout.controlCount + (hasHDR ? 1 : 0)),
-            "The floating long-capture toolbar must reserve a slot for its HDR control")
+            availableWidth: screen.visibleFrame.width, controlCount: ScreenshotToolbarLayout.controlCount + (hasHDR ? 1 : 0)
+        ),
+        "The floating long-capture toolbar must reserve a slot for its HDR control")
         editor.model.replaceCapture(with: nextSDR, translatingAnnotationsBy: .zero)
         #expect(controller.longCaptureToolbarFrame(on: screen).width == ScreenshotToolbarLayout.viewportWidth(
-            availableWidth: screen.visibleFrame.width, controlCount: ScreenshotToolbarLayout.controlCount),
-            "SDR toolbars must not reserve an absent HDR control")
+            availableWidth: screen.visibleFrame.width, controlCount: ScreenshotToolbarLayout.controlCount
+        ),
+        "SDR toolbars must not reserve an absent HDR control")
     }
 
     @Test(arguments: [false, true])
@@ -559,7 +562,7 @@ struct ScreenshotHDRTests {
         var panels: [ScreenshotSelectionPanel] = []
         var result: ScreenshotCaptureResult?
         let controller = ScreenshotSelectionController(captureScreen: { _ in (screenImage, sdr, hasHDR ? hdr : nil) },
-            presentPanels: { panels = $0 }, snapTargets: { _ in [] })
+                                                       presentPanels: { panels = $0 }, snapTargets: { _ in [] })
         defer { controller.cancel() }
         controller.onCaptured = { result = $0 }
         await controller.start(on: screen)
@@ -571,7 +574,7 @@ struct ScreenshotHDRTests {
         let preview = try #require(host.rootView.image?.cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(ScreenshotImageRendering.isHDR(preview) == hasHDR)
         #expect(try Self.pixel(preview, x: 160, y: 120) == Self.pixel(hasHDR ? hdr : sdr, x: 160, y: 120),
-            "Entering screenshot selection must preserve the frozen HDR screen's original light levels")
+                "Entering screenshot selection must preserve the frozen HDR screen's original light levels")
         #expect(host.rootView.cgImage === sdr, "Color sampling must retain the SDR representation")
         let backdrops = Self.backingViews(in: host)
         #expect(!backdrops.isEmpty)
@@ -580,7 +583,7 @@ struct ScreenshotHDRTests {
                 let contents = try #require(backdrop.hdrLayer.contents) as! CGImage
                 #expect(!backdrop.hdrLayer.isHidden && backdrop.image == nil)
                 #expect(try Self.pixel(contents, x: 160, y: 120)[0] == 4,
-                    "The selection entry must activate native HDR presentation before the first drag")
+                        "The selection entry must activate native HDR presentation before the first drag")
             } else {
                 #expect(backdrop.hdrLayer.isHidden && backdrop.hdrLayer.contents == nil)
                 #expect(backdrop.image === screenImage)
@@ -594,11 +597,11 @@ struct ScreenshotHDRTests {
         var cancelled: ScreenshotSelectionController!
         var presentations = 0
         cancelled = ScreenshotSelectionController(captureScreen: { _ in (screenImage, sdr, hasHDR ? hdr : nil) },
-            presentPanels: { _ in presentations += 1 }, snapTargets: { _ in [] })
+                                                  presentPanels: { _ in presentations += 1 }, snapTargets: { _ in [] })
         cancelled.onSelectionWillPresent = { cancelled.cancel() }
         await cancelled.start(on: screen)
         #expect(presentations == 0 && cancelled.selectionWindowCount == 0,
-            "Cancelling during preparation must discard both dynamic ranges")
+                "Cancelling during preparation must discard both dynamic ranges")
     }
 
     @Test
@@ -613,10 +616,10 @@ struct ScreenshotHDRTests {
         let source = NSImage(cgImage: try Self.hdrImage(), size: CGSize(width: 32, height: 24))
         let model = ScreenshotEditorModel(image: source)
         let editor = ScreenshotEditorView(model: model, selectionState: ScreenshotAnnotationSelectionState(),
-            settingsStore: settings, onClose: {}, onCopy: {}, onPinToggle: { _ in }, onLongCapture: {})
+                                          settingsStore: settings, onClose: {}, onCopy: {}, onPinToggle: { _ in }, onLongCapture: {})
         let host = NSHostingView(rootView: editor.hdrButton)
         let window = NSWindow(contentRect: CGRect(origin: .zero, size: host.fittingSize),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -662,10 +665,10 @@ struct ScreenshotHDRTests {
         let data = values.withUnsafeBytes { Data($0) }
         let provider = try #require(CGDataProvider(data: data as CFData))
         let image = try #require(CGImage(width: 8, height: 8, bitsPerComponent: 32, bitsPerPixel: 128,
-            bytesPerRow: 8 * 16, space: linearSpace,
-            bitmapInfo: [.floatComponents, .byteOrder32Little,
-                CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)],
-            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+                                         bytesPerRow: 8 * 16, space: linearSpace,
+                                         bitmapInfo: [.floatComponents, .byteOrder32Little,
+                                                      CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)],
+                                         provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
         if #available(macOS 15.0, *) {
             return try #require(CGImageCreateCopyWithContentHeadroom(headroom, image))
         }
@@ -688,7 +691,7 @@ struct ScreenshotHDRTests {
         var output: CGImage?
         renderer.render { size, draw in
             guard let bitmap = ScreenshotImageRendering.bitmapContext(width: Int(size.width), height: Int(size.height),
-                matching: image) else { return }
+                                                                      matching: image) else { return }
             bitmap.setEDRTargetHeadroom(targetHeadroom)
             draw(bitmap)
             output = bitmap.makeImage()
@@ -711,7 +714,7 @@ struct ScreenshotHDRTests {
             width: width, height: height, bitsPerComponent: 16, bitsPerPixel: 64,
             bytesPerRow: width * 8, space: linearSpace,
             bitmapInfo: [.floatComponents, .byteOrder16Little,
-                CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)],
+                         CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)],
             provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
         ))
         if #available(macOS 15.0, *) {
@@ -724,7 +727,7 @@ struct ScreenshotHDRTests {
         var values = [Float](repeating: 0, count: 4)
         values.withUnsafeMutableBytes { bytes in
             context.render(CIImage(cgImage: image), toBitmap: bytes.baseAddress!, rowBytes: 16,
-                bounds: CGRect(x: x, y: y, width: 1, height: 1), format: .RGBAf, colorSpace: linearSpace)
+                           bounds: CGRect(x: x, y: y, width: 1, height: 1), format: .RGBAf, colorSpace: linearSpace)
         }
         return values
     }

@@ -109,8 +109,8 @@ struct FileShelfShakeViewTests {
             shared = $0
             sharingAnchor = $1
         })
-            .environment(\.locale, language.locale)
-            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        .environment(\.locale, language.locale)
+        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let panel = FileShelfShakeController.makeWindow(contentView: host, frame: CGRect(origin: .zero, size: FileShelfShakeLayout.size))
         defer { panel.close() }
@@ -294,8 +294,8 @@ struct IslandGlassStandaloneSurfaceTests {
                 Color.clear.islandGlassSurface(.input, cornerRadius: 14)
             }
         }
-            .environment(\.islandVisualStyle, .frosted)
-            .environment(\.colorScheme, .dark))
+        .environment(\.islandVisualStyle, .frosted)
+        .environment(\.colorScheme, .dark))
         let panel = FileShelfShakeController.makeWindow(contentView: host, frame: CGRect(x: 0, y: 0, width: 360, height: 44))
         defer { panel.close() }
         host.layoutSubtreeIfNeeded()
@@ -475,7 +475,7 @@ struct FileShelfShakeControllerTests {
     @Test(arguments: [false, true], [false, true])
     func shakeRequiresBothSwitchesWhileShelfOnlyRequiresItsParent(shelfEnabled: Bool, shakeEnabled: Bool) throws {
         let fixture = try Fixture(settings: FeatureSettings(fileShelfEnabled: shelfEnabled,
-            fileShelfShakeEnabled: shakeEnabled, contextNotesEnabled: false))
+                                                            fileShelfShakeEnabled: shakeEnabled, contextNotesEnabled: false))
         defer { fixture.close() }
         #expect(IslandModule.shelf.isEnabled(in: fixture.settings.settings) == shelfEnabled)
         #expect(fixture.controller.isMonitoring == (shelfEnabled && shakeEnabled))

@@ -76,8 +76,8 @@ enum RecordingMediaImporter {
                 if type?.conforms(to: .image) == true {
                     let size = try RecordingMediaImageStore.dimensions(of: copied)
                     timeline.assets.append(.init(id: id, name: name, file: file, kind: .image,
-                        duration: 5, width: Int(size.width), height: Int(size.height), importedAt: importedAt,
-                        capturedAt: RecordingMediaMetadata.capturedAt(image: copied)))
+                                                 duration: 5, width: Int(size.width), height: Int(size.height), importedAt: importedAt,
+                                                 capturedAt: RecordingMediaMetadata.capturedAt(image: copied)))
                 } else {
                     let asset = AVURLAsset(url: copied)
                     let duration = try await asset.load(.duration).seconds
@@ -89,11 +89,11 @@ enum RecordingMediaImporter {
                         let transform = try await video.load(.preferredTransform)
                         let size = CGRect(origin: .zero, size: natural).applying(transform).size
                         timeline.assets.append(.init(id: id, name: name, file: file, kind: .video,
-                            duration: duration, width: Int(abs(size.width)), height: Int(abs(size.height)), hasAudio: audio != nil,
-                            importedAt: importedAt, capturedAt: capturedAt))
+                                                     duration: duration, width: Int(abs(size.width)), height: Int(abs(size.height)), hasAudio: audio != nil,
+                                                     importedAt: importedAt, capturedAt: capturedAt))
                     } else if audio != nil {
                         timeline.assets.append(.init(id: id, name: name, file: file, kind: .audio,
-                            duration: duration, hasAudio: true, importedAt: importedAt, capturedAt: capturedAt))
+                                                     duration: duration, hasAudio: true, importedAt: importedAt, capturedAt: capturedAt))
                     } else { throw ScreenRecordingExportError.unavailableMedia }
                 }
                 fileIndices[file, default: []].append(timeline.assets.count - 1)
@@ -108,10 +108,10 @@ enum RecordingMediaImporter {
             } else {
                 let first = timeline.assets[0]
                 candidate = .init(name: String(urls[0].deletingPathExtension().lastPathComponent.prefix(512)),
-                    videoFile: "", duration: first.duration,
-                    width: first.kind == .audio ? 1_920 : first.width,
-                    height: first.kind == .audio ? 1_080 : first.height,
-                    edits: .init(segments: []), timeline: timeline)
+                                  videoFile: "", duration: first.duration,
+                                  width: first.kind == .audio ? 1_920 : first.width,
+                                  height: first.kind == .audio ? 1_080 : first.height,
+                                  edits: .init(segments: []), timeline: timeline)
             }
             try candidate.validate()
             try checkCancellation()

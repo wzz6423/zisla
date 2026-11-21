@@ -99,7 +99,7 @@ struct ImageTransformTests {
         let original = try Data(contentsOf: input)
         let replacement = try Pixels.image(width: 12, height: 8)
         let batch = try await ImageProcessingService(executableURL: nil).process([input], options: .init(formats: formats),
-            rasterTransform: { _, _ in replacement })
+                                                                                 rasterTransform: { _, _ in replacement })
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.failures.isEmpty, "\(batch.failures)")
         let item = try #require(batch.items.first)
@@ -156,10 +156,10 @@ struct ImageTransformTests {
         let original = try Data(contentsOf: input)
         await #expect(throws: ImageProcessingError.rasterEditingMetadataUnsupported) {
             try await ImageProcessingService(executableURL: nil).process([input], options: .init(formats: formats, preserveMetadata: true),
-                rasterTransform: { image, _ in
-                    Issue.record("Unsupported metadata retention must fail before editing")
-                    return image
-                })
+                                                                         rasterTransform: { image, _ in
+                                                                             Issue.record("Unsupported metadata retention must fail before editing")
+                                                                             return image
+                                                                         })
         }
         #expect(try Data(contentsOf: input) == original)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == ["source.png"])
@@ -412,8 +412,8 @@ struct ImageTransformTests {
     }
 
     @Test(arguments: [ImageProcessingOptions(formats: [.jpeg]), .init(formats: [.webp]), .init(formats: [.avif]),
-                     .init(formats: [.jpegXL]), .init(formats: [.svg]), .init(formats: [.png, .jpeg, .png]),
-                     .init(resize: .init(method: .fit, width: 20, height: 20)),
+                      .init(formats: [.jpegXL]), .init(formats: [.svg]), .init(formats: [.png, .jpeg, .png]),
+                      .init(resize: .init(method: .fit, width: 20, height: 20)),
                       .init(transform: .init(rotation: .clockwise90))])
     func additionalEncodingOptionsStillRequireAnEngine(options: ImageProcessingOptions) async throws {
         let fixture = try ImageProcessingServiceTests.Fixture()
@@ -431,16 +431,16 @@ struct ImageTransformTests {
         let input = try fixture.png()
         let original = try Data(contentsOf: input)
         var callbacks = CGDataProviderDirectCallbacks(version: 0, getBytePointer: nil, releaseBytePointer: nil,
-            getBytesAtPosition: { _, buffer, _, count in
-                Issue.record("Excessive edited dimensions must be rejected before the pixel provider is read")
-                buffer.initializeMemory(as: UInt8.self, repeating: 0, count: count)
-                return count
-            }, releaseInfo: nil)
+                                                      getBytesAtPosition: { _, buffer, _, count in
+                                                          Issue.record("Excessive edited dimensions must be rejected before the pixel provider is read")
+                                                          buffer.initializeMemory(as: UInt8.self, repeating: 0, count: count)
+                                                          return count
+                                                      }, releaseInfo: nil)
         let provider = try #require(CGDataProvider(directInfo: nil, size: Int64(size.0 * size.1 * 4), callbacks: &callbacks))
         let excessive = try #require(CGImage(width: size.0, height: size.1, bitsPerComponent: 8, bitsPerPixel: 32,
-            bytesPerRow: size.0 * 4, space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+                                             bytesPerRow: size.0 * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                             provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
         let batch = try await ImageProcessingService(executableURL: nil).process([input], options: .init(), rasterTransform: { _, _ in excessive })
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.items.isEmpty && batch.failures.count == 1)
@@ -486,9 +486,9 @@ struct ImageTransformTests {
         static func make(width: Int, height: Int, bytes: [UInt8]) throws -> CGImage {
             let provider = try #require(CGDataProvider(data: Data(bytes) as CFData))
             return try #require(CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
-                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+                                        bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                        provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
         }
 
         static func write(_ image: CGImage, to url: URL, properties: [CFString: Any] = [:]) throws {
@@ -501,8 +501,8 @@ struct ImageTransformTests {
             var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
             try bytes.withUnsafeMutableBytes { data in
                 let context = try #require(CGContext(data: data.baseAddress, width: image.width, height: image.height,
-                    bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                     bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
                 context.interpolationQuality = .none
                 context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
             }

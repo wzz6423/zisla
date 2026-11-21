@@ -126,7 +126,7 @@ struct TypingStatsKeyboardView: View {
                             exposesEmptyMetadata: exposesEmptyKeysToAssistiveTech
                         )
                         .equatable()
-                            .padding(.top, 12)
+                        .padding(.top, 12)
                     } label: {
                         Text(AppLocalization.text("外接键盘与扩展按键"))
                             .font(.subheadline.weight(.medium))
@@ -156,7 +156,7 @@ struct TypingStatsKeyboardView: View {
         KeyboardHeatmapLegend(
             leadingLabel: scale.hasValues
                 ? L10n.format("低 %@ ", statsCount(Int64(scale.low.rounded())))
-                    .trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: .whitespaces)
                 : L10n.tr("低 0"),
             trailingLabel: scale.hasValues
                 ? L10n.format("高 ≥%@", statsCount(Int64(scale.high.rounded())))

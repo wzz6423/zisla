@@ -33,10 +33,10 @@ struct ScreenshotShortcutContextTests {
         var closedEditors = 0
         let editors = (0..<3).map { _ in
             ScreenshotEditorWindowController(image: image, screenImage: image,
-                screenCGImage: pixels, screen: nil,
-                captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
-                capturedApplication: nil, settingsStore: store, onStash: { _, _ in },
-                onClose: { closedEditors += 1 })
+                                             screenCGImage: pixels, screen: nil,
+                                             captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
+                                             capturedApplication: nil, settingsStore: store, onStash: { _, _ in },
+                                             onClose: { closedEditors += 1 })
         }
         defer { editors.forEach { $0.close() } }
         for editor in editors { editor.window?.alphaValue = 0 }
@@ -87,7 +87,7 @@ struct ScreenshotShortcutContextTests {
         var closedEditors = 0
         let pins = try (0..<2).map { index in
             try syntheticEditor(settingsStore: store, keyWindow: index == 0 ? true : nil,
-                onClose: { closedEditors += 1 })
+                                onClose: { closedEditors += 1 })
         }
         defer { pins.forEach { $0.close() } }
         for pin in pins {
@@ -117,7 +117,7 @@ struct ScreenshotShortcutContextTests {
         }
         for (pin, key) in zip(pins, escapeKeys) {
             let result = pin.pinnedEscapeHotkeyManager.register(keyCode: key, modifiers: flags,
-                action: { [weak pin] in pin?.close() })
+                                                                action: { [weak pin] in pin?.close() })
             #expect(result == .registered)
         }
         var panels: [ScreenshotSelectionPanel] = []
@@ -143,9 +143,9 @@ struct ScreenshotShortcutContextTests {
         }
         ScreenshotHotkeyContext.update(selecting: false, editors: pins, globalManagers: globals)
         #expect(globals.allSatisfy { !$0.isSuspended && $0.hasActiveRegistration },
-            "Focused pins must leave both capture registrations active")
+                "Focused pins must leave both capture registrations active")
         #expect(pins.allSatisfy { $0.pinnedEscapeHotkeyManager.isSuspended },
-            "Focused pins must keep global Escape from claiming the local cancel key")
+                "Focused pins must keep global Escape from claiming the local cancel key")
 
         for key in captureKeys {
             captureTask = nil
@@ -168,7 +168,7 @@ struct ScreenshotShortcutContextTests {
         defer { editor.close() }
         ScreenshotHotkeyContext.update(selecting: false, editors: pins + [editor], globalManagers: globals)
         #expect(globals.allSatisfy { $0.isSuspended && !$0.hasActiveRegistration },
-            "A new unpinned editor must suspend capture even with older pins present")
+                "A new unpinned editor must suspend capture even with older pins present")
         let editorWindow = try #require(editor.window as? ScreenshotEditorWindow)
         #expect(editorWindow.performKeyEquivalent(with: try event(window: editorWindow, key: "\u{1b}", code: 53)))
         ScreenshotHotkeyContext.update(selecting: false, editors: pins, globalManagers: globals)
@@ -209,7 +209,7 @@ struct ScreenshotShortcutContextTests {
         var closeCount = 0
         var stashedImages: [Data] = []
         let controller = try syntheticEditor(settingsStore: store,
-            onStash: { data, _ in stashedImages.append(data) }, onClose: { closeCount += 1 })
+                                             onStash: { data, _ in stashedImages.append(data) }, onClose: { closeCount += 1 })
         defer { controller.close() }
         controller.setPinned(true)
         let window = try #require(controller.window as? ScreenshotEditorWindow)
@@ -219,11 +219,11 @@ struct ScreenshotShortcutContextTests {
         #expect(!consumed)
         let eventFlags: NSEvent.ModifierFlags = defaults ? .control : [.control, .option, .command, .shift]
         #expect(!window.performKeyEquivalent(with: try event(window: window,
-            key: hotkey.keyDisplayName, code: UInt16(hotkey.keyCode), flags: eventFlags)))
+                                                             key: hotkey.keyDisplayName, code: UInt16(hotkey.keyCode), flags: eventFlags)))
         #expect(controller.isPinnedPresentation && window.contentView === view)
         #expect(window.frame == frame)
         #expect(closeCount == 0 && stashedImages.isEmpty,
-            "Capture shortcuts must preserve the pin even when no global registration is available")
+                "Capture shortcuts must preserve the pin even when no global registration is available")
     }
 
     @Test(arguments: [
@@ -247,13 +247,13 @@ struct ScreenshotShortcutContextTests {
         var closeCount = 0
         var stashedImages: [Data] = []
         let controller = try syntheticEditor(settingsStore: store,
-            onStash: { data, _ in stashedImages.append(data) }, onClose: { closeCount += 1 })
+                                             onStash: { data, _ in stashedImages.append(data) }, onClose: { closeCount += 1 })
         defer { controller.close() }
         if context != "editor" { controller.setPinned(true) }
         let window = try #require(controller.window as? ScreenshotEditorWindow)
         let hotkey = action == "pin" ? store.settings.screenshotPinHotkey : store.settings.screenshotStashHotkey
         #expect(window.performKeyEquivalent(with: try event(window: window,
-            key: hotkey.keyDisplayName, code: UInt16(hotkey.keyCode), flags: .control)))
+                                                            key: hotkey.keyDisplayName, code: UInt16(hotkey.keyCode), flags: .control)))
         if action == "pin" && context == "editor" {
             #expect(controller.isPinnedPresentation && window.contentView != nil)
             #expect(closeCount == 0 && stashedImages.isEmpty)
@@ -287,7 +287,7 @@ struct ScreenshotShortcutContextTests {
         defer { capture.unregister(); occupied.unregister() }
         var requestedCapture = false
         #expect(capture.register(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers,
-            action: { requestedCapture = true }) == .registered)
+                                 action: { requestedCapture = true }) == .registered)
         let owner = GlobalHotkeyManager.beginRecording()
         defer { GlobalHotkeyManager.endRecording(owner) }
         ScreenshotHotkeyContext.update(selecting: false, editors: [controller], globalManagers: [capture])
@@ -296,7 +296,7 @@ struct ScreenshotShortcutContextTests {
         #expect(!controller.performEditorShortcut(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers))
         GlobalHotkeyManager.endRecording(owner)
         #expect(!capture.isSuspended && capture.hasActiveRegistration,
-            "Finishing hotkey recording must restore capture despite the pin's focus")
+                "Finishing hotkey recording must restore capture despite the pin's focus")
         #expect(try sendHotkeyPressed(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers) == noErr)
         #expect(requestedCapture)
         capture.unregister()
@@ -329,11 +329,11 @@ struct ScreenshotShortcutContextTests {
         var closeCount = 0
         var stashCount = 0
         let controller = ScreenshotEditorWindowController(image: image, screenImage: image,
-            screenCGImage: pixels, screen: nil, captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
-            capturedApplication: nil, settingsStore: store, onStash: { _, _ in
-                if fails { throw ShortcutStashError() }
-                stashCount += 1
-            }, onClose: { closeCount += 1 })
+                                                          screenCGImage: pixels, screen: nil, captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
+                                                          capturedApplication: nil, settingsStore: store, onStash: { _, _ in
+                                                              if fails { throw ShortcutStashError() }
+                                                              stashCount += 1
+                                                          }, onClose: { closeCount += 1 })
         defer { controller.close() }
         let window = try #require(controller.window as? ScreenshotEditorWindow)
         window.alphaValue = 0
@@ -451,8 +451,8 @@ struct ScreenshotShortcutContextTests {
         let recorder = HotkeyRecorderButton(hotkey: ScreenshotHotkeyDefaults.capture, locale: Locale(identifier: "zh-Hans"))
         window.contentView = recorder
         let mouse = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: .zero,
-            modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
-            eventNumber: 0, clickCount: 1, pressure: 1))
+                                                    modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                                    eventNumber: 0, clickCount: 1, pressure: 1))
         recorder.mouseDown(with: mouse)
         defer { recorder.stopRecording() }
         #expect(recorder.isRecording)
@@ -493,8 +493,8 @@ struct ScreenshotShortcutContextTests {
         image.unlockFocus()
         let pixels = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
         let controller = ScreenshotEditorWindowController(image: image, screenImage: image,
-            screenCGImage: pixels, screen: nil, captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
-            capturedApplication: nil, settingsStore: store, onStash: { _, _ in }, onClose: {})
+                                                          screenCGImage: pixels, screen: nil, captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
+                                                          capturedApplication: nil, settingsStore: store, onStash: { _, _ in }, onClose: {})
         defer { controller.close() }
         let window = try #require(controller.window as? ScreenshotEditorWindow)
         window.alphaValue = 0
@@ -503,7 +503,7 @@ struct ScreenshotShortcutContextTests {
         for tool in ScreenshotTool.allCases {
             let hotkey = try #require(store.settings.screenshotToolHotkeys[tool.rawValue])
             #expect(window.performKeyEquivalent(with: try event(window: window, key: hotkey.keyDisplayName,
-                code: UInt16(hotkey.keyCode), flags: .control)))
+                                                                code: UInt16(hotkey.keyCode), flags: .control)))
             #expect(model.tool == tool)
         }
         store.settings.screenshotToolHotkeys["rectangle"] = .init(keyCode: 15, carbonModifiers: 0x0800, keyDisplayName: "R")
@@ -511,14 +511,14 @@ struct ScreenshotShortcutContextTests {
         #expect(model.tool == .rectangle)
         let longCaptureHotkey = store.settings.screenshotEditorLongHotkey
         #expect(window.performKeyEquivalent(with: try event(window: window,
-            key: longCaptureHotkey.keyDisplayName, code: UInt16(longCaptureHotkey.keyCode), flags: .control)))
+                                                            key: longCaptureHotkey.keyDisplayName, code: UInt16(longCaptureHotkey.keyCode), flags: .control)))
         if NSScreen.screens.isEmpty {
             #expect(model.statusMessage == AppLocalization.text("找不到显示器"))
         } else {
             #expect(model.isLongCapturePreviewing)
             #expect(model.statusMessage == AppLocalization.text("请滚动页面，停止后自动拼接"))
             #expect(window.performKeyEquivalent(with: try event(window: window,
-                key: longCaptureHotkey.keyDisplayName, code: UInt16(longCaptureHotkey.keyCode), flags: .control)))
+                                                                key: longCaptureHotkey.keyDisplayName, code: UInt16(longCaptureHotkey.keyCode), flags: .control)))
             #expect(model.isLongCapturePreviewing)
         }
         // Close before the asynchronous capture task can request screen access or read the display.
@@ -527,8 +527,8 @@ struct ScreenshotShortcutContextTests {
 
     private func event(window: NSWindow, key: String, code: UInt16, flags: NSEvent.ModifierFlags = []) throws -> NSEvent {
         try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags,
-            timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: key,
-            charactersIgnoringModifiers: key, isARepeat: false, keyCode: code))
+                                      timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: key,
+                                      charactersIgnoringModifiers: key, isARepeat: false, keyCode: code))
     }
 
     private func syntheticEditor(
@@ -538,21 +538,21 @@ struct ScreenshotShortcutContextTests {
         onClose: @escaping () -> Void = {}
     ) throws -> ScreenshotEditorWindowController {
         let context = try #require(CGContext(data: nil, width: 40, height: 40, bitsPerComponent: 8,
-            bytesPerRow: 160, space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bytesPerRow: 160, space: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(red: 0.2, green: 0.4, blue: 0.6, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: 40, height: 40))
         let pixels = try #require(context.makeImage())
         let image = NSImage(cgImage: pixels, size: CGSize(width: 40, height: 40))
         let controller = ScreenshotEditorWindowController(image: image, screenImage: image,
-            screenCGImage: pixels, screen: nil, captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
-            capturedApplication: nil, settingsStore: settingsStore, onStash: onStash,
-            writeImageToPasteboard: { _ in false }, presentSavePanel: { _, _ in }, onClose: onClose)
+                                                          screenCGImage: pixels, screen: nil, captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
+                                                          capturedApplication: nil, settingsStore: settingsStore, onStash: onStash,
+                                                          writeImageToPasteboard: { _ in false }, presentSavePanel: { _, _ in }, onClose: onClose)
         controller.window?.alphaValue = 0
         if let keyWindow {
             let original = try #require(controller.window)
             let replacement = ShortcutContextKeyWindow(contentRect: original.frame,
-                styleMask: .borderless, backing: .buffered, defer: false)
+                                                       styleMask: .borderless, backing: .buffered, defer: false)
             replacement.reportsKeyWindow = keyWindow
             replacement.isReleasedWhenClosed = false
             replacement.alphaValue = 0
@@ -568,13 +568,13 @@ struct ScreenshotShortcutContextTests {
     private func sendHotkeyPressed(keyCode: UInt32, modifiers: UInt32) throws -> OSStatus {
         var createdEvent: EventRef?
         #expect(CreateEvent(nil, OSType(kEventClassKeyboard), UInt32(kEventHotKeyPressed),
-            0, 0, &createdEvent) == noErr)
+                            0, 0, &createdEvent) == noErr)
         let event = try #require(createdEvent)
         defer { ReleaseEvent(event) }
         var hotkeyID = EventHotKeyID(signature: OSType(0x4F524254), id: (keyCode << 16) | (modifiers & 0xFFFF))
         #expect(withUnsafePointer(to: &hotkeyID) { pointer in
             SetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
-                MemoryLayout<EventHotKeyID>.size, pointer)
+                              MemoryLayout<EventHotKeyID>.size, pointer)
         } == noErr)
         return SendEventToEventTarget(event, GetApplicationEventTarget())
     }

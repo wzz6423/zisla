@@ -51,12 +51,12 @@ struct FloatingIslandInformationLayout {
                     leadingInset: CGFloat = CompactPillStatusPresentation.trailingInset) -> Status {
             let text = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date)
             return Status(presentation: presentation, text: text,
-                length: presentation.length(thickness: thickness, edge: edge, text: text, item: item,
-                    leadingInset: leadingInset), leadingInset: leadingInset)
+                          length: presentation.length(thickness: thickness, edge: edge, text: text, item: item,
+                                                      leadingInset: leadingInset), leadingInset: leadingInset)
         }
         let primaryStatuses = primary.enumerated().map { index, presentation in
             status(presentation, thickness: statusThickness,
-                leadingInset: icons.isEmpty && index == 0 ? CompactPillStatusPresentation.trailingInset : 0)
+                   leadingInset: icons.isEmpty && index == 0 ? CompactPillStatusPresentation.trailingInset : 0)
         }
         let secondaryStatus = secondary.map { status($0, thickness: CompactPillStatusPresentation.minimumThickness) }
         let iconLength = edge.isVertical ? iconSize?.height ?? 0 : iconSize?.width ?? 0
@@ -100,7 +100,7 @@ struct FloatingIslandInformationView: View {
                            alignment: layout.edge.isVertical ? .top : .leading)
                 if let secondary = layout.secondary {
                     CompactPillStatusContent(presentation: secondary.presentation, text: secondary.text,
-                        edge: layout.edge, visualizationStyle: visualizationStyle, item: item, date: date)
+                                             edge: layout.edge, visualizationStyle: visualizationStyle, item: item, date: date)
                         .frame(width: layout.edge.isVertical ? CompactPillStatusPresentation.minimumThickness : min(length, secondary.length),
                                height: layout.edge.isVertical ? min(length, secondary.length) : CompactPillStatusPresentation.minimumThickness)
                         .frame(width: layout.edge.isVertical ? CompactPillStatusPresentation.minimumThickness : length,
@@ -122,9 +122,9 @@ struct FloatingIslandInformationView: View {
             }
             ForEach(layout.primary) { status in
                 CompactPillStatusContent(presentation: status.presentation, text: status.text, edge: layout.edge,
-                    visualizationStyle: visualizationStyle, item: status.presentation.isMedia ? item : nil,
-                    date: date, leadingInset: status.leadingInset,
-                    controlRegionThickness: layout.primaryThickness, onJoinMeeting: onJoinMeeting)
+                                         visualizationStyle: visualizationStyle, item: status.presentation.isMedia ? item : nil,
+                                         date: date, leadingInset: status.leadingInset,
+                                         controlRegionThickness: layout.primaryThickness, onJoinMeeting: onJoinMeeting)
                     .frame(width: layout.edge.isVertical ? layout.statusThickness : status.length,
                            height: layout.edge.isVertical ? status.length : layout.statusThickness)
             }

@@ -14,7 +14,7 @@ struct MeetingNoteStoreTests {
             let date = Date(timeIntervalSince1970: 42)
             let note = try #require(store.addContextNote("  original\ntext  ", location: location, addedAt: date))
             let enabled = try #require(store.updateContextNote(id: note.id, text: note.text!, reminderInterval: .sixHours,
-                at: Date(timeIntervalSince1970: 10_000)))
+                                                               at: Date(timeIntervalSince1970: 10_000)))
             let content = try Data(contentsOf: enabled.url)
             #expect(store.setMeeting(first, associated: true, withNote: note.id))
             var expected = enabled; expected.noteMeetingIDs = [first]
@@ -36,9 +36,9 @@ struct MeetingNoteStoreTests {
         try withStore { store, index in
             let note = try #require(store.addContextNote("original", location: location, meetingID: first))
             let second = CalendarEventIdentity(calendarIdentifier: "work", eventIdentifier: "series",
-                occurrenceDate: Date(timeIntervalSince1970: 100))
+                                               occurrenceDate: Date(timeIntervalSince1970: 100))
             let third = CalendarEventIdentity(calendarIdentifier: "work", eventIdentifier: "series",
-                occurrenceDate: Date(timeIntervalSince1970: 86_500))
+                                              occurrenceDate: Date(timeIntervalSince1970: 86_500))
             #expect(store.setMeeting(first, associated: true, withNote: note.id))
             #expect(store.items.first?.noteMeetingIDs == [first])
             #expect(store.setMeeting(second, associated: true, withNote: note.id))

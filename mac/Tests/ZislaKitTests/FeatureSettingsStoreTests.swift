@@ -88,7 +88,7 @@ struct FeatureSettingsStoreTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(Data(#"{"systemCleanupPolicy":"sevenDays","clipboardHistoryCleanupPolicy":"fifteenDays","voiceRecordingCleanupPolicy":"thirtyDays"}"#.utf8),
-            forKey: "feature-settings-v1")
+                     forKey: "feature-settings-v1")
         let store = FeatureSettingsStore(defaults: defaults)
         #expect(store.settings.trashCleanupPolicy == .never)
         #expect(store.settings.systemCleanupPolicy == .sevenDays)
@@ -116,7 +116,7 @@ struct FeatureSettingsStoreTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(Data(#"{"systemMonitorEnabled":false,"trashCleanupPolicy":"fifteenDays"}"#.utf8),
-            forKey: "feature-settings-v1")
+                     forKey: "feature-settings-v1")
         let store = FeatureSettingsStore(defaults: defaults)
         #expect(!store.settings.automaticPowerModeEnabled)
         #expect(store.settings.powerAdapterDefaultMode == .automatic)
@@ -339,7 +339,7 @@ struct FeatureSettingsStoreTests {
         } else if layout == "previousWithVoiceShortcut" {
             #expect(store.settings.voiceInputHotkeyPreset == old.voiceInputHotkeyPreset)
             let editor = [store.settings.screenshotPinHotkey, store.settings.screenshotStashHotkey,
-                store.settings.screenshotEditorLongHotkey] + Array(store.settings.screenshotToolHotkeys.values)
+                          store.settings.screenshotEditorLongHotkey] + Array(store.settings.screenshotToolHotkeys.values)
             #expect(editor.allSatisfy { !$0.conflicts(with: old.voiceInputHotkeyPreset) })
             #expect(store.settings.screenshotToolHotkeys["ellipse"]?.keyDisplayName == "5")
             #expect(store.settings.screenshotToolHotkeys.count == 9)

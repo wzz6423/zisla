@@ -169,11 +169,11 @@ struct CollapsedPetLayoutTests {
     @Test(arguments: [IslandEdge.left, .right])
     func widePetStaysVisibleWhenThePillTouchesTheScreenEdge(edge: IslandEdge) throws {
         let screen = ScreenSnapshot(displayID: 9,
-            frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
-            visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056))
+                                    frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
+                                    visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056))
         let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: edge),
-            pillSize: CGSize(width: 180, height: 24), edgeInset: 0)).layout(for: screen)
+                                                                                 placement: IslandPlacement(mode: .custom, edge: edge),
+                                                                                 pillSize: CGSize(width: 180, height: 24), edgeInset: 0)).layout(for: screen)
         let ratio = CGFloat(182) / 136
         let container = CollapsedPetLayout.frame(for: layout, petAspectRatio: ratio)
         for side in [PetSide.left, .right] {
@@ -194,7 +194,7 @@ struct CollapsedPetLayoutTests {
         #expect(CollapsedPetLayout.petFrame(for: layout, compactBarFrame: bar, side: .left)?.maxX == bar.minX - 4)
         let ratio = CGFloat(182) / 136
         let pet = try #require(CollapsedPetLayout.petFrame(for: layout, compactBarFrame: bar,
-            petAspectRatio: ratio, side: .left))
+                                                           petAspectRatio: ratio, side: .left))
         #expect(abs(pet.minX - bar.maxX - 4) < 0.001)
         #expect(pet.size == CGSize(width: 24 * ratio, height: 24))
         #expect(CollapsedPetLayout.frame(for: layout, compactBarFrame: bar, petAspectRatio: ratio).contains(pet))
@@ -208,7 +208,7 @@ struct CollapsedPetLayoutTests {
         #expect(CollapsedPetLayout.petFrame(for: layout, compactBarFrame: bar, side: .left) != nil)
         for side in [PetSide.left, .right] {
             #expect(CollapsedPetLayout.petFrame(for: layout, compactBarFrame: bar,
-                petAspectRatio: CGFloat(182) / 136, side: side) == nil)
+                                                petAspectRatio: CGFloat(182) / 136, side: side) == nil)
         }
     }
 
@@ -249,8 +249,8 @@ struct CollapsedPetLayoutTests {
     @Test
     func crampedScreenOmitsPetsWhenNeitherEndHasSpace() {
         let screen = ScreenSnapshot(displayID: 1,
-            frame: CGRect(x: -100, y: -80, width: 64, height: 64),
-            visibleFrame: CGRect(x: -100, y: -80, width: 64, height: 40))
+                                    frame: CGRect(x: -100, y: -80, width: 64, height: 64),
+                                    visibleFrame: CGRect(x: -100, y: -80, width: 64, height: 40))
         for edge in IslandEdge.allCases {
             let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
                 layoutStyle: .pill, placement: IslandPlacement(mode: .custom, edge: edge)
@@ -268,7 +268,7 @@ struct CollapsedPetLayoutTests {
         bar.size.width = 0
         #expect(CollapsedPetLayout.petFrame(for: layout, compactBarFrame: bar, side: .left) == nil)
         #expect(CollapsedPetLayout.petFrame(for: layout, compactBarFrame: bar,
-            petAspectRatio: CGFloat(182) / 136, side: .left) == nil)
+                                            petAspectRatio: CGFloat(182) / 136, side: .left) == nil)
     }
 
     @Test
@@ -282,8 +282,8 @@ struct CollapsedPetLayoutTests {
         pillSize: CGSize = ScreenLayoutConfiguration().pillSize
     ) -> ScreenOverlayLayout {
         let screen = ScreenSnapshot(displayID: 9,
-            frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
-            visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056))
+                                    frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
+                                    visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056))
         return ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             layoutStyle: .pill,
             placement: IslandPlacement(mode: .custom, edge: edge, offset: offset),

@@ -269,7 +269,6 @@ struct AIAgentStoreTests {
         #expect(account.provider == provider.name)
     }
 
-
     @Test
     func persistenceCoalescesRapidChangesAndWritesTheLatestSnapshot() async throws {
         let directory = FileManager.default.temporaryDirectory
@@ -351,7 +350,6 @@ struct AIAgentStoreTests {
         #expect(restored.state.cliStatuses.isEmpty)
         #expect(store.persistenceError == nil)
     }
-
 
     private func makeStore() -> (AIAgentStore, URL) {
         let directory = FileManager.default.temporaryDirectory

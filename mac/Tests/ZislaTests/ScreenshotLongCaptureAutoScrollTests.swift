@@ -61,14 +61,14 @@ struct ScreenshotLongCaptureAutoScrollTests {
         #expect(scrolling.nextStep(after: .unchanged) == .none)
         scrolling.start()
         #expect(scrolling.nextStep(after: .unchanged) == .capture,
-            "Resuming before the scrolled frame repaints must not scroll past it")
+                "Resuming before the scrolled frame repaints must not scroll past it")
         #expect(scrolling.nextStep(after: .rejected) == .capture)
         #expect(scrolling.nextStep(after: .appended) == .scroll)
         scrolling.stop()
         #expect(scrolling.nextStep(after: .appended) == .none)
         scrolling.start()
         #expect(scrolling.nextStep(after: .unchanged) == .scroll,
-            "A frame stitched while paused must permit the next automatic step")
+                "A frame stitched while paused must permit the next automatic step")
     }
 
     @Test(arguments: ScreenshotLongCaptureDirection.allCases, [ScreenshotLongCapturePlacement.append, .prepend])
@@ -252,7 +252,7 @@ struct ScreenshotLongCaptureAutoScrollTests {
             .environment(\.locale, language.locale)
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 220, height: 420),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -372,7 +372,8 @@ struct ScreenshotLongCaptureAutoScrollTests {
             settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
             presentSavePanel: { _, _ in }, captureScreen: { _, _ in
                 let next = try #require(source.cropping(to: CGRect(
-                    x: 0, y: CGFloat(offset), width: screen.frame.width, height: screen.frame.height)))
+                    x: 0, y: CGFloat(offset), width: screen.frame.width, height: screen.frame.height
+                )))
                 return (NSImage(cgImage: next, size: screen.frame.size), next, nil)
             }, scheduleLongCaptureWork: { delay, work in
                 scheduled.append((delay, work))
@@ -407,7 +408,7 @@ struct ScreenshotLongCaptureAutoScrollTests {
             for _ in 0..<2 {
                 pending.1.perform()
                 try #require(await queue.next())
-        pending = try #require(scheduled.last)
+                pending = try #require(scheduled.last)
                 #expect(posted == 1, "An unchanged repaint must not permit another wheel event")
                 #expect(model.image.size.height == 160)
             }
@@ -416,7 +417,7 @@ struct ScreenshotLongCaptureAutoScrollTests {
         }
         pending.1.perform()
         try #require(await queue.next())
-            pending = try #require(scheduled.last)
+        pending = try #require(scheduled.last)
         #expect(model.image.size.height == 192)
         if scenario == "permission revoked" {
             #expect(posted == 1 && !model.longCaptureAutoScroll.isRunning)
@@ -425,7 +426,7 @@ struct ScreenshotLongCaptureAutoScrollTests {
             try #require(await queue.next())
             pending = try #require(scheduled.last)
             #expect(model.statusMessage == AppLocalization.text("无法自动滚动，请手动滚动页面"),
-                "An idle capture must preserve the delivery failure")
+                    "An idle capture must preserve the delivery failure")
             model.longCaptureAutoScroll.start()
             inputAccess = true
             pending.1.perform()
@@ -450,7 +451,7 @@ struct ScreenshotLongCaptureAutoScrollTests {
             try #require(await queue.next())
             pending = try #require(scheduled.last)
             #expect(model.statusMessage == AppLocalization.text("自动滚动已暂停，可手动滚动或点击“完成”"),
-                "End-of-page feedback must remain visible until another action")
+                    "End-of-page feedback must remain visible until another action")
         }
         #expect(scheduled.filter { $0.delay != 0.35 }.allSatisfy { $0.delay >= ScreenshotLongCaptureAutoScroll.settleDelay })
         controller.finishLongCapture()
@@ -538,7 +539,7 @@ struct ScreenshotLongCaptureAutoScrollTests {
         model.beginLongCapturePreview()
         model.longCaptureAutoScroll.start()
         #expect(model.longCaptureAutoScroll.nextStep(after: .unchanged) == .scroll,
-            "A new capture must not inherit the previous session's pending frame")
+                "A new capture must not inherit the previous session's pending frame")
         model.endLongCapturePreview()
         #expect(!model.longCaptureAutoScroll.isRunning)
         #expect(!model.isLongCapturePreviewing)

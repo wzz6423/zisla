@@ -53,7 +53,7 @@ struct ScreenRecordingStudioView: View {
                                 case 0:
                                     ScreenRecordingMultitrackClipInspector(model: model)
                                     ScreenRecordingTimelineView(model: model, selectedSegmentID: $selectedSegmentID,
-                                        showsClipInspector: false)
+                                                                showsClipInspector: false)
                                     if model.project?.timeline == nil {
                                         DisclosureGroup(AppLocalization.text("恢复完整素材")) {
                                             ScreenRecordingTimelineView(model: model, selectedSegmentID: $selectedSegmentID)
@@ -132,8 +132,8 @@ struct ScreenRecordingStudioView: View {
                 Button(AppLocalization.text("保存录屏项目"), action: model.saveProject).disabled(model.project == nil)
                 Button(AppLocalization.text("项目另存为"), action: model.saveCopy).disabled(!model.canEdit)
             } label: { Label(AppLocalization.text("项目"), systemImage: "folder") }
-            .disabled(model.isBusy || model.isChoosingFile || model.isRecording || model.exporter.isExporting)
-            .accessibilityIdentifier("screenRecording.projectMenu")
+                .disabled(model.isBusy || model.isChoosingFile || model.isRecording || model.exporter.isExporting)
+                .accessibilityIdentifier("screenRecording.projectMenu")
             Spacer()
             HStack(spacing: 10) {
                 Button(action: model.undo) { Image(systemName: "arrow.uturn.backward") }

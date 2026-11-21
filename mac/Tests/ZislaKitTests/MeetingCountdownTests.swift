@@ -34,7 +34,7 @@ struct MeetingCountdownTests {
 
     private func fixture() -> CalendarEventSnapshot {
         CalendarEventSnapshot(id: "event", title: "Team", startDate: Date(timeIntervalSince1970: 1_000),
-            endDate: Date(timeIntervalSince1970: 4_600), isAllDay: false, calendarTitle: "Work",
-            eventURL: URL(string: "https://zoom.us/j/123456789?pwd=PrivateFixture"), notes: "Private notes")
+                              endDate: Date(timeIntervalSince1970: 4_600), isAllDay: false, calendarTitle: "Work",
+                              eventURL: URL(string: "https://zoom.us/j/123456789?pwd=PrivateFixture"), notes: "Private notes")
     }
 }

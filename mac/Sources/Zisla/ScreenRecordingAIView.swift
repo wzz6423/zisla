@@ -34,7 +34,7 @@ struct ScreenRecordingAIView: View {
                     Text(AppLocalization.text("输出时长：%@", ScreenRecordingStudioView.clock(pending.outputDuration)))
                         .font(.system(size: 12, weight: .medium))
                     Text(AppLocalization.text("片段 %d · 缩放 %d · 字幕 %d", pending.edits.segments.count,
-                        pending.edits.zoomClips.count, pending.captions.count)).font(.caption)
+                                              pending.edits.zoomClips.count, pending.captions.count)).font(.caption)
                     Text(AppLocalization.text(pending.edits.background.title)).font(.caption).foregroundStyle(.secondary)
                 } actions: {
                     ViewThatFits(in: .horizontal) {

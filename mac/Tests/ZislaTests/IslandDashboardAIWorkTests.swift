@@ -196,7 +196,7 @@ struct IslandDashboardAIWorkTests {
     private func text(in object: NSObject) -> Set<String> {
         var strings = Set<String>()
         for key in ["accessibilityLabel", "accessibilityValue"]
-        where object.responds(to: NSSelectorFromString(key)) {
+            where object.responds(to: NSSelectorFromString(key)) {
             if let value = object.value(forKey: key) as? String { strings.insert(value) }
         }
         if object.responds(to: NSSelectorFromString("accessibilityChildren")) {

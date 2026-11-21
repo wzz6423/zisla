@@ -179,7 +179,7 @@ struct ShelfModuleView: View {
                                                       }
                                                   })
                                               })
-                            .id(ObjectIdentifier(draft))
+                                              .id(ObjectIdentifier(draft))
                     } else if let screenshot = noteEditor.screenshot {
                         ShelfScreenshotDetailView(detail: screenshot, onCopy: {
                             if let item = model.shelf.items.first(where: { $0.id == screenshot.id }) { model.copyShelfItems([item]) }
@@ -299,8 +299,8 @@ struct ShelfModuleView: View {
     private func menuActions(for items: [FileShelfItem]) -> [ShelfMenuAction] {
         let canAct = !items.isEmpty && !contextActions.isProcessing
         var actions = [ShelfMenuAction(title: items.count == 1 && items[0].screenshotMetadata != nil ? "预览" : "打开",
-            isEnabled: canAct && (items.count == 1 || items.allSatisfy { $0.noteLocation == nil && $0.screenshotMetadata == nil }),
-            action: { openItems(items) })]
+                                       isEnabled: canAct && (items.count == 1 || items.allSatisfy { $0.noteLocation == nil && $0.screenshotMetadata == nil }),
+                                       action: { openItems(items) })]
         actions.append(ShelfMenuAction(title: "在 Finder 中显示", isEnabled: canAct && items.contains { $0.text == nil }, action: {
             do {
                 let urls = try ShelfContextActions.fileURLs(items.filter { $0.text == nil }, in: model.shelf, requiresRegularFile: false)
@@ -311,7 +311,7 @@ struct ShelfModuleView: View {
         actions.append(ShelfMenuAction(title: "复制", isEnabled: canAct, action: { model.copyShelfItems(items) }))
         if items.contains(where: { $0.screenshotMetadata != nil }) {
             actions.append(ShelfMenuAction(title: "保存", isEnabled: canAct && items.count == 1,
-                action: { if let item = items.first { model.saveShelfScreenshot(item) } }))
+                                           action: { if let item = items.first { model.saveShelfScreenshot(item) } }))
         }
         actions.append(ShelfMenuAction(title: "发送到随记", isEnabled: canAct, action: {
             model.receiveQuickNoteTransferItems(model.shelfTransferItems(items))
@@ -322,8 +322,8 @@ struct ShelfModuleView: View {
         for action in ShelfContextAction.allCases {
             let featureEnabled = action != .editVideo || model.settingsStore.settings.screenRecordingEnabled
             actions.append(ShelfMenuAction(title: action.title,
-                isEnabled: canAct && featureEnabled && action.supports(items),
-                action: { model.performShelfContextAction(action, items: items) }))
+                                           isEnabled: canAct && featureEnabled && action.supports(items),
+                                           action: { model.performShelfContextAction(action, items: items) }))
         }
         actions.append(ShelfMenuAction(title: "移除", isEnabled: canAct, isDestructive: true, action: { removeItems(items) }))
         return actions
@@ -783,8 +783,8 @@ struct ShelfItemView: View {
                     onSelect: onSelect,
                     makeContextMenu: menuActions.map { actions in { Self.contextMenu(actions) } }
                 )
-                    .frame(width: 42, height: 42)
-                    .frame(width: 66, height: 50)
+                .frame(width: 42, height: 42)
+                .frame(width: 66, height: 50)
                 removeButton
             }
             Text(item.displayName)

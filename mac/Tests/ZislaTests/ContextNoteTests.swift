@@ -330,10 +330,10 @@ struct ContextNoteTests {
         let restored = FileShelfStore(storageURL: index)
         var reminders: [UUID] = []
         let controller = ContextNoteController(settingsStore: fixture.settings,
-            languageStore: AppLanguageStore(defaults: fixture.defaults), shelf: restored,
-            currentLocation: { _, _ in .unavailable }, canInteract: { true },
-            onReminder: { item, _ in reminders.append(item.id); return true },
-            onCaptureFailure: { _ in }, onSaved: { _, _, _ in })
+                                               languageStore: AppLanguageStore(defaults: fixture.defaults), shelf: restored,
+                                               currentLocation: { _, _ in .unavailable }, canInteract: { true },
+                                               onReminder: { item, _ in reminders.append(item.id); return true },
+                                               onCaptureFailure: { _ in }, onSaved: { _, _, _ in })
         defer { controller.stop() }
         controller.checkForReturn(at: .zero, now: date.addingTimeInterval(100_000))
         #expect(reminders.isEmpty)
@@ -1053,7 +1053,7 @@ struct ContextNoteInputMethodTests {
                                          replacementRange: NSRange(location: 0, length: editor.string.utf16.count))
                     #expect(editor.hasMarkedText())
                     #expect(!ContextNoteInputCommand.shouldSave(#selector(NSResponder.insertNewline(_:)),
-                                                               hasMarkedText: editor.hasMarkedText()))
+                                                                hasMarkedText: editor.hasMarkedText()))
                 }
             }
             let range = NSRange(location: 0, length: text.utf16.count)
@@ -1086,7 +1086,7 @@ struct ContextNoteInputMethodTests {
         field.stringValue = "输入"
         let fieldEditor = ContextNoteFieldEditor()
         let panel = ContextNoteController.makeWindow(contentView: field,
-            frame: CGRect(x: 0, y: 0, width: 360, height: 44), fieldEditor: fieldEditor)
+                                                     frame: CGRect(x: 0, y: 0, width: 360, height: 44), fieldEditor: fieldEditor)
         defer { panel.contentView = nil; panel.close() }
 
         #expect(panel.allowsKeyWindow)
@@ -1114,7 +1114,7 @@ struct ContextNoteInputMethodTests {
         let field = NSTextField(frame: CGRect(x: 0, y: 0, width: 240, height: 24))
         let fieldEditor = ContextNoteFieldEditor()
         let panel = ContextNoteController.makeWindow(contentView: field,
-            frame: CGRect(x: 0, y: 0, width: 360, height: 44), fieldEditor: fieldEditor)
+                                                     frame: CGRect(x: 0, y: 0, width: 360, height: 44), fieldEditor: fieldEditor)
         defer { panel.contentView = nil; panel.close() }
         #expect(panel.makeFirstResponder(field))
         let inputClient = try #require(field.currentEditor() as? NSTextInputClient)
@@ -1122,11 +1122,11 @@ struct ContextNoteInputMethodTests {
                                   replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(inputClient.hasMarkedText())
         #expect(!ContextNoteInputCommand.shouldSave(#selector(NSResponder.insertNewline(_:)),
-                                                   hasMarkedText: inputClient.hasMarkedText()))
+                                                    hasMarkedText: inputClient.hasMarkedText()))
         inputClient.unmarkText()
         #expect(!inputClient.hasMarkedText())
         #expect(ContextNoteInputCommand.shouldSave(#selector(NSResponder.insertNewline(_:)),
-                                                  hasMarkedText: inputClient.hasMarkedText()))
+                                                   hasMarkedText: inputClient.hasMarkedText()))
 
         #expect(panel.makeFirstResponder(nil))
         panel.contentView = nil
@@ -1139,7 +1139,7 @@ struct ContextNoteInputMethodTests {
         var nativeRange = NSRange(location: NSNotFound, length: 0)
         var noteRange = nativeRange
         #expect(fieldEditor.firstRect(forCharacterRange: range, actualRange: &noteRange)
-                == nativeEditor.firstRect(forCharacterRange: range, actualRange: &nativeRange))
+            == nativeEditor.firstRect(forCharacterRange: range, actualRange: &nativeRange))
         #expect(noteRange == nativeRange)
         #expect(inputClient.windowLevel?() == NSWindow.Level.normal.rawValue)
         #expect(!panel.isVisible)
@@ -1178,7 +1178,7 @@ struct ContextNoteHoldShortcutTests {
     @Test
     func recordedSidesAndPrimaryKeyMustAllBeHeld() {
         let hotkey = VoiceInputHotkeyPreset(keyCode: 49, carbonModifiers: 0x1800, keyDisplayName: "Space",
-                                           modifierSides: [.leftControl, .rightOption])
+                                            modifierSides: [.leftControl, .rightOption])
         for (keys, expected) in [([49, 59, 61], true), ([49, 62, 61], false), ([59, 61], false), ([49, 59, 61, 58], false)] {
             #expect(ContextNoteHoldShortcut.isPressed(hotkey, modifiers: [.control, .option]) { keys.contains(Int($0)) } == expected)
         }

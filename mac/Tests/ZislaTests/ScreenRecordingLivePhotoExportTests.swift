@@ -25,9 +25,9 @@ struct ScreenRecordingLivePhotoExportTests {
         let target = fixture.root.appendingPathComponent("Output.livephoto", isDirectory: true)
         let fractions = Fractions()
         try await ScreenRecordingLivePhotoExporter.run(project: project, directory: fixture.directory, destination: target,
-            configuration: .init(format: .livePhoto, resolution: .source, frameRate: 30), checkpoint: { _ in }) {
-                await fractions.append($0)
-            }
+                                                       configuration: .init(format: .livePhoto, resolution: .source, frameRate: 30), checkpoint: { _ in }) {
+            await fractions.append($0)
+        }
         #expect(Set(try FileManager.default.contentsOfDirectory(atPath: target.path)) == ["photo.jpg", "video.mov"])
         let values = await fractions.values
         #expect(values == values.sorted() && values.last == 1 && values.contains { $0 > 0 && $0 < 1 })
@@ -62,7 +62,7 @@ struct ScreenRecordingLivePhotoExportTests {
         let target = fixture.root.appendingPathComponent("From studio.livephoto", isDirectory: true)
         let exporter = ScreenRecordingExporter()
         try await exporter.export(project: project, directory: fixture.directory, to: target,
-            configuration: .init(format: .livePhoto, resolution: .source))
+                                  configuration: .init(format: .livePhoto, resolution: .source))
         let resources = try await inspect(target)
         #expect(abs(resources.duration - 2) < 0.001)
         #expect(resources.frames.count == 60)
@@ -79,8 +79,8 @@ struct ScreenRecordingLivePhotoExportTests {
         let target = fixture.root.appendingPathComponent("Nonfinite.livephoto", isDirectory: true)
         await #expect(throws: ScreenRecordingProjectError.invalidProject) {
             try await ScreenRecordingLivePhotoExporter.run(project: project, directory: fixture.directory,
-                destination: target, configuration: .init(format: .livePhoto, resolution: .source),
-                checkpoint: { _ in Issue.record("Invalid projects must not access media") }, progress: { _ in })
+                                                           destination: target, configuration: .init(format: .livePhoto, resolution: .source),
+                                                           checkpoint: { _ in Issue.record("Invalid projects must not access media") }, progress: { _ in })
         }
         #expect(!FileManager.default.fileExists(atPath: target.path))
         #expect(try noStagingFiles(in: fixture.root))
@@ -128,9 +128,9 @@ struct ScreenRecordingLivePhotoExportTests {
         let target = fixture.root.appendingPathComponent("Rejected.livephoto", isDirectory: true)
         await #expect(throws: RecordingLivePhotoExportError.durationExceeded) {
             try await ScreenRecordingLivePhotoExporter.run(project: project, directory: fixture.directory, destination: target,
-                configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { _ in
-                    Issue.record("Unsupported Live Photo durations must not admit media reads or writes")
-                }, progress: { _ in })
+                                                           configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { _ in
+                                                               Issue.record("Unsupported Live Photo durations must not admit media reads or writes")
+                                                           }, progress: { _ in })
         }
         #expect(!FileManager.default.fileExists(atPath: target.path))
         #expect(try noStagingFiles(in: fixture.root))
@@ -162,10 +162,10 @@ struct ScreenRecordingLivePhotoExportTests {
         let target = fixture.root.appendingPathComponent("Invalid.livephoto")
         await #expect(throws: ScreenRecordingExportError.invalidConfiguration) {
             try await ScreenRecordingLivePhotoExporter.run(project: fixture.project(), directory: fixture.directory,
-                destination: target, configuration: .init(format: invalidRate ? .livePhoto : .mp4,
-                    resolution: .source, frameRate: invalidRate ? 0 : 30), checkpoint: { _ in
-                        Issue.record("Invalid export options must not admit media operations")
-                    }, progress: { _ in })
+                                                           destination: target, configuration: .init(format: invalidRate ? .livePhoto : .mp4,
+                                                                                                     resolution: .source, frameRate: invalidRate ? 0 : 30), checkpoint: { _ in
+                                                               Issue.record("Invalid export options must not admit media operations")
+                                                           }, progress: { _ in })
         }
         #expect(!FileManager.default.fileExists(atPath: target.path))
         #expect(try noStagingFiles(in: fixture.root))
@@ -183,12 +183,12 @@ struct ScreenRecordingLivePhotoExportTests {
         let originalMovie = try Data(contentsOf: target.appendingPathComponent("video.mov"))
         do {
             try await ScreenRecordingLivePhotoExporter.run(project: project, directory: fixture.directory, destination: target,
-                configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { point in
-                    if point == .beforeCommit {
-                        if cancelled { throw CancellationError() }
-                        throw CocoaError(.fileWriteOutOfSpace)
-                    }
-                }, progress: { _ in })
+                                                           configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { point in
+                                                               if point == .beforeCommit {
+                                                                   if cancelled { throw CancellationError() }
+                                                                   throw CocoaError(.fileWriteOutOfSpace)
+                                                               }
+                                                           }, progress: { _ in })
             Issue.record("The injected commit failure must propagate")
         } catch {
             if cancelled { #expect(error is CancellationError) }
@@ -256,9 +256,9 @@ struct ScreenRecordingLivePhotoExportTests {
         try await fixture.createVideo()
         let task = Task {
             try await ScreenRecordingLivePhotoExporter.run(project: fixture.project(), directory: fixture.directory, destination: target,
-                configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { point in
-                    if point == .frame(3) { withUnsafeCurrentTask { $0?.cancel() } }
-                }, progress: { _ in })
+                                                           configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { point in
+                                                               if point == .frame(3) { withUnsafeCurrentTask { $0?.cancel() } }
+                                                           }, progress: { _ in })
         }
         do { try await task.value; Issue.record("A cancelled render must not commit a Live Photo") }
         catch { #expect(error is CancellationError) }
@@ -275,11 +275,11 @@ struct ScreenRecordingLivePhotoExportTests {
         let intruder = DestinationChange(target: target)
         await #expect(throws: ScreenRecordingExportError.invalidDestination) {
             try await ScreenRecordingLivePhotoExporter.run(project: fixture.project(), directory: fixture.directory,
-                destination: target, configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { _ in },
-                progress: { fraction in
-                    do { try await intruder.createUnrelatedDirectory(after: fraction) }
-                    catch { Issue.record("The controlled destination change must succeed: \(error)") }
-                })
+                                                           destination: target, configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { _ in },
+                                                           progress: { fraction in
+                                                               do { try await intruder.createUnrelatedDirectory(after: fraction) }
+                                                               catch { Issue.record("The controlled destination change must succeed: \(error)") }
+                                                           })
         }
         #expect(try Data(contentsOf: target.appendingPathComponent("unrelated.txt")) == Data("keep me".utf8))
         #expect(Set(try FileManager.default.contentsOfDirectory(atPath: target.path)) == ["unrelated.txt"])
@@ -288,7 +288,7 @@ struct ScreenRecordingLivePhotoExportTests {
 
     private func export(_ project: ScreenRecordingProject, fixture: RecordingMultitrackTestFixture, to target: URL) async throws {
         try await ScreenRecordingLivePhotoExporter.run(project: project, directory: fixture.directory, destination: target,
-            configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { _ in }, progress: { _ in })
+                                                       configuration: .init(format: .livePhoto, resolution: .source), checkpoint: { _ in }, progress: { _ in })
     }
 
     private func noStagingFiles(in root: URL) throws -> Bool {
@@ -334,21 +334,21 @@ struct ScreenRecordingLivePhotoExportTests {
         let type = try #require(marker.dataType)
         #expect(adaptor.nextTimedMetadataGroup() == nil)
         return Resources(identifier: identifier, duration: try await movie.load(.duration).seconds,
-            audioCount: try await movie.loadTracks(withMediaType: .audio).count, markerTime: group.timeRange.start.seconds,
-            markerDuration: group.timeRange.duration.seconds,
-            markerValue: value, markerType: type, photo: photo,
-            frames: try await RecordingMultitrackTestFixture.decode(movie))
+                         audioCount: try await movie.loadTracks(withMediaType: .audio).count, markerTime: group.timeRange.start.seconds,
+                         markerDuration: group.timeRange.duration.seconds,
+                         markerValue: value, markerType: type, photo: photo,
+                         frames: try await RecordingMultitrackTestFixture.decode(movie))
     }
 
     private func requestLivePhoto(from directory: URL) async throws -> PHLivePhoto {
         try await withCheckedThrowingContinuation { continuation in
             PHLivePhoto.request(withResourceFileURLs: [directory.appendingPathComponent("photo.jpg"),
-                directory.appendingPathComponent("video.mov")], placeholderImage: nil, targetSize: .zero, contentMode: .aspectFit) {
-                    photo, info in
-                    if info[PHLivePhotoInfoIsDegradedKey] as? Bool == true { return }
-                    if let photo { continuation.resume(returning: photo) }
-                    else { continuation.resume(throwing: info[PHLivePhotoInfoErrorKey] as? Error ?? RecordingLivePhotoExportError.cannotCreate) }
-                }
+                                                       directory.appendingPathComponent("video.mov")], placeholderImage: nil, targetSize: .zero, contentMode: .aspectFit) {
+                photo, info in
+                if info[PHLivePhotoInfoIsDegradedKey] as? Bool == true { return }
+                if let photo { continuation.resume(returning: photo) }
+                else { continuation.resume(throwing: info[PHLivePhotoInfoErrorKey] as? Error ?? RecordingLivePhotoExportError.cannotCreate) }
+            }
         }
     }
 

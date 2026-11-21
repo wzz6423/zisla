@@ -42,8 +42,8 @@ struct TransientNoticeScrollingTests {
                 "The compact error row must remain centered on the notch when the module panel is wider")
         #expect(alignment == .top)
         #expect(IslandRootView.notchAlignment(petSide: petSide, usesCompactSurface: false)
-                == (petSide == .right ? .topLeading : .topTrailing),
-                "Returning to the full module must restore its reserved pet slot alignment")
+            == (petSide == .right ? .topLeading : .topTrailing),
+            "Returning to the full module must restore its reserved pet slot alignment")
     }
 
     @Test

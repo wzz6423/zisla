@@ -256,14 +256,14 @@ struct ClipboardHistoryQueryTests {
         let secondApp = ClipboardSourceApp(bundleIdentifier: "test.b", name: "删除")
         let records = [
             ClipboardHistoryItem(content: .text("first app favorite"), lastCopiedAt: Date(timeIntervalSince1970: 1),
-                isPinned: true, sourceApp: firstApp),
+                                 isPinned: true, sourceApp: firstApp),
             ClipboardHistoryItem(content: .text("first app history"), lastCopiedAt: Date(timeIntervalSince1970: 3),
-                sourceApp: .init(bundleIdentifier: firstApp.bundleIdentifier, name: "Renamed Tool")),
+                                 sourceApp: .init(bundleIdentifier: firstApp.bundleIdentifier, name: "Renamed Tool")),
             ClipboardHistoryItem(content: .text("second app history"), lastCopiedAt: Date(timeIntervalSince1970: 2), sourceApp: secondApp),
             ClipboardHistoryItem(content: .text("decomposed app history"), lastCopiedAt: Date(timeIntervalSince1970: 6),
-                sourceApp: .init(bundleIdentifier: "test.e\u{301}", name: "Unicode Tool")),
+                                 sourceApp: .init(bundleIdentifier: "test.e\u{301}", name: "Unicode Tool")),
             ClipboardHistoryItem(content: .text("composed app history"), lastCopiedAt: Date(timeIntervalSince1970: 5),
-                sourceApp: .init(bundleIdentifier: "test.é", name: "Unicode Tool")),
+                                 sourceApp: .init(bundleIdentifier: "test.é", name: "Unicode Tool")),
             ClipboardHistoryItem(content: .text("unknown history"), lastCopiedAt: Date(timeIntervalSince1970: 4)),
             ClipboardHistoryItem(content: .text("older unknown history"), lastCopiedAt: Date(timeIntervalSince1970: 0)),
         ]
@@ -279,7 +279,7 @@ struct ClipboardHistoryQueryTests {
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let window = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 620, height: 900),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         window.orderFrontRegardless()
@@ -301,7 +301,7 @@ struct ClipboardHistoryQueryTests {
             let buttonFrame = try #require(button as? any NSAccessibilityElementProtocol).accessibilityFrame()
             let categoryFrame = try #require(category as? any NSAccessibilityElementProtocol).accessibilityFrame()
             #expect(buttonFrame.height > 0 && abs(buttonFrame.midY - categoryFrame.midY) < 1,
-                "Application grouping must share the content category row")
+                    "Application grouping must share the content category row")
             try #require(button.responds(to: NSSelectorFromString("accessibilityPerformPress")))
             _ = button.perform(NSSelectorFromString("accessibilityPerformPress"))
             try await waitUntil { fixture.store.currentQuery.grouping == grouping }
@@ -311,7 +311,7 @@ struct ClipboardHistoryQueryTests {
             #expect(button.value(forKey: "accessibilityValue") as? String == AppLocalization.text(grouping.title))
             if grouping == .sourceApp {
                 #expect(groupHeadings(in: host) == ["删除", "删除", "Unicode Tool", "Unicode Tool", AppLocalization.text("未知应用")],
-                    "App names are user data, and same-named bundles must have separate source headings")
+                        "App names are user data, and same-named bundles must have separate source headings")
                 #expect(fixture.store.items == records)
             } else {
                 #expect(groupHeadings(in: host).isEmpty && fixture.store.isShowingHistoryPreview)
@@ -380,7 +380,7 @@ struct ClipboardHistoryQueryTests {
         host.frame = NSRect(x: 0, y: 0, width: 360, height: 440)
         await layout(host)
         fixture.store.updateQuery(scope: .all, searchText: dimension == "search" ? "no match" : "",
-            category: dimension == "category" ? .url : .all, grouping: .sourceApp)
+                                  category: dimension == "category" ? .url : .all, grouping: .sourceApp)
         await fixture.store.waitUntilLoaded()
         await layout(host)
 
@@ -480,9 +480,9 @@ private struct ClipboardQueryFixture {
         }
         defer { sqlite3_close(connection) }
         guard sqlite3_exec(connection, """
-            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected query control failure'); END;
-            """, nil, nil, nil) == SQLITE_OK else { throw ClipboardQueryFixtureError() }
+        CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected query control failure'); END;
+        """, nil, nil, nil) == SQLITE_OK else { throw ClipboardQueryFixtureError() }
     }
 
     func allowRemovals() throws {

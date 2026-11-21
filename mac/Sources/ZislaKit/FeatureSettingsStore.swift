@@ -27,8 +27,7 @@ public final class FeatureSettingsStore: ObservableObject {
         var shouldPersistMigration = false
         if
             let data = defaults.data(forKey: key),
-            let value = try? JSONDecoder().decode(FeatureSettings.self, from: data)
-        {
+            let value = try? JSONDecoder().decode(FeatureSettings.self, from: data) {
             var settings = value
             if !Self.containsUpdateChannel(in: data) {
                 settings.updateChannel = self.defaultUpdateChannel

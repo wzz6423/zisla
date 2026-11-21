@@ -12,13 +12,13 @@ struct DesktopAISessionDetectorTests {
         for account in ["user_a", "user_b"] {
             let database = root.appendingPathComponent("\(account)/data.sqlite")
             try execute("""
-                CREATE TABLE app_threads (id TEXT, name TEXT, status TEXT, archived INTEGER,
-                    created_at INTEGER, last_prompted_at INTEGER, stub BLOB, state BLOB);
-                INSERT INTO app_threads VALUES ('same-id','Example','streaming',0,1909999700000,1909999990000,X'00',X'FF');
-                INSERT INTO app_threads VALUES ('idle','Private','unread',0,1909999700000,1909999990000,X'00',X'FF');
-                INSERT INTO app_threads VALUES ('archived','Private','streaming',1,1909999700000,1909999990000,X'00',X'FF');
-                INSERT INTO app_threads VALUES ('old','Private','streaming',0,1909990000000,1909990000000,X'00',X'FF');
-                """, at: database)
+            CREATE TABLE app_threads (id TEXT, name TEXT, status TEXT, archived INTEGER,
+                created_at INTEGER, last_prompted_at INTEGER, stub BLOB, state BLOB);
+            INSERT INTO app_threads VALUES ('same-id','Example','streaming',0,1909999700000,1909999990000,X'00',X'FF');
+            INSERT INTO app_threads VALUES ('idle','Private','unread',0,1909999700000,1909999990000,X'00',X'FF');
+            INSERT INTO app_threads VALUES ('archived','Private','streaming',1,1909999700000,1909999990000,X'00',X'FF');
+            INSERT INTO app_threads VALUES ('old','Private','streaming',0,1909990000000,1909990000000,X'00',X'FF');
+            """, at: database)
         }
         let detector = DeltaSessionActivityDetector(dataRoot: root, now: { now })
         let tasks = try detector.activeTasks()
@@ -34,14 +34,14 @@ struct DesktopAISessionDetectorTests {
         let root = try fixtureRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let database = root.appendingPathComponent("user_a/data.sqlite")
         try execute("""
-            CREATE TABLE app_model_usage_daily (day INTEGER, access_provider TEXT, model_provider TEXT,
-                model TEXT, pricing_tier TEXT, input_tokens INTEGER, output_tokens INTEGER,
-                cache_write_tokens INTEGER, cache_read_tokens INTEGER);
-            INSERT INTO app_model_usage_daily VALUES (22000,'direct','example','model-a','standard',10,20,30,40);
-            INSERT INTO app_model_usage_daily VALUES (22000,'direct','example','model-a','fast',5,2,0,0);
-            INSERT INTO app_model_usage_daily VALUES (22000,'direct','example','model-b','standard',9223372036854775807,1,9,9);
-            INSERT INTO app_model_usage_daily VALUES (-1,'direct','example','model-c','standard',1,1,0,0);
-            """, at: database)
+        CREATE TABLE app_model_usage_daily (day INTEGER, access_provider TEXT, model_provider TEXT,
+            model TEXT, pricing_tier TEXT, input_tokens INTEGER, output_tokens INTEGER,
+            cache_write_tokens INTEGER, cache_read_tokens INTEGER);
+        INSERT INTO app_model_usage_daily VALUES (22000,'direct','example','model-a','standard',10,20,30,40);
+        INSERT INTO app_model_usage_daily VALUES (22000,'direct','example','model-a','fast',5,2,0,0);
+        INSERT INTO app_model_usage_daily VALUES (22000,'direct','example','model-b','standard',9223372036854775807,1,9,9);
+        INSERT INTO app_model_usage_daily VALUES (-1,'direct','example','model-c','standard',1,1,0,0);
+        """, at: database)
         let detector = DeltaSessionActivityDetector(dataRoot: root)
         let first = try detector.usageSamples()
         #expect(first.count == 3)
@@ -80,11 +80,11 @@ struct DesktopAISessionDetectorTests {
         let root = try fixtureRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let database = root.appendingPathComponent("agent-session-journal.db")
         try execute("""
-            CREATE TABLE agent_session_records (session_id TEXT, record_json TEXT);
-            CREATE TABLE journal_sessions (session_id TEXT, epoch TEXT);
-            CREATE TABLE journal_rows (session_id TEXT, epoch TEXT, seq INTEGER, ts INTEGER, row_json TEXT);
-            INSERT INTO journal_sessions VALUES ('test-session','current');
-            """, at: database)
+        CREATE TABLE agent_session_records (session_id TEXT, record_json TEXT);
+        CREATE TABLE journal_sessions (session_id TEXT, epoch TEXT);
+        CREATE TABLE journal_rows (session_id TEXT, epoch TEXT, seq INTEGER, ts INTEGER, row_json TEXT);
+        INSERT INTO journal_sessions VALUES ('test-session','current');
+        """, at: database)
         try insertRecord(record(), at: database)
         try insertTurn(seq: 1, state: "running", at: database)
         let detector = OrcaSessionActivityDetector(dataRoots: [root], now: { now })
@@ -112,11 +112,11 @@ struct DesktopAISessionDetectorTests {
         let root = try fixtureRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let database = root.appendingPathComponent("agent-session-journal.db")
         try execute("""
-            CREATE TABLE agent_session_records (session_id TEXT, record_json TEXT);
-            CREATE TABLE journal_sessions (session_id TEXT, epoch TEXT);
-            CREATE TABLE journal_rows (session_id TEXT, epoch TEXT, seq INTEGER, ts INTEGER, row_json TEXT);
-            INSERT INTO journal_sessions VALUES ('test-session','current');
-            """, at: database)
+        CREATE TABLE agent_session_records (session_id TEXT, record_json TEXT);
+        CREATE TABLE journal_sessions (session_id TEXT, epoch TEXT);
+        CREATE TABLE journal_rows (session_id TEXT, epoch TEXT, seq INTEGER, ts INTEGER, row_json TEXT);
+        INSERT INTO journal_sessions VALUES ('test-session','current');
+        """, at: database)
         try insertRecord(record(), at: database)
         let detector = OrcaSessionActivityDetector(dataRoots: [root], now: { now })
         try insertRow(["v": 2, "kind": "item", "itemId": "old", "revision": 1,
@@ -152,11 +152,11 @@ struct DesktopAISessionDetectorTests {
         let root = try fixtureRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let database = root.appendingPathComponent("agent-session-journal.db")
         try execute("""
-            CREATE TABLE agent_session_records (session_id TEXT, record_json TEXT);
-            CREATE TABLE journal_sessions (session_id TEXT, epoch TEXT);
-            CREATE TABLE journal_rows (session_id TEXT, epoch TEXT, seq INTEGER, ts INTEGER, row_json TEXT);
-            INSERT INTO journal_sessions VALUES ('test-session','current');
-            """, at: database)
+        CREATE TABLE agent_session_records (session_id TEXT, record_json TEXT);
+        CREATE TABLE journal_sessions (session_id TEXT, epoch TEXT);
+        CREATE TABLE journal_rows (session_id TEXT, epoch TEXT, seq INTEGER, ts INTEGER, row_json TEXT);
+        INSERT INTO journal_sessions VALUES ('test-session','current');
+        """, at: database)
         try insertTurn(seq: 1, state: "running", at: database)
         let detector = OrcaSessionActivityDetector(dataRoots: [root], now: { now })
         var changed = record()
@@ -179,7 +179,7 @@ struct DesktopAISessionDetectorTests {
         try FileManager.default.createDirectory(at: transcript.deletingLastPathComponent(), withIntermediateDirectories: true)
         let event: [String: Any] = ["type": "assistant", "timestamp": "2030-07-10T12:00:00Z", "message": [
             "id": "example-message", "model": "example-model", "usage": ["input_tokens": 10, "output_tokens": 20,
-                "cache_creation_input_tokens": 30, "cache_read_input_tokens": 40]
+                                                                         "cache_creation_input_tokens": 30, "cache_read_input_tokens": 40]
         ]]
         var data = try JSONSerialization.data(withJSONObject: event); data.append(10)
         try data.write(to: transcript)
@@ -196,7 +196,7 @@ struct DesktopAISessionDetectorTests {
         try insertRecord(pinned, at: database)
         let samples = try OrcaSessionActivityDetector(dataRoots: [root]).usageSamples()
         let direct = try AIUsageLogDetector(claudeProjectsDirectory: transcript.deletingLastPathComponent(),
-            enabledProviders: [.claude]).usageSamples()
+                                            enabledProviders: [.claude]).usageSamples()
         #expect(samples == direct)
         #expect(samples.count == 1)
         #expect(samples[0].provider == .claude)
@@ -211,7 +211,7 @@ struct DesktopAISessionDetectorTests {
         let transcript = root.appendingPathComponent("outside/session.jsonl")
         try FileManager.default.createDirectory(at: transcript.deletingLastPathComponent(), withIntermediateDirectories: true)
         let event: [String: Any] = ["timestamp": "2030-07-10T12:00:00Z", "model": "example",
-                                 "usage": ["input_tokens": 10, "output_tokens": 20]]
+                                    "usage": ["input_tokens": 10, "output_tokens": 20]]
         var data = try JSONSerialization.data(withJSONObject: event); data.append(10)
         try data.write(to: transcript)
         let detector = AIUsageLogDetector(qoderRoots: [], enabledProviders: [.coder],
@@ -249,7 +249,7 @@ struct DesktopAISessionDetectorTests {
 
     private func hook(pane: String, state: String, extra: [String: Any] = [:]) -> [String: Any] {
         var result: [String: Any] = ["paneKey": pane, "connectionId": NSNull(), "receivedAt": 1_909_999_990_000,
-            "stateStartedAt": 1_909_999_980_000, "payload": ["state": state, "agentType": "claude", "prompt": "private prompt"]]
+                                     "stateStartedAt": 1_909_999_980_000, "payload": ["state": state, "agentType": "claude", "prompt": "private prompt"]]
         result.merge(extra) { _, next in next }; return result
     }
     private func record() -> [String: Any] {

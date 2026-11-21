@@ -148,8 +148,8 @@ struct ScreenRecordingMediaLibraryTests {
         #expect(model.project == explicit && !model.canUndo && !model.isDirty)
         var hidden = project
         hidden.timeline?.assets[0] = RecordingMediaAsset(id: project.id, name: project.name, file: project.videoFile,
-            kind: .video, duration: project.duration, width: project.width, height: project.height,
-            hasAudio: true, isHiddenFromLibrary: true)
+                                                         kind: .video, duration: project.duration, width: project.width, height: project.height,
+                                                         hasAudio: true, isHiddenFromLibrary: true)
         model.install(hidden, directory: fixture.directory)
         #expect(model.mediaAssets.isEmpty && model.selectedRemovedMediaAsset?.id == project.id)
         #expect(try JSONDecoder().decode(ScreenRecordingProject.self, from: encoder.encode(hidden)) == hidden)
@@ -196,7 +196,7 @@ struct ScreenRecordingMediaLibraryTests {
         var project = fixture.project()
         var timeline = RecordingMultitrackTimeline.migrating(project)
         let asset = RecordingMediaAsset(name: "Unavailable", file: image.lastPathComponent, kind: .image,
-            duration: 2, width: 64, height: 48)
+                                        duration: 2, width: 64, height: 48)
         timeline.assets.append(asset)
         let addedClip = timeline.addAssetClip(asset.id, at: 0)
         let clipID = try #require(addedClip)
@@ -225,12 +225,12 @@ struct ScreenRecordingMediaLibraryTests {
         _ = try fixture.createImage(image.lastPathComponent)
         model.restoreMediaAsset(asset.id)
         #expect(model.project == project && model.errorMessage == nil && model.selectedRemovedMediaAsset == nil,
-            "Repairing the original file must restore the same asset and clear the failed attempt's error")
+                "Repairing the original file must restore the same asset and clear the failed attempt's error")
         model.undo()
         #expect(model.project == before)
         model.undo()
         #expect(model.project == project && !model.canUndo,
-            "A failed restoration must leave the removal as the only undoable edit")
+                "A failed restoration must leave the removal as the only undoable edit")
     }
 
     @Test func busyOperationsDisableRemoveAndRestoreWithoutClearingRedo() async throws {
@@ -239,10 +239,10 @@ struct ScreenRecordingMediaLibraryTests {
         _ = try await fixture.createVideo()
         var completeRecognition: ScreenRecordingTranscriber.Completion?
         let transcriber = ScreenRecordingTranscriber(dependencies: .init(authorizationStatus: { .authorized },
-            requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { _, _, complete in
-                completeRecognition = complete
-                return {}
-            }, scheduleDeadline: { _ in {} }))
+                                                                         requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { _, _, complete in
+                                                                             completeRecognition = complete
+                                                                             return {}
+                                                                         }, scheduleDeadline: { _ in {} }))
         let model = ScreenRecordingStudioModel(transcriber: transcriber, projectStore: fixture.store)
         defer { model.shutdown() }
         model.install(fixture.project(), directory: fixture.directory)
@@ -254,7 +254,7 @@ struct ScreenRecordingMediaLibraryTests {
         })
         host.sizingOptions = []
         let window = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 660, height: 760),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         window.orderFrontRegardless()
@@ -306,11 +306,11 @@ struct ScreenRecordingMediaLibraryTests {
         let sound = try fixture.createTone(recording ? "microphone.wav" : "tone.wav")
         var recognized: URL?
         let transcriber = ScreenRecordingTranscriber(dependencies: .init(authorizationStatus: { .authorized },
-            requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { url, _, complete in
-                recognized = url
-                complete(.success([.init(start: 0.5, end: 1.5, text: "Hidden source")]))
-                return {}
-            }, scheduleDeadline: { _ in {} }))
+                                                                         requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { url, _, complete in
+                                                                             recognized = url
+                                                                             complete(.success([.init(start: 0.5, end: 1.5, text: "Hidden source")]))
+                                                                             return {}
+                                                                         }, scheduleDeadline: { _ in {} }))
         let model = ScreenRecordingStudioModel(transcriber: transcriber, projectStore: fixture.store)
         defer { model.shutdown() }
         var project = fixture.project()
@@ -380,7 +380,7 @@ struct ScreenRecordingMediaLibraryTests {
         for format in [RecordingExportFormat.mp4, .gif] {
             let destination = fixture.root.appendingPathComponent("hidden." + format.rawValue)
             try await exporter.export(project: hidden, directory: fixture.directory, to: destination,
-                configuration: .init(format: format, resolution: .source, frameRate: 4))
+                                      configuration: .init(format: format, resolution: .source, frameRate: 4))
             if format == .mp4 {
                 let exported = AVURLAsset(url: destination)
                 let decoded = try await RecordingMultitrackTestFixture.decode(exported)
@@ -407,7 +407,7 @@ struct ScreenRecordingMediaLibraryTests {
         var project = fixture.project()
         var timeline = RecordingMultitrackTimeline.migrating(project)
         let image = RecordingMediaAsset(name: "Display title", file: imageURL.lastPathComponent, kind: .image,
-            duration: 2, width: 64, height: 48)
+                                        duration: 2, width: 64, height: 48)
         timeline.assets.append(image)
         let addedClip = timeline.addAssetClip(image.id, at: 0)
         let imageClip = try #require(addedClip)
@@ -422,7 +422,7 @@ struct ScreenRecordingMediaLibraryTests {
         })
         host.sizingOptions = []
         let window = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 660, height: 760),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         window.orderFrontRegardless()
@@ -497,7 +497,7 @@ struct ScreenRecordingMediaLibraryTests {
             var values = [Float](repeating: 0, count: count)
             let result = values.withUnsafeMutableBytes {
                 CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: count * MemoryLayout<Float>.size,
-                    destination: $0.baseAddress!)
+                                           destination: $0.baseAddress!)
             }
             try #require(result == kCMBlockBufferNoErr)
             energy += values.reduce(0) { $0 + Double($1) * Double($1) }
@@ -561,7 +561,7 @@ struct ScreenRecordingMediaLibraryTests {
         let frame = try #require(element(identifier, in: host)).accessibilityFrame()
         let point = window.convertPoint(fromScreen: CGPoint(x: frame.midX, y: frame.midY))
         let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: point, modifierFlags: [],
-            timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+                                                    timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
         var target = host.hitTest(host.convert(point, from: nil))
         while let view = target {
             if let menu = view.menu(for: event) { return menu }

@@ -20,7 +20,7 @@ struct CompactPlaybackProgressTests {
         fixture.settings.settings.mediaVisualizationStyle = .glow
         let date = Date(timeIntervalSince1970: 100)
         fixture.media.publishSnapshot(NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil,
-            artworkData: nil, duration: 60, elapsedTime: 15, timestamp: date, isPlaying: true))
+                                                         artworkData: nil, duration: 60, elapsedTime: 15, timestamp: date, isPlaying: true))
         let notice = IslandNotice(id: "media-active-progress-samples", title: "Music")
         fixture.queue.enqueue(notice, expiresAfter: nil)
         let state = SideNoticeDisplayState()
@@ -29,9 +29,9 @@ struct CompactPlaybackProgressTests {
         state.compactWingHeight = 32
         let size = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: date)).size
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults),
-            onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults),
+                                        onStatusHidden: {})
         let clock = PlaybackClock(date: date)
         let host = NSHostingView(rootView: PlaybackSurface(clock: clock, status: view, size: size))
         let expected = NSHostingView(rootView: view.statusBarContent(at: date.addingTimeInterval(30))
@@ -40,7 +40,7 @@ struct CompactPlaybackProgressTests {
         expected.sizingOptions = []
         let windows = [host as NSView, expected as NSView].map { content in
             let window = NSWindow(contentRect: CGRect(origin: .zero, size: size),
-                styleMask: [.borderless], backing: .buffered, defer: false)
+                                  styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = content
             return window

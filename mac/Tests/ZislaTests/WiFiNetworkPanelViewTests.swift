@@ -22,8 +22,7 @@ struct WiFiNetworkPanelViewTests {
         defer { releaseAccessibility() }
         let host = NSHostingView(rootView: WiFiNetworkPanelView(controller: controller)
             .accentColor(.blue)
-            .environment(\.controlActiveState, .inactive)
-        )
+            .environment(\.controlActiveState, .inactive))
         let window = NSWindow(
             contentRect: NSRect(x: 20_000, y: 100, width: 320, height: 320),
             styleMask: .borderless, backing: .buffered, defer: false

@@ -25,7 +25,7 @@ struct VerticalStatusText: View {
     var body: some View {
         let usesScrolling = scrollProgress != nil || scrollsAutomatically
         let rows = CompactPillStatusPresentation.verticalTextRows(text, availableWidth: availableWidth,
-            availableHeight: usesScrolling ? CGFloat(text.count) * 14 : availableHeight)
+                                                                  availableHeight: usesScrolling ? CGFloat(text.count) * 14 : availableHeight)
         let travel = max(0, CGFloat(rows.count) * 14 - 1 - availableHeight)
         let content = VStack(spacing: 1) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
@@ -54,8 +54,8 @@ struct VerticalStatusText: View {
             }
         }
         .id(AutomaticAnimationIdentity(text: text, width: availableWidth, height: availableHeight,
-            scrollsAutomatically: scrollsAutomatically, usesExternalProgress: scrollProgress != nil,
-            reduceMotion: reduceMotion))
+                                       scrollsAutomatically: scrollsAutomatically, usesExternalProgress: scrollProgress != nil,
+                                       reduceMotion: reduceMotion))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)
     }
@@ -86,8 +86,8 @@ struct CompactPillStatusContent: View {
 
     nonisolated static func transientPresentation(message: String) -> CompactPillStatusPresentation {
         CompactPillStatusPresentation(priority: .transient,
-            notice: IslandNotice(id: "app-transient", title: message, symbolName: "exclamationmark.triangle.fill"),
-            text: message)
+                                      notice: IslandNotice(id: "app-transient", title: message, symbolName: "exclamationmark.triangle.fill"),
+                                      text: message)
     }
 
     nonisolated static func displayText(
@@ -135,68 +135,69 @@ struct CompactPillStatusContent: View {
         GeometryReader { proxy in
             if presentation.isAccountBalance {
                 CompactAIAccountBalanceBar(notice: presentation.notice,
-                    height: edge.isVertical ? proxy.size.width : proxy.size.height, edge: edge,
-                    leadingInset: leadingInset)
+                                           height: edge.isVertical ? proxy.size.width : proxy.size.height, edge: edge,
+                                           leadingInset: leadingInset)
             } else {
-            let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
-            let iconSize = max(0, thickness - 8)
-            let textBudget = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
-                - iconSize - (presentation.showsWaveform ? iconSize + 6 : 0) - 6
-                - CompactPillStatusPresentation.trailingInset - leadingInset
-                - (presentation.priority == .focusCountdown
-                    ? CompactPillStatusPresentation.pomodoroControlsLength + 6 : 0))
-            let identityLength = min(textBudget, presentation.mediaIdentityLength(
-                thickness: thickness, edge: edge, text: text, item: item))
-            let textLength = max(0, textBudget - identityLength - (identityLength > 0 && !text.isEmpty ? 6 : 0))
-            let layout = edge.isVertical
-                ? AnyLayout(VStackLayout(spacing: 6))
-                : AnyLayout(HStackLayout(spacing: 6))
-            layout {
-                if presentation.priority == .updateAvailable {
-                    ForEach([NoticeSide.left, .right], id: \.self) { side in
-                        CompactUpdateWing(notice: presentation.notice, side: side, height: thickness,
-                            usesTransparentBackground: true)
+                let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
+                let iconSize = max(0, thickness - 8)
+                let textBudget = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
+                    - iconSize - (presentation.showsWaveform ? iconSize + 6 : 0) - 6
+                    - CompactPillStatusPresentation.trailingInset - leadingInset
+                    - (presentation.priority == .focusCountdown
+                        ? CompactPillStatusPresentation.pomodoroControlsLength + 6 : 0))
+                let identityLength = min(textBudget, presentation.mediaIdentityLength(
+                    thickness: thickness, edge: edge, text: text, item: item
+                ))
+                let textLength = max(0, textBudget - identityLength - (identityLength > 0 && !text.isEmpty ? 6 : 0))
+                let layout = edge.isVertical
+                    ? AnyLayout(VStackLayout(spacing: 6))
+                    : AnyLayout(HStackLayout(spacing: 6))
+                layout {
+                    if presentation.priority == .updateAvailable {
+                        ForEach([NoticeSide.left, .right], id: \.self) { side in
+                            CompactUpdateWing(notice: presentation.notice, side: side, height: thickness,
+                                              usesTransparentBackground: true)
+                                .frame(width: edge.isVertical ? thickness : iconSize,
+                                       height: edge.isVertical ? iconSize : thickness)
+                        }
+                    } else {
+                        statusIcon(size: iconSize)
                             .frame(width: edge.isVertical ? thickness : iconSize,
                                    height: edge.isVertical ? iconSize : thickness)
                     }
-                } else {
-                    statusIcon(size: iconSize)
-                        .frame(width: edge.isVertical ? thickness : iconSize,
-                               height: edge.isVertical ? iconSize : thickness)
-                }
-                if let item, identityLength > 0 {
-                    mediaIdentity(item, length: identityLength, thickness: thickness)
-                        .frame(width: edge.isVertical ? thickness : identityLength,
-                               height: edge.isVertical ? identityLength : thickness)
-                }
-                if presentation.showsWaveform, identityLength > 0 {
-                    waveform(size: iconSize, thickness: thickness)
-                }
-                if !text.isEmpty {
-                    if edge.isVertical {
-                        VerticalStatusText(text: text, availableWidth: thickness, availableHeight: textLength,
-                                           scrollProgress: lyricScrollProgress)
-                            .frame(width: thickness, height: textLength, alignment: .top)
-                    } else {
-                        MarqueeText(text, font: .system(size: 11, weight: .medium),
-                                    textColor: .white, pointsPerSecond: TransientNoticeMetrics.pointsPerSecond,
-                                    repeats: false, scrollProgress: lyricScrollProgress)
-                            .frame(width: textLength, height: thickness, alignment: .leading)
+                    if let item, identityLength > 0 {
+                        mediaIdentity(item, length: identityLength, thickness: thickness)
+                            .frame(width: edge.isVertical ? thickness : identityLength,
+                                   height: edge.isVertical ? identityLength : thickness)
+                    }
+                    if presentation.showsWaveform, identityLength > 0 {
+                        waveform(size: iconSize, thickness: thickness)
+                    }
+                    if !text.isEmpty {
+                        if edge.isVertical {
+                            VerticalStatusText(text: text, availableWidth: thickness, availableHeight: textLength,
+                                               scrollProgress: lyricScrollProgress)
+                                .frame(width: thickness, height: textLength, alignment: .top)
+                        } else {
+                            MarqueeText(text, font: .system(size: 11, weight: .medium),
+                                        textColor: .white, pointsPerSecond: TransientNoticeMetrics.pointsPerSecond,
+                                        repeats: false, scrollProgress: lyricScrollProgress)
+                                .frame(width: textLength, height: thickness, alignment: .leading)
+                        }
+                    }
+                    if presentation.showsWaveform, identityLength == 0 {
+                        waveform(size: iconSize, thickness: thickness)
+                    }
+                    if presentation.priority == .focusCountdown {
+                        CompactPomodoroControls(edge: edge)
+                            .frame(width: edge.isVertical ? thickness : CompactPillStatusPresentation.pomodoroControlsLength,
+                                   height: edge.isVertical ? CompactPillStatusPresentation.pomodoroControlsLength : thickness)
                     }
                 }
-                if presentation.showsWaveform, identityLength == 0 {
-                    waveform(size: iconSize, thickness: thickness)
-                }
-                if presentation.priority == .focusCountdown {
-                    CompactPomodoroControls(edge: edge)
-                        .frame(width: edge.isVertical ? thickness : CompactPillStatusPresentation.pomodoroControlsLength,
-                               height: edge.isVertical ? CompactPillStatusPresentation.pomodoroControlsLength : thickness)
-                }
-            }
-            .padding(edge.isVertical ? .top : .leading, leadingInset)
-            .padding(edge.isVertical ? .bottom : .trailing, CompactPillStatusPresentation.trailingInset)
-            .frame(width: proxy.size.width, height: proxy.size.height)
-            .environment(\.layoutDirection, presentation.priority == .focusCountdown ? .leftToRight : layoutDirection)
+                .padding(edge.isVertical ? .top : .leading, leadingInset)
+                .padding(edge.isVertical ? .bottom : .trailing, CompactPillStatusPresentation.trailingInset)
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .environment(\.layoutDirection, presentation.priority == .focusCountdown ? .leftToRight : layoutDirection)
             }
         }
         .foregroundStyle(.white)
@@ -221,11 +222,11 @@ struct CompactPillStatusContent: View {
             let width = artist.isEmpty ? thickness : thickness / 2
             HStack(spacing: 0) {
                 VerticalStatusText(text: item.title, availableWidth: width,
-                    availableHeight: length, scrollsAutomatically: true)
+                                   availableHeight: length, scrollsAutomatically: true)
                     .frame(width: width, height: length, alignment: .top)
                 if !artist.isEmpty {
                     VerticalStatusText(text: artist, availableWidth: width,
-                        availableHeight: length, scrollsAutomatically: true)
+                                       availableHeight: length, scrollsAutomatically: true)
                         .frame(width: width, height: length, alignment: .top)
                         .opacity(0.62)
                 }
@@ -237,7 +238,7 @@ struct CompactPillStatusContent: View {
 
     private func waveform(size: CGFloat, thickness: CGFloat) -> some View {
         MediaWaveformView(artworkData: item?.artworkData ?? presentation.notice.artworkData,
-            width: size, height: min(18, size), isActive: item?.isPlaying ?? true)
+                          width: size, height: min(18, size), isActive: item?.isPlaying ?? true)
             .frame(width: edge.isVertical ? thickness : size,
                    height: edge.isVertical ? size : thickness)
     }
@@ -253,7 +254,7 @@ struct CompactPillStatusContent: View {
             )
         } else if presentation.priority == .aiActivity {
             AIMascotStack(notices: presentation.aiNotices.isEmpty ? [presentation.notice] : presentation.aiNotices,
-                size: size, edge: edge)
+                          size: size, edge: edge)
         } else if presentation.notice.style == .headphone {
             HeadphoneGlyph(
                 productID: presentation.notice.headphoneProductID,

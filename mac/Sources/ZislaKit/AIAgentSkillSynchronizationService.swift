@@ -230,8 +230,8 @@ public struct AIAgentSkillSynchronizationService {
         let linkTarget = try? fileManager.destinationOfSymbolicLink(atPath: destination.path)
         guard managedDirectory.standardizedFileURL.path != destination.standardizedFileURL.path,
               (managedPath.path == destinationPath.path && linkTarget != nil)
-                || (!managedPath.pathComponents.starts(with: destinationPath.pathComponents)
-                    && !destinationPath.pathComponents.starts(with: managedPath.pathComponents)) else {
+              || (!managedPath.pathComponents.starts(with: destinationPath.pathComponents)
+                  && !destinationPath.pathComponents.starts(with: managedPath.pathComponents)) else {
             throw AIAgentSkillSynchronizationError.destinationIsNotManaged(destination.path)
         }
     }

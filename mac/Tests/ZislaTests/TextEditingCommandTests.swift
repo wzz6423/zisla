@@ -146,8 +146,8 @@ struct TextEditingCommandTests {
             #expect(TextEditingCommands.handle(event) === event)
         }
         let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
-            timestamp: 0, windowNumber: 0, context: nil, characters: "a", charactersIgnoringModifiers: "a",
-            isARepeat: false, keyCode: 0))
+                                                  timestamp: 0, windowNumber: 0, context: nil, characters: "a", charactersIgnoringModifiers: "a",
+                                                  isARepeat: false, keyCode: 0))
         #expect(event.window == nil)
         #expect(TextEditingCommands.handle(event) === event)
         #expect(editor.string == "111")
@@ -156,7 +156,7 @@ struct TextEditingCommandTests {
     @Test(arguments: ["empty", "disabled", "read-only", "read-only-redo", "missing-manager"])
     func unavailableTextHistoryCannotUndoTheProject(_ mode: String) throws {
         let window = ScreenshotEditorWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
-            styleMask: [.titled], backing: .buffered, defer: false)
+                                            styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
         var projectRevision = 2
@@ -190,7 +190,7 @@ struct TextEditingCommandTests {
     @Test
     func noTextFocusPreservesProjectUndoAndRedo() throws {
         let window = ScreenshotEditorWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
-            styleMask: [.titled], backing: .buffered, defer: false)
+                                            styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
         var projectRevision = 2
@@ -214,8 +214,8 @@ struct TextEditingCommandTests {
         let recorder = HotkeyRecorderButton(hotkey: nil, locale: Locale(identifier: "en"))
         window.contentView = recorder
         let click = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: .zero,
-            modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
-            eventNumber: 0, clickCount: 1, pressure: 1))
+                                                    modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                                    eventNumber: 0, clickCount: 1, pressure: 1))
         recorder.mouseDown(with: click)
         defer { recorder.stopRecording() }
         #expect(recorder.isRecording)
@@ -232,7 +232,7 @@ struct TextEditingCommandTests {
     @Test
     func hiddenRichNoteEditorKeepsItsExistingUndoAndRedoCommands() async throws {
         let host = NSHostingView(rootView: RichNoteEditor(html: "<div>初始内容</div>", command: nil,
-            isEditable: true, onChange: { _, _ in }).frame(width: 320, height: 240))
+                                                          isEditable: true, onChange: { _, _ in }).frame(width: 320, height: 240))
         let window = makeWindow(.notes)
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -249,18 +249,18 @@ struct TextEditingCommandTests {
         let webView = try #require(readyView, "The local rich-note editor must finish loading in its hidden host")
         #expect(window.makeFirstResponder(webView))
         _ = try await webView.evaluateJavaScript("""
-            (() => {
-              const editor = document.getElementById('editor');
-              editor.focus();
-              const range = document.createRange();
-              range.selectNodeContents(editor);
-              range.collapse(false);
-              const selection = window.getSelection();
-              selection.removeAllRanges();
-              selection.addRange(range);
-              window.zisla.exec('insertText', '变更');
-            })();
-            """)
+        (() => {
+          const editor = document.getElementById('editor');
+          editor.focus();
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          window.zisla.exec('insertText', '变更');
+        })();
+        """)
         #expect(try await webView.evaluateJavaScript("document.getElementById('editor').innerText") as? String == "初始内容变更")
         let undo = try key("z", in: window)
         #expect(TextEditingCommands.handle(undo) === undo)
@@ -344,8 +344,8 @@ struct TextEditingCommandTests {
         default: 0
         }
         return try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
-            timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: value,
-            charactersIgnoringModifiers: value, isARepeat: false, keyCode: code))
+                                             timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: value,
+                                             charactersIgnoringModifiers: value, isARepeat: false, keyCode: code))
     }
 
     private func descendants<T: NSView>(_ type: T.Type, in view: NSView) -> [T] {

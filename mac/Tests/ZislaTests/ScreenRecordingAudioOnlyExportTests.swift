@@ -28,7 +28,7 @@ struct ScreenRecordingAudioOnlyExportTests {
             if case .frame = $0 { Issue.record("Audio exports must not render video frames") }
         })
         try await exporter.export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: format, resolution: .ultraHD, frameRate: -99))
+                                  configuration: .init(format: format, resolution: .ultraHD, frameRate: -99))
         #expect(exporter.progress == 1 && !exporter.isExporting)
         let asset = AVURLAsset(url: output)
         #expect(try await asset.loadTracks(withMediaType: .video).isEmpty)
@@ -55,7 +55,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         project.timeline?.clips[0].sourceEnd = Double(frames) / 48_000
         let output = fixture.root.appendingPathComponent("valid-frames." + format.fileExtension)
         try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: format))
+                                                   configuration: .init(format: format))
         let file = try AVAudioFile(forReading: output)
         #expect(file.length == AVAudioFramePosition(frames))
         let decoded = try await decode(output)
@@ -72,7 +72,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         project.videoFile = ""
         let audio = RecordingMediaAsset(name: "Tone", file: "tone.wav", kind: .audio, duration: 2)
         let image = RecordingMediaAsset(name: "Unneeded image", file: "not-decoded.png", kind: .image,
-            duration: 2, width: 64, height: 48)
+                                        duration: 2, width: 64, height: 48)
         project.timeline = .init(assets: [audio, image], tracks: [.init(id: "mixed"), .init(id: "overlay")], clips: [
             .init(trackID: "mixed", content: .audio(audio.id), start: 0.2, sourceStart: 0.2, sourceEnd: 0.6, volume: 0.4),
             .init(trackID: "overlay", content: .audio(audio.id), start: 0.2, sourceStart: 0.2, sourceEnd: 0.6, volume: 0.4),
@@ -82,7 +82,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         let output = fixture.root.appendingPathComponent("mixed.wav")
         let exporter = ScreenRecordingExporter()
         try await exporter.export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: .wav))
+                                  configuration: .init(format: .wav))
         let decoded = try await decode(output)
         #expect(abs(Double(decoded.samples.count) / decoded.rate - 2) < 1 / decoded.rate)
         let single = energy(decoded.samples, start: 1.0, end: 1.2)
@@ -94,13 +94,13 @@ struct ScreenRecordingAudioOnlyExportTests {
         referenceProject.timeline?.clips[1].volume = 1
         let referenceURL = fixture.root.appendingPathComponent("reference.wav")
         try await ScreenRecordingExporter().export(project: referenceProject, directory: fixture.directory, to: referenceURL,
-            configuration: .init(format: .wav))
+                                                   configuration: .init(format: .wav))
         let reference = try await decode(referenceURL)
         let fullGain = energy(reference.samples, start: 1.0, end: 1.2)
         #expect(abs(single / fullGain - 0.16) < 0.01, "A clip gain of 0.4 must preserve its energy scale")
         for (start, end) in [(0.02, 0.16), (0.65, 0.82), (1.45, 1.95)] {
             #expect(energy(decoded.samples, start: start, end: end) < 0.000_000_1,
-                "Empty edited ranges must remain silent instead of collapsing the timeline")
+                    "Empty edited ranges must remain silent instead of collapsing the timeline")
         }
         #expect(try fixture.files() == ["tone.wav"])
         #expect(try stagingFiles(in: fixture.root).isEmpty)
@@ -119,7 +119,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         ]
         let output = fixture.root.appendingPathComponent("two-lanes.wav")
         try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: .wav))
+                                                   configuration: .init(format: .wav))
         let samples = try await decode(output)
         #expect(energy(samples.samples, start: 0.944, end: 0.956) < 0.000_000_1)
         #expect(energy(samples.samples, start: 1.03, end: 1.17) < 0.000_000_1)
@@ -139,18 +139,18 @@ struct ScreenRecordingAudioOnlyExportTests {
         project.timeline?.clips[0].speed = speed
         let clip = try #require(project.timeline?.clips.first)
         let image = RecordingMediaAsset(name: "Image duration", file: "not-loaded.png", kind: .image,
-            duration: 2, width: 64, height: 48)
+                                        duration: 2, width: 64, height: 48)
         project.timeline?.assets.append(image)
         project.timeline?.tracks.append(.init(id: "visual"))
         project.timeline?.clips.append(.init(trackID: "visual", content: .image(image.id), start: 0, sourceEnd: clip.end + 0.137))
         let output = fixture.root.appendingPathComponent("resampled.wav")
         try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: .wav))
+                                                   configuration: .init(format: .wav))
         let decoded = try await decode(output)
         #expect(abs(Double(decoded.samples.count) / 48_000 - project.outputDuration) <= 1 / 48_000)
         #expect(energy(decoded.samples, start: 0.01, end: 0.11) < 0.000_000_1)
         #expect(energy(decoded.samples, start: clip.start + clip.duration * 0.3,
-            end: clip.start + clip.duration * 0.7) > 0.000_1)
+                       end: clip.start + clip.duration * 0.7) > 0.000_1)
         #expect(energy(decoded.samples, start: clip.end + 0.002, end: clip.end + 0.01) < 0.000_000_1)
         #expect(energy(decoded.samples, start: clip.end + 0.04, end: clip.end + 0.12) < 0.000_000_1)
         #expect(try stagingFiles(in: fixture.root).isEmpty)
@@ -175,7 +175,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         let exporter = ScreenRecordingExporter()
         await #expect(throws: RecordingAudioOnlyExportError.noAudio) {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: .wav))
+                                      configuration: .init(format: .wav))
         }
         #expect(try Data(contentsOf: output) == original)
         #expect(!exporter.isExporting && exporter.progress < 1)
@@ -197,7 +197,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         let exporter = ScreenRecordingExporter(resolveFFmpeg: { throw ScreenRecordingExportError.missingFFmpeg })
         await #expect(throws: (any Error).self) {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: failure == "missingEncoder" ? .mp3 : .wav))
+                                      configuration: .init(format: failure == "missingEncoder" ? .mp3 : .wav))
         }
         #expect(try Data(contentsOf: output) == original)
         #expect(!exporter.isExporting && exporter.progress < 1)
@@ -218,13 +218,13 @@ struct ScreenRecordingAudioOnlyExportTests {
         })
         await #expect(throws: CocoaError.self) {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: .wav))
+                                      configuration: .init(format: .wav))
         }
         #expect(try Data(contentsOf: output) == original)
         #expect(!exporter.isExporting && exporter.progress < 1)
         #expect(try stagingFiles(in: fixture.root).isEmpty)
         try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: .wav))
+                                                   configuration: .init(format: .wav))
         #expect(try Data(contentsOf: output).prefix(4) == Data("RIFF".utf8))
     }
 
@@ -241,7 +241,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         let exporter = ScreenRecordingExporter(checkpoint: { if $0 == .audioSample(0) { gate.pause() } })
         let task = Task {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: .wav))
+                                      configuration: .init(format: .wav))
         }
         await gate.waitUntilPaused()
         #expect(exporter.isExporting)
@@ -267,7 +267,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         })
         await #expect(throws: ScreenRecordingExportError.invalidDestination) {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: .wav))
+                                      configuration: .init(format: .wav))
         }
         #expect(try Data(contentsOf: protected) == original)
         #expect(try stagingFiles(in: fixture.root).isEmpty)
@@ -290,7 +290,7 @@ struct ScreenRecordingAudioOnlyExportTests {
         })
         do {
             try await exporter.export(project: project, directory: fixture.directory, to: output,
-                configuration: .init(format: format))
+                                      configuration: .init(format: format))
             Issue.record("The injected audio encoder failure must fail the export")
         } catch {
             #expect(cancellation ? error is CancellationError : error as? ScreenRecordingExportError == .transcodingFailure)
@@ -389,10 +389,10 @@ struct ScreenRecordingAudioOnlyIntegrationTests {
         try #require(YTDLPResolver.isTrustedExecutable(probe))
         let exporter = ScreenRecordingExporter()
         try await exporter.export(project: project, directory: fixture.directory, to: output,
-            configuration: .init(format: format, frameRate: -99))
+                                  configuration: .init(format: format, frameRate: -99))
         let result = try await AIAgentProcessRunner.run(executableURL: probe,
-            arguments: ["-v", "error", "-protocol_whitelist", "file", "-show_streams", "-show_format", "-of", "json", output.path],
-            timeout: 15, maximumOutputBytes: 16_384, maximumErrorBytes: 4_096)
+                                                        arguments: ["-v", "error", "-protocol_whitelist", "file", "-show_streams", "-show_format", "-of", "json", output.path],
+                                                        timeout: 15, maximumOutputBytes: 16_384, maximumErrorBytes: 4_096)
         #expect(result.status == 0 && !result.didTimeout)
         let json = try #require(JSONSerialization.jsonObject(with: result.standardOutput) as? [String: Any])
         let streams = try #require(json["streams"] as? [[String: Any]])
@@ -405,9 +405,9 @@ struct ScreenRecordingAudioOnlyIntegrationTests {
         let duration = try #require(Double(durationString))
         #expect(abs(duration - 0.5) < 0.06)
         let decoded = try await AIAgentProcessRunner.run(executableURL: executable,
-            arguments: ["-v", "error", "-protocol_whitelist", "file,pipe", "-i", output.path,
-                        "-map", "0:a:0", "-f", "f32le", "-ac", "1", "-ar", "48000", "pipe:1"],
-            timeout: 15, maximumOutputBytes: 48_000 * 4, maximumErrorBytes: 4_096)
+                                                         arguments: ["-v", "error", "-protocol_whitelist", "file,pipe", "-i", output.path,
+                                                                     "-map", "0:a:0", "-f", "f32le", "-ac", "1", "-ar", "48000", "pipe:1"],
+                                                         timeout: 15, maximumOutputBytes: 48_000 * 4, maximumErrorBytes: 4_096)
         #expect(decoded.status == 0)
         let samples = decoded.standardOutput.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
         #expect(abs(Double(samples.count) / 48_000 - 0.5) < 0.06)

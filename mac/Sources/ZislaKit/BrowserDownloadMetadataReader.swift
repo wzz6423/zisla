@@ -18,7 +18,7 @@ enum BrowserDownloadMetadataReader {
         var budget = 64 * 1024 * 1024
         let current = try read(directory.appendingPathComponent("CURRENT"), budget: &budget)
         guard let manifestName = String(bytes: current, encoding: .utf8),
-            manifestName.range(of: #"^MANIFEST-[0-9]+\n$"#, options: .regularExpression) != nil
+              manifestName.range(of: #"^MANIFEST-[0-9]+\n$"#, options: .regularExpression) != nil
         else { throw ReadError.malformed }
         let manifest = try read(directory.appendingPathComponent(String(manifestName.dropLast())), budget: &budget)
         var tables: Set<UInt64> = []
@@ -61,7 +61,7 @@ enum BrowserDownloadMetadataReader {
                     let sequence = try cursor.integer(count: 8)
                     let count = try cursor.integer(count: 4)
                     guard count <= UInt64(cursor.remaining / 2),
-                        sequence <= 0x00ff_ffff_ffff_ffff - count
+                          sequence <= 0x00ff_ffff_ffff_ffff - count
                     else { throw ReadError.malformed }
                     for index in 0..<count {
                         let kind = try cursor.integer(count: 1)
@@ -95,7 +95,7 @@ enum BrowserDownloadMetadataReader {
                         let kind = version & 0xff
                         guard kind <= 1 else { throw ReadError.unsupported }
                         try merge(Array(internalKey.dropLast(8)),
-                            record: Record(sequence: version >> 8, value: kind == 1 ? value : nil), into: &records)
+                                  record: Record(sequence: version >> 8, value: kind == 1 ? value : nil), into: &records)
                     }
                 }
                 remainingTables.remove(number)
@@ -106,12 +106,12 @@ enum BrowserDownloadMetadataReader {
         guard !records.isEmpty else { return nil }
         return try records.values.compactMap { record in
             guard let value = record.value,
-                case let .bytes(info)? = try fields(value)[1],
-                case let .bytes(progress)? = try fields(info)[4]
+                  case let .bytes(info)? = try fields(value)[1],
+                  case let .bytes(progress)? = try fields(info)[4]
             else { return nil }
             let fields = try fields(progress)
             guard case .integer(0)? = fields[21],
-                case let .bytes(current)? = fields[13]
+                  case let .bytes(current)? = fields[13]
             else { return nil }
             let currentPath = try path(current)
             guard currentPaths.contains(currentPath), case let .bytes(target)? = fields[14] else { return nil }
@@ -185,7 +185,7 @@ enum BrowserDownloadMetadataReader {
 
     private static func block(_ data: [UInt8], offset: UInt64, size: UInt64, budget: inout Int) throws -> [UInt8] {
         guard data.count >= 53, offset <= UInt64(data.count - 53),
-            size <= UInt64(data.count - 53) - offset
+              size <= UInt64(data.count - 53) - offset
         else { throw ReadError.malformed }
         let start = Int(offset)
         let end = start + Int(size)
@@ -267,7 +267,7 @@ enum BrowserDownloadMetadataReader {
         let length = try cursor.integer(count: 4)
         let bytes = try cursor.bytes(count: length)
         guard cursor.remaining == (4 - Int(length) % 4) % 4,
-            !bytes.contains(0), let path = String(bytes: bytes, encoding: .utf8)
+              !bytes.contains(0), let path = String(bytes: bytes, encoding: .utf8)
         else { throw ReadError.malformed }
         return path
     }

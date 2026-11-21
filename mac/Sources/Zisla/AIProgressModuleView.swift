@@ -34,8 +34,8 @@ struct AIProgressModuleView: View {
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 AIAccountBalanceSection(balances: monitor.accountBalances,
-                    displayedProviders: displayedBalanceProviders, monitoredProviders: monitoredBalanceProviders,
-                    language: language)
+                                        displayedProviders: displayedBalanceProviders, monitoredProviders: monitoredBalanceProviders,
+                                        language: language)
             }
             .padding(.trailing, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay) + 1)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -77,7 +77,8 @@ struct AIProgressModuleView: View {
             UsageHeatmap(weeks: usageCalendar(endingAt: date), selectedDate: $selectedUsageDate)
             if let selectedUsageDate {
                 DailyModelUsageList(day: AIUsageHistoryPresentation.selectedDay(in: AIUsageHistory(
-                    usageSamples: monitor.state.usageSamples, modelUsageSamples: monitor.state.modelUsageSamples), date: selectedUsageDate))
+                    usageSamples: monitor.state.usageSamples, modelUsageSamples: monitor.state.modelUsageSamples
+                ), date: selectedUsageDate))
             }
         }
     }
@@ -126,7 +127,7 @@ private struct AIProgressUpperSectionLayout: Layout {
         let width = proposal.replacingUnspecifiedDimensions().width
         let contentWidth = width - 24 - dividerWidth
         return CGSize(width: width,
-            height: subviews[2].sizeThatFits(ProposedViewSize(width: contentWidth * 0.52, height: nil)).height)
+                      height: subviews[2].sizeThatFits(ProposedViewSize(width: contentWidth * 0.52, height: nil)).height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
@@ -136,7 +137,7 @@ private struct AIProgressUpperSectionLayout: Layout {
         var x = bounds.minX
         for (subview, width) in zip(subviews, widths) {
             subview.place(at: CGPoint(x: x, y: bounds.minY),
-                anchor: .topLeading, proposal: ProposedViewSize(width: width, height: bounds.height))
+                          anchor: .topLeading, proposal: ProposedViewSize(width: width, height: bounds.height))
             x += width + 12
         }
     }
@@ -243,8 +244,8 @@ struct DailyModelUsageList: View {
     static func tokenBreakdown(_ usage: AIModelUsage, locale: Locale = AppLocalization.currentLanguage.locale) -> String {
         let format = FloatingPointFormatStyle<Double>.number.grouping(.never).precision(.fractionLength(0...6)).locale(locale)
         return AppLocalization.format("输入 %@ · 输出 %@", locale: locale,
-            [(Double(usage.inputTokens) / 1_000_000).formatted(format) + " M",
-             (Double(usage.outputTokens) / 1_000_000).formatted(format) + " M"])
+                                      [(Double(usage.inputTokens) / 1_000_000).formatted(format) + " M",
+                                       (Double(usage.outputTokens) / 1_000_000).formatted(format) + " M"])
     }
 }
 
@@ -324,7 +325,7 @@ struct UsageTrendChart: View {
                     .foregroundStyle(Color.secondary.opacity(0.4))
                 if let selected = series.first(where: { Calendar.current.isDate($0.timestamp, inSameDayAs: selectedDate) }) {
                     PointMark(x: .value(AppLocalization.text("时间"), selected.timestamp),
-                        y: .value(AppLocalization.text("总 Token"), selected.totalTokens))
+                              y: .value(AppLocalization.text("总 Token"), selected.totalTokens))
                         .foregroundStyle(Color.blue)
                         .symbolSize(30)
                 }
@@ -361,7 +362,7 @@ struct UsageTrendChart: View {
                                 .fixedSize()
                                 .alignmentGuide(HorizontalAlignment.center) { size in
                                     min(frame.minX + x, max(size.width / 2,
-                                        frame.minX + x + size.width - width))
+                                                            frame.minX + x + size.width - width))
                                 }
                                 .frame(width: 0, alignment: .center)
                                 .position(x: frame.minX + x, y: frame.maxY + 8)
@@ -594,7 +595,7 @@ struct UsageHeatmap: View {
     private let gap: CGFloat = 1.5
 
     init(weeks: [[ContributionDay?]], selectedDate: Binding<Date?> = .constant(nil), cellSize: CGFloat? = nil,
-        layout: Layout = .calendar) {
+         layout: Layout = .calendar) {
         self.weeks = weeks
         _selectedDate = selectedDate
         self.cellSize = cellSize
@@ -639,7 +640,7 @@ struct UsageHeatmap: View {
                     ForEach(weeks.flatMap { $0 }.compactMap { $0 }, id: \.date) { day in
                         VStack(spacing: 3) {
                             UsageCalendarCell(day: day, intensity: intensity(for: day.tokens),
-                                isSelected: isSelected(day), select: { selectedDate = $0 })
+                                              isSelected: isSelected(day), select: { selectedDate = $0 })
                                 .frame(width: cellSize, height: cellSize)
                             Button { selectedDate = day.date } label: {
                                 Text(day.date, format: .dateTime.month(.twoDigits).day(.twoDigits))

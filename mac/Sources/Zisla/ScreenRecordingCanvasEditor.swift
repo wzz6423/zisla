@@ -52,7 +52,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
     private var selection: RecordingCanvasSelection?
     private var editable = false
     private let imageContext = CIContext(options: [.cacheIntermediates: false,
-        .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
+                                                   .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
     private var original: RecordingCanvasElement?
     private(set) var draft: RecordingCanvasElement?
     private var gestureOrigin: CGPoint?
@@ -120,7 +120,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
         hdrSelectionHandles.path = nil
         if let renderedImage, !ScreenshotImageRendering.isHDR(renderedImage) {
             NSImage(cgImage: renderedImage, size: canvasSize).draw(in: canvasRect, from: .zero,
-                operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                                                                   operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }
         guard editable, let element = selectedElement else { return }
         let box = viewRect(element.bounds(canvas: canvasSize))
@@ -346,7 +346,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
                 renderedImage = try multitrackScene.image(project: project, editingText: editingText)
             } else {
                 renderedImage = try RecordingExportRenderer.composedPreview(base: baseImage, project: project,
-                    sourceTime: sourceTime, context: imageContext, editingText: editingText)
+                                                                            sourceTime: sourceTime, context: imageContext, editingText: editingText)
             }
         } catch {
             renderedImage = nil
@@ -363,7 +363,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
 
     private func viewRect(_ rect: CGRect) -> CGRect {
         CGRect(origin: viewPoint(rect.origin), size: CGSize(width: rect.width * canvasRect.width / canvasSize.width,
-                                                          height: rect.height * canvasRect.height / canvasSize.height))
+                                                            height: rect.height * canvasRect.height / canvasSize.height))
     }
 
     private func imagePoint(_ point: CGPoint) -> CGPoint {
@@ -383,8 +383,7 @@ private final class RecordingCanvasTextView: NSTextView {
         else if event.keyCode == 36, !event.modifierFlags.contains(.shift), !event.modifierFlags.contains(.option) {
             if hasMarkedText() { unmarkText() }
             else { onFinish(true) }
-        }
-        else { super.keyDown(with: event) }
+        } else { super.keyDown(with: event) }
     }
 }
 

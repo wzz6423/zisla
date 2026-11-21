@@ -185,7 +185,7 @@ struct ClipboardHistorySourceAppTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let storage = directory.appendingPathComponent("history.sqlite")
         let duplicate = ClipboardHistoryItem(content: try content(kind, in: directory), lastCopiedAt: .distantPast,
-            isPinned: true, sourceApp: Self.firstApp)
+                                             isPinned: true, sourceApp: Self.firstApp)
         let recent = ClipboardHistoryItem(content: .text("other pinned item"), lastCopiedAt: .distantFuture, isPinned: true)
         let database = ClipboardHistoryDatabase(storageURL: storage)
         try database.flush([.upsert(duplicate, capacity: nil), .upsert(recent, capacity: nil)])
@@ -236,7 +236,7 @@ struct ClipboardHistorySourceAppTests {
         let other = ClipboardHistoryItem(content: .text("recent editor"), lastCopiedAt: .distantFuture, sourceApp: Self.firstApp)
         try database.flush((matching + [pinned, image, other]).map { .upsert($0, capacity: nil) })
         let store = ClipboardHistoryStore(storageURL: storage, pageSize: 2, persistenceDelay: .seconds(60),
-            now: { Date(timeIntervalSince1970: 100) })
+                                          now: { Date(timeIntervalSince1970: 100) })
         await store.waitUntilLoaded()
         defer { store.flushPendingChanges() }
         store.updateQuery(scope: .history, searchText: query, category: .text)
@@ -392,8 +392,8 @@ struct ClipboardHistorySourceAppTests {
         switch kind {
         case "image":
             let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1,
-                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                bytesPerRow: 0, bitsPerPixel: 0))
+                                                       bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                                       bytesPerRow: 0, bitsPerPixel: 0))
             bitmap.setColor(.red, atX: 0, y: 0)
             return .image(try #require(bitmap.representation(using: .png, properties: [:])))
         case "file":
@@ -407,12 +407,12 @@ struct ClipboardHistorySourceAppTests {
     private func createOldDatabase(at url: URL, id: UUID, version: Int) throws {
         let columns = version == 6 ? ", file_url TEXT, file_display_name TEXT, file_bookmark BLOB, content_category TEXT, content_digest BLOB" : ""
         try execute("""
-            CREATE TABLE clipboard_history (id TEXT PRIMARY KEY NOT NULL, content_type INTEGER NOT NULL,
-                text_value TEXT, image_data BLOB, last_copied_at REAL NOT NULL, is_pinned INTEGER NOT NULL\(columns));
-            INSERT INTO clipboard_history(id, content_type, text_value, last_copied_at, is_pinned)
-                VALUES('\(id.uuidString)', 0, 'legacy value', 2, 1);
-            PRAGMA user_version = \(version);
-            """, at: url)
+        CREATE TABLE clipboard_history (id TEXT PRIMARY KEY NOT NULL, content_type INTEGER NOT NULL,
+            text_value TEXT, image_data BLOB, last_copied_at REAL NOT NULL, is_pinned INTEGER NOT NULL\(columns));
+        INSERT INTO clipboard_history(id, content_type, text_value, last_copied_at, is_pinned)
+            VALUES('\(id.uuidString)', 0, 'legacy value', 2, 1);
+        PRAGMA user_version = \(version);
+        """, at: url)
     }
 
     private func execute(_ sql: String, at url: URL) throws {

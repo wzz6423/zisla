@@ -43,29 +43,29 @@ struct QuickNoteNavigationShortcutTests {
             ("\u{F700}", UInt16(126), firstID)
         ] {
             let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
-                modifierFlags: [.command, .numericPad, .function], timestamp: 0,
-                windowNumber: panel.windowNumber, context: nil, characters: key,
-                charactersIgnoringModifiers: key, isARepeat: false, keyCode: keyCode))
+                                                      modifierFlags: [.command, .numericPad, .function], timestamp: 0,
+                                                      windowNumber: panel.windowNumber, context: nil, characters: key,
+                                                      charactersIgnoringModifiers: key, isARepeat: false, keyCode: keyCode))
             #expect(panel.performKeyEquivalent(with: event))
             #expect(service.selectedID == expectedID)
             #expect(editor.string == "Fixture note body")
         }
         let repeated = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
-            modifierFlags: NSEvent.ModifierFlags(rawValue: 0x8).union([.command, .numericPad, .function, .capsLock]), timestamp: 0,
-            windowNumber: panel.windowNumber, context: nil, characters: "\u{F701}",
-            charactersIgnoringModifiers: "\u{F701}", isARepeat: true, keyCode: 125))
+                                                     modifierFlags: NSEvent.ModifierFlags(rawValue: 0x8).union([.command, .numericPad, .function, .capsLock]), timestamp: 0,
+                                                     windowNumber: panel.windowNumber, context: nil, characters: "\u{F701}",
+                                                     charactersIgnoringModifiers: "\u{F701}", isARepeat: true, keyCode: 125))
         #expect(panel.performKeyEquivalent(with: repeated))
         #expect(service.selectedID == lastID)
         #expect(panel.performKeyEquivalent(with: repeated))
         #expect(service.selectedID == lastID)
 
         for modifiers: NSEvent.ModifierFlags in [[], .shift, .option, .control,
-                                                [.command, .shift], [.command, .option], [.command, .control]] {
+                                                 [.command, .shift], [.command, .option], [.command, .control]] {
             service.select(id: lastID)
             let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
-                modifierFlags: modifiers.union([.numericPad, .function]), timestamp: 0,
-                windowNumber: panel.windowNumber, context: nil, characters: "\u{F700}",
-                charactersIgnoringModifiers: "\u{F700}", isARepeat: false, keyCode: 126))
+                                                      modifierFlags: modifiers.union([.numericPad, .function]), timestamp: 0,
+                                                      windowNumber: panel.windowNumber, context: nil, characters: "\u{F700}",
+                                                      charactersIgnoringModifiers: "\u{F700}", isARepeat: false, keyCode: 126))
             _ = panel.performKeyEquivalent(with: event)
             #expect(service.selectedID == lastID, "Modifiers \(modifiers.rawValue) must not change the selection")
         }
@@ -81,14 +81,14 @@ struct QuickNoteNavigationShortcutTests {
         let otherPanel = IslandPanel(contentView: NSView(), frame: panel.frame)
         defer { otherPanel.close() }
         let otherEvent = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
-            modifierFlags: .command, timestamp: 0, windowNumber: otherPanel.windowNumber,
-            context: nil, characters: "\u{F700}", charactersIgnoringModifiers: "\u{F700}",
-            isARepeat: false, keyCode: 126))
+                                                       modifierFlags: .command, timestamp: 0, windowNumber: otherPanel.windowNumber,
+                                                       context: nil, characters: "\u{F700}", charactersIgnoringModifiers: "\u{F700}",
+                                                       isARepeat: false, keyCode: 126))
         _ = panel.performKeyEquivalent(with: otherEvent)
         #expect(service.selectedID == lastID, "Events from another window must not navigate this list")
         let unknownKey = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
-            modifierFlags: .command, timestamp: 0, windowNumber: panel.windowNumber,
-            context: nil, characters: "q", charactersIgnoringModifiers: "q", isARepeat: false, keyCode: 12))
+                                                       modifierFlags: .command, timestamp: 0, windowNumber: panel.windowNumber,
+                                                       context: nil, characters: "q", charactersIgnoringModifiers: "q", isARepeat: false, keyCode: 12))
         #expect(!panel.performKeyEquivalent(with: unknownKey))
         #expect(service.selectedID == lastID)
         service.selectedID = nil
@@ -131,12 +131,12 @@ struct QuickNoteNavigationShortcutTests {
         let panel = IslandPanel(contentView: host, frame: CGRect(x: 0, y: 0, width: 152, height: 160))
         defer { panel.contentView = nil; panel.close() }
         await layout(host)
-        let scrollView = try #require(scrollView(in: host))
+        let scrollView = try #require(self.scrollView(in: host))
         let initialOrigin = scrollView.contentView.bounds.origin.y
         let down = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
-            modifierFlags: [.command, .numericPad, .function], timestamp: 0,
-            windowNumber: panel.windowNumber, context: nil, characters: "\u{F701}",
-            charactersIgnoringModifiers: "\u{F701}", isARepeat: false, keyCode: 125))
+                                                 modifierFlags: [.command, .numericPad, .function], timestamp: 0,
+                                                 windowNumber: panel.windowNumber, context: nil, characters: "\u{F701}",
+                                                 charactersIgnoringModifiers: "\u{F701}", isARepeat: false, keyCode: 125))
         for note in notes {
             #expect(panel.performKeyEquivalent(with: down))
             #expect(service.selectedID == note.id)
@@ -151,8 +151,8 @@ struct QuickNoteNavigationShortcutTests {
         await layout(host)
         #expect(scrollView.contentView.bounds.origin.y < bottomOrigin, "Returning to the welcome row must scroll toward the top")
         let number = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
-            modifierFlags: .command, timestamp: 0, windowNumber: panel.windowNumber,
-            context: nil, characters: "2", charactersIgnoringModifiers: "2", isARepeat: false, keyCode: 19))
+                                                   modifierFlags: .command, timestamp: 0, windowNumber: panel.windowNumber,
+                                                   context: nil, characters: "2", charactersIgnoringModifiers: "2", isARepeat: false, keyCode: 19))
         #expect(panel.performKeyEquivalent(with: number))
         #expect(service.selectedID == notes[1].id, "Command-number selection must retain its regular-note numbering")
         #expect(!panel.isVisible)

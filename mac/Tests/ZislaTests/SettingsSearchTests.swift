@@ -9,7 +9,7 @@ struct SettingsSearchTests {
     @Test(arguments: AppLanguage.allCases, [false, true]) @MainActor
     func aiQuotaSearchNavigatesToAIWithoutDuplicateFeatureSettings(language: AppLanguage, aiEnabled: Bool) throws {
         let settings = FeatureSettings(aiProgressEnabled: aiEnabled,
-            aiAccountBalanceMonitoredProviders: [.coder, .trae, .zed], aiAccountBalanceQoderRegions: [.global, .china])
+                                       aiAccountBalanceMonitoredProviders: [.coder, .trae, .zed], aiAccountBalanceQoderRegions: [.global, .china])
         let destinations: [(String, SettingsSearchAnchor)] = [
             ("低额度提醒", .row("低额度提醒")),
             ("收起态额度样式", .row("收起态额度样式")),
@@ -54,13 +54,13 @@ struct SettingsSearchTests {
         for providers in [Set<AIProvider>(), [.coder], [.trae], [.zed]] {
             let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: providers, aiAccountBalanceQoderRegions: regions)
             let regionMatches = results(AppLocalization.string("Qoder 监控地区", language: language),
-                settings: settings, locale: language.locale)
+                                        settings: settings, locale: language.locale)
             #expect(regionMatches.count == 1 && regionMatches.first?.anchor == .group("各供应商额度"))
             let websites = AIAccountBalanceWebsite.selected(for: providers, qoderRegions: regions)
             for key in ["网站额度凭据", "粘贴网站 Cookie", "从默认浏览器导入"] {
                 let matches = results(AppLocalization.string(key, language: language), settings: settings, locale: language.locale)
                 #expect(matches.count == (websites.isEmpty ? 0 : 1),
-                    "Hidden credential inputs must not remain search destinations: \(language.rawValue)/\(key)")
+                        "Hidden credential inputs must not remain search destinations: \(language.rawValue)/\(key)")
                 #expect(matches.allSatisfy { $0.section == .ai && $0.anchor == .group("网站额度凭据") })
             }
         }
@@ -69,7 +69,7 @@ struct SettingsSearchTests {
     @Test(arguments: IslandLayoutStyle.allCases, IslandPlacementMode.allCases)
     func pinnedQuotaSearchFollowsTheEffectiveIslandPlacement(style: IslandLayoutStyle, mode: IslandPlacementMode) {
         var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
+                                       aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
         settings.islandLayoutStyle = style
         settings.islandPlacement = IslandPlacement(mode: mode, edge: .left)
         let saved = settings
@@ -85,7 +85,7 @@ struct SettingsSearchTests {
     @Test(arguments: AppLanguage.allCases) @MainActor
     func pinnedQuotaSearchNavigatesToAIInTheRequestedLanguage(language: AppLanguage) throws {
         var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
+                                       aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
         settings.islandLayoutStyle = .pill
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         let saved = settings
@@ -110,7 +110,7 @@ struct SettingsSearchTests {
     @Test(arguments: [false, true], [false, true])
     func pinnedQuotaSearchFollowsAIVisibilityForEveryCustomEdge(aiEnabled: Bool, noticesEnabled: Bool) {
         var settings = FeatureSettings(aiProgressEnabled: aiEnabled, systemMonitorEnabled: false,
-            sideNoticesEnabled: noticesEnabled, aiAccountBalanceMonitoredProviders: [], aiAccountBalanceDisplayedProviders: [])
+                                       sideNoticesEnabled: noticesEnabled, aiAccountBalanceMonitoredProviders: [], aiAccountBalanceDisplayedProviders: [])
         settings.mediaEnabled = false
         settings.islandLayoutStyle = .pill
         for edge in IslandEdge.allCases {
@@ -119,7 +119,7 @@ struct SettingsSearchTests {
             for key in ["常驻额度信息", "其他位置常驻额度"] {
                 let matches = results(key, settings: settings)
                 #expect(matches.count == (aiEnabled ? 1 : 0),
-                    "The quota setting follows the AI page visibility, regardless of notifications and provider selections")
+                        "The quota setting follows the AI page visibility, regardless of notifications and provider selections")
                 #expect(matches.allSatisfy { $0.section == .ai && $0.anchor == .row("常驻额度信息") })
             }
             #expect(settings == saved)
@@ -131,7 +131,7 @@ struct SettingsSearchTests {
         let settings = FeatureSettings(systemMonitorEnabled: systemEnabled)
         #expect(!SettingsSearchIndex.items(settings: settings, displayCount: 2).contains { $0.title == "电池监控" })
         let matches = results(AppLocalization.string("电池监控", language: language),
-            settings: settings, locale: language.locale)
+                              settings: settings, locale: language.locale)
         #expect(matches.contains {
             $0.section == .features && $0.title == "系统状态与清理" && $0.anchor == .row("系统状态与清理")
         })
@@ -244,7 +244,7 @@ struct SettingsSearchTests {
         #expect(items.contains { $0.title == title && $0.section == .notifications } == (displayCount == 2))
         for key in [title, "播放与 AI 活动通知显示在此屏幕"] {
             let matches = results(AppLocalization.string(key, language: language), settings: settings,
-                locale: language.locale, displayCount: displayCount)
+                                  locale: language.locale, displayCount: displayCount)
             #expect(matches.contains { $0.section == .notifications && $0.anchor == .group(title) } == (displayCount == 2))
         }
         #expect(results("活动展示", settings: settings, displayCount: displayCount).contains {
@@ -255,8 +255,8 @@ struct SettingsSearchTests {
     @Test
     func informationPagesKeepDisabledFeatureConfigurationSearchable() {
         let settings = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false,
-            dailyBriefing: DailyBriefingSettings(enabled: false), lockScreenInfoEnabled: false,
-            sideNoticesEnabled: false, userCareEnabled: false)
+                                       dailyBriefing: DailyBriefingSettings(enabled: false), lockScreenInfoEnabled: false,
+                                       sideNoticesEnabled: false, userCareEnabled: false)
         for (title, page) in [("简报模板", SettingsSection.dailyBriefing), ("播放来源", .workflow),
                               ("活动展示", .notifications), ("收起态展示优先级", .info)] {
             #expect(results(title, settings: settings).contains { $0.title == title && $0.section == page })
@@ -297,7 +297,7 @@ struct SettingsSearchTests {
     func userCareOptInIsSearchableBeforeEnablingIt(language: AppLanguage, sideNoticesEnabled: Bool) {
         let title = AppLocalization.string("用户关怀", language: language)
         let matches = results(title, settings: FeatureSettings(sideNoticesEnabled: sideNoticesEnabled,
-            userCareEnabled: false), locale: language.locale)
+                                                               userCareEnabled: false), locale: language.locale)
         #expect(matches.contains { $0.section == .features && $0.title == "用户关怀" && $0.anchor == .row("用户关怀") })
     }
 

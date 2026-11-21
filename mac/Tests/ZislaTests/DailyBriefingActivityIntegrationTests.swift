@@ -15,12 +15,12 @@ struct DailyBriefingActivityIntegrationTests {
     private func controller(store: DailyBriefingStore, onObserve: @escaping (Date) -> Void = { _ in },
                             export: @escaping @MainActor (DailyBriefingReport) -> Void = { _ in }) -> DailyBriefingController {
         DailyBriefingController(store: store,
-            observation: { date in
-                onObserve(date)
-                return .init(date: date, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: false)
-            },
-            typing: { _ in nil }, readScreenTime: { _ in .init() },
-            export: { report, _, _, directory in export(report); return directory.appendingPathComponent("fixture.png") })
+                                observation: { date in
+                                    onObserve(date)
+                                    return .init(date: date, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: false)
+                                },
+                                typing: { _ in nil }, readScreenTime: { _ in .init() },
+                                export: { report, _, _, directory in export(report); return directory.appendingPathComponent("fixture.png") })
     }
 
     @Test(.timeLimit(.minutes(1)))

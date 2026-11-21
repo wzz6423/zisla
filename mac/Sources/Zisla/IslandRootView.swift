@@ -92,276 +92,276 @@ struct IslandRootView: View {
                 : surfaceSize
 
             ZStack(alignment: .top) {
-            if showsTransferHints {
-                transferLayout {
-                    transferShoulder(
-                        symbol: "square.and.arrow.up",
-                        title: "共享",
-                        detail: hintDetail,
-                        color: .cyan,
-                        targeted: dropState.shareTargeted
-                    ) {
-                        shareDetectedLink()
-                    }
-                    .onDrop(
-                        of: TransferDropDelegate.supportedTypes,
-                        delegate: TransferDropDelegate(isTargeted: $dropState.shareTargeted) {
-                            model.share($0)
+                if showsTransferHints {
+                    transferLayout {
+                        transferShoulder(
+                            symbol: "square.and.arrow.up",
+                            title: "共享",
+                            detail: hintDetail,
+                            color: .cyan,
+                            targeted: dropState.shareTargeted
+                        ) {
+                            shareDetectedLink()
                         }
-                    )
-                    .contextMenu {
-                        Button(AppLocalization.text("粘贴并共享")) {
+                        .onDrop(
+                            of: TransferDropDelegate.supportedTypes,
+                            delegate: TransferDropDelegate(isTargeted: $dropState.shareTargeted) {
+                                model.share($0)
+                            }
+                        )
+                        .contextMenu {
+                            Button(AppLocalization.text("粘贴并共享")) {
+                                model.shareFromPasteboard()
+                            }
+                            .keyboardShortcut("v", modifiers: .command)
+                        }
+                        .onPasteCommand(of: TransferDropDelegate.supportedContentTypes) { _ in
                             model.shareFromPasteboard()
                         }
-                        .keyboardShortcut("v", modifiers: .command)
-                    }
-                    .onPasteCommand(of: TransferDropDelegate.supportedContentTypes) { _ in
-                        model.shareFromPasteboard()
-                    }
 
-                    if !model.islandEdge.isVertical {
-                        Spacer(minLength: max(0, surfaceSize.width - 216))
-                    }
+                        if !model.islandEdge.isVertical {
+                            Spacer(minLength: max(0, surfaceSize.width - 216))
+                        }
 
-                    transferShoulder(
-                        symbol: "tray.and.arrow.down.fill",
-                        title: "中转",
-                        detail: hintDetail,
-                        color: .green,
-                        targeted: dropState.shelfTargeted
-                    ) {
-                        model.prepareDetectedLink()
+                        transferShoulder(
+                            symbol: "tray.and.arrow.down.fill",
+                            title: "中转",
+                            detail: hintDetail,
+                            color: .green,
+                            targeted: dropState.shelfTargeted
+                        ) {
+                            model.prepareDetectedLink()
+                        }
+                        .shelfDropTarget(isTargeted: $dropState.shelfTargeted) {
+                            model.receiveShelfDropItems($0)
+                        }
                     }
-                    .shelfDropTarget(isTargeted: $dropState.shelfTargeted) {
-                        model.receiveShelfDropItems($0)
-                    }
+                    .frame(width: surfaceSize.width)
+                    .padding(model.islandEdge == .bottom ? .bottom : .top, model.islandEdge.isVertical ? 16 : 62)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92)))
+                    .zIndex(0)
                 }
-                .frame(width: surfaceSize.width)
-                .padding(model.islandEdge == .bottom ? .bottom : .top, model.islandEdge.isVertical ? 16 : 62)
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92)))
-                .zIndex(0)
-            }
 
-            IslandSurface(
-                isCollapsed: isIslandCollapsed,
-                collapsedSize: model.collapsedIslandSize,
-                expandedSize: renderedSurfaceSize,
-                visualStyle: settingsStore.settings.islandVisualStyle,
-                notchBackground: settingsStore.settings.islandNotchBackground,
-                usesCompactGlassSurface: usesCompactSurface,
-                collapsedCenterOffsetX: collapsedCenterOffsetX,
-                resultSweep: model.aiResultSweep,
-                layoutStyle: settingsStore.settings.islandLayoutStyle,
-                collapsedFrame: pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: .leftToRight),
-                edge: model.islandEdge,
-                contentTopInset: contentTopInset
-            ) {
-                if model.isMirrorPresented {
-                    DeferredMount {
-                        CameraMirrorView(onClose: model.dismissMirror)
-                            .frame(
-                                width: surfaceSize.width,
-                                height: surfaceSize.height
-                            )
-                    }
-                } else if model.isTeleprompterPresented {
-                    DeferredMount {
-                        TeleprompterView(onClose: model.dismissTeleprompter)
-                            .frame(
-                                width: surfaceSize.width,
-                                height: surfaceSize.height
-                            )
-                    }
-                } else {
-                    ZStack(alignment: .top) {
-                    VStack(spacing: 0) {
-                        if voiceInput.isCapturingInput {
-                            VoiceTranscriptionView(
-                                isRecording: voiceInput.isRecording,
-                                transcript: voiceInput.transcript,
-                                errorDescription: voiceInput.errorDescription,
-                                geometry: voiceRecordingGeometry,
-                                keepsIconsAdjacent: settingsStore.settings.islandLayoutStyle == .pill
-                                    && settingsStore.settings.islandPlacement.mode == .custom
-                            )
-                                .frame(height: layout.islandSize.height, alignment: .top)
-                        } else if showsCompactTransientNotice, let notice = model.transientMessage {
-                            if let presentation = customTransientPresentation {
-                                if let frame = pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: layoutDirection) {
-                                    CompactPillStatusContent(presentation: presentation, text: presentation.text,
-                                        edge: model.islandEdge, visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
-                                        item: nil, date: .now)
-                                        .frame(width: frame.width, height: frame.height)
-                                        .position(x: frame.midX, y: frame.midY)
-                                }
-                            } else {
-                                TransientNoticeView(message: notice, geometry: voiceRecordingGeometry)
+                IslandSurface(
+                    isCollapsed: isIslandCollapsed,
+                    collapsedSize: model.collapsedIslandSize,
+                    expandedSize: renderedSurfaceSize,
+                    visualStyle: settingsStore.settings.islandVisualStyle,
+                    notchBackground: settingsStore.settings.islandNotchBackground,
+                    usesCompactGlassSurface: usesCompactSurface,
+                    collapsedCenterOffsetX: collapsedCenterOffsetX,
+                    resultSweep: model.aiResultSweep,
+                    layoutStyle: settingsStore.settings.islandLayoutStyle,
+                    collapsedFrame: pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: .leftToRight),
+                    edge: model.islandEdge,
+                    contentTopInset: contentTopInset
+                ) {
+                    if model.isMirrorPresented {
+                        DeferredMount {
+                            CameraMirrorView(onClose: model.dismissMirror)
+                                .frame(
+                                    width: surfaceSize.width,
+                                    height: surfaceSize.height
+                                )
+                        }
+                    } else if model.isTeleprompterPresented {
+                        DeferredMount {
+                            TeleprompterView(onClose: model.dismissTeleprompter)
+                                .frame(
+                                    width: surfaceSize.width,
+                                    height: surfaceSize.height
+                                )
+                        }
+                    } else {
+                        ZStack(alignment: .top) {
+                            VStack(spacing: 0) {
+                                if voiceInput.isCapturingInput {
+                                    VoiceTranscriptionView(
+                                        isRecording: voiceInput.isRecording,
+                                        transcript: voiceInput.transcript,
+                                        errorDescription: voiceInput.errorDescription,
+                                        geometry: voiceRecordingGeometry,
+                                        keepsIconsAdjacent: settingsStore.settings.islandLayoutStyle == .pill
+                                            && settingsStore.settings.islandPlacement.mode == .custom
+                                    )
                                     .frame(height: layout.islandSize.height, alignment: .top)
-                            }
-                        } else if !isIslandCollapsed {
-                            // Keep the top shell fixed so module changes replace only the functional area below.
-                            NowPlayingHeader(model: model)
-                                .padding(.horizontal, 14)
-                                .padding(.top, contentTopInset)
-                                .padding(.bottom, 4)
-                                .environment(\.colorScheme, .dark)
+                                } else if showsCompactTransientNotice, let notice = model.transientMessage {
+                                    if let presentation = customTransientPresentation {
+                                        if let frame = pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: layoutDirection) {
+                                            CompactPillStatusContent(presentation: presentation, text: presentation.text,
+                                                                     edge: model.islandEdge, visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
+                                                                     item: nil, date: .now)
+                                                .frame(width: frame.width, height: frame.height)
+                                                .position(x: frame.midX, y: frame.midY)
+                                        }
+                                    } else {
+                                        TransientNoticeView(message: notice, geometry: voiceRecordingGeometry)
+                                            .frame(height: layout.islandSize.height, alignment: .top)
+                                    }
+                                } else if !isIslandCollapsed {
+                                    // Keep the top shell fixed so module changes replace only the functional area below.
+                                    NowPlayingHeader(model: model)
+                                        .padding(.horizontal, 14)
+                                        .padding(.top, contentTopInset)
+                                        .padding(.bottom, 4)
+                                        .environment(\.colorScheme, .dark)
 
-                            toolRail
-                                .transaction { transaction in
-                                    transaction.animation = nil
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.bottom, 7)
-                                .environment(\.colorScheme, .dark)
+                                    toolRail
+                                        .transaction { transaction in
+                                            transaction.animation = nil
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.bottom, 7)
+                                        .environment(\.colorScheme, .dark)
 
-                            Group {
-                                if let activeModule {
-                                    DeferredMount {
-                                        switch activeModule {
-                                        case .dashboard:
-                                            IslandDashboardView(model: model)
-                                        case .shelf:
-                                            ShelfModuleView(model: model)
-                                        case .clipboard:
-                                            ClipboardHistoryModuleView(model: model)
-                                        case .aiMonitor:
-                                            AIProgressModuleView(monitor: model.aiMonitor,
-                                                displayedBalanceProviders: model.settingsStore.settings.aiAccountBalanceDisplayedProviders,
-                                                monitoredBalanceProviders: model.settingsStore.settings.aiAccountBalanceMonitoredProviders,
-                                                language: model.languageStore.language)
-                                        case .download:
-                                            DownloadModuleView(model: model)
-                                        case .agenda:
-                                            AgendaModuleView(model: model, calendar: model.calendar)
-                                        case .mail:
-                                            MailModuleView(
-                                                model: model,
-                                                onTransientInteractionChanged: onTransientInteractionChanged
-                                            )
-                                        case .quickNotes:
-                                            QuickNoteModuleView(model: model)
-                                        case .volumeMixer:
-                                            ApplicationVolumeMixerModuleView(service: model.applicationVolumes)
-                                        case .toolbox:
-                                            ToolboxModuleView(model: model)
-                                        case .system, .battery:
-                                            SystemMonitorView(
-                                                service: model.systemMonitor,
-                                                batteryMonitor: model.battery,
-                                                networkMonitor: model.networkBattery,
-                                                showsSystemMonitor: settingsStore.settings.systemMonitorEnabled,
-                                                showsBatteryMonitor: settingsStore.settings.systemMonitorEnabled,
-                                                onCleanupRequested: cleanupPanelPresentation.present,
-                                                onTransientMessage: { model.transientMessage = $0 }
-                                            )
-                                        case .lockScreen:
-                                            LockScreenModuleView(model: model)
-                                        case .keyboardSound:
-                                            KeyboardSoundModuleView(model: model)
+                                    Group {
+                                        if let activeModule {
+                                            DeferredMount {
+                                                switch activeModule {
+                                                case .dashboard:
+                                                    IslandDashboardView(model: model)
+                                                case .shelf:
+                                                    ShelfModuleView(model: model)
+                                                case .clipboard:
+                                                    ClipboardHistoryModuleView(model: model)
+                                                case .aiMonitor:
+                                                    AIProgressModuleView(monitor: model.aiMonitor,
+                                                                         displayedBalanceProviders: model.settingsStore.settings.aiAccountBalanceDisplayedProviders,
+                                                                         monitoredBalanceProviders: model.settingsStore.settings.aiAccountBalanceMonitoredProviders,
+                                                                         language: model.languageStore.language)
+                                                case .download:
+                                                    DownloadModuleView(model: model)
+                                                case .agenda:
+                                                    AgendaModuleView(model: model, calendar: model.calendar)
+                                                case .mail:
+                                                    MailModuleView(
+                                                        model: model,
+                                                        onTransientInteractionChanged: onTransientInteractionChanged
+                                                    )
+                                                case .quickNotes:
+                                                    QuickNoteModuleView(model: model)
+                                                case .volumeMixer:
+                                                    ApplicationVolumeMixerModuleView(service: model.applicationVolumes)
+                                                case .toolbox:
+                                                    ToolboxModuleView(model: model)
+                                                case .system, .battery:
+                                                    SystemMonitorView(
+                                                        service: model.systemMonitor,
+                                                        batteryMonitor: model.battery,
+                                                        networkMonitor: model.networkBattery,
+                                                        showsSystemMonitor: settingsStore.settings.systemMonitorEnabled,
+                                                        showsBatteryMonitor: settingsStore.settings.systemMonitorEnabled,
+                                                        onCleanupRequested: cleanupPanelPresentation.present,
+                                                        onTransientMessage: { model.transientMessage = $0 }
+                                                    )
+                                                case .lockScreen:
+                                                    LockScreenModuleView(model: model)
+                                                case .keyboardSound:
+                                                    KeyboardSoundModuleView(model: model)
+                                                }
+                                            }
+                                        } else {
+                                            ContentUnavailableView {
+                                                Label(AppLocalization.text("没有启用模块"), systemImage: "rectangle.slash")
+                                            }
                                         }
                                     }
-                                } else {
-                                    ContentUnavailableView {
-                                        Label(AppLocalization.text("没有启用模块"), systemImage: "rectangle.slash")
-                                    }
+                                    .padding(.horizontal, IslandSurfaceGeometry.moduleInset)
+                                    .padding(.top, IslandSurfaceGeometry.moduleInset)
+                                    .padding(.bottom, IslandSurfaceGeometry.moduleInset)
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        maxHeight: .infinity,
+                                        alignment: .top
+                                    )
+                                    .clipShape(
+                                        UnevenRoundedRectangle(
+                                            cornerRadii: .init(
+                                                topLeading: 0,
+                                                bottomLeading: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
+                                                bottomTrailing: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
+                                                topTrailing: 0
+                                            ),
+                                            style: .continuous
+                                        )
+                                    )
+                                    .id(activeModule?.rawValue)
+                                    .transition(
+                                        reduceMotion
+                                            ? .identity
+                                            : .modulePush(direction: model.moduleSwitchDirection)
+                                    )
+                                    .animation(reduceMotion ? nil : ZislaMotion.moduleSwitch, value: activeModule)
+                                    // Lower modules sit on dark frosted glass, so force dark mode for legible light text.
+                                    .environment(\.colorScheme, .dark)
                                 }
                             }
-                            .padding(.horizontal, IslandSurfaceGeometry.moduleInset)
-                            .padding(.top, IslandSurfaceGeometry.moduleInset)
-                            .padding(.bottom, IslandSurfaceGeometry.moduleInset)
-                            .frame(
-                                maxWidth: .infinity,
-                                maxHeight: .infinity,
-                                alignment: .top
-                            )
-                            .clipShape(
-                                UnevenRoundedRectangle(
-                                    cornerRadii: .init(
-                                        topLeading: 0,
-                                        bottomLeading: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-                                        bottomTrailing: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-                                        topTrailing: 0
-                                    ),
-                                    style: .continuous
-                                )
-                            )
-                            .id(activeModule?.rawValue)
-                            .transition(
-                                reduceMotion
-                                    ? .identity
-                                    : .modulePush(direction: model.moduleSwitchDirection)
-                            )
-                            .animation(reduceMotion ? nil : ZislaMotion.moduleSwitch, value: activeModule)
-                            // Lower modules sit on dark frosted glass, so force dark mode for legible light text.
-                            .environment(\.colorScheme, .dark)
-                        }
-                    }
 
-                    if !isIslandCollapsed {
-                        uptimeIndicator
-                    }
-                    }
-                    // Must be top-aligned: module pages carry incompressible minimum heights, so
-                    // while the panel is still at the previous module's smaller size this stack is
-                    // taller than `surfaceSize`. Default centering would push the whole chrome above
-                    // the surface (-87pt for dashboard → mail) and slide it back down as the resize
-                    // spring runs — read as the page dropping in from the top. Top alignment keeps
-                    // the crown at y=0 and lets only the module region below overflow into the mask.
-                    .frame(width: surfaceSize.width, height: surfaceSize.height, alignment: .top)
-                    .overlay(alignment: .bottom) {
-                        if showsTransientNotice, !isIslandCollapsed, let notice = model.transientMessage {
-                            transientNoticeBar(notice)
-                                .transition(
-                                    reduceMotion
-                                        ? .opacity
-                                        : .move(edge: .bottom).combined(with: .opacity)
-                                )
+                            if !isIslandCollapsed {
+                                uptimeIndicator
+                            }
                         }
+                        // Must be top-aligned: module pages carry incompressible minimum heights, so
+                        // while the panel is still at the previous module's smaller size this stack is
+                        // taller than `surfaceSize`. Default centering would push the whole chrome above
+                        // the surface (-87pt for dashboard → mail) and slide it back down as the resize
+                        // spring runs — read as the page dropping in from the top. Top alignment keeps
+                        // the crown at y=0 and lets only the module region below overflow into the mask.
+                        .frame(width: surfaceSize.width, height: surfaceSize.height, alignment: .top)
+                        .overlay(alignment: .bottom) {
+                            if showsTransientNotice, !isIslandCollapsed, let notice = model.transientMessage {
+                                transientNoticeBar(notice)
+                                    .transition(
+                                        reduceMotion
+                                            ? .opacity
+                                            : .move(edge: .bottom).combined(with: .opacity)
+                                    )
+                            }
+                        }
+                        .animation(
+                            reduceMotion ? nil : .snappy(duration: 0.22),
+                            value: model.transientMessage
+                        )
                     }
-                    .animation(
-                        reduceMotion ? nil : .snappy(duration: 0.22),
-                        value: model.transientMessage
-                    )
                 }
-            }
-            .frame(width: surfaceSize.width, height: surfaceSize.height)
-            .frame(
-                width: panelSize.width,
-                height: surfaceSize.height,
-                alignment: islandSurfaceAlignment
-            )
-            // Springs the surface between module layout sizes; the NSPanel itself snaps
-            // (two-phase, see scheduleExpandedSizeUpdate) while all visible motion is drawn here.
-            // With the top-aligned frame above, this resize only moves the island's bottom edge.
-            .animation(reduceMotion ? nil : ZislaMotion.surfaceResize, value: surfaceSize)
-            .environment(\.colorScheme, .dark)
-            .environment(\.islandVisualStyle, settingsStore.settings.islandVisualStyle)
-            .environment(\.mediaVisualizationStyle, settingsStore.settings.mediaVisualizationStyle)
-            .contentShape(IslandSilhouette(
-                topCornerRadius: settingsStore.settings.islandLayoutStyle == .pill
-                    ? IslandSurfaceGeometry.expandedBottomCornerRadius : 0
-            ))
-            .onHover { hovering in
-                if hovering { onPointerEntered() } else { onPointerExited() }
-            }
-            .opacity(hidesIslandSurface ? 0 : 1)
-            // Keep the dissolve on the surface so sibling overlays do not participate in the
-            // recycle fade. The parent transaction below only suppresses structural layout motion.
-            .animation(
-                reduceMotion || !hidesIslandSurface ? nil : ZislaMotion.islandRecycleFade,
-                value: hidesIslandSurface
-            )
-            .zIndex(1)
+                .frame(width: surfaceSize.width, height: surfaceSize.height)
+                .frame(
+                    width: panelSize.width,
+                    height: surfaceSize.height,
+                    alignment: islandSurfaceAlignment
+                )
+                // Springs the surface between module layout sizes; the NSPanel itself snaps
+                // (two-phase, see scheduleExpandedSizeUpdate) while all visible motion is drawn here.
+                // With the top-aligned frame above, this resize only moves the island's bottom edge.
+                .animation(reduceMotion ? nil : ZislaMotion.surfaceResize, value: surfaceSize)
+                .environment(\.colorScheme, .dark)
+                .environment(\.islandVisualStyle, settingsStore.settings.islandVisualStyle)
+                .environment(\.mediaVisualizationStyle, settingsStore.settings.mediaVisualizationStyle)
+                .contentShape(IslandSilhouette(
+                    topCornerRadius: settingsStore.settings.islandLayoutStyle == .pill
+                        ? IslandSurfaceGeometry.expandedBottomCornerRadius : 0
+                ))
+                .onHover { hovering in
+                    if hovering { onPointerEntered() } else { onPointerExited() }
+                }
+                .opacity(hidesIslandSurface ? 0 : 1)
+                // Keep the dissolve on the surface so sibling overlays do not participate in the
+                // recycle fade. The parent transaction below only suppresses structural layout motion.
+                .animation(
+                    reduceMotion || !hidesIslandSurface ? nil : ZislaMotion.islandRecycleFade,
+                    value: hidesIslandSurface
+                )
+                .zIndex(1)
 
-            if petSlotWidth == ExpandedPetLayout.sideSlotWidth, !isIslandCollapsed {
-                expandedPetOverlay
-                    .frame(
-                        width: panelSize.width,
-                        height: surfaceSize.height,
-                        alignment: expandedPetAlignment
-                    )
-                    .zIndex(2)
-            }
+                if petSlotWidth == ExpandedPetLayout.sideSlotWidth, !isIslandCollapsed {
+                    expandedPetOverlay
+                        .frame(
+                            width: panelSize.width,
+                            height: surfaceSize.height,
+                            alignment: expandedPetAlignment
+                        )
+                        .zIndex(2)
+                }
 
             }
             // A collapse removes the expanded content in the same transaction that starts the
@@ -784,33 +784,33 @@ struct CollapsedPetView: View {
                     Self.pillPet(sprite: sprite, behavior: petController.behavior, layout: screenLayout,
                                  compactBarFrame: compactFrame, side: model.settingsStore.settings.petSide)
                 } else {
-                let horizontalInset = CollapsedPetLayout.outerGap
-                let verticalInset = min(4, max(2, proxy.size.height * 0.1))
-                let size = max(
-                    0,
-                    min(
-                        CollapsedPetLayout.maximumPetSize,
-                        proxy.size.width - horizontalInset * 2,
-                        proxy.size.height - verticalInset * 2
+                    let horizontalInset = CollapsedPetLayout.outerGap
+                    let verticalInset = min(4, max(2, proxy.size.height * 0.1))
+                    let size = max(
+                        0,
+                        min(
+                            CollapsedPetLayout.maximumPetSize,
+                            proxy.size.width - horizontalInset * 2,
+                            proxy.size.height - verticalInset * 2
+                        )
                     )
-                )
-                let side = model.settingsStore.settings.petSide
-                IslandPetView(
-                    sprite: sprite,
-                    behavior: petController.behavior,
-                    side: side,
-                    size: CGSize(width: size, height: size)
-                )
-                .padding(
-                    side == .right ? .trailing : .leading,
-                    horizontalInset
-                )
-                .padding(.top, verticalInset)
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: side == .right ? .topTrailing : .topLeading
-                )
+                    let side = model.settingsStore.settings.petSide
+                    IslandPetView(
+                        sprite: sprite,
+                        behavior: petController.behavior,
+                        side: side,
+                        size: CGSize(width: size, height: size)
+                    )
+                    .padding(
+                        side == .right ? .trailing : .leading,
+                        horizontalInset
+                    )
+                    .padding(.top, verticalInset)
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: side == .right ? .topTrailing : .topLeading
+                    )
                 }
             }
         }
@@ -822,7 +822,7 @@ struct CollapsedPetView: View {
         let aspectRatio = sprite.frameSize.width / sprite.frameSize.height
         let container = CollapsedPetLayout.frame(for: layout, compactBarFrame: compactBarFrame, petAspectRatio: aspectRatio)
         if let frame = CollapsedPetLayout.petFrame(for: layout, compactBarFrame: compactBarFrame,
-                                                  petAspectRatio: aspectRatio, side: side) {
+                                                   petAspectRatio: aspectRatio, side: side) {
             IslandPetView(sprite: sprite, behavior: behavior, side: side, size: frame.size)
                 .position(x: frame.midX - container.minX, y: container.maxY - frame.midY)
         }
@@ -880,14 +880,14 @@ struct VoiceTranscriptionView: View {
                 clipsOverflowWhenStatic: followsTranscript,
                 viewportHeight: geometry.transcriptRowFrame.height
             )
-                .environment(\.layoutDirection, layoutDirection)
-                .padding(.horizontal, TransientNoticeMetrics.rowHorizontalPadding)
-                .frame(
-                    width: geometry.transcriptRowFrame.width,
-                    height: geometry.transcriptRowFrame.height,
-                    alignment: .leading
-                )
-                .position(x: geometry.transcriptRowFrame.midX, y: geometry.transcriptRowFrame.midY)
+            .environment(\.layoutDirection, layoutDirection)
+            .padding(.horizontal, TransientNoticeMetrics.rowHorizontalPadding)
+            .frame(
+                width: geometry.transcriptRowFrame.width,
+                height: geometry.transcriptRowFrame.height,
+                alignment: .leading
+            )
+            .position(x: geometry.transcriptRowFrame.midX, y: geometry.transcriptRowFrame.midY)
         }
         .frame(width: geometry.surfaceSize.width, height: geometry.surfaceSize.height)
         // Row frames use screen coordinates while each label retains its reading direction.
@@ -942,14 +942,14 @@ struct TransientNoticeView: View {
                 repeats: false,
                 viewportHeight: geometry.transcriptRowFrame.height
             )
-                .environment(\.layoutDirection, layoutDirection)
-                .padding(.horizontal, TransientNoticeMetrics.rowHorizontalPadding)
-                .frame(
-                    width: geometry.transcriptRowFrame.width,
-                    height: geometry.transcriptRowFrame.height,
-                    alignment: .leading
-                )
-                .position(x: geometry.transcriptRowFrame.midX, y: geometry.transcriptRowFrame.midY)
+            .environment(\.layoutDirection, layoutDirection)
+            .padding(.horizontal, TransientNoticeMetrics.rowHorizontalPadding)
+            .frame(
+                width: geometry.transcriptRowFrame.width,
+                height: geometry.transcriptRowFrame.height,
+                alignment: .leading
+            )
+            .position(x: geometry.transcriptRowFrame.midX, y: geometry.transcriptRowFrame.midY)
         }
         .frame(width: geometry.surfaceSize.width, height: geometry.surfaceSize.height)
         .environment(\.layoutDirection, .leftToRight)
@@ -957,7 +957,6 @@ struct TransientNoticeView: View {
         .accessibilityLabel(message)
     }
 }
-
 
 @MainActor
 private final class IslandDropState: ObservableObject {

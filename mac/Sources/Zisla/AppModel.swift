@@ -7,4884 +7,4887 @@ import ZislaCore
 import ZislaKit
 
 enum IslandModule: String, CaseIterable, Identifiable {
-  case dashboard
-  case shelf
-  case clipboard
-  case aiMonitor
-  case keyboardSound
-  case download
-  case agenda
-  case mail
-  case quickNotes
-  case volumeMixer
-  case toolbox
-  case system
-  case battery
-  case lockScreen
+    case dashboard
+    case shelf
+    case clipboard
+    case aiMonitor
+    case keyboardSound
+    case download
+    case agenda
+    case mail
+    case quickNotes
+    case volumeMixer
+    case toolbox
+    case system
+    case battery
+    case lockScreen
 
-  var id: Self { self }
+    var id: Self { self }
 
-  var navigationTarget: Self { self == .battery ? .system : self }
+    var navigationTarget: Self { self == .battery ? .system : self }
 
-  var allowsIslandKeyboardFocus: Bool {
-    switch self {
-    case .shelf, .clipboard, .download, .mail, .quickNotes:
-      true
-    default:
-      false
+    var allowsIslandKeyboardFocus: Bool {
+        switch self {
+        case .shelf, .clipboard, .download, .mail, .quickNotes:
+            true
+        default:
+            false
+        }
     }
-  }
 
-  var title: String {
-    switch self {
-    case .dashboard: "首页"
-    case .shelf: "中转站"
-    case .clipboard: "剪贴板"
-    case .aiMonitor: "AI 信息"
-    case .download: "下载"
-    case .agenda: "天气日程"
-    case .mail: "邮件"
-    case .quickNotes: "随记"
-    case .volumeMixer: "应用音量混音器"
-    case .toolbox: "小工具"
-    case .system: "CPU"
-    case .battery: "电池"
-    case .lockScreen: "锁屏"
-    case .keyboardSound: "键盘信息"
+    var title: String {
+        switch self {
+        case .dashboard: "首页"
+        case .shelf: "中转站"
+        case .clipboard: "剪贴板"
+        case .aiMonitor: "AI 信息"
+        case .download: "下载"
+        case .agenda: "天气日程"
+        case .mail: "邮件"
+        case .quickNotes: "随记"
+        case .volumeMixer: "应用音量混音器"
+        case .toolbox: "小工具"
+        case .system: "CPU"
+        case .battery: "电池"
+        case .lockScreen: "锁屏"
+        case .keyboardSound: "键盘信息"
+        }
     }
-  }
 
-  var symbol: String {
-    switch self {
-    case .dashboard: "rectangle.grid.2x2.fill"
-    case .shelf: "tray.full.fill"
-    case .clipboard: "clipboard"
-    case .aiMonitor: "chart.xyaxis.line"
-    case .download: "arrow.down.circle.fill"
-    case .agenda: "calendar"
-    case .mail: "envelope.fill"
-    case .quickNotes: "note.text"
-    case .volumeMixer: "slider.horizontal.3"
-    case .toolbox: "wrench.and.screwdriver.fill"
-    case .system: "gauge.with.dots.needle.67percent"
-    case .battery: "battery.100percent"
-    case .lockScreen: "lock.display"
-    case .keyboardSound: "keyboard.badge.ellipsis"
+    var symbol: String {
+        switch self {
+        case .dashboard: "rectangle.grid.2x2.fill"
+        case .shelf: "tray.full.fill"
+        case .clipboard: "clipboard"
+        case .aiMonitor: "chart.xyaxis.line"
+        case .download: "arrow.down.circle.fill"
+        case .agenda: "calendar"
+        case .mail: "envelope.fill"
+        case .quickNotes: "note.text"
+        case .volumeMixer: "slider.horizontal.3"
+        case .toolbox: "wrench.and.screwdriver.fill"
+        case .system: "gauge.with.dots.needle.67percent"
+        case .battery: "battery.100percent"
+        case .lockScreen: "lock.display"
+        case .keyboardSound: "keyboard.badge.ellipsis"
+        }
     }
-  }
 
-  var layout: IslandModuleLayout {
-    switch self {
-    case .dashboard:
-      .standard
-    case .clipboard, .shelf:
-      .clipboard
-    case .aiMonitor:
-      .ai
-    case .mail, .quickNotes, .system, .battery, .keyboardSound:
-      .system
-    case .download, .agenda, .volumeMixer:
-      .agenda
-    case .toolbox:
-      .toolbox
-    case .lockScreen:
-      .standard
+    var layout: IslandModuleLayout {
+        switch self {
+        case .dashboard:
+            .standard
+        case .clipboard, .shelf:
+            .clipboard
+        case .aiMonitor:
+            .ai
+        case .mail, .quickNotes, .system, .battery, .keyboardSound:
+            .system
+        case .download, .agenda, .volumeMixer:
+            .agenda
+        case .toolbox:
+            .toolbox
+        case .lockScreen:
+            .standard
+        }
     }
-  }
 }
 
 extension IslandModule {
-  static func configuredOrder(_ settings: FeatureSettings) -> [Self] {
-    IslandModuleOrder.normalized(settings.moduleOrder).compactMap { Self(rawValue: $0.rawValue) }
-  }
-
-  static func enabledOrder(_ settings: FeatureSettings) -> [Self] {
-    configuredOrder(settings).filter { $0.isEnabled(in: settings) }
-  }
-
-  /// Formerly a private IslandRootView extension; AppModel also needs it to fall back from a disabled selected module after settings changes.
-  func isEnabled(in settings: FeatureSettings) -> Bool {
-    switch self {
-    case .dashboard: true
-    case .shelf: settings.fileShelfEnabled || settings.contextNotesEnabled
-    case .clipboard: settings.clipboardHistoryEnabled
-    case .aiMonitor: settings.aiProgressEnabled
-    case .download: settings.downloaderEnabled
-    case .agenda: settings.calendarEnabled || settings.weatherEnabled
-    case .mail: settings.mailEnabled
-    case .quickNotes: settings.quickNotesEnabled
-    case .volumeMixer: settings.volumeMixerEnabled
-    case .toolbox: settings.toolboxEnabled
-    case .system, .battery: settings.systemMonitorEnabled
-    case .lockScreen: settings.lockScreenInfoEnabled
-    case .keyboardSound: settings.keyboardEnabled
+    static func configuredOrder(_ settings: FeatureSettings) -> [Self] {
+        IslandModuleOrder.normalized(settings.moduleOrder).compactMap { Self(rawValue: $0.rawValue) }
     }
-  }
+
+    static func enabledOrder(_ settings: FeatureSettings) -> [Self] {
+        configuredOrder(settings).filter { $0.isEnabled(in: settings) }
+    }
+
+    /// Formerly a private IslandRootView extension; AppModel also needs it to fall back from a disabled selected module after settings changes.
+    func isEnabled(in settings: FeatureSettings) -> Bool {
+        switch self {
+        case .dashboard: true
+        case .shelf: settings.fileShelfEnabled || settings.contextNotesEnabled
+        case .clipboard: settings.clipboardHistoryEnabled
+        case .aiMonitor: settings.aiProgressEnabled
+        case .download: settings.downloaderEnabled
+        case .agenda: settings.calendarEnabled || settings.weatherEnabled
+        case .mail: settings.mailEnabled
+        case .quickNotes: settings.quickNotesEnabled
+        case .volumeMixer: settings.volumeMixerEnabled
+        case .toolbox: settings.toolboxEnabled
+        case .system, .battery: settings.systemMonitorEnabled
+        case .lockScreen: settings.lockScreenInfoEnabled
+        case .keyboardSound: settings.keyboardEnabled
+        }
+    }
 }
 
 struct IslandModuleLayout: Equatable {
-  let islandSize: CGSize
-  let panelSize: CGSize
+    let islandSize: CGSize
+    let panelSize: CGSize
 
-  /// Returns the same layout with both widths replaced. Voice recording follows the collapsed
-  /// pill's overflow width (notch + wings on notched screens) instead of a fixed constant.
-  func matchingWidth(_ width: CGFloat) -> IslandModuleLayout {
-    IslandModuleLayout(
-      islandSize: CGSize(width: width, height: islandSize.height),
-      panelSize: CGSize(width: width, height: panelSize.height)
-    )
-  }
-
-  private static let unifiedIslandWidth: CGFloat = 776
-  private static let unifiedPanelWidth: CGFloat = 776
-
-  /// All module pages share the width of the combined monitor navigation.
-  static let standard = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 340),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 344)
-  )
-  private static let expandedChromeHeight = IslandDashboardLayout.contentTopInset
-    + IslandDashboardLayout.mediaHeaderHeight
-    + IslandDashboardLayout.toolbarHeight
-    + IslandDashboardLayout.toolbarBottomInset
-  private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
-  private static let panelHeightAllowance: CGFloat = 4
-  /// Fixed-height modules size the surface to their rendered content instead of inheriting
-  /// the standard panel's unused vertical space.
-  private static func compactModule(
-    contentHeight: CGFloat,
-    islandWidth: CGFloat = unifiedIslandWidth
-  ) -> IslandModuleLayout {
-    let islandHeight = expandedChromeHeight + contentHeight + moduleVerticalInsets
-    return IslandModuleLayout(
-      islandSize: CGSize(width: islandWidth, height: islandHeight),
-      panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + panelHeightAllowance)
-    )
-  }
-
-  static let toolbox = compactModule(contentHeight: 136)
-  static let download = compactModule(contentHeight: 170)
-  static let agenda = compactModule(contentHeight: 160)
-  /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
-  static let system = compactModule(contentHeight: 401)
-  /// Shelf content keeps its fixed budget below the shared chrome and scrolls when it contains more files.
-  static let shelfContentHeight: CGFloat = 355
-  static let shelfShareWidth: CGFloat = 84
-  static let shelfColumnSpacing: CGFloat = 6
-  static let shelf = compactModule(contentHeight: shelfContentHeight)
-  /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
-  /// Width matches standard; only the island body is taller.
-  static let clipboard = compactModule(contentHeight: shelfContentHeight)
-  static let ai = compactModule(contentHeight: 350)
-  static let battery = system
-  static let keyboardSound = system
-  static let notes = system
-  static let mail = system
-  /// Dashboard height follows the fixed crown chrome and rendered activity-card grid.
-  /// The arithmetic lives in `IslandDashboardLayout` (ZislaKit) so it is unit-testable and
-  /// stays clamped above the crown's black → glass transition.
-  /// Voice recording keeps the collapsed pill's width and only adds one transcript line below.
-  static let voiceRecording = IslandModuleLayout(
-    islandSize: CGSize(width: 240, height: 54),
-    panelSize: CGSize(width: 240, height: 58)
-  )
-
-  static func compactSurface(
-    collapsedSize: CGSize, overflowWidth: CGFloat, edge: IslandEdge,
-    locale: Locale = AppLocalization.currentLanguage.locale
-  ) -> IslandModuleLayout {
-    if edge.isVertical {
-      let size = CGSize(width: 320, height: max(80, collapsedSize.height))
-      return IslandModuleLayout(islandSize: size, panelSize: size)
+    /// Returns the same layout with both widths replaced. Voice recording follows the collapsed
+    /// pill's overflow width (notch + wings on notched screens) instead of a fixed constant.
+    func matchingWidth(_ width: CGFloat) -> IslandModuleLayout {
+        IslandModuleLayout(
+            islandSize: CGSize(width: width, height: islandSize.height),
+            panelSize: CGSize(width: width, height: panelSize.height)
+        )
     }
-    let height = collapsedSize.height + VoiceRecordingIslandGeometry.transcriptRowHeight
-    let textWidth = TransientNoticeMetrics.textWidth(of: AppLocalization.string("正在聆听…", locale: locale))
-    let width = max(70, overflowWidth, ceil(textWidth) + TransientNoticeMetrics.rowHorizontalPadding * 2)
-    return IslandModuleLayout(
-      islandSize: CGSize(width: width, height: height),
-      panelSize: CGSize(width: width, height: height + 4)
-    )
-  }
-  /// Mirror uses a square panel so the camera preview maintains its natural aspect ratio without cropping.
-  static let mirror = IslandModuleLayout(
-    islandSize: CGSize(width: 640, height: 640),
-    panelSize: CGSize(width: 640, height: 644)
-  )
-  static let teleprompter = IslandModuleLayout(
-    islandSize: CGSize(width: 760, height: 640),
-    panelSize: CGSize(width: 760, height: 644)
-  )
 
-  /// Resolves the current layout. Dashboard height follows its rendered activity-card rows.
-  nonisolated static func resolved(
-    for module: IslandModule,
-    dashboardCardCount: Int,
-    contentTopInset: CGFloat = IslandDashboardLayout.contentTopInset
-  ) -> IslandModuleLayout {
-    let layout: IslandModuleLayout
-    if module == .dashboard {
-      // Empty and single-card dashboards are clamped to the crown floor instead of falling back
-      // to `.standard`: a fixed 340pt left a large black gap under the toolbar, while shrinking to
-      // pure content height (~129pt for one card) sank the whole island inside the 132pt black
-      // crown, hiding the frosted glass and the bottom corner radius.
-      let islandHeight = min(
-        IslandDashboardLayout.contentHeight(cardCount: dashboardCardCount),
-        IslandModuleLayout.keyboardSound.islandSize.height
-      )
-      layout = IslandModuleLayout(
-        islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
-        panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
-      )
-    } else {
-      layout = module.layout
-    }
-    let additionalHeight = contentTopInset - IslandDashboardLayout.contentTopInset
-    return IslandModuleLayout(
-      islandSize: CGSize(width: layout.islandSize.width, height: layout.islandSize.height + additionalHeight),
-      panelSize: CGSize(width: layout.panelSize.width, height: layout.panelSize.height + additionalHeight)
+    private static let unifiedIslandWidth: CGFloat = 776
+    private static let unifiedPanelWidth: CGFloat = 776
+
+    /// All module pages share the width of the combined monitor navigation.
+    static let standard = IslandModuleLayout(
+        islandSize: CGSize(width: unifiedIslandWidth, height: 340),
+        panelSize: CGSize(width: unifiedPanelWidth, height: 344)
     )
-  }
+    private static let expandedChromeHeight = IslandDashboardLayout.contentTopInset
+        + IslandDashboardLayout.mediaHeaderHeight
+        + IslandDashboardLayout.toolbarHeight
+        + IslandDashboardLayout.toolbarBottomInset
+    private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
+    private static let panelHeightAllowance: CGFloat = 4
+    /// Fixed-height modules size the surface to their rendered content instead of inheriting
+    /// the standard panel's unused vertical space.
+    private static func compactModule(
+        contentHeight: CGFloat,
+        islandWidth: CGFloat = unifiedIslandWidth
+    ) -> IslandModuleLayout {
+        let islandHeight = expandedChromeHeight + contentHeight + moduleVerticalInsets
+        return IslandModuleLayout(
+            islandSize: CGSize(width: islandWidth, height: islandHeight),
+            panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + panelHeightAllowance)
+        )
+    }
+
+    static let toolbox = compactModule(contentHeight: 136)
+    static let download = compactModule(contentHeight: 170)
+    static let agenda = compactModule(contentHeight: 160)
+    /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
+    static let system = compactModule(contentHeight: 401)
+    /// Shelf content keeps its fixed budget below the shared chrome and scrolls when it contains more files.
+    static let shelfContentHeight: CGFloat = 355
+    static let shelfShareWidth: CGFloat = 84
+    static let shelfColumnSpacing: CGFloat = 6
+    static let shelf = compactModule(contentHeight: shelfContentHeight)
+    /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
+    /// Width matches standard; only the island body is taller.
+    static let clipboard = compactModule(contentHeight: shelfContentHeight)
+    static let ai = compactModule(contentHeight: 350)
+    static let battery = system
+    static let keyboardSound = system
+    static let notes = system
+    static let mail = system
+    /// Dashboard height follows the fixed crown chrome and rendered activity-card grid.
+    /// The arithmetic lives in `IslandDashboardLayout` (ZislaKit) so it is unit-testable and
+    /// stays clamped above the crown's black → glass transition.
+    /// Voice recording keeps the collapsed pill's width and only adds one transcript line below.
+    static let voiceRecording = IslandModuleLayout(
+        islandSize: CGSize(width: 240, height: 54),
+        panelSize: CGSize(width: 240, height: 58)
+    )
+
+    static func compactSurface(
+        collapsedSize: CGSize, overflowWidth: CGFloat, edge: IslandEdge,
+        locale: Locale = AppLocalization.currentLanguage.locale
+    ) -> IslandModuleLayout {
+        if edge.isVertical {
+            let size = CGSize(width: 320, height: max(80, collapsedSize.height))
+            return IslandModuleLayout(islandSize: size, panelSize: size)
+        }
+        let height = collapsedSize.height + VoiceRecordingIslandGeometry.transcriptRowHeight
+        let textWidth = TransientNoticeMetrics.textWidth(of: AppLocalization.string("正在聆听…", locale: locale))
+        let width = max(70, overflowWidth, ceil(textWidth) + TransientNoticeMetrics.rowHorizontalPadding * 2)
+        return IslandModuleLayout(
+            islandSize: CGSize(width: width, height: height),
+            panelSize: CGSize(width: width, height: height + 4)
+        )
+    }
+    /// Mirror uses a square panel so the camera preview maintains its natural aspect ratio without cropping.
+    static let mirror = IslandModuleLayout(
+        islandSize: CGSize(width: 640, height: 640),
+        panelSize: CGSize(width: 640, height: 644)
+    )
+    static let teleprompter = IslandModuleLayout(
+        islandSize: CGSize(width: 760, height: 640),
+        panelSize: CGSize(width: 760, height: 644)
+    )
+
+    /// Resolves the current layout. Dashboard height follows its rendered activity-card rows.
+    nonisolated static func resolved(
+        for module: IslandModule,
+        dashboardCardCount: Int,
+        contentTopInset: CGFloat = IslandDashboardLayout.contentTopInset
+    ) -> IslandModuleLayout {
+        let layout: IslandModuleLayout
+        if module == .dashboard {
+            // Empty and single-card dashboards are clamped to the crown floor instead of falling back
+            // to `.standard`: a fixed 340pt left a large black gap under the toolbar, while shrinking to
+            // pure content height (~129pt for one card) sank the whole island inside the 132pt black
+            // crown, hiding the frosted glass and the bottom corner radius.
+            let islandHeight = min(
+                IslandDashboardLayout.contentHeight(cardCount: dashboardCardCount),
+                IslandModuleLayout.keyboardSound.islandSize.height
+            )
+            layout = IslandModuleLayout(
+                islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
+                panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
+            )
+        } else {
+            layout = module.layout
+        }
+        let additionalHeight = contentTopInset - IslandDashboardLayout.contentTopInset
+        return IslandModuleLayout(
+            islandSize: CGSize(width: layout.islandSize.width, height: layout.islandSize.height + additionalHeight),
+            panelSize: CGSize(width: layout.panelSize.width, height: layout.panelSize.height + additionalHeight)
+        )
+    }
 }
 
 enum UpdateCheckState: Equatable {
-  case idle
-  case checking
-  case current
-  case available
-  case failed(String)
+    case idle
+    case checking
+    case current
+    case available
+    case failed(String)
 }
 
 enum DownloadUIState: Equatable {
-  case idle
-  case preparing
-  case downloading(fraction: Double, speed: String, eta: String)
-  case completed(URL)
-  case failed(String)
+    case idle
+    case preparing
+    case downloading(fraction: Double, speed: String, eta: String)
+    case completed(URL)
+    case failed(String)
 
-  var isRunning: Bool {
-    switch self {
-    case .preparing, .downloading: true
-    default: false
+    var isRunning: Bool {
+        switch self {
+        case .preparing, .downloading: true
+        default: false
+        }
     }
-  }
 }
 
 struct DownloadTaskSnapshot: Identifiable, Equatable {
-  let id: UUID
-  let urlString: String
-  let state: DownloadUIState
+    let id: UUID
+    let urlString: String
+    let state: DownloadUIState
 }
 
 enum WeatherLocationUIState: Equatable {
-  case idle
-  case locating
-  case searching
-  case ready(String)
-  case failed(String)
+    case idle
+    case locating
+    case searching
+    case ready(String)
+    case failed(String)
 
-  var isBusy: Bool {
-    self == .locating || self == .searching
-  }
+    var isBusy: Bool {
+        self == .locating || self == .searching
+    }
 }
 
 @MainActor
 private final class SharingPickerDelegateProxy: NSObject,
-  @preconcurrency NSSharingServicePickerDelegate
-{
-  var onCompletion: ((NSSharingServicePicker) -> Void)?
+    @preconcurrency NSSharingServicePickerDelegate {
+    var onCompletion: ((NSSharingServicePicker) -> Void)?
 
-  func sharingServicePicker(
-    _ sharingServicePicker: NSSharingServicePicker,
-    didChoose service: NSSharingService?
-  ) {
-    onCompletion?(sharingServicePicker)
-  }
+    func sharingServicePicker(
+        _ sharingServicePicker: NSSharingServicePicker,
+        didChoose service: NSSharingService?
+    ) {
+        onCompletion?(sharingServicePicker)
+    }
 }
 
 struct MailComposeRequest: Equatable {
-  let id = UUID()
-  let recipient: String
+    let id = UUID()
+    let recipient: String
 }
 
 @MainActor
 enum BrowserDownloadQuickActionPresenter {
-  static func present(
-    _ transfer: BrowserCompletedTransfer,
-    on controller: ClipboardAssistantController,
-    settings: FeatureSettings,
-    isVoiceRecording: Bool,
-    isVoicePreparing: Bool,
-    isIslandVisible: Bool
-  ) -> Bool {
-    guard settings.clipboardAssistantEnabled, settings.downloadCompletionFolderActionEnabled,
-      !isVoiceRecording, !isVoicePreparing, !isIslandVisible else { return false }
-    let detection = ClipboardAssistantDetection(
-      kind: .file,
-      title: transfer.fileName,
-      detail: .path(transfer.directoryURL.path),
-      actions: [.openFolder(transfer.directoryURL)]
-    )
-    controller.displayDuration = settings.clipboardAssistantDisplayDuration
-    controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
-    controller.presentation.notchBackground = settings.islandNotchBackground
-    return controller.present(detection, visualStyle: settings.islandVisualStyle) != nil
-  }
+    static func present(
+        _ transfer: BrowserCompletedTransfer,
+        on controller: ClipboardAssistantController,
+        settings: FeatureSettings,
+        isVoiceRecording: Bool,
+        isVoicePreparing: Bool,
+        isIslandVisible: Bool
+    ) -> Bool {
+        guard settings.clipboardAssistantEnabled, settings.downloadCompletionFolderActionEnabled,
+              !isVoiceRecording, !isVoicePreparing, !isIslandVisible else { return false }
+        let detection = ClipboardAssistantDetection(
+            kind: .file,
+            title: transfer.fileName,
+            detail: .path(transfer.directoryURL.path),
+            actions: [.openFolder(transfer.directoryURL)]
+        )
+        controller.displayDuration = settings.clipboardAssistantDisplayDuration
+        controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
+        controller.presentation.notchBackground = settings.islandNotchBackground
+        return controller.present(detection, visualStyle: settings.islandVisualStyle) != nil
+    }
 }
 
 struct IslandClipboardHandoff {
-  struct Pending {
-    let content: ClipboardHistoryContent
-    let downloadableURL: URL?
-    let changeCount: Int
-    let sourceApplication: NSRunningApplication?
+    struct Pending {
+        let content: ClipboardHistoryContent
+        let downloadableURL: URL?
+        let changeCount: Int
+        let sourceApplication: NSRunningApplication?
 
-    init(
-      content: ClipboardHistoryContent,
-      downloadableURL: URL?,
-      changeCount: Int,
-      sourceApplication: NSRunningApplication? = nil
-    ) {
-      self.content = content
-      self.downloadableURL = downloadableURL
-      self.changeCount = changeCount
-      self.sourceApplication = sourceApplication
+        init(
+            content: ClipboardHistoryContent,
+            downloadableURL: URL?,
+            changeCount: Int,
+            sourceApplication: NSRunningApplication? = nil
+        ) {
+            self.content = content
+            self.downloadableURL = downloadableURL
+            self.changeCount = changeCount
+            self.sourceApplication = sourceApplication
+        }
     }
-  }
 
-  private(set) var shouldDefer = false
-  private var pending: Pending?
+    private(set) var shouldDefer = false
+    private var pending: Pending?
 
-  mutating func noteDidCopy() { shouldDefer = true }
-  mutating func beginRecycle() { shouldDefer = true }
-  mutating func hold(_ capture: Pending) { pending = capture }
+    mutating func noteDidCopy() { shouldDefer = true }
+    mutating func beginRecycle() { shouldDefer = true }
+    mutating func hold(_ capture: Pending) { pending = capture }
 
-  mutating func finishRecycle(currentChangeCount: Int) -> Pending? {
-    shouldDefer = false
-    defer { pending = nil }
-    guard pending?.changeCount == currentChangeCount else { return nil }
-    return pending
-  }
+    mutating func finishRecycle(currentChangeCount: Int) -> Pending? {
+        shouldDefer = false
+        defer { pending = nil }
+        guard pending?.changeCount == currentChangeCount else { return nil }
+        return pending
+    }
 
-  mutating func cancel() {
-    shouldDefer = false
-    pending = nil
-  }
+    mutating func cancel() {
+        shouldDefer = false
+        pending = nil
+    }
 }
 
 @MainActor
 final class AppModel: ObservableObject {
-  enum AIProcessingTarget {
-    case http(
-      endpoint: AIEndpoint,
-      protocolKind: AgentChannelProtocol,
-      model: String,
-      apiKey: String?,
-      effort: AgentModelEffort?,
-      localInference: Bool,
-      localThinkingEnabled: Bool
-    )
-    case cliProfile(accountID: UUID, model: String)
+    enum AIProcessingTarget {
+        case http(
+            endpoint: AIEndpoint,
+            protocolKind: AgentChannelProtocol,
+            model: String,
+            apiKey: String?,
+            effort: AgentModelEffort?,
+            localInference: Bool,
+            localThinkingEnabled: Bool
+        )
+        case cliProfile(accountID: UUID, model: String)
 
-    var requiresVoiceProofreading: Bool {
-      switch self {
-      case let .http(_, _, _, _, _, localInference, localThinkingEnabled):
-        localInference && !localThinkingEnabled
-      case .cliProfile:
-        false
-      }
-    }
-  }
-
-  static let shared = AppModel()
-
-  @Published var selectedModule: IslandModule = .dashboard {
-    didSet {
-      if selectedModule != .shelf { contextNoteEditor.hide() }
-      // Do not put teardown in default: named cases such as agenda and mail would skip it, leaving usage history resident in memory.
-      if oldValue == .aiMonitor, selectedModule != .aiMonitor {
-        aiMonitor.unloadUsageHistory()
-      }
-      switch selectedModule {
-      case .agenda:
-        refreshAgendaIfEnabled()
-      case .mail:
-        Task { await mail.refresh(checkForNewMail: false) }
-      case .quickNotes:
-        Task { await quickNotes.refresh() }
-      case .aiMonitor:
-        aiMonitor.loadUsageHistory()
-      default:
-        break
-      }
-    }
-  }
-  /// Module switch direction (+1 rightward in module order, -1 leftward) driving the
-  /// directional page transition. Committed one run-loop turn before `selectedModule`
-  /// changes so the outgoing view's removal transition also carries the fresh direction.
-  @Published private(set) var moduleSwitchDirection: CGFloat = 1
-  private var pendingModuleSelection: IslandModule?
-
-  /// Preferred entry point for switching modules: records the navigation direction for
-  /// the directional transition, then applies the switch on the next run-loop turn.
-  func selectModule(_ module: IslandModule) {
-    let module = module.navigationTarget
-    let current = pendingModuleSelection ?? selectedModule
-    guard module != current else { return }
-    let order = IslandModule.configuredOrder(settingsStore.settings)
-    if let from = order.firstIndex(of: current),
-       let to = order.firstIndex(of: module) {
-      moduleSwitchDirection = to > from ? 1 : -1
-    }
-    pendingModuleSelection = module
-    DispatchQueue.main.async { [weak self] in
-      guard let self, let target = self.pendingModuleSelection else { return }
-      self.pendingModuleSelection = nil
-      guard target != self.selectedModule else { return }
-      self.selectedModule = target
-    }
-  }
-
-  @Published var isPinned = false
-  @Published private(set) var weatherSnapshotsByLocationID: [String: WeatherSnapshot] = [:] {
-    didSet { scheduleWeatherExpiry() }
-  }
-  @Published var weatherLocationState: WeatherLocationUIState = .idle
-  @Published var updateState: UpdateCheckState = .idle
-  @Published private(set) var productUpdateAvailable = false
-  @Published var downloadURL = ""
-  @Published var downloadMode: DownloadMode = .video {
-    didSet {
-      guard downloadMode != oldValue else { return }
-      selectedDownloadFormat = nil
-    }
-  }
-  let saveLocations = SaveLocationStore()
-  var downloadDirectory: URL { saveLocations[.download] }
-  @Published var downloadState: DownloadUIState = .idle
-  @Published private(set) var activeDownloads: [DownloadTaskSnapshot] = []
-  @Published private(set) var downloadFormats: [DownloadFormat] = []
-  @Published private(set) var isLoadingDownloadFormats = false
-  @Published private(set) var downloadFormatSelectionEnabled = false
-  @Published private(set) var downloadFormatError: String?
-  @Published private(set) var downloadNeedsBrowserCookies = false
-  @Published private(set) var downloadBrowserCookieSources: [DownloadBrowserCookieSource] = []
-  @Published var selectedDownloadFormat: DownloadFormatSelection?
-  @Published var downloadBrowserCookieSource: DownloadBrowserCookieSource? {
-    didSet {
-      guard downloadBrowserCookieSource != oldValue else { return }
-      resetDownloadFormatState()
-    }
-  }
-  @Published var transientMessage: String? {
-    didSet {
-      userCareFeedback.messageDidChange()
-      scheduleTransientMessageDismissal()
-    }
-  }
-
-  private var userCareFeedback = UserCareFeedback()
-  private var transientMessageDismissTask: Task<Void, Never>?
-  var hasActiveDownloads: Bool { !activeDownloadIDs.isEmpty }
-  @Published private(set) var mailComposeRequest: MailComposeRequest?
-  @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
-  @Published var islandScreenLayout: ScreenOverlayLayout?
-  @Published var islandHasSystemMonitorIcons = false
-  var onChooseIslandPlacement: (() -> Void)?
-  var islandEdge: IslandEdge {
-    guard settingsStore.settings.islandLayoutStyle == .pill else { return .top }
-    let placement = settingsStore.settings.islandPlacement
-    return placement.mode == .camera ? .top : placement.edge
-  }
-  @Published var isIslandOnPhysicalNotch = false
-
-  /// Overflow width of the collapsed capsule. On notched displays, the compact bar extends one wing width past each side of the notch.
-  /// On displays without a notch, it is the capsule width. Compact surfaces use it to align with the collapsed surface's visible edge.
-  var collapsedOverflowWidth: CGFloat {
-    collapsedIslandSize.width
-      + (isIslandOnPhysicalNotch ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
-  }
-  /// Number of cards rendered below the dashboard summary.
-  @Published private(set) var dashboardCardCount = 0
-  @Published private(set) var isMirrorPresented = false
-  @Published private(set) var isTeleprompterPresented = false
-  private(set) var teleprompterPresentationPoint: CGPoint?
-  @Published var isIslandVisible = false {
-    didSet {
-      guard oldValue != isIslandVisible else { return }
-      if isIslandVisible { dailyBriefing.recordExpansion() }
-      if !isIslandVisible { contextNoteEditor.hide() }
-      updateSpectrumMonitoring()
-      applicationOpenRepairPresenter.flush()
-    }
-  }
-  @Published var isExternalDragging = false
-  @Published var detectedLink: URL?
-  @Published private(set) var isSharingPickerVisible = false
-
-  /// Signal to request the island to collapse immediately when disk cleaning opens or completes.
-  @Published var islandCollapseRequested = false
-
-  /// Signal to expand the island from an entry point that fires while it is still collapsed, such
-  /// as a clipboard assistant action that has to land the user inside an island module.
-  @Published var islandExpansionRequested = false
-
-  let settingsStore = FeatureSettingsStore()
-  let languageStore = AppLanguageStore()
-  let aiMonitor = AIStateMonitor()
-  let aiAccountBalanceCookieInputs = AppModel.makeAccountBalanceCookieInputs()
-
-  static func makeAccountBalanceCookieInputs(
-    makeInput: (AIAccountBalanceWebsite) -> AIAccountBalanceCookieInputModel = { AIAccountBalanceCookieInputModel(website: $0) }
-  ) -> [AIAccountBalanceWebsite: AIAccountBalanceCookieInputModel] {
-    Dictionary(uniqueKeysWithValues: AIAccountBalanceWebsite.allCases.map { ($0, makeInput($0)) })
-  }
-
-  let notices = SideNoticeQueue()
-  let aiResultSweep = AIResultSweepController()
-  let media = NowPlayingService()
-  let audioOutput = AudioOutputDeviceService()
-  let applicationVolumes = ApplicationVolumeMixerService()
-  let calendar = CalendarService()
-  private lazy var meetingCountdown = MeetingCountdownController(calendar: calendar, queue: notices,
-    settings: settingsStore, language: languageStore)
-  let shelf = FileShelfStore()
-  lazy var shelfContextActions = ShelfContextActions(shelf: shelf)
-  @Published var selectedShelfCategory: FileShelfCategory = .all
-  let contextNoteEditor = ContextNoteShelfEditor()
-  var onBeginContextNote: (() -> Void)?
-  var onContextNoteSaved: ((FileShelfItem) -> Void)?
-  let weatherLocations = WeatherLocationStore()
-  let clipboardMonitor = ClipboardLinkMonitor()
-  let clipboardHistory = ClipboardHistoryStore()
-  let clipboardHistoryMonitor = ClipboardHistoryMonitor()
-  /// Copy assistant: recognizes copied content and shows a toast with a next-step action.
-  let clipboardAssistant = ClipboardAssistantController()
-  let pomodoro = PomodoroService()
-  let managedTools = ManagedToolService()
-  let powerAssertions = PowerAssertionController()
-  let screenCleaning = ScreenCleaningController()
-  private(set) lazy var systemMonitor = SystemMonitorService(batterySnapshotProvider: { [weak self] in
-    self?.battery.snapshot
-  })
-  private(set) lazy var systemAutoCleanup: SystemAutoCleanupService = {
-    let monitor = systemMonitor
-    return SystemAutoCleanupService(
-      scan: { await monitor.scanCleanupCandidates(kinds: $0, options: $1) },
-      trash: { await monitor.trashSelected($0) },
-      emptyTrash: { @MainActor [weak self] in
-        let result = await DesktopOrganizer.emptyTrash()
-        if case .failure(let error) = result, let self, !immediateCleanup.isRunning {
-          transientMessage = error.message
-        }
-        return result
-      },
-      onTrashReservationFailure: { [weak self] error in
-        self?.transientMessage = error.message
-      }
-    )
-  }()
-  private(set) lazy var immediateCleanup: ImmediateCleanupController = {
-    let systemCleanup = systemAutoCleanup
-    let clipboardHistory = clipboardHistory
-    let voiceHistory = voiceHistory
-    let permissions = OnboardingPermissionCoordinator()
-    return ImmediateCleanupController(
-      operation: { settings in
-        await ImmediateCleanupController.cleanConfiguredItems(settings: settings, systemCleanup: systemCleanup,
-          clipboardHistory: clipboardHistory, voiceHistory: voiceHistory)
-      },
-      onMessage: { [weak self] message in
-        guard let self else { return }
-        transientMessage = message
-        if immediateCleanup.isRunning { transientMessageDismissTask?.cancel() }
-      },
-      requestPermission: { permissions.openSettings(for: $0) }
-    )
-  }()
-  let backgroundSounds = SystemBackgroundSoundService()
-  let battery = BatteryMonitor()
-  private(set) lazy var automaticPowerMode = AutomaticPowerModeService(onFailure: { [weak self] error in
-    self?.transientMessage = AppLocalization.text(BatteryPowerModePresentation.messageKey(for: error))
-  })
-  private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
-  private lazy var accountBalanceNotice = AIAccountBalanceNoticeController(queue: notices)
-  var userCarePresentationAllowed: () -> Bool = { false }
-  private lazy var userCare = UserCareService(
-    presentationAllowed: { [weak self] in self?.canPresentUserCareMessage == true },
-    onReminder: { [weak self] in _ = self?.presentUserCareMessage($0) },
-    onClear: { [weak self] in self?.clearUserCareMessage(routineOnly: $0) }
-  )
-  let networkBattery = NetworkBatteryMonitor()
-  let focusMode = FocusModeMonitor()
-  let quickNotes = QuickNotesService()
-  let browserDownloads = BrowserDownloadMonitor()
-  private let videoDownloadFavicons = VideoDownloadFaviconStore()
-  /// Cached favicon data for long-tail sites; reused on each progress refresh to avoid re-queuing and losing the image.
-  private var videoDownloadFaviconData: Data?
-  private var videoDownloadPlatform: VideoDownloadPlatform?
-  private var videoDownloadHost: String?
-  let mail = MailService()
-  let voiceInput = VoiceInputController()
-  let voiceHistory = VoiceHistoryStore()
-  let aiAgent = AIAgentWorkspace()
-  /// Integrated keyboard sound engine and local typing statistics.
-  let keyboardSound = KeyboardSoundController()
-  private(set) lazy var dailyBriefing = DailyBriefingController(
-    saveLocations: saveLocations,
-    observation: { [unowned self] date in self.dailyBriefingObservation(at: date) },
-    aiAccountBalances: { [unowned self] in
-      let settings = self.settingsStore.settings
-      return AIAccountBalanceCatalog.displayedBalances(self.aiMonitor.accountBalances,
-        monitoredProviders: settings.aiAccountBalanceMonitoredProviders,
-        displayedProviders: settings.aiAccountBalanceDisplayedProviders)
-    },
-    typing: { [unowned self] date in
-      guard self.settingsStore.settings.keyboardTypingStatsEnabled,
-        self.keyboardSound.isInputMonitoringGranted else { return nil }
-      return try await self.keyboardSound.dailyBriefingTyping(on: date)
-    },
-    readAIUsage: { range in
-      try await Task.detached(priority: .utility) {
-        try AIStateRepository(directoryURL: AppPaths.applicationSupport).loadUsageHistory(
-          startingAt: range.start, endingBefore: range.end)
-      }.value
-    }
-  )
-  /// Synchronous hook used by the app delegate to arm overlay focus protection before any
-  /// recording-start cleanup can reorder windows.
-  var onVoiceInputWillStart: (() -> Void)?
-  var onScreenRecordingRequested: (() -> Void)?
-  var onShelfVideosRequested: (([URL]) -> Bool)?
-
-  /// Model discovery state: used by the settings page to show connection test results and the available model list.
-  @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
-  @Published var discoveredModels: [AIDiscoveredModel] = []
-  /// True while an AI model is cleaning up a recorded transcript; drives the collapsed-island processing indicator.
-  @Published private(set) var isProcessingVoiceTranscript = false
-  @Published private(set) var voiceInputInputMonitoringAccessGranted =
-    GlobalHotkeyManager.hasInputMonitoringAccess
-  /// Accessibility trust state for the clipboard assistant's quick-copy mouse gesture.
-  @Published private(set) var assistantAccessibilityGranted = AccessibilityPermission.isTrusted
-  private let weatherService = WeatherService()
-  private let weatherLocationService = WeatherLocationService()
-  private lazy var sparkleUpdateController: SparkleUpdateController? = {
-    let controller = SparkleUpdateController(languageStore: languageStore)
-    controller?.onUpdateFound = { [weak self] in
-      guard let self else { return }
-      self.updateState = .available
-      self.productUpdateAvailable = true
-      self.refreshUpdateNotices()
-    }
-    controller?.onNoUpdateFound = { [weak self] in
-      guard let self else { return }
-      self.updateState = .current
-      self.productUpdateAvailable = false
-      self.refreshUpdateNotices()
-    }
-    controller?.onCheckFailed = { [weak self] error in
-      self?.updateState = .failed(error.localizedDescription)
-    }
-    controller?.onUpdateSkipped = { [weak self] in
-      guard let self else { return }
-      self.updateState = .idle
-      self.productUpdateAvailable = false
-      self.refreshUpdateNotices()
-    }
-    return controller
-  }()
-  private let downloadService = DownloadService()
-  private let hotkeyManager = GlobalHotkeyManager()
-  private let windowPreview = WindowPreviewController()
-  private let voicePostProcessingQueue = VoicePostProcessingQueue()
-  /// Serial voice-processing runs share one pair of wing notices; removed when the last run finishes.
-  private var voiceProcessingOperationCount = 0
-  private let voiceTranscriptDelivery = VoiceTranscriptDelivery()
-  private let voiceRecordingPlayer = VoiceRecordingPlayer()
-  @Published private(set) var systemMonitorHeadphoneTransient = SystemMonitorHeadphoneTransient()
-  private var headphoneTransientLifecycleActive = false
-  private var automaticPowerModeLifecycleActive = false
-  private var headphoneTransientTask: Task<Void, Never>?
-  private var cancellables: Set<AnyCancellable> = []
-  private var weatherTask: Task<Void, Never>?
-  private var weatherExpiryTask: Task<Void, Never>?
-  private var updatePollingTask: Task<Void, Never>?
-  private let updateFeedResolver = UpdateFeedResolver {
-    UpdateFeedPreference(countryCode: await AppModel.countryCodeForCurrentIP())
-  }
-  private var voiceRecordingCleanupTask: Task<Void, Never>?
-  private var appliedVoiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy?
-  private var downloadTasks: [UUID: Task<Void, Never>] = [:]
-  private var activeDownloadIDs: Set<UUID> = []
-  private var downloadTaskStates: [UUID: DownloadUIState] = [:]
-  private var downloadTaskURLs: [UUID: String] = [:]
-  private var downloadTaskOrder: [UUID] = []
-  private var downloadFormatProbeTask: Task<Void, Never>?
-  private var downloadFormatProbeGeneration = 0
-  private var downloadFormatSourceURL: String?
-  private var detectedLinkTask: Task<Void, Never>?
-  private var translationTask: Task<Void, Never>?
-  private var voiceModelDiscoveryTask: Task<Void, Never>?
-  private var voiceModelDiscoveryGeneration = 0
-  private var activeDownloadID: UUID?
-  private var knownNoticeIDs: Set<String> = []
-  private var wasPinnedBeforeMirror = false
-  private var wasPinnedBeforeTeleprompter = false
-  private var taskStatuses: [String: AIProgressStatus] = [:]
-  private var activeAINoticeIDs: Set<String> = []
-  /// AI notices shown during the current activity; once hidden by timeout, they are not re-queued within the same activity cycle.
-  private var activityNoticeShownIDs: Set<String> = []
-  private var mediaActivityPresented = false
-  private var hasLoadedMail = false
-  private var knownMailMessageIDs: Set<String> = []
-  private var lastActivityNoticeDisplayDuration: ActivityNoticeDisplayDuration?
-  private var isUpdatePollingEnabled = false
-  private let mediaNoticeIDs: Set<String> = [
-    "media-active-left",
-    "media-active-right",
-  ]
-  private let backgroundSoundNoticeIDs: Set<String> = [
-    "background-sound-left",
-    "background-sound-right",
-  ]
-  private let toolboxReminderIDs: Set<String> = [
-    "toolbox-reminder-left",
-    "toolbox-reminder-right",
-  ]
-  private let focusCountdownNoticePrefix = PomodoroService.focusCountdownNoticeIDPrefix
-  private let focusModeNoticeIDs: Set<String> = [
-    "focus-mode-left",
-    "focus-mode-right",
-  ]
-  private let browserDownloadNoticeIDs: Set<String> = [
-    "browser-download-left",
-    "browser-download-right",
-  ]
-  private let videoDownloadNoticeIDs: Set<String> = [
-    "video-download-left",
-    "video-download-right",
-  ]
-  private let updateNoticePrefix = "update-available-"
-  private var cleaningPowerState:
-    (
-      keepDisplayAwake: Bool,
-      preventIdleSystemSleep: Bool
-    )?
-  private let launchDate = Date()
-  private let sharingPickerDelegate = SharingPickerDelegateProxy()
-  private var sharingPicker: NSSharingServicePicker?
-  private var sharingPickerDismissesClipboardAssistant = false
-  private var voiceInputTarget: VoiceTranscriptDeliveryTarget?
-  private var voiceInputTargetProcessIdentifier: pid_t?
-  private var voiceInputTargetMouseLocation: CGPoint?
-  /// Snapshot of locally installed applications used to resolve copied names.
-  private var installedApplications: [InstalledApplication] = []
-
-  /// Wires observable services with weak ownership; quota publications and language changes update notices independently.
-  private init() {
-    let networkProxyURL = settingsStore.settings.networkProxyURL
-    let networkProxyEnabled = settingsStore.settings.networkProxyEnabled
-    aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
-    managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
-    Task { await downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
-    startInstalledApplicationCatalog()
-    sharingPickerDelegate.onCompletion = { [weak self] picker in
-      self?.sharingPickerDidComplete(picker)
-    }
-    screenCleaning.onCleaningDidEnd = { [weak self] in
-      self?.restorePowerAssertionsAfterCleaning()
-    }
-    backgroundSounds.onAutomaticStop = { [weak self] in
-      guard let self, self.settingsStore.settings.systemBackgroundSoundEnabled else { return }
-      var settings = self.settingsStore.settings
-      settings.systemBackgroundSoundEnabled = false
-      self.settingsStore.settings = settings
-    }
-    pomodoro.onUserCareReminder = { [weak self] reminder in
-      guard let self else { return }
-      self.presentUserCareMessage(reminder)
-    }
-    quickNotes.onNoteSaved = { [weak self] event in
-      _ = self?.presentUserCareMessage(
-        event == .created ? .noteCreated : .noteUpdated,
-        throttlesNoteUpdates: event == .updated
-      )
-    }
-    languageStore.$language.dropFirst()
-      .sink { [weak self] language in
-        guard let self else { return }
-        self.dailyBriefing.configure(settings: self.settingsStore.settings.dailyBriefing,
-          directory: self.saveLocations[.dailyBriefing], language: language)
-        self.accountBalanceNotice.update(balances: self.aiMonitor.accountBalances,
-          settings: self.settingsStore.settings, language: language)
-      }
-      .store(in: &cancellables)
-    clipboardHistoryMonitor.onContentCaptured = { [weak self] content, sourceApp in
-      guard let self else { return }
-      self.dailyBriefing.recordActivity(.clipboardCaptured)
-      if self.settingsStore.settings.clipboardHistoryEnabled {
-        _ = self.clipboardHistory.record(content, sourceApp: sourceApp)
-      }
-      self.handleCapturedClipboardContent(content)
-    }
-    let recordActivity: DailyBriefingActivityHandler = { [weak self] activity, count, seconds, date in
-      self?.dailyBriefing.recordActivity(activity, count: count, focusSeconds: seconds, at: date)
-    }
-    shelf.onDailyBriefingActivity = recordActivity
-    pomodoro.onDailyBriefingActivity = recordActivity
-    quickNotes.onDailyBriefingActivity = recordActivity
-    keyboardSound.onPhysicalKeyDown = { [weak self] date in self?.dailyBriefing.recordKeyPress(at: date) }
-    keyboardSound.onBeforeTermination = { [weak self] in await self?.dailyBriefing.prepareToTerminate() ?? true }
-    Self.observeDailyBriefingExports(dailyBriefing) { [weak self] message in
-      self?.transientMessage = message
-    }
-    .store(in: &cancellables)
-    clipboardAssistant.onPerformAction = { [weak self] action in
-      self?.performClipboardAssistantAction(action)
-    }
-    browserDownloads.onCompletedTransfer = { [weak self] transfer in
-      self?.presentCompletedTransfer(transfer)
-    }
-    clipboardMonitor.onLinkDetected = { [weak self] url, text in
-      guard let self else { return }
-      let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil
-      routeCapturedClipboardContent(.text(text), downloadableURL: downloadableURL)
-    }
-    voiceInput.onRecordingWillStart = { [weak self] in
-      guard let self else { return }
-      self.clearUserCareMessage()
-      let processIdentifier = Self.frontmostVoiceInputTargetProcessIdentifier()
-      voiceInputTargetProcessIdentifier = processIdentifier
-      voiceInputTarget = processIdentifier.flatMap(VoiceTranscriptDelivery.captureTarget(for:))
-      voiceInputTargetMouseLocation = CGEvent(source: nil)?.location
-      self.updateSpectrumMonitoring()
-      self.onVoiceInputWillStart?()
-      self.clipboardAssistant.dismiss(animated: false)
-    }
-    voiceInput.onTranscriptCompleted = { [weak self] recording in
-      self?.deliverVoiceRecording(recording)
-    }
-    // The in-island transcript HUD only exists while recording, so a permission or start-up failure
-    // would otherwise leave the shortcut looking like it did nothing at all.
-    voiceInput.$errorDescription
-      .compactMap { $0 }
-      .sink { [weak self] message in
-        Task { @MainActor [weak self] in self?.transientMessage = message }
-      }
-      .store(in: &cancellables)
-
-    Self.observeDisplayAwakeErrors(powerAssertions) { [weak self] message in
-      self?.transientMessage = message
-    }
-    .store(in: &cancellables)
-
-    voiceInput.isCapturingInputPublisher
-      .sink { [weak self] _ in
-        Task { @MainActor [weak self] in
-          self?.updateSpectrumMonitoring()
-          self?.applicationOpenRepairPresenter.flush()
-        }
-      }
-      .store(in: &cancellables)
-
-    // Disabling the open module in Settings falls the island back to the dashboard, but the panel sizing pipeline observes only
-    // selectedModule; failing to reset selection leaves misaligned NSPanel geometry and stale icon highlighting.
-    settingsStore.$settings
-      .sink { [weak self] _ in
-        Task { @MainActor [weak self] in
-          guard let self else { return }
-          // Read the live value rather than the emitted snapshot to avoid an incorrect fallback during rapid toggles.
-          guard !self.selectedModule.isEnabled(in: self.settingsStore.settings) else { return }
-          self.selectedModule = .dashboard
-        }
-      }
-      .store(in: &cancellables)
-
-    let childPublishers = [
-      settingsStore.objectWillChange,
-      notices.objectWillChange,
-      audioOutput.objectWillChange,
-      backgroundSounds.objectWillChange,
-      calendar.objectWillChange,
-      shelf.objectWillChange,
-      clipboardHistory.objectWillChange,
-      weatherLocations.objectWillChange,
-      powerAssertions.objectWillChange,
-      screenCleaning.objectWillChange,
-      battery.objectWillChange,
-      focusMode.objectWillChange,
-      quickNotes.objectWillChange,
-      mail.objectWillChange,
-      voiceHistory.objectWillChange,
-      aiAgent.objectWillChange,
-      managedTools.objectWillChange,
-      keyboardSound.objectWillChange,
-      dailyBriefing.objectWillChange,
-      saveLocations.objectWillChange,
-    ]
-    for publisher in childPublishers {
-      publisher
-        .sink { [weak self] in
-          Task { @MainActor [weak self] in self?.objectWillChange.send() }
-        }
-        .store(in: &cancellables)
-    }
-
-    for publisher in [
-      pomodoro.objectWillChange,
-      powerAssertions.objectWillChange,
-      screenCleaning.objectWillChange,
-    ] {
-      publisher
-        .sink { [weak self] in
-          Task { @MainActor [weak self] in
-            if let self, self.screenCleaning.isScreenCleaning || self.screenCleaning.isKeyboardCleaning {
-              self.clearUserCareMessage()
+        var requiresVoiceProofreading: Bool {
+            switch self {
+            case let .http(_, _, _, _, _, localInference, localThinkingEnabled):
+                localInference && !localThinkingEnabled
+            case .cliProfile:
+                false
             }
-            self?.refreshFocusCountdownNotice()
-            self?.refreshToolboxReminderNotice()
-          }
         }
-        .store(in: &cancellables)
     }
 
-    settingsStore.$settings
-      .dropFirst()
-      .sink { [weak self] settings in
-        Task { @MainActor [weak self] in
-          self?.apply(settings: settings, requestWindowPreviewPermissions: true)
+    static let shared = AppModel()
+
+    @Published var selectedModule: IslandModule = .dashboard {
+        didSet {
+            if selectedModule != .shelf { contextNoteEditor.hide() }
+            // Do not put teardown in default: named cases such as agenda and mail would skip it, leaving usage history resident in memory.
+            if oldValue == .aiMonitor, selectedModule != .aiMonitor {
+                aiMonitor.unloadUsageHistory()
+            }
+            switch selectedModule {
+            case .agenda:
+                refreshAgendaIfEnabled()
+            case .mail:
+                Task { await mail.refresh(checkForNewMail: false) }
+            case .quickNotes:
+                Task { await quickNotes.refresh() }
+            case .aiMonitor:
+                aiMonitor.loadUsageHistory()
+            default:
+                break
+            }
         }
-        let networkProxyURL = settings.networkProxyURL
-        let networkProxyEnabled = settings.networkProxyEnabled
-        self?.aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
-        self?.managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
-        Task { await self?.downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
-      }
-      .store(in: &cancellables)
+    }
+    /// Module switch direction (+1 rightward in module order, -1 leftward) driving the
+    /// directional page transition. Committed one run-loop turn before `selectedModule`
+    /// changes so the outgoing view's removal transition also carries the fresh direction.
+    @Published private(set) var moduleSwitchDirection: CGFloat = 1
+    private var pendingModuleSelection: IslandModule?
 
-    aiMonitor.$state
-      .dropFirst()
-      .sink { [weak self] state in
-        Task { @MainActor [weak self] in self?.consumeAIState(state) }
-      }
-      .store(in: &cancellables)
-
-    aiMonitor.$accountBalances
-      .sink { [weak self] balances in
-        Task { @MainActor [weak self] in
-          guard let self else { return }
-          self.accountBalanceNotice.update(balances: balances, settings: self.settingsStore.settings,
-            language: self.languageStore.language)
+    /// Preferred entry point for switching modules: records the navigation direction for
+    /// the directional transition, then applies the switch on the next run-loop turn.
+    func selectModule(_ module: IslandModule) {
+        let module = module.navigationTarget
+        let current = pendingModuleSelection ?? selectedModule
+        guard module != current else { return }
+        let order = IslandModule.configuredOrder(settingsStore.settings)
+        if let from = order.firstIndex(of: current),
+           let to = order.firstIndex(of: module) {
+            moduleSwitchDirection = to > from ? 1 : -1
         }
-      }
-      .store(in: &cancellables)
-
-    Publishers.CombineLatest(battery.$snapshot, networkBattery.$devices)
-      .sink { [weak self] snapshot, _ in
-        Task { @MainActor [weak self] in
-          guard let self else { return }
-          let settings = self.settingsStore.settings
-          if self.automaticPowerModeLifecycleActive {
-            self.automaticPowerMode.apply(settings: settings, snapshot: snapshot)
-          }
-          self.lowBatteryNotice.update(
-            snapshot: self.battery.snapshot,
-            enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
-          )
-          self.lowBatteryNotice.update(
-            devices: self.networkBattery.devices,
-            enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
-          )
+        pendingModuleSelection = module
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let target = self.pendingModuleSelection else { return }
+            self.pendingModuleSelection = nil
+            guard target != self.selectedModule else { return }
+            self.selectedModule = target
         }
-      }
-      .store(in: &cancellables)
+    }
 
-    media.$snapshot
-      .sink { [weak self] snapshot in
-        Task { @MainActor [weak self] in
-          self?.consumeMediaSnapshot(snapshot)
-          self?.refreshDashboardPresentation()
+    @Published var isPinned = false
+    @Published private(set) var weatherSnapshotsByLocationID: [String: WeatherSnapshot] = [:] {
+        didSet { scheduleWeatherExpiry() }
+    }
+    @Published var weatherLocationState: WeatherLocationUIState = .idle
+    @Published var updateState: UpdateCheckState = .idle
+    @Published private(set) var productUpdateAvailable = false
+    @Published var downloadURL = ""
+    @Published var downloadMode: DownloadMode = .video {
+        didSet {
+            guard downloadMode != oldValue else { return }
+            selectedDownloadFormat = nil
         }
-      }
-      .store(in: &cancellables)
-
-    Publishers.CombineLatest(backgroundSounds.$isPlaying, backgroundSounds.$playingSound)
-      .removeDuplicates { lhs, rhs in
-        lhs.0 == rhs.0 && lhs.1 == rhs.1
-      }
-      .sink { [weak self] _ in
-        Task { @MainActor [weak self] in
-          self?.consumeBackgroundSoundPlayback()
-          self?.updateSpectrumMonitoring()
+    }
+    let saveLocations = SaveLocationStore()
+    var downloadDirectory: URL { saveLocations[.download] }
+    @Published var downloadState: DownloadUIState = .idle
+    @Published private(set) var activeDownloads: [DownloadTaskSnapshot] = []
+    @Published private(set) var downloadFormats: [DownloadFormat] = []
+    @Published private(set) var isLoadingDownloadFormats = false
+    @Published private(set) var downloadFormatSelectionEnabled = false
+    @Published private(set) var downloadFormatError: String?
+    @Published private(set) var downloadNeedsBrowserCookies = false
+    @Published private(set) var downloadBrowserCookieSources: [DownloadBrowserCookieSource] = []
+    @Published var selectedDownloadFormat: DownloadFormatSelection?
+    @Published var downloadBrowserCookieSource: DownloadBrowserCookieSource? {
+        didSet {
+            guard downloadBrowserCookieSource != oldValue else { return }
+            resetDownloadFormatState()
         }
-      }
-      .store(in: &cancellables)
-
-    Publishers.CombineLatest(notices.$left, notices.$right)
-      .map { [weak self] left, right in
-        guard let self else { return false }
-        return left.contains {
-          self.mediaNoticeIDs.contains($0.id) || self.backgroundSoundNoticeIDs.contains($0.id)
-        } || right.contains {
-          self.mediaNoticeIDs.contains($0.id) || self.backgroundSoundNoticeIDs.contains($0.id)
+    }
+    @Published var transientMessage: String? {
+        didSet {
+            userCareFeedback.messageDidChange()
+            scheduleTransientMessageDismissal()
         }
-      }
-      .removeDuplicates()
-      .sink { [weak self] _ in
-        Task { @MainActor [weak self] in self?.updateSpectrumMonitoring() }
-      }
-      .store(in: &cancellables)
+    }
 
-    audioOutput.$headphoneConnection
-      .compactMap { $0 }
-      .sink { [weak self] connection in
-        Task { @MainActor [weak self] in self?.consumeHeadphoneConnection(connection) }
-      }
-      .store(in: &cancellables)
+    private var userCareFeedback = UserCareFeedback()
+    private var transientMessageDismissTask: Task<Void, Never>?
+    var hasActiveDownloads: Bool { !activeDownloadIDs.isEmpty }
+    @Published private(set) var mailComposeRequest: MailComposeRequest?
+    @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
+    @Published var islandScreenLayout: ScreenOverlayLayout?
+    @Published var islandHasSystemMonitorIcons = false
+    var onChooseIslandPlacement: (() -> Void)?
+    var islandEdge: IslandEdge {
+        guard settingsStore.settings.islandLayoutStyle == .pill else { return .top }
+        let placement = settingsStore.settings.islandPlacement
+        return placement.mode == .camera ? .top : placement.edge
+    }
+    @Published var isIslandOnPhysicalNotch = false
 
-    audioOutput.$devices
-      .sink { [weak self] _ in
-        Task { @MainActor [weak self] in
-          guard let self else { return }
-          self.reconcileHeadphoneTransient(devices: self.audioOutput.devices)
+    /// Overflow width of the collapsed capsule. On notched displays, the compact bar extends one wing width past each side of the notch.
+    /// On displays without a notch, it is the capsule width. Compact surfaces use it to align with the collapsed surface's visible edge.
+    var collapsedOverflowWidth: CGFloat {
+        collapsedIslandSize.width
+            + (isIslandOnPhysicalNotch ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
+    }
+    /// Number of cards rendered below the dashboard summary.
+    @Published private(set) var dashboardCardCount = 0
+    @Published private(set) var isMirrorPresented = false
+    @Published private(set) var isTeleprompterPresented = false
+    private(set) var teleprompterPresentationPoint: CGPoint?
+    @Published var isIslandVisible = false {
+        didSet {
+            guard oldValue != isIslandVisible else { return }
+            if isIslandVisible { dailyBriefing.recordExpansion() }
+            if !isIslandVisible { contextNoteEditor.hide() }
+            updateSpectrumMonitoring()
+            applicationOpenRepairPresenter.flush()
         }
-      }
-      .store(in: &cancellables)
+    }
+    @Published var isExternalDragging = false
+    @Published var detectedLink: URL?
+    @Published private(set) var isSharingPickerVisible = false
 
-    browserDownloads.$snapshot
-      .sink { [weak self] snapshot in
-        Task { @MainActor [weak self] in self?.consumeBrowserDownloadSnapshot(snapshot) }
-      }
-      .store(in: &cancellables)
+    /// Signal to request the island to collapse immediately when disk cleaning opens or completes.
+    @Published var islandCollapseRequested = false
 
-    focusMode.$status
-      .dropFirst()
-      .sink { [weak self] status in
-        Task { @MainActor [weak self] in
-          self?.consumeFocusModeStatus(status, showsTransition: false)
-        }
-      }
-      .store(in: &cancellables)
+    /// Signal to expand the island from an entry point that fires while it is still collapsed, such
+    /// as a clipboard assistant action that has to land the user inside an island module.
+    @Published var islandExpansionRequested = false
 
-    focusMode.$latestTransition
-      .compactMap { $0 }
-      .sink { [weak self] transition in
-        Task { @MainActor [weak self] in
-          self?.consumeFocusModeStatus(transition.status, showsTransition: true)
-        }
-      }
-      .store(in: &cancellables)
+    let settingsStore = FeatureSettingsStore()
+    let languageStore = AppLanguageStore()
+    let aiMonitor = AIStateMonitor()
+    let aiAccountBalanceCookieInputs = AppModel.makeAccountBalanceCookieInputs()
 
-    mail.$messages
-      .dropFirst()
-      .sink { [weak self] messages in
-        Task { @MainActor [weak self] in self?.consumeMailMessages(messages) }
-      }
-      .store(in: &cancellables)
+    static func makeAccountBalanceCookieInputs(
+        makeInput: (AIAccountBalanceWebsite) -> AIAccountBalanceCookieInputModel = { AIAccountBalanceCookieInputModel(website: $0) }
+    ) -> [AIAccountBalanceWebsite: AIAccountBalanceCookieInputModel] {
+        Dictionary(uniqueKeysWithValues: AIAccountBalanceWebsite.allCases.map { ($0, makeInput($0)) })
+    }
 
-    aiAgent.$cliUpdates
-      .dropFirst()
-      .sink { [weak self] _ in
-        Task { @MainActor [weak self] in self?.refreshUpdateNotices() }
-      }
-      .store(in: &cancellables)
-
-    // Any source affecting the dashboard height. Pomodoro exposes `phase` as a computed property over
-    // its engine, so it can only be observed via `objectWillChange`, which fires before the value lands.
-    // Deferring to the next run-loop turn ensures the panel size matches the cards SwiftUI can render.
-    Publishers.MergeMany(
-      pomodoro.objectWillChange.eraseToAnyPublisher(),
-      aiMonitor.$state.map { _ in () }.eraseToAnyPublisher(),
-      settingsStore.$settings.map { _ in () }.eraseToAnyPublisher(),
-      $downloadState.map { _ in () }.eraseToAnyPublisher(),
-      browserDownloads.$snapshots.map { _ in () }.eraseToAnyPublisher(),
-      notices.$left.combineLatest(notices.$right)
-        .map { ($0 + $1).filter { $0.id.hasPrefix(ScreenRecordingOperationNotice.prefix) }.count }
-        .removeDuplicates()
-        .map { _ in () }.eraseToAnyPublisher()
+    let notices = SideNoticeQueue()
+    let aiResultSweep = AIResultSweepController()
+    let media = NowPlayingService()
+    let audioOutput = AudioOutputDeviceService()
+    let applicationVolumes = ApplicationVolumeMixerService()
+    let calendar = CalendarService()
+    private lazy var meetingCountdown = MeetingCountdownController(calendar: calendar, queue: notices,
+                                                                   settings: settingsStore, language: languageStore)
+    let shelf = FileShelfStore()
+    lazy var shelfContextActions = ShelfContextActions(shelf: shelf)
+    @Published var selectedShelfCategory: FileShelfCategory = .all
+    let contextNoteEditor = ContextNoteShelfEditor()
+    var onBeginContextNote: (() -> Void)?
+    var onContextNoteSaved: ((FileShelfItem) -> Void)?
+    let weatherLocations = WeatherLocationStore()
+    let clipboardMonitor = ClipboardLinkMonitor()
+    let clipboardHistory = ClipboardHistoryStore()
+    let clipboardHistoryMonitor = ClipboardHistoryMonitor()
+    /// Copy assistant: recognizes copied content and shows a toast with a next-step action.
+    let clipboardAssistant = ClipboardAssistantController()
+    let pomodoro = PomodoroService()
+    let managedTools = ManagedToolService()
+    let powerAssertions = PowerAssertionController()
+    let screenCleaning = ScreenCleaningController()
+    private(set) lazy var systemMonitor = SystemMonitorService(batterySnapshotProvider: { [weak self] in
+        self?.battery.snapshot
+    })
+    private(set) lazy var systemAutoCleanup: SystemAutoCleanupService = {
+        let monitor = systemMonitor
+        return SystemAutoCleanupService(
+            scan: { await monitor.scanCleanupCandidates(kinds: $0, options: $1) },
+            trash: { await monitor.trashSelected($0) },
+            emptyTrash: { @MainActor [weak self] in
+                let result = await DesktopOrganizer.emptyTrash()
+                if case .failure(let error) = result, let self, !immediateCleanup.isRunning {
+                    transientMessage = error.message
+                }
+                return result
+            },
+            onTrashReservationFailure: { [weak self] error in
+                self?.transientMessage = error.message
+            }
+        )
+    }()
+    private(set) lazy var immediateCleanup: ImmediateCleanupController = {
+        let systemCleanup = systemAutoCleanup
+        let clipboardHistory = clipboardHistory
+        let voiceHistory = voiceHistory
+        let permissions = OnboardingPermissionCoordinator()
+        return ImmediateCleanupController(
+            operation: { settings in
+                await ImmediateCleanupController.cleanConfiguredItems(settings: settings, systemCleanup: systemCleanup,
+                                                                      clipboardHistory: clipboardHistory, voiceHistory: voiceHistory)
+            },
+            onMessage: { [weak self] message in
+                guard let self else { return }
+                transientMessage = message
+                if immediateCleanup.isRunning { transientMessageDismissTask?.cancel() }
+            },
+            requestPermission: { permissions.openSettings(for: $0) }
+        )
+    }()
+    let backgroundSounds = SystemBackgroundSoundService()
+    let battery = BatteryMonitor()
+    private(set) lazy var automaticPowerMode = AutomaticPowerModeService(onFailure: { [weak self] error in
+        self?.transientMessage = AppLocalization.text(BatteryPowerModePresentation.messageKey(for: error))
+    })
+    private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
+    private lazy var accountBalanceNotice = AIAccountBalanceNoticeController(queue: notices)
+    var userCarePresentationAllowed: () -> Bool = { false }
+    private lazy var userCare = UserCareService(
+        presentationAllowed: { [weak self] in self?.canPresentUserCareMessage == true },
+        onReminder: { [weak self] in _ = self?.presentUserCareMessage($0) },
+        onClear: { [weak self] in self?.clearUserCareMessage(routineOnly: $0) }
     )
-    .sink { [weak self] in
-      DispatchQueue.main.async { [weak self] in
-        self?.refreshDashboardPresentation()
-      }
-    }
-    .store(in: &cancellables)
-
-    refreshDashboardPresentation()
-  }
-
-  /// Mirrors the dashboard's rendered cards so the island height stays in sync.
-  private func refreshDashboardPresentation() {
-    let settings = settingsStore.settings
-    let hasPomodoro = pomodoro.phase != .idle
-    let aiCardCount = DashboardAIWorkSummary.groups(
-      from: aiMonitor.state.tasks, enabled: settings.aiProgressEnabled
-    ).count
-    let browserDownloadCount = settings.showsBrowserDownloadProgress
-      ? browserDownloads.snapshots.count : 0
-    let cardCount = [hasPomodoro, hasActiveDownloads].filter { $0 }.count
-      + aiCardCount + browserDownloadCount + notices.screenRecordingOperations.count
-    if dashboardCardCount != cardCount {
-      dashboardCardCount = cardCount
-    }
-  }
-
-  func synchronizeDashboardCardCount(_ count: Int) {
-    guard dashboardCardCount != count else { return }
-    dashboardCardCount = count
-  }
-
-  @Published private(set) var isFirstLaunchOnboardingActive = false
-
-  func setFirstLaunchOnboardingActive(_ active: Bool) {
-    let wasActive = isFirstLaunchOnboardingActive
-    isFirstLaunchOnboardingActive = active
-    if wasActive, !active, GlobalHotkeyManager.hasInputMonitoringAccess {
-      applyKeyboardSettings(settingsStore.settings)
-    }
-  }
-
-  func start(hasExistingInstallation: Bool) {
-    headphoneTransientLifecycleActive = true
-    automaticPowerModeLifecycleActive = true
-    backgroundSounds.startLifecycleMonitoring()
-    apply(settings: settingsStore.settings)
-    LegacyAlarmNotificationCleanup.removeScheduledNotifications()
-    sparkleUpdateController?.showInstalledReleaseNotes(hasExistingInstallation: hasExistingInstallation) { [weak self] in
-      await self?.updateFeedResolver.resolvedPreference()
-    }
-  }
-
-  func toggleBackgroundSound() {
-    var settings = settingsStore.settings
-    let sound = settings.systemBackgroundSound
-    if backgroundSounds.isPlaying || backgroundSounds.isDownloading(sound) {
-      backgroundSounds.cancelDownload(sound: sound)
-      backgroundSounds.stop()
-      settings.systemBackgroundSoundEnabled = false
-      settingsStore.settings = settings
-      return
-    }
-
-    settings.systemBackgroundSoundEnabled = true
-    settingsStore.settings = settings
-    backgroundSounds.playOrDownload(sound: sound)
-  }
-
-  func selectBackgroundSound(_ sound: SystemBackgroundSound) {
-    var settings = settingsStore.settings
-    let previousSound = settings.systemBackgroundSound
-    let wasPlaying = backgroundSounds.isPlaying
-    backgroundSounds.refresh()
-    settings.systemBackgroundSound = sound
-    if !backgroundSounds.isInstalled(sound) {
-      settings.systemBackgroundSoundEnabled = false
-    }
-    settingsStore.settings = settings
-    if !backgroundSounds.isInstalled(sound) {
-      if wasPlaying { backgroundSounds.stop() }
-      backgroundSounds.requestDownload(sound: sound, playWhenReady: wasPlaying)
-    } else if wasPlaying, previousSound != sound {
-      _ = backgroundSounds.play(sound: sound)
-    }
-  }
-
-  func openVoiceInputInputMonitoringSettings() {
-    refreshVoiceInputInputMonitoringAccess()
-    guard !voiceInputInputMonitoringAccessGranted else { return }
-
-    _ = GlobalHotkeyManager.requestInputMonitoringAccess()
-    guard let url = URL(
-      string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-    ), NSWorkspace.shared.open(url) else {
-      transientMessage = AppLocalization.text("无法打开系统设置的输入监控页面")
-      return
-    }
-  }
-
-  func refreshAssistantAccessibility() {
-    windowPreview.refreshPermissions()
-    guard assistantAccessibilityGranted != AccessibilityPermission.isTrusted else { return }
-    assistantAccessibilityGranted = AccessibilityPermission.isTrusted
-    // Re-apply the gesture when the permission flips to granted.
-    if assistantAccessibilityGranted, settingsStore.settings.clipboardAssistantEnabled {
-      applyAssistantMouseGesture()
-    }
-    applicationOpenFailureMonitor.setEnabled(
-      settingsStore.settings.applicationOpenFailureMonitoringActive
-    ) { [weak self] url in self?.applicationOpenRepairPresenter.receive([url], fromSystemAlert: true) }
-  }
-
-  /// Opens System Settings at the accessibility pane (and fires the system grant prompt).
-  func openAssistantAccessibilitySettings() {
-    guard !assistantAccessibilityGranted else { return }
-    _ = AccessibilityPermission.promptIfNeeded()
-    guard let url = URL(
-      string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-    ), NSWorkspace.shared.open(url) else {
-      transientMessage = AppLocalization.text("无法打开系统设置的辅助功能页面")
-      return
-    }
-  }
-
-  func refreshVoiceInputInputMonitoringAccess() {
-    let granted = GlobalHotkeyManager.hasInputMonitoringAccess
-    guard voiceInputInputMonitoringAccessGranted != granted else { return }
-    let wasGranted = voiceInputInputMonitoringAccessGranted
-    voiceInputInputMonitoringAccessGranted = granted
-
-    if granted, !wasGranted, settingsStore.settings.clipboardAssistantEnabled {
-      clipboardAssistant.setTriggers(
-        hotkey: settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey,
-        mouseButton: settingsStore.settings.clipboardAssistantMouseButton,
-        dismissHotkey: settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey
-      )
-      applyAssistantMouseGesture()
-    }
-
-    // Re-register the hotkey when permission changes from denied to granted.
-    if granted, !wasGranted, settingsStore.settings.voiceInputEnabled {
-      let preset = settingsStore.settings.voiceInputHotkeyPreset
-      let mode = settingsStore.settings.voiceInputMode
-      let registration = hotkeyManager.register(
-        hotkey: preset,
-        onKeyDown: { [weak self] in
-          guard let self else { return }
-          switch mode {
-          case .toggle:
-            self.voiceInput.toggle()
-          case .pushToTalk:
-            self.voiceInput.start()
-          }
+    let networkBattery = NetworkBatteryMonitor()
+    let focusMode = FocusModeMonitor()
+    let quickNotes = QuickNotesService()
+    let browserDownloads = BrowserDownloadMonitor()
+    private let videoDownloadFavicons = VideoDownloadFaviconStore()
+    /// Cached favicon data for long-tail sites; reused on each progress refresh to avoid re-queuing and losing the image.
+    private var videoDownloadFaviconData: Data?
+    private var videoDownloadPlatform: VideoDownloadPlatform?
+    private var videoDownloadHost: String?
+    let mail = MailService()
+    let voiceInput = VoiceInputController()
+    let voiceHistory = VoiceHistoryStore()
+    let aiAgent = AIAgentWorkspace()
+    /// Integrated keyboard sound engine and local typing statistics.
+    let keyboardSound = KeyboardSoundController()
+    private(set) lazy var dailyBriefing = DailyBriefingController(
+        saveLocations: saveLocations,
+        observation: { [unowned self] date in self.dailyBriefingObservation(at: date) },
+        aiAccountBalances: { [unowned self] in
+            let settings = self.settingsStore.settings
+            return AIAccountBalanceCatalog.displayedBalances(self.aiMonitor.accountBalances,
+                                                             monitoredProviders: settings.aiAccountBalanceMonitoredProviders,
+                                                             displayedProviders: settings.aiAccountBalanceDisplayedProviders)
         },
-        onKeyUp: { [weak self] in
-          guard let self else { return }
-          if mode == .pushToTalk {
-            self.voiceInput.stop()
-          }
+        typing: { [unowned self] date in
+            guard self.settingsStore.settings.keyboardTypingStatsEnabled,
+                  self.keyboardSound.isInputMonitoringGranted else { return nil }
+            return try await self.keyboardSound.dailyBriefingTyping(on: date)
+        },
+        readAIUsage: { range in
+            try await Task.detached(priority: .utility) {
+                try AIStateRepository(directoryURL: AppPaths.applicationSupport).loadUsageHistory(
+                    startingAt: range.start, endingBefore: range.end
+                )
+            }.value
         }
-      )
-
-      switch registration {
-      case .registered:
-        transientMessage = AppLocalization.text("语音输入快捷键已启用")
-      case .inputMonitoringPermissionRequired:
-        transientMessage = AppLocalization.text("快捷键需要输入监控权限，请在系统设置中授权后重启 App")
-      case .registrationFailed:
-        transientMessage = AppLocalization.text("无法注册语音输入快捷键")
-      }
-    }
-  }
-
-  func stop() {
-    immediateCleanup.cancel()
-    meetingCountdown.stop()
-    automaticPowerModeLifecycleActive = false
-    automaticPowerMode.stop()
-    dailyBriefing.stop()
-    headphoneTransientLifecycleActive = false
-    userCare.stop()
-    aiResultSweep.cancel()
-    windowPreview.stop()
-    settingsStore.flushPendingChanges()
-    islandClipboardHandoff.cancel()
-    managedTools.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
-    keyboardSound.stop()
-    clipboardHistory.flushPendingChanges()
-    clipboardHistory.stopCleanup()
-    aiAgent.store.flushPendingChanges()
-    weatherTask?.cancel()
-    weatherExpiryTask?.cancel()
-    weatherExpiryTask = nil
-    updatePollingTask?.cancel()
-    updateFeedResolver.cancel()
-    voiceRecordingCleanupTask?.cancel()
-    voiceRecordingCleanupTask = nil
-    appliedVoiceRecordingCleanupPolicy = nil
-    cancelAllDownloads()
-    voicePostProcessingQueue.cancelAll()
-    voiceProcessingOperationCount = 0
-    isProcessingVoiceTranscript = false
-    notices.remove(id: "voice-processing-left")
-    notices.remove(id: "voice-processing-right")
-    detectedLinkTask?.cancel()
-    translationTask?.cancel()
-    clipboardServiceOpenTask?.cancel()
-    applicationOpenRepairTask?.cancel()
-    applicationOpenRepairPresenter.cancel()
-    applicationOpenFailureMonitor.stop()
-    voiceModelDiscoveryTask?.cancel()
-    voiceModelDiscoveryTask = nil
-    voiceModelDiscoveryGeneration &+= 1
-    voiceInputTarget = nil
-    voiceInputTargetProcessIdentifier = nil
-    voiceInputTargetMouseLocation = nil
-    voiceInput.cancel()
-    shelfContextActions.cancel()
-    backgroundSounds.cancelAllDownloads()
-    backgroundSounds.stopLifecycleMonitoring()
-    backgroundSounds.stop()
-    hotkeyManager.unregister()
-    clipboardMonitor.setEnabled(false)
-    clipboardHistoryMonitor.setEnabled(false)
-    clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil, dismissHotkey: nil)
-    clipboardAssistant.setMouseGesture(enabled: false, onQuickCopy: {})
-    clipboardAssistant.dismiss()
-    Task { [downloadService] in await downloadService.cancelAll() }
-    aiMonitor.stop()
-    aiAgent.stop()
-    media.stop()
-    applicationVolumes.stop()
-    clearHeadphoneTransient()
-    audioOutput.stop()
-    calendar.stop()
-    pomodoro.stop()
-    screenCleaning.stopAll()
-    cleaningPowerState = nil
-    powerAssertions.releaseAll()
-    systemAutoCleanup.stop()
-    systemMonitor.stop()
-    battery.stop()
-    networkBattery.stop()
-    focusMode.stop()
-    browserDownloads.stop()
-    mail.stop()
-    hasLoadedMail = false
-    knownMailMessageIDs.removeAll()
-    clearMediaNotices()
-    clearFocusModeNotices()
-    notices.removeAll()
-    detectedLink = nil
-    let picker = sharingPicker
-    sharingPicker = nil
-    sharingPickerDismissesClipboardAssistant = false
-    isSharingPickerVisible = false
-    picker?.close()
-  }
-
-  func startScreenCleaning() {
-    guard settingsStore.settings.toolboxEnabled else { return }
-    enablePowerAssertionsForCleaning()
-    screenCleaning.startScreenCleaning()
-    refreshFocusCountdownNotice()
-    refreshToolboxReminderNotice()
-  }
-
-  func startKeyboardCleaning() {
-    guard settingsStore.settings.toolboxEnabled else { return }
-    switch screenCleaning.startKeyboardCleaning() {
-    case .started:
-      enablePowerAssertionsForCleaning()
-    case .accessibilityPermissionRequired:
-      _ = ScreenCleaningController.requestAccessibilityAccess()
-      transientMessage = AppLocalization.text("清洁键盘需要在系统设置中允许辅助功能")
-    case .registrationFailed:
-      transientMessage = AppLocalization.text("无法接管键盘输入")
-    case .alreadyActive:
-      break
-    }
-    refreshToolboxReminderNotice()
-  }
-
-  // MARK: - Transient notice
-
-  static func observeDailyBriefingExports(
-    _ controller: DailyBriefingController,
-    onMessage: @escaping (String) -> Void
-  ) -> AnyCancellable {
-    let success = controller.$lastExportURL
-      .compactMap { $0 }
-      .map { AppLocalization.text("已保存到 %@", $0.lastPathComponent) }
-    return success.merge(with: controller.$errorMessage.compactMap { $0 })
-      .sink(receiveValue: onMessage)
-  }
-
-  static func observeDisplayAwakeErrors(
-    _ controller: PowerAssertionController,
-    onMessage: @escaping (String) -> Void
-  ) -> AnyCancellable {
-    controller.$displayAwakeError
-      .compactMap { $0 }
-      .map { AppLocalization.text($0) }
-      .sink(receiveValue: onMessage)
-  }
-
-  /// The island shows `transientMessage` as a row protruding under the pill, so it has to recycle
-  /// itself — nothing else ever clears it. A message too wide for the row scrolls once, so the
-  /// lifetime follows that pass instead of a fixed beat: a long error would otherwise be swapped out
-  /// mid-scroll, having shown only its opening words.
-  private func scheduleTransientMessageDismissal() {
-    transientMessageDismissTask?.cancel()
-    transientMessageDismissTask = nil
-    guard let message = transientMessage else { return }
-    let duration = TransientNoticeMetrics.displayDuration(
-      for: message,
-      rowWidth: islandEdge.isVertical
-        ? 320 - collapsedIslandSize.width
-        : collapsedOverflowWidth
     )
-    transientMessageDismissTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: duration)
-      guard !Task.isCancelled, let self, self.transientMessage == message else { return }
-      self.transientMessage = nil
+    /// Synchronous hook used by the app delegate to arm overlay focus protection before any
+    /// recording-start cleanup can reorder windows.
+    var onVoiceInputWillStart: (() -> Void)?
+    var onScreenRecordingRequested: (() -> Void)?
+    var onShelfVideosRequested: (([URL]) -> Bool)?
+
+    /// Model discovery state: used by the settings page to show connection test results and the available model list.
+    @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
+    @Published var discoveredModels: [AIDiscoveredModel] = []
+    /// True while an AI model is cleaning up a recorded transcript; drives the collapsed-island processing indicator.
+    @Published private(set) var isProcessingVoiceTranscript = false
+    @Published private(set) var voiceInputInputMonitoringAccessGranted =
+        GlobalHotkeyManager.hasInputMonitoringAccess
+    /// Accessibility trust state for the clipboard assistant's quick-copy mouse gesture.
+    @Published private(set) var assistantAccessibilityGranted = AccessibilityPermission.isTrusted
+    private let weatherService = WeatherService()
+    private let weatherLocationService = WeatherLocationService()
+    private lazy var sparkleUpdateController: SparkleUpdateController? = {
+        let controller = SparkleUpdateController(languageStore: languageStore)
+        controller?.onUpdateFound = { [weak self] in
+            guard let self else { return }
+            self.updateState = .available
+            self.productUpdateAvailable = true
+            self.refreshUpdateNotices()
+        }
+        controller?.onNoUpdateFound = { [weak self] in
+            guard let self else { return }
+            self.updateState = .current
+            self.productUpdateAvailable = false
+            self.refreshUpdateNotices()
+        }
+        controller?.onCheckFailed = { [weak self] error in
+            self?.updateState = .failed(error.localizedDescription)
+        }
+        controller?.onUpdateSkipped = { [weak self] in
+            guard let self else { return }
+            self.updateState = .idle
+            self.productUpdateAvailable = false
+            self.refreshUpdateNotices()
+        }
+        return controller
+    }()
+    private let downloadService = DownloadService()
+    private let hotkeyManager = GlobalHotkeyManager()
+    private let windowPreview = WindowPreviewController()
+    private let voicePostProcessingQueue = VoicePostProcessingQueue()
+    /// Serial voice-processing runs share one pair of wing notices; removed when the last run finishes.
+    private var voiceProcessingOperationCount = 0
+    private let voiceTranscriptDelivery = VoiceTranscriptDelivery()
+    private let voiceRecordingPlayer = VoiceRecordingPlayer()
+    @Published private(set) var systemMonitorHeadphoneTransient = SystemMonitorHeadphoneTransient()
+    private var headphoneTransientLifecycleActive = false
+    private var automaticPowerModeLifecycleActive = false
+    private var headphoneTransientTask: Task<Void, Never>?
+    private var cancellables: Set<AnyCancellable> = []
+    private var weatherTask: Task<Void, Never>?
+    private var weatherExpiryTask: Task<Void, Never>?
+    private var updatePollingTask: Task<Void, Never>?
+    private let updateFeedResolver = UpdateFeedResolver {
+        UpdateFeedPreference(countryCode: await AppModel.countryCodeForCurrentIP())
     }
-  }
+    private var voiceRecordingCleanupTask: Task<Void, Never>?
+    private var appliedVoiceRecordingCleanupPolicy: VoiceRecordingCleanupPolicy?
+    private var downloadTasks: [UUID: Task<Void, Never>] = [:]
+    private var activeDownloadIDs: Set<UUID> = []
+    private var downloadTaskStates: [UUID: DownloadUIState] = [:]
+    private var downloadTaskURLs: [UUID: String] = [:]
+    private var downloadTaskOrder: [UUID] = []
+    private var downloadFormatProbeTask: Task<Void, Never>?
+    private var downloadFormatProbeGeneration = 0
+    private var downloadFormatSourceURL: String?
+    private var detectedLinkTask: Task<Void, Never>?
+    private var translationTask: Task<Void, Never>?
+    private var voiceModelDiscoveryTask: Task<Void, Never>?
+    private var voiceModelDiscoveryGeneration = 0
+    private var activeDownloadID: UUID?
+    private var knownNoticeIDs: Set<String> = []
+    private var wasPinnedBeforeMirror = false
+    private var wasPinnedBeforeTeleprompter = false
+    private var taskStatuses: [String: AIProgressStatus] = [:]
+    private var activeAINoticeIDs: Set<String> = []
+    /// AI notices shown during the current activity; once hidden by timeout, they are not re-queued within the same activity cycle.
+    private var activityNoticeShownIDs: Set<String> = []
+    private var mediaActivityPresented = false
+    private var hasLoadedMail = false
+    private var knownMailMessageIDs: Set<String> = []
+    private var lastActivityNoticeDisplayDuration: ActivityNoticeDisplayDuration?
+    private var isUpdatePollingEnabled = false
+    private let mediaNoticeIDs: Set<String> = [
+        "media-active-left",
+        "media-active-right",
+    ]
+    private let backgroundSoundNoticeIDs: Set<String> = [
+        "background-sound-left",
+        "background-sound-right",
+    ]
+    private let toolboxReminderIDs: Set<String> = [
+        "toolbox-reminder-left",
+        "toolbox-reminder-right",
+    ]
+    private let focusCountdownNoticePrefix = PomodoroService.focusCountdownNoticeIDPrefix
+    private let focusModeNoticeIDs: Set<String> = [
+        "focus-mode-left",
+        "focus-mode-right",
+    ]
+    private let browserDownloadNoticeIDs: Set<String> = [
+        "browser-download-left",
+        "browser-download-right",
+    ]
+    private let videoDownloadNoticeIDs: Set<String> = [
+        "video-download-left",
+        "video-download-right",
+    ]
+    private let updateNoticePrefix = "update-available-"
+    private var cleaningPowerState:
+        (
+            keepDisplayAwake: Bool,
+            preventIdleSystemSleep: Bool
+        )?
+    private let launchDate = Date()
+    private let sharingPickerDelegate = SharingPickerDelegateProxy()
+    private var sharingPicker: NSSharingServicePicker?
+    private var sharingPickerDismissesClipboardAssistant = false
+    private var voiceInputTarget: VoiceTranscriptDeliveryTarget?
+    private var voiceInputTargetProcessIdentifier: pid_t?
+    private var voiceInputTargetMouseLocation: CGPoint?
+    /// Snapshot of locally installed applications used to resolve copied names.
+    private var installedApplications: [InstalledApplication] = []
 
-  // MARK: - Trash
-
-  /// Empties the Trash. Irreversible — shows a confirmation dialog with the item count first.
-  func emptyTrash() {
-    Task { @MainActor [weak self] in
-      guard let self else { return }
-      let count: Int
-      switch await DesktopOrganizer.trashItemCount() {
-      case .success(let value):
-        count = value
-      case .failure(let error):
-        transientMessage = error.message
-        return
-      }
-      guard count > 0 else {
-        transientMessage = AppLocalization.text("废纸篓已经是空的")
-        return
-      }
-
-      let alert = NSAlert()
-      alert.messageText = AppLocalization.text("清空废纸篓？")
-      alert.informativeText = AppLocalization.text("将永久删除 %ld 个项目，此操作无法撤销。", count)
-      alert.alertStyle = .warning
-      alert.addButton(withTitle: AppLocalization.text("清空"))
-      alert.addButton(withTitle: AppLocalization.text("取消"))
-      NSApp.activate(ignoringOtherApps: true)
-      WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
-      guard alert.runModal() == .alertFirstButtonReturn else { return }
-
-      switch await DesktopOrganizer.emptyTrash() {
-      case .success:
-        transientMessage = AppLocalization.text("已清空废纸篓（%ld 个项目）", count)
-      case .failure(let error):
-        transientMessage = error.message
-      }
-    }
-  }
-
-  func refreshForExpansion() {
-    let settings = settingsStore.settings
-    let module = selectedModule
-    let weatherStale = isWeatherStale
-    let calendarStale = calendar.isDataStale
-
-    Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .milliseconds(250))
-      guard let self, self.isIslandVisible else { return }
-      if settings.mediaEnabled { self.media.refresh() }
-      if settings.aiProgressEnabled, module != .aiMonitor { self.aiMonitor.refresh() }
-      if settings.weatherEnabled, weatherStale { self.refreshWeather() }
-      if settings.systemMonitorEnabled { await self.systemMonitor.sampleOnce() }
-      if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled {
-        self.battery.refresh()
-      }
-      if settings.mailEnabled, module == .mail { await self.mail.refresh(checkForNewMail: false) }
-      if settings.quickNotesEnabled, module == .quickNotes {
-        await self.quickNotes.refresh()
-      }
-      if settings.calendarEnabled, module == .agenda, calendarStale {
-        await self.calendar.refresh()
-      }
-    }
-  }
-
-  func refreshWeather() {
-    guard settingsStore.settings.weatherEnabled else {
-      weatherTask?.cancel()
-      weatherTask = nil
-      return
-    }
-    weatherTask?.cancel()
-    let configuredLocations = weatherLocations.locations
-    weatherLocationState = .locating
-    weatherTask = Task { [weak self, weatherService, weatherLocationService] in
-      guard let self else { return }
-      var requests: [(id: String, location: GeoLocation)] = []
-      var firstError: String?
-
-      for configured in configuredLocations {
-        switch configured.kind {
-        case .current:
-          do {
-            let current = try await weatherLocationService.currentLocation()
-            try Task.checkCancellation()
-            weatherLocations.updateCurrent(
-              name: current.displayName,
-              coordinate: GeoCoordinate(
-                latitude: current.latitude,
-                longitude: current.longitude
-              ),
-              isoCountryCode: current.isoCountryCode
+    /// Wires observable services with weak ownership; quota publications and language changes update notices independently.
+    private init() {
+        let networkProxyURL = settingsStore.settings.networkProxyURL
+        let networkProxyEnabled = settingsStore.settings.networkProxyEnabled
+        aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
+        managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
+        Task { await downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
+        startInstalledApplicationCatalog()
+        sharingPickerDelegate.onCompletion = { [weak self] picker in
+            self?.sharingPickerDidComplete(picker)
+        }
+        screenCleaning.onCleaningDidEnd = { [weak self] in
+            self?.restorePowerAssertionsAfterCleaning()
+        }
+        backgroundSounds.onAutomaticStop = { [weak self] in
+            guard let self, self.settingsStore.settings.systemBackgroundSoundEnabled else { return }
+            var settings = self.settingsStore.settings
+            settings.systemBackgroundSoundEnabled = false
+            self.settingsStore.settings = settings
+        }
+        pomodoro.onUserCareReminder = { [weak self] reminder in
+            guard let self else { return }
+            self.presentUserCareMessage(reminder)
+        }
+        quickNotes.onNoteSaved = { [weak self] event in
+            _ = self?.presentUserCareMessage(
+                event == .created ? .noteCreated : .noteUpdated,
+                throttlesNoteUpdates: event == .updated
             )
-            requests.append((configured.id, current))
-          } catch is CancellationError {
+        }
+        languageStore.$language.dropFirst()
+            .sink { [weak self] language in
+                guard let self else { return }
+                self.dailyBriefing.configure(settings: self.settingsStore.settings.dailyBriefing,
+                                             directory: self.saveLocations[.dailyBriefing], language: language)
+                self.accountBalanceNotice.update(balances: self.aiMonitor.accountBalances,
+                                                 settings: self.settingsStore.settings, language: language)
+            }
+            .store(in: &cancellables)
+        clipboardHistoryMonitor.onContentCaptured = { [weak self] content, sourceApp in
+            guard let self else { return }
+            self.dailyBriefing.recordActivity(.clipboardCaptured)
+            if self.settingsStore.settings.clipboardHistoryEnabled {
+                _ = self.clipboardHistory.record(content, sourceApp: sourceApp)
+            }
+            self.handleCapturedClipboardContent(content)
+        }
+        let recordActivity: DailyBriefingActivityHandler = { [weak self] activity, count, seconds, date in
+            self?.dailyBriefing.recordActivity(activity, count: count, focusSeconds: seconds, at: date)
+        }
+        shelf.onDailyBriefingActivity = recordActivity
+        pomodoro.onDailyBriefingActivity = recordActivity
+        quickNotes.onDailyBriefingActivity = recordActivity
+        keyboardSound.onPhysicalKeyDown = { [weak self] date in self?.dailyBriefing.recordKeyPress(at: date) }
+        keyboardSound.onBeforeTermination = { [weak self] in await self?.dailyBriefing.prepareToTerminate() ?? true }
+        Self.observeDailyBriefingExports(dailyBriefing) { [weak self] message in
+            self?.transientMessage = message
+        }
+        .store(in: &cancellables)
+        clipboardAssistant.onPerformAction = { [weak self] action in
+            self?.performClipboardAssistantAction(action)
+        }
+        browserDownloads.onCompletedTransfer = { [weak self] transfer in
+            self?.presentCompletedTransfer(transfer)
+        }
+        clipboardMonitor.onLinkDetected = { [weak self] url, text in
+            guard let self else { return }
+            let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil
+            routeCapturedClipboardContent(.text(text), downloadableURL: downloadableURL)
+        }
+        voiceInput.onRecordingWillStart = { [weak self] in
+            guard let self else { return }
+            self.clearUserCareMessage()
+            let processIdentifier = Self.frontmostVoiceInputTargetProcessIdentifier()
+            voiceInputTargetProcessIdentifier = processIdentifier
+            voiceInputTarget = processIdentifier.flatMap(VoiceTranscriptDelivery.captureTarget(for:))
+            voiceInputTargetMouseLocation = CGEvent(source: nil)?.location
+            self.updateSpectrumMonitoring()
+            self.onVoiceInputWillStart?()
+            self.clipboardAssistant.dismiss(animated: false)
+        }
+        voiceInput.onTranscriptCompleted = { [weak self] recording in
+            self?.deliverVoiceRecording(recording)
+        }
+        // The in-island transcript HUD only exists while recording, so a permission or start-up failure
+        // would otherwise leave the shortcut looking like it did nothing at all.
+        voiceInput.$errorDescription
+            .compactMap { $0 }
+            .sink { [weak self] message in
+                Task { @MainActor [weak self] in self?.transientMessage = message }
+            }
+            .store(in: &cancellables)
+
+        Self.observeDisplayAwakeErrors(powerAssertions) { [weak self] message in
+            self?.transientMessage = message
+        }
+        .store(in: &cancellables)
+
+        voiceInput.isCapturingInputPublisher
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.updateSpectrumMonitoring()
+                    self?.applicationOpenRepairPresenter.flush()
+                }
+            }
+            .store(in: &cancellables)
+
+        // Disabling the open module in Settings falls the island back to the dashboard, but the panel sizing pipeline observes only
+        // selectedModule; failing to reset selection leaves misaligned NSPanel geometry and stale icon highlighting.
+        settingsStore.$settings
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    // Read the live value rather than the emitted snapshot to avoid an incorrect fallback during rapid toggles.
+                    guard !self.selectedModule.isEnabled(in: self.settingsStore.settings) else { return }
+                    self.selectedModule = .dashboard
+                }
+            }
+            .store(in: &cancellables)
+
+        let childPublishers = [
+            settingsStore.objectWillChange,
+            notices.objectWillChange,
+            audioOutput.objectWillChange,
+            backgroundSounds.objectWillChange,
+            calendar.objectWillChange,
+            shelf.objectWillChange,
+            clipboardHistory.objectWillChange,
+            weatherLocations.objectWillChange,
+            powerAssertions.objectWillChange,
+            screenCleaning.objectWillChange,
+            battery.objectWillChange,
+            focusMode.objectWillChange,
+            quickNotes.objectWillChange,
+            mail.objectWillChange,
+            voiceHistory.objectWillChange,
+            aiAgent.objectWillChange,
+            managedTools.objectWillChange,
+            keyboardSound.objectWillChange,
+            dailyBriefing.objectWillChange,
+            saveLocations.objectWillChange,
+        ]
+        for publisher in childPublishers {
+            publisher
+                .sink { [weak self] in
+                    Task { @MainActor [weak self] in self?.objectWillChange.send() }
+                }
+                .store(in: &cancellables)
+        }
+
+        for publisher in [
+            pomodoro.objectWillChange,
+            powerAssertions.objectWillChange,
+            screenCleaning.objectWillChange,
+        ] {
+            publisher
+                .sink { [weak self] in
+                    Task { @MainActor [weak self] in
+                        if let self, self.screenCleaning.isScreenCleaning || self.screenCleaning.isKeyboardCleaning {
+                            self.clearUserCareMessage()
+                        }
+                        self?.refreshFocusCountdownNotice()
+                        self?.refreshToolboxReminderNotice()
+                    }
+                }
+                .store(in: &cancellables)
+        }
+
+        settingsStore.$settings
+            .dropFirst()
+            .sink { [weak self] settings in
+                Task { @MainActor [weak self] in
+                    self?.apply(settings: settings, requestWindowPreviewPermissions: true)
+                }
+                let networkProxyURL = settings.networkProxyURL
+                let networkProxyEnabled = settings.networkProxyEnabled
+                self?.aiAgent.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
+                self?.managedTools.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled)
+                Task { await self?.downloadService.setNetworkProxy(url: networkProxyURL, enabled: networkProxyEnabled) }
+            }
+            .store(in: &cancellables)
+
+        aiMonitor.$state
+            .dropFirst()
+            .sink { [weak self] state in
+                Task { @MainActor [weak self] in self?.consumeAIState(state) }
+            }
+            .store(in: &cancellables)
+
+        aiMonitor.$accountBalances
+            .sink { [weak self] balances in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.accountBalanceNotice.update(balances: balances, settings: self.settingsStore.settings,
+                                                     language: self.languageStore.language)
+                }
+            }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest(battery.$snapshot, networkBattery.$devices)
+            .sink { [weak self] snapshot, _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    let settings = self.settingsStore.settings
+                    if self.automaticPowerModeLifecycleActive {
+                        self.automaticPowerMode.apply(settings: settings, snapshot: snapshot)
+                    }
+                    self.lowBatteryNotice.update(
+                        snapshot: self.battery.snapshot,
+                        enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
+                    )
+                    self.lowBatteryNotice.update(
+                        devices: self.networkBattery.devices,
+                        enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
+                    )
+                }
+            }
+            .store(in: &cancellables)
+
+        media.$snapshot
+            .sink { [weak self] snapshot in
+                Task { @MainActor [weak self] in
+                    self?.consumeMediaSnapshot(snapshot)
+                    self?.refreshDashboardPresentation()
+                }
+            }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest(backgroundSounds.$isPlaying, backgroundSounds.$playingSound)
+            .removeDuplicates { lhs, rhs in
+                lhs.0 == rhs.0 && lhs.1 == rhs.1
+            }
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.consumeBackgroundSoundPlayback()
+                    self?.updateSpectrumMonitoring()
+                }
+            }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest(notices.$left, notices.$right)
+            .map { [weak self] left, right in
+                guard let self else { return false }
+                return left.contains {
+                    self.mediaNoticeIDs.contains($0.id) || self.backgroundSoundNoticeIDs.contains($0.id)
+                } || right.contains {
+                    self.mediaNoticeIDs.contains($0.id) || self.backgroundSoundNoticeIDs.contains($0.id)
+                }
+            }
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.updateSpectrumMonitoring() }
+            }
+            .store(in: &cancellables)
+
+        audioOutput.$headphoneConnection
+            .compactMap { $0 }
+            .sink { [weak self] connection in
+                Task { @MainActor [weak self] in self?.consumeHeadphoneConnection(connection) }
+            }
+            .store(in: &cancellables)
+
+        audioOutput.$devices
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.reconcileHeadphoneTransient(devices: self.audioOutput.devices)
+                }
+            }
+            .store(in: &cancellables)
+
+        browserDownloads.$snapshot
+            .sink { [weak self] snapshot in
+                Task { @MainActor [weak self] in self?.consumeBrowserDownloadSnapshot(snapshot) }
+            }
+            .store(in: &cancellables)
+
+        focusMode.$status
+            .dropFirst()
+            .sink { [weak self] status in
+                Task { @MainActor [weak self] in
+                    self?.consumeFocusModeStatus(status, showsTransition: false)
+                }
+            }
+            .store(in: &cancellables)
+
+        focusMode.$latestTransition
+            .compactMap { $0 }
+            .sink { [weak self] transition in
+                Task { @MainActor [weak self] in
+                    self?.consumeFocusModeStatus(transition.status, showsTransition: true)
+                }
+            }
+            .store(in: &cancellables)
+
+        mail.$messages
+            .dropFirst()
+            .sink { [weak self] messages in
+                Task { @MainActor [weak self] in self?.consumeMailMessages(messages) }
+            }
+            .store(in: &cancellables)
+
+        aiAgent.$cliUpdates
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshUpdateNotices() }
+            }
+            .store(in: &cancellables)
+
+        // Any source affecting the dashboard height. Pomodoro exposes `phase` as a computed property over
+        // its engine, so it can only be observed via `objectWillChange`, which fires before the value lands.
+        // Deferring to the next run-loop turn ensures the panel size matches the cards SwiftUI can render.
+        Publishers.MergeMany(
+            pomodoro.objectWillChange.eraseToAnyPublisher(),
+            aiMonitor.$state.map { _ in () }.eraseToAnyPublisher(),
+            settingsStore.$settings.map { _ in () }.eraseToAnyPublisher(),
+            $downloadState.map { _ in () }.eraseToAnyPublisher(),
+            browserDownloads.$snapshots.map { _ in () }.eraseToAnyPublisher(),
+            notices.$left.combineLatest(notices.$right)
+                .map { ($0 + $1).filter { $0.id.hasPrefix(ScreenRecordingOperationNotice.prefix) }.count }
+                .removeDuplicates()
+                .map { _ in () }.eraseToAnyPublisher()
+        )
+        .sink { [weak self] in
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshDashboardPresentation()
+            }
+        }
+        .store(in: &cancellables)
+
+        refreshDashboardPresentation()
+    }
+
+    /// Mirrors the dashboard's rendered cards so the island height stays in sync.
+    private func refreshDashboardPresentation() {
+        let settings = settingsStore.settings
+        let hasPomodoro = pomodoro.phase != .idle
+        let aiCardCount = DashboardAIWorkSummary.groups(
+            from: aiMonitor.state.tasks, enabled: settings.aiProgressEnabled
+        ).count
+        let browserDownloadCount = settings.showsBrowserDownloadProgress
+            ? browserDownloads.snapshots.count : 0
+        let cardCount = [hasPomodoro, hasActiveDownloads].filter { $0 }.count
+            + aiCardCount + browserDownloadCount + notices.screenRecordingOperations.count
+        if dashboardCardCount != cardCount {
+            dashboardCardCount = cardCount
+        }
+    }
+
+    func synchronizeDashboardCardCount(_ count: Int) {
+        guard dashboardCardCount != count else { return }
+        dashboardCardCount = count
+    }
+
+    @Published private(set) var isFirstLaunchOnboardingActive = false
+
+    func setFirstLaunchOnboardingActive(_ active: Bool) {
+        let wasActive = isFirstLaunchOnboardingActive
+        isFirstLaunchOnboardingActive = active
+        if wasActive, !active, GlobalHotkeyManager.hasInputMonitoringAccess {
+            applyKeyboardSettings(settingsStore.settings)
+        }
+    }
+
+    func start(hasExistingInstallation: Bool) {
+        headphoneTransientLifecycleActive = true
+        automaticPowerModeLifecycleActive = true
+        backgroundSounds.startLifecycleMonitoring()
+        apply(settings: settingsStore.settings)
+        LegacyAlarmNotificationCleanup.removeScheduledNotifications()
+        sparkleUpdateController?.showInstalledReleaseNotes(hasExistingInstallation: hasExistingInstallation) { [weak self] in
+            await self?.updateFeedResolver.resolvedPreference()
+        }
+    }
+
+    func toggleBackgroundSound() {
+        var settings = settingsStore.settings
+        let sound = settings.systemBackgroundSound
+        if backgroundSounds.isPlaying || backgroundSounds.isDownloading(sound) {
+            backgroundSounds.cancelDownload(sound: sound)
+            backgroundSounds.stop()
+            settings.systemBackgroundSoundEnabled = false
+            settingsStore.settings = settings
             return
-          } catch {
-            firstError = error.localizedDescription
-            if let coordinate = configured.coordinate {
-              requests.append(
-                (
-                  configured.id,
-                  GeoLocation(
-                    latitude: coordinate.latitude,
-                    longitude: coordinate.longitude,
-                    displayName: configured.displayName,
-                    isoCountryCode: configured.isoCountryCode
-                  )
-                ))
+        }
+
+        settings.systemBackgroundSoundEnabled = true
+        settingsStore.settings = settings
+        backgroundSounds.playOrDownload(sound: sound)
+    }
+
+    func selectBackgroundSound(_ sound: SystemBackgroundSound) {
+        var settings = settingsStore.settings
+        let previousSound = settings.systemBackgroundSound
+        let wasPlaying = backgroundSounds.isPlaying
+        backgroundSounds.refresh()
+        settings.systemBackgroundSound = sound
+        if !backgroundSounds.isInstalled(sound) {
+            settings.systemBackgroundSoundEnabled = false
+        }
+        settingsStore.settings = settings
+        if !backgroundSounds.isInstalled(sound) {
+            if wasPlaying { backgroundSounds.stop() }
+            backgroundSounds.requestDownload(sound: sound, playWhenReady: wasPlaying)
+        } else if wasPlaying, previousSound != sound {
+            _ = backgroundSounds.play(sound: sound)
+        }
+    }
+
+    func openVoiceInputInputMonitoringSettings() {
+        refreshVoiceInputInputMonitoringAccess()
+        guard !voiceInputInputMonitoringAccessGranted else { return }
+
+        _ = GlobalHotkeyManager.requestInputMonitoringAccess()
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+        ), NSWorkspace.shared.open(url) else {
+            transientMessage = AppLocalization.text("无法打开系统设置的输入监控页面")
+            return
+        }
+    }
+
+    func refreshAssistantAccessibility() {
+        windowPreview.refreshPermissions()
+        guard assistantAccessibilityGranted != AccessibilityPermission.isTrusted else { return }
+        assistantAccessibilityGranted = AccessibilityPermission.isTrusted
+        // Re-apply the gesture when the permission flips to granted.
+        if assistantAccessibilityGranted, settingsStore.settings.clipboardAssistantEnabled {
+            applyAssistantMouseGesture()
+        }
+        applicationOpenFailureMonitor.setEnabled(
+            settingsStore.settings.applicationOpenFailureMonitoringActive
+        ) { [weak self] url in self?.applicationOpenRepairPresenter.receive([url], fromSystemAlert: true) }
+    }
+
+    /// Opens System Settings at the accessibility pane (and fires the system grant prompt).
+    func openAssistantAccessibilitySettings() {
+        guard !assistantAccessibilityGranted else { return }
+        _ = AccessibilityPermission.promptIfNeeded()
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ), NSWorkspace.shared.open(url) else {
+            transientMessage = AppLocalization.text("无法打开系统设置的辅助功能页面")
+            return
+        }
+    }
+
+    func refreshVoiceInputInputMonitoringAccess() {
+        let granted = GlobalHotkeyManager.hasInputMonitoringAccess
+        guard voiceInputInputMonitoringAccessGranted != granted else { return }
+        let wasGranted = voiceInputInputMonitoringAccessGranted
+        voiceInputInputMonitoringAccessGranted = granted
+
+        if granted, !wasGranted, settingsStore.settings.clipboardAssistantEnabled {
+            clipboardAssistant.setTriggers(
+                hotkey: settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey,
+                mouseButton: settingsStore.settings.clipboardAssistantMouseButton,
+                dismissHotkey: settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey
+            )
+            applyAssistantMouseGesture()
+        }
+
+        // Re-register the hotkey when permission changes from denied to granted.
+        if granted, !wasGranted, settingsStore.settings.voiceInputEnabled {
+            let preset = settingsStore.settings.voiceInputHotkeyPreset
+            let mode = settingsStore.settings.voiceInputMode
+            let registration = hotkeyManager.register(
+                hotkey: preset,
+                onKeyDown: { [weak self] in
+                    guard let self else { return }
+                    switch mode {
+                    case .toggle:
+                        self.voiceInput.toggle()
+                    case .pushToTalk:
+                        self.voiceInput.start()
+                    }
+                },
+                onKeyUp: { [weak self] in
+                    guard let self else { return }
+                    if mode == .pushToTalk {
+                        self.voiceInput.stop()
+                    }
+                }
+            )
+
+            switch registration {
+            case .registered:
+                transientMessage = AppLocalization.text("语音输入快捷键已启用")
+            case .inputMonitoringPermissionRequired:
+                transientMessage = AppLocalization.text("快捷键需要输入监控权限，请在系统设置中授权后重启 App")
+            case .registrationFailed:
+                transientMessage = AppLocalization.text("无法注册语音输入快捷键")
             }
-          }
-        case .saved:
-          guard let coordinate = configured.coordinate else { continue }
-          requests.append(
-            (
-              configured.id,
-              GeoLocation(
-                latitude: coordinate.latitude,
-                longitude: coordinate.longitude,
-                displayName: configured.displayName,
-                isoCountryCode: configured.isoCountryCode
-              )
-            ))
         }
-      }
-
-      var snapshots: [String: WeatherSnapshot] = [:]
-      await withTaskGroup(of: (String, WeatherSnapshot?, String?).self) { group in
-        for request in requests {
-          group.addTask {
-            do {
-              let snapshot = try await weatherService.fetch(
-                latitude: request.location.latitude,
-                longitude: request.location.longitude,
-                locationName: request.location.displayName,
-                isoCountryCode: request.location.isoCountryCode
-              )
-              return (request.id, snapshot, nil)
-            } catch {
-              return (request.id, nil, error.localizedDescription)
-            }
-          }
-        }
-        for await (id, snapshot, error) in group {
-          if let snapshot { snapshots[id] = snapshot }
-          if firstError == nil, let error { firstError = error }
-        }
-      }
-
-      guard !Task.isCancelled else { return }
-      weatherSnapshotsByLocationID = weatherLocations.mergingSnapshots(
-        snapshots, retaining: weatherSnapshotsByLocationID
-      )
-      let ordered = weatherLocations.orderedSnapshots(weatherSnapshotsByLocationID)
-      if ordered.isEmpty {
-        let message = firstError ?? AppLocalization.text("没有可用的天气数据")
-        weatherLocationState = .failed(message)
-        transientMessage = message
-      } else {
-        weatherLocationState = .ready(AppLocalization.text("%ld 个地点", ordered.count))
-      }
-    }
-  }
-
-  var weatherSnapshots: [WeatherSnapshot] {
-    weatherLocations.orderedSnapshots(weatherSnapshotsByLocationID)
-  }
-
-  var weather: WeatherSnapshot? {
-    weatherSnapshots.first
-  }
-
-  private var isWeatherStale: Bool {
-    weatherSnapshots.isEmpty
-      || weatherSnapshots.contains { Date().timeIntervalSince($0.fetchedAt) > 900 }
-  }
-
-  func weatherSnapshot(for locationID: String) -> WeatherSnapshot? {
-    weatherLocations.snapshot(for: locationID, in: weatherSnapshotsByLocationID)
-  }
-
-  private func scheduleWeatherExpiry() {
-    weatherExpiryTask?.cancel()
-    weatherExpiryTask = Self.weatherExpiryTask(
-      expirationDates: weatherSnapshotsByLocationID.values.map(\.expiresAt)
-    ) { [weak self] in
-      guard let self else { return }
-      Self.expireWeather(
-        snapshots: &self.weatherSnapshotsByLocationID, state: &self.weatherLocationState, at: Date()
-      )
-    }
-  }
-
-  static func expireWeather(
-    snapshots: inout [String: WeatherSnapshot],
-    state: inout WeatherLocationUIState,
-    at date: Date
-  ) {
-    snapshots = snapshots.filter { $0.value.expiresAt > date }
-    if snapshots.isEmpty, case .ready = state {
-      state = .failed(AppLocalization.text("没有可用的天气数据"))
-    }
-  }
-
-  static func weatherExpiryTask(
-    expirationDates: [Date],
-    now: @escaping () -> Date = Date.init,
-    sleeper: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
-    onExpiry: @escaping @MainActor () -> Void
-  ) -> Task<Void, Never>? {
-    guard let date = expirationDates.min() else { return nil }
-    return Task {
-      do {
-        try await sleeper(.seconds(max(0, date.timeIntervalSince(now()))))
-      } catch {
-        return
-      }
-      guard !Task.isCancelled else { return }
-      onExpiry()
-    }
-  }
-
-  func selectWeatherLocation(named query: String) {
-    weatherTask?.cancel()
-    weatherLocationState = .searching
-    weatherTask = Task { [weak self, weatherLocationService] in
-      do {
-        let location = try await weatherLocationService.search(query)
-        try Task.checkCancellation()
-        self?.weatherLocations.addSaved(
-          name: location.displayName,
-          coordinate: GeoCoordinate(
-            latitude: location.latitude,
-            longitude: location.longitude
-          ),
-          isoCountryCode: location.isoCountryCode
-        )
-        guard !Task.isCancelled else { return }
-        self?.weatherLocationState = .ready(location.displayName)
-        self?.weatherTask = nil
-        self?.refreshWeather()
-      } catch is CancellationError {
-        return
-      } catch {
-        self?.transientMessage = error.localizedDescription
-        self?.weatherLocationState = .failed(error.localizedDescription)
-      }
-    }
-  }
-
-  func removeWeatherLocation(id: String) {
-    weatherLocations.remove(id: id)
-    weatherSnapshotsByLocationID.removeValue(forKey: id)
-  }
-
-  func moveWeatherLocation(id: String, to destinationID: String) -> Bool {
-    weatherLocations.moveSaved(id: id, to: destinationID)
-  }
-
-  func refreshMail(checkForNewMail: Bool = true) async {
-    guard settingsStore.settings.mailEnabled else { return }
-    await mail.refresh(checkForNewMail: checkForNewMail)
-  }
-
-  func markMailRead(_ message: MailMessage) async {
-    _ = reportMailOperation(await mail.markRead(message), successMessage: AppLocalization.text("已标记为已读"))
-  }
-
-  func markAllMailRead(accountName: String?) async {
-    _ = reportMailOperation(
-      await mail.markAllRead(accountName: accountName),
-      successMessage: AppLocalization.text("已将全部邮件标记为已读")
-    )
-  }
-
-  func markMailJunk(_ message: MailMessage) async {
-    _ = reportMailOperation(await mail.markJunk(message), successMessage: AppLocalization.text("已标记为垃圾邮件"))
-  }
-
-  func deleteMail(_ message: MailMessage) async {
-    _ = reportMailOperation(await mail.delete(message), successMessage: AppLocalization.text("已移到废纸篓"))
-  }
-
-  func sendMail(
-    fromAddress: String?,
-    to recipients: String,
-    subject: String,
-    body: String,
-    attachmentURLs: [URL]
-  ) async -> Bool {
-    reportMailOperation(
-      await mail.send(fromAddress: fromAddress, to: recipients, subject: subject, body: body, attachmentURLs: attachmentURLs),
-      successMessage: AppLocalization.text("邮件已发送")
-    )
-  }
-
-  func replyToMail(_ message: MailMessage, body: String, attachmentURLs: [URL]) async -> Bool {
-    reportMailOperation(
-      await mail.reply(to: message, body: body, attachmentURLs: attachmentURLs),
-      successMessage: AppLocalization.text("回复已发送")
-    )
-  }
-
-  func takeMailComposeRequest() -> MailComposeRequest? {
-    defer { mailComposeRequest = nil }
-    return mailComposeRequest
-  }
-
-  func checkForUpdates(manual: Bool) {
-    guard manual || settingsStore.settings.updateChecksEnabled else { return }
-    guard let sparkleUpdateController else {
-      if manual { updateState = .failed(AppLocalization.text("无法启动自动更新服务")) }
-      return
-    }
-    if manual {
-      updateState = .checking
-    }
-    updateFeedResolver.resolve(manual: manual) { [weak self] feedPreference in
-      guard let self else { return }
-      let settings = settingsStore.settings
-
-      if manual {
-        if !sparkleUpdateController.checkForUpdates(
-          channel: settings.updateChannel,
-          checksEnabled: settings.updateChecksEnabled,
-          automaticDownloadEnabled: settings.automaticDownloadEnabled,
-          feedPreference: feedPreference
-        ) {
-          updateState = .failed(AppLocalization.text("无法启动自动更新服务"))
-        }
-      } else {
-        _ = sparkleUpdateController.configure(
-          channel: settings.updateChannel,
-          checksEnabled: settings.updateChecksEnabled,
-          automaticDownloadEnabled: settings.automaticDownloadEnabled,
-          feedPreference: feedPreference
-        )
-      }
-    }
-  }
-
-  func selectSystemMonitor() {
-    guard settingsStore.settings.systemMonitorEnabled else { return }
-    selectModule(.system)
-    Task { await systemMonitor.sampleOnce() }
-  }
-
-  func presentScreenRecording() {
-    guard settingsStore.settings.screenRecordingEnabled else { return }
-    islandCollapseRequested = true
-    onScreenRecordingRequested?()
-  }
-
-  func presentMirror() {
-    guard !isMirrorPresented else { return }
-    clearUserCareMessage()
-    wasPinnedBeforeMirror = isPinned
-    isPinned = true
-    isMirrorPresented = true
-  }
-
-  func dismissMirror() {
-    guard isMirrorPresented else { return }
-    isPinned = wasPinnedBeforeMirror
-    isMirrorPresented = false
-  }
-
-  func presentTeleprompter() {
-    guard !isTeleprompterPresented else { return }
-    clearUserCareMessage()
-    teleprompterPresentationPoint = NSEvent.mouseLocation
-    wasPinnedBeforeTeleprompter = isPinned
-    isPinned = true
-    isTeleprompterPresented = true
-  }
-
-  func dismissTeleprompter() {
-    guard isTeleprompterPresented else { return }
-    isPinned = wasPinnedBeforeTeleprompter
-    isTeleprompterPresented = false
-  }
-
-  func addToShelf(_ urls: [URL]) {
-    let count = shelf.add(urls)
-    guard count > 0 else { return }
-    transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
-    selectModule(.shelf)
-  }
-
-  func pasteFilesToShelf() {
-    let payloads = TransferPasteboard.readShelfItems()
-    guard !payloads.isEmpty else {
-      transientMessage = AppLocalization.text("剪贴板没有可暂存的内容")
-      return
-    }
-    receiveTransferItems(payloads.map(TransferDropItem.init(payload:)))
-  }
-
-  func copyShelfItems(_ items: [FileShelfItem]) {
-    let screenshots: [UUID: Data]
-    do {
-      screenshots = try Dictionary(uniqueKeysWithValues: items.filter { $0.screenshotMetadata != nil }.map {
-        ($0.id, try shelf.screenshotData(id: $0.id))
-      })
-    } catch {
-      transientMessage = error.localizedDescription
-      return
-    }
-    guard FileShelfPasteboard.writeItems(items, screenshotData: screenshots) else {
-      transientMessage = AppLocalization.text("无法写入剪贴板")
-      return
-    }
-    dailyBriefing.recordActivity(.shelfItemsCopied, count: items.count)
-    transientMessage = AppLocalization.text("已复制到剪贴板")
-  }
-
-  func stashScreenshot(_ data: Data, metadata: ShelfScreenshotMetadata) throws {
-    try shelf.stashScreenshot(png: data, metadata: metadata)
-    transientMessage = AppLocalization.text("已加入 %ld 个项目", 1)
-  }
-
-  func saveShelfScreenshot(_ item: FileShelfItem) {
-    do {
-      ScreenshotImageExport.presentSavePanel(for: try shelf.screenshotData(id: item.id)) { [weak self] message in
-        if let message { self?.transientMessage = message }
-      }
-    } catch { transientMessage = error.localizedDescription }
-  }
-
-  func shelfTransferItems(_ items: [FileShelfItem]) -> [TransferDropItem] {
-    do {
-      return try items.map { item in
-        let payload: TransferPasteboardPayload = item.screenshotMetadata == nil
-          ? item.payload : .file(try shelf.screenshotFileURL(id: item.id))
-        return TransferDropItem(payload: payload)
-      }
-    } catch {
-      transientMessage = error.localizedDescription
-      return []
-    }
-  }
-
-  func performShelfContextAction(_ action: ShelfContextAction, items: [FileShelfItem]) {
-    let task = shelfContextActions.perform(action, items: items, createQuickNote: { [weak self] text in
-      guard let self else { return false }
-      let created = await quickNotes.create(markdown: text)
-      if created { selectModule(.quickNotes) }
-      return created
-    }, openStudio: { [weak self] urls in self?.onShelfVideosRequested?(urls) ?? false })
-    guard let task else {
-      transientMessage = shelfContextActions.message
-      return
-    }
-    Task { [weak self] in
-      await task.value
-      guard let self else { return }
-      transientMessage = shelfContextActions.message
-      if shelfContextActions.generatedItemID != nil {
-        selectedShelfCategory = .all
-        selectModule(.shelf)
-      }
-    }
-  }
-
-  func saveShelfContextNote() {
-    let isNew = contextNoteEditor.itemID == nil
-    let screenshotError = contextNoteEditor.draft?.screenshotError
-    guard let item = contextNoteEditor.save(in: shelf) else { return }
-    onContextNoteSaved?(item)
-    contextNoteDidSave(isNew: isNew, screenshotError: screenshotError)
-  }
-
-  func contextNoteDidSave(isNew: Bool, screenshotError: String?) {
-    if let screenshotError {
-      transientMessage = AppLocalization.text("已保存便签") + " · " + screenshotError
-    } else if settingsStore.settings.userCareEnabled {
-      presentUserCareMessage(isNew ? .noteCreated : .noteUpdated)
-    } else {
-      transientMessage = isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签")
-    }
-  }
-
-  func copyContextNoteText(_ text: String) {
-    let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-    let success = pasteboard.writeObjects([FileShelfPasteboard.pasteboardWriter(for: .text(text))])
-    transientMessage = success ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
-  }
-
-  func copyContextNoteScreenshot(_ png: Data) {
-    let copied = ClipboardHistoryPasteboard.write(.image(png))
-    transientMessage = copied ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
-  }
-
-  static func contextNoteCopyAction(id: UUID, in shelf: FileShelfStore) -> ClipboardAssistantAction? {
-    guard let text = shelf.items.first(where: { $0.id == id && $0.noteLocation != nil })?.text else { return nil }
-    return .copyText(text)
-  }
-
-  static func deleteContextNote(id: UUID, from shelf: FileShelfStore, editor: ContextNoteShelfEditor) -> Bool {
-    guard shelf.items.contains(where: { $0.id == id && $0.noteLocation != nil }) else { return false }
-    shelf.remove(id: id)
-    guard !shelf.items.contains(where: { $0.id == id }) else { return false }
-    editor.removed(id)
-    return true
-  }
-
-  func navigateToContextNote(_ location: ContextNoteLocation) {
-    guard ContextNoteNavigator().navigate(to: location) else {
-      transientMessage = AppLocalization.text("无法前往记录位置，窗口或显示器可能已关闭")
-      return
-    }
-    islandCollapseRequested = true
-  }
-
-  func joinMeeting(_ event: CalendarEventSnapshot) {
-    switch MeetingJoinAction.perform(event, resolve: calendar.resolveMeeting) {
-    case .opened:
-      break
-    case .unavailable:
-      transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
-      calendar.refreshMeetings()
-    case .failed:
-      transientMessage = AppLocalization.text("无法打开会议链接")
-    }
-  }
-
-  func joinMeetingNotice(_ eventID: String) {
-    calendar.refreshMeetings()
-    guard let event = calendar.meetingEvents.first(where: { $0.id == eventID }) else {
-      transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
-      return
-    }
-    joinMeeting(event)
-  }
-
-  func openMeetingNote(_ note: FileShelfItem) {
-    contextNoteEditor.open(note)
-    selectedShelfCategory = .note
-    selectModule(.shelf)
-  }
-
-  func createMeetingNote(_ event: CalendarEventSnapshot) {
-    guard let identity = event.eventIdentity, let url = event.meetingURL else { return }
-    let draft = ContextNoteDraft(location: .webPage(url: url, title: event.title,
-      applicationName: AppLocalization.text("日历")), meetingID: identity)
-    contextNoteEditor.begin(draft)
-    selectedShelfCategory = .note
-    selectModule(.shelf)
-  }
-
-  func setMeeting(_ event: CalendarEventSnapshot, associated: Bool, with note: FileShelfItem) {
-    guard let identity = event.eventIdentity else { return }
-    if !shelf.setMeeting(identity, associated: associated, withNote: note.id) {
-      transientMessage = shelf.errorDescription ?? AppLocalization.text("无法关联会议便签")
-    }
-  }
-
-  func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
-    guard ClipboardHistoryPasteboard.write(item) else {
-      transientMessage = AppLocalization.text("无法写入剪贴板")
-      return
-    }
-    dailyBriefing.recordActivity(.clipboardReused)
-    transientMessage = AppLocalization.text("已复制到剪贴板")
-  }
-
-  // MARK: - Clipboard Assistant
-
-  /// Pasteboard changeCount written by an assistant action itself; the toast must not re-trigger
-  /// for its own "copy result" writes.
-  private var suppressedAssistantChangeCount: Int?
-  private var clipboardAssistantContent: ClipboardHistoryContent?
-  private var isClipboardCalendarEditorPresented = false
-  private var lastClipboardAssistantRoutingChangeCount: Int?
-  private var islandClipboardHandoff = IslandClipboardHandoff()
-  /// Live exchange-rate fetching for the assistant's currency conversion; quotes are fetched
-  /// fresh on every conversion and never cached.
-  private let exchangeRateService = ExchangeRateService.live()
-  private var clipboardAssistantDetectionTask: Task<Void, Never>?
-  private var currencyConversionTask: Task<Void, Never>?
-  private var clipboardServiceOpenTask: Task<Void, Never>?
-  private lazy var applicationOpenRepairPresenter = ApplicationOpenRepairPresenter(
-    controller: clipboardAssistant,
-    settings: { [weak self] in self?.settingsStore.settings ?? .default },
-    canPresent: { [weak self] in self?.canPresentApplicationRepair == true }
-  )
-  private var applicationOpenRepairTask: Task<Void, Never>?
-  private let applicationOpenFailureMonitor = ApplicationOpenFailureMonitor()
-
-  private var canPresentApplicationRepair: Bool {
-    !isIslandVisible && !voiceInput.isRecording && !voiceInput.isPreparing
-  }
-
-  private enum ClipboardAssistantPresentationResult {
-    case presented
-    case unavailable
-    case ignored
-  }
-
-  private func clipboardAssistantMessage(_ key: String) -> String {
-    AppLocalization.string(key, language: languageStore.language)
-  }
-
-  private func clipboardAssistantMessage(_ key: String, _ argument: CVarArg) -> String {
-    AppLocalization.format(key, locale: languageStore.language.locale, [argument])
-  }
-
-  /// Warms up the installed-application index in the background so copied names
-  /// can resolve as soon as the first snapshot lands; refreshed automatically
-  /// when watched application directories change.
-  private func startInstalledApplicationCatalog() {
-    InstalledApplicationCatalog.shared.start { [weak self] applications in
-      self?.installedApplications = applications
-    }
-  }
-
-  private func handleCapturedClipboardContent(_ content: ClipboardHistoryContent) {
-    let downloadableURL: URL?
-    if case .text(let text) = content,
-       DownloadURLClassifier.isLikelyDownloadable(text) {
-      downloadableURL = HTTPURLParser.url(from: text)
-    } else {
-      downloadableURL = nil
-    }
-    routeCapturedClipboardContent(content, downloadableURL: downloadableURL)
-  }
-
-  func quickNoteDidCopy() {
-    // WebKit can finish copying after the pointer has already collapsed the island.
-    defer { clipboardHistoryMonitor.pollNow() }
-    guard settingsStore.settings.clipboardAssistantEnabled,
-      isIslandVisible, !isExternalDragging,
-      !voiceInput.isRecording, !voiceInput.isPreparing else { return }
-    islandClipboardHandoff.noteDidCopy()
-    islandCollapseRequested = true
-  }
-
-  func islandDidBeginRecycling() {
-    islandClipboardHandoff.beginRecycle()
-  }
-
-  func islandDidFinishRecycling() {
-    let pending = islandClipboardHandoff.finishRecycle(
-      currentChangeCount: NSPasteboard.general.changeCount
-    )
-    guard !isIslandVisible, let pending else { return }
-    presentCapturedClipboardContent(
-      pending.content,
-      downloadableURL: pending.downloadableURL,
-      sourceApplication: pending.sourceApplication
-    )
-  }
-
-  func islandDidReexpand() {
-    islandClipboardHandoff.cancel()
-  }
-
-  private func routeCapturedClipboardContent(
-    _ content: ClipboardHistoryContent,
-    downloadableURL: URL?
-  ) {
-    let changeCount = NSPasteboard.general.changeCount
-    guard lastClipboardAssistantRoutingChangeCount != changeCount else { return }
-    lastClipboardAssistantRoutingChangeCount = changeCount
-    clipboardAssistantDetectionTask?.cancel()
-    if clipboardAssistant.presentation.translation != nil, suppressedAssistantChangeCount != changeCount {
-      clipboardAssistant.dismiss(animated: false)
     }
 
-    let sourceApplication = NSWorkspace.shared.frontmostApplication
-    if islandClipboardHandoff.shouldDefer {
-      islandClipboardHandoff.hold(.init(
-        content: content,
-        downloadableURL: downloadableURL,
-        changeCount: changeCount,
-        sourceApplication: sourceApplication
-      ))
-      return
-    }
-    presentCapturedClipboardContent(
-      content,
-      downloadableURL: downloadableURL,
-      sourceApplication: sourceApplication
-    )
-  }
-
-  private func presentCapturedClipboardContent(
-    _ content: ClipboardHistoryContent,
-    downloadableURL: URL?,
-    sourceApplication: NSRunningApplication?
-  ) {
-    clipboardAssistantDetectionTask = Task { [weak self] in
-      guard let self else { return }
-      let result = await presentClipboardAssistant(for: content, sourceApplication: sourceApplication)
-      guard !Task.isCancelled else { return }
-      switch result {
-      case .presented, .ignored:
-        guard downloadableURL != nil else { return }
+    func stop() {
+        immediateCleanup.cancel()
+        meetingCountdown.stop()
+        automaticPowerModeLifecycleActive = false
+        automaticPowerMode.stop()
+        dailyBriefing.stop()
+        headphoneTransientLifecycleActive = false
+        userCare.stop()
+        aiResultSweep.cancel()
+        windowPreview.stop()
+        settingsStore.flushPendingChanges()
+        islandClipboardHandoff.cancel()
+        managedTools.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
+        keyboardSound.stop()
+        clipboardHistory.flushPendingChanges()
+        clipboardHistory.stopCleanup()
+        aiAgent.store.flushPendingChanges()
+        weatherTask?.cancel()
+        weatherExpiryTask?.cancel()
+        weatherExpiryTask = nil
+        updatePollingTask?.cancel()
+        updateFeedResolver.cancel()
+        voiceRecordingCleanupTask?.cancel()
+        voiceRecordingCleanupTask = nil
+        appliedVoiceRecordingCleanupPolicy = nil
+        cancelAllDownloads()
+        voicePostProcessingQueue.cancelAll()
+        voiceProcessingOperationCount = 0
+        isProcessingVoiceTranscript = false
+        notices.remove(id: "voice-processing-left")
+        notices.remove(id: "voice-processing-right")
         detectedLinkTask?.cancel()
+        translationTask?.cancel()
+        clipboardServiceOpenTask?.cancel()
+        applicationOpenRepairTask?.cancel()
+        applicationOpenRepairPresenter.cancel()
+        applicationOpenFailureMonitor.stop()
+        voiceModelDiscoveryTask?.cancel()
+        voiceModelDiscoveryTask = nil
+        voiceModelDiscoveryGeneration &+= 1
+        voiceInputTarget = nil
+        voiceInputTargetProcessIdentifier = nil
+        voiceInputTargetMouseLocation = nil
+        voiceInput.cancel()
+        shelfContextActions.cancel()
+        backgroundSounds.cancelAllDownloads()
+        backgroundSounds.stopLifecycleMonitoring()
+        backgroundSounds.stop()
+        hotkeyManager.unregister()
+        clipboardMonitor.setEnabled(false)
+        clipboardHistoryMonitor.setEnabled(false)
+        clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil, dismissHotkey: nil)
+        clipboardAssistant.setMouseGesture(enabled: false, onQuickCopy: {})
+        clipboardAssistant.dismiss()
+        Task { [downloadService] in await downloadService.cancelAll() }
+        aiMonitor.stop()
+        aiAgent.stop()
+        media.stop()
+        applicationVolumes.stop()
+        clearHeadphoneTransient()
+        audioOutput.stop()
+        calendar.stop()
+        pomodoro.stop()
+        screenCleaning.stopAll()
+        cleaningPowerState = nil
+        powerAssertions.releaseAll()
+        systemAutoCleanup.stop()
+        systemMonitor.stop()
+        battery.stop()
+        networkBattery.stop()
+        focusMode.stop()
+        browserDownloads.stop()
+        mail.stop()
+        hasLoadedMail = false
+        knownMailMessageIDs.removeAll()
+        clearMediaNotices()
+        clearFocusModeNotices()
+        notices.removeAll()
         detectedLink = nil
-      case .unavailable:
-        guard clipboardMonitor.isEnabled, let downloadableURL else { return }
-        presentDetectedLink(downloadableURL)
-      }
+        let picker = sharingPicker
+        sharingPicker = nil
+        sharingPickerDismissesClipboardAssistant = false
+        isSharingPickerVisible = false
+        picker?.close()
     }
-  }
 
-  private func presentClipboardAssistant(
-    for content: ClipboardHistoryContent,
-    sourceApplication: NSRunningApplication?
-  ) async -> ClipboardAssistantPresentationResult {
-    let settings = settingsStore.settings
-    guard settings.clipboardAssistantEnabled else { return .unavailable }
-    guard !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else {
-      clipboardAssistant.dismiss(animated: false)
-      return .unavailable
+    func startScreenCleaning() {
+        guard settingsStore.settings.toolboxEnabled else { return }
+        enablePowerAssertionsForCleaning()
+        screenCleaning.startScreenCleaning()
+        refreshFocusCountdownNotice()
+        refreshToolboxReminderNotice()
     }
-    if let suppressed = suppressedAssistantChangeCount,
-       suppressed == NSPasteboard.general.changeCount {
-      return .ignored
+
+    func startKeyboardCleaning() {
+        guard settingsStore.settings.toolboxEnabled else { return }
+        switch screenCleaning.startKeyboardCleaning() {
+        case .started:
+            enablePowerAssertionsForCleaning()
+        case .accessibilityPermissionRequired:
+            _ = ScreenCleaningController.requestAccessibilityAccess()
+            transientMessage = AppLocalization.text("清洁键盘需要在系统设置中允许辅助功能")
+        case .registrationFailed:
+            transientMessage = AppLocalization.text("无法接管键盘输入")
+        case .alreadyActive:
+            break
+        }
+        refreshToolboxReminderNotice()
     }
-    // The frontmost app at capture time is the app the user copied from.
-    if let bundleIdentifier = sourceApplication?.bundleIdentifier,
-       settings.clipboardAssistantBlacklist.contains(bundleIdentifier) {
-      return .unavailable
+
+    // MARK: - Transient notice
+
+    static func observeDailyBriefingExports(
+        _ controller: DailyBriefingController,
+        onMessage: @escaping (String) -> Void
+    ) -> AnyCancellable {
+        let success = controller.$lastExportURL
+            .compactMap { $0 }
+            .map { AppLocalization.text("已保存到 %@", $0.lastPathComponent) }
+        return success.merge(with: controller.$errorMessage.compactMap { $0 })
+            .sink(receiveValue: onMessage)
     }
-    let enabledKinds = settings.clipboardAssistantEnabledKinds.isEmpty
-      ? Set(ClipboardAssistantKind.allCases)
-      : settings.clipboardAssistantEnabledKinds
-    let changeCount = NSPasteboard.general.changeCount
-    var shellCommand: String?
-    if enabledKinds.contains(.shellCommand), case .text(let text) = content {
-      shellCommand = await ClipboardShellCommandResolver.resolve(text)
+
+    static func observeDisplayAwakeErrors(
+        _ controller: PowerAssertionController,
+        onMessage: @escaping (String) -> Void
+    ) -> AnyCancellable {
+        controller.$displayAwakeError
+            .compactMap { $0 }
+            .map { AppLocalization.text($0) }
+            .sink(receiveValue: onMessage)
     }
-    guard !Task.isCancelled, changeCount == NSPasteboard.general.changeCount,
-          settings == settingsStore.settings,
-          !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else { return .ignored }
-    let shellCommandWasResolved = shellCommand != nil
-    let result = await ClipboardAssistantDetector.detectInBackground(
-      content: content,
-      enabledKinds: enabledKinds,
-      offersDownload: settings.downloaderEnabled,
-      preferredCurrencyCode: ClipboardAssistantDetector.currentPreferredCurrencyCode(
-        language: languageStore.language
-      ),
-      locale: languageStore.language.locale,
-      installedApplications: installedApplications,
-      shellCommandExists: { _ in shellCommandWasResolved }
+
+    /// The island shows `transientMessage` as a row protruding under the pill, so it has to recycle
+    /// itself — nothing else ever clears it. A message too wide for the row scrolls once, so the
+    /// lifetime follows that pass instead of a fixed beat: a long error would otherwise be swapped out
+    /// mid-scroll, having shown only its opening words.
+    private func scheduleTransientMessageDismissal() {
+        transientMessageDismissTask?.cancel()
+        transientMessageDismissTask = nil
+        guard let message = transientMessage else { return }
+        let duration = TransientNoticeMetrics.displayDuration(
+            for: message,
+            rowWidth: islandEdge.isVertical
+                ? 320 - collapsedIslandSize.width
+                : collapsedOverflowWidth
+        )
+        transientMessageDismissTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: duration)
+            guard !Task.isCancelled, let self, self.transientMessage == message else { return }
+            self.transientMessage = nil
+        }
+    }
+
+    // MARK: - Trash
+
+    /// Empties the Trash. Irreversible — shows a confirmation dialog with the item count first.
+    func emptyTrash() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let count: Int
+            switch await DesktopOrganizer.trashItemCount() {
+            case .success(let value):
+                count = value
+            case .failure(let error):
+                transientMessage = error.message
+                return
+            }
+            guard count > 0 else {
+                transientMessage = AppLocalization.text("废纸篓已经是空的")
+                return
+            }
+
+            let alert = NSAlert()
+            alert.messageText = AppLocalization.text("清空废纸篓？")
+            alert.informativeText = AppLocalization.text("将永久删除 %ld 个项目，此操作无法撤销。", count)
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: AppLocalization.text("清空"))
+            alert.addButton(withTitle: AppLocalization.text("取消"))
+            NSApp.activate(ignoringOtherApps: true)
+            WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+            switch await DesktopOrganizer.emptyTrash() {
+            case .success:
+                transientMessage = AppLocalization.text("已清空废纸篓（%ld 个项目）", count)
+            case .failure(let error):
+                transientMessage = error.message
+            }
+        }
+    }
+
+    func refreshForExpansion() {
+        let settings = settingsStore.settings
+        let module = selectedModule
+        let weatherStale = isWeatherStale
+        let calendarStale = calendar.isDataStale
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let self, self.isIslandVisible else { return }
+            if settings.mediaEnabled { self.media.refresh() }
+            if settings.aiProgressEnabled, module != .aiMonitor { self.aiMonitor.refresh() }
+            if settings.weatherEnabled, weatherStale { self.refreshWeather() }
+            if settings.systemMonitorEnabled { await self.systemMonitor.sampleOnce() }
+            if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled {
+                self.battery.refresh()
+            }
+            if settings.mailEnabled, module == .mail { await self.mail.refresh(checkForNewMail: false) }
+            if settings.quickNotesEnabled, module == .quickNotes {
+                await self.quickNotes.refresh()
+            }
+            if settings.calendarEnabled, module == .agenda, calendarStale {
+                await self.calendar.refresh()
+            }
+        }
+    }
+
+    func refreshWeather() {
+        guard settingsStore.settings.weatherEnabled else {
+            weatherTask?.cancel()
+            weatherTask = nil
+            return
+        }
+        weatherTask?.cancel()
+        let configuredLocations = weatherLocations.locations
+        weatherLocationState = .locating
+        weatherTask = Task { [weak self, weatherService, weatherLocationService] in
+            guard let self else { return }
+            var requests: [(id: String, location: GeoLocation)] = []
+            var firstError: String?
+
+            for configured in configuredLocations {
+                switch configured.kind {
+                case .current:
+                    do {
+                        let current = try await weatherLocationService.currentLocation()
+                        try Task.checkCancellation()
+                        weatherLocations.updateCurrent(
+                            name: current.displayName,
+                            coordinate: GeoCoordinate(
+                                latitude: current.latitude,
+                                longitude: current.longitude
+                            ),
+                            isoCountryCode: current.isoCountryCode
+                        )
+                        requests.append((configured.id, current))
+                    } catch is CancellationError {
+                        return
+                    } catch {
+                        firstError = error.localizedDescription
+                        if let coordinate = configured.coordinate {
+                            requests.append(
+                                (
+                                    configured.id,
+                                    GeoLocation(
+                                        latitude: coordinate.latitude,
+                                        longitude: coordinate.longitude,
+                                        displayName: configured.displayName,
+                                        isoCountryCode: configured.isoCountryCode
+                                    )
+                                )
+                            )
+                        }
+                    }
+                case .saved:
+                    guard let coordinate = configured.coordinate else { continue }
+                    requests.append(
+                        (
+                            configured.id,
+                            GeoLocation(
+                                latitude: coordinate.latitude,
+                                longitude: coordinate.longitude,
+                                displayName: configured.displayName,
+                                isoCountryCode: configured.isoCountryCode
+                            )
+                        )
+                    )
+                }
+            }
+
+            var snapshots: [String: WeatherSnapshot] = [:]
+            await withTaskGroup(of: (String, WeatherSnapshot?, String?).self) { group in
+                for request in requests {
+                    group.addTask {
+                        do {
+                            let snapshot = try await weatherService.fetch(
+                                latitude: request.location.latitude,
+                                longitude: request.location.longitude,
+                                locationName: request.location.displayName,
+                                isoCountryCode: request.location.isoCountryCode
+                            )
+                            return (request.id, snapshot, nil)
+                        } catch {
+                            return (request.id, nil, error.localizedDescription)
+                        }
+                    }
+                }
+                for await (id, snapshot, error) in group {
+                    if let snapshot { snapshots[id] = snapshot }
+                    if firstError == nil, let error { firstError = error }
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+            weatherSnapshotsByLocationID = weatherLocations.mergingSnapshots(
+                snapshots, retaining: weatherSnapshotsByLocationID
+            )
+            let ordered = weatherLocations.orderedSnapshots(weatherSnapshotsByLocationID)
+            if ordered.isEmpty {
+                let message = firstError ?? AppLocalization.text("没有可用的天气数据")
+                weatherLocationState = .failed(message)
+                transientMessage = message
+            } else {
+                weatherLocationState = .ready(AppLocalization.text("%ld 个地点", ordered.count))
+            }
+        }
+    }
+
+    var weatherSnapshots: [WeatherSnapshot] {
+        weatherLocations.orderedSnapshots(weatherSnapshotsByLocationID)
+    }
+
+    var weather: WeatherSnapshot? {
+        weatherSnapshots.first
+    }
+
+    private var isWeatherStale: Bool {
+        weatherSnapshots.isEmpty
+            || weatherSnapshots.contains { Date().timeIntervalSince($0.fetchedAt) > 900 }
+    }
+
+    func weatherSnapshot(for locationID: String) -> WeatherSnapshot? {
+        weatherLocations.snapshot(for: locationID, in: weatherSnapshotsByLocationID)
+    }
+
+    private func scheduleWeatherExpiry() {
+        weatherExpiryTask?.cancel()
+        weatherExpiryTask = Self.weatherExpiryTask(
+            expirationDates: weatherSnapshotsByLocationID.values.map(\.expiresAt)
+        ) { [weak self] in
+            guard let self else { return }
+            Self.expireWeather(
+                snapshots: &self.weatherSnapshotsByLocationID, state: &self.weatherLocationState, at: Date()
+            )
+        }
+    }
+
+    static func expireWeather(
+        snapshots: inout [String: WeatherSnapshot],
+        state: inout WeatherLocationUIState,
+        at date: Date
+    ) {
+        snapshots = snapshots.filter { $0.value.expiresAt > date }
+        if snapshots.isEmpty, case .ready = state {
+            state = .failed(AppLocalization.text("没有可用的天气数据"))
+        }
+    }
+
+    static func weatherExpiryTask(
+        expirationDates: [Date],
+        now: @escaping () -> Date = Date.init,
+        sleeper: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        onExpiry: @escaping @MainActor () -> Void
+    ) -> Task<Void, Never>? {
+        guard let date = expirationDates.min() else { return nil }
+        return Task {
+            do {
+                try await sleeper(.seconds(max(0, date.timeIntervalSince(now()))))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            onExpiry()
+        }
+    }
+
+    func selectWeatherLocation(named query: String) {
+        weatherTask?.cancel()
+        weatherLocationState = .searching
+        weatherTask = Task { [weak self, weatherLocationService] in
+            do {
+                let location = try await weatherLocationService.search(query)
+                try Task.checkCancellation()
+                self?.weatherLocations.addSaved(
+                    name: location.displayName,
+                    coordinate: GeoCoordinate(
+                        latitude: location.latitude,
+                        longitude: location.longitude
+                    ),
+                    isoCountryCode: location.isoCountryCode
+                )
+                guard !Task.isCancelled else { return }
+                self?.weatherLocationState = .ready(location.displayName)
+                self?.weatherTask = nil
+                self?.refreshWeather()
+            } catch is CancellationError {
+                return
+            } catch {
+                self?.transientMessage = error.localizedDescription
+                self?.weatherLocationState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func removeWeatherLocation(id: String) {
+        weatherLocations.remove(id: id)
+        weatherSnapshotsByLocationID.removeValue(forKey: id)
+    }
+
+    func moveWeatherLocation(id: String, to destinationID: String) -> Bool {
+        weatherLocations.moveSaved(id: id, to: destinationID)
+    }
+
+    func refreshMail(checkForNewMail: Bool = true) async {
+        guard settingsStore.settings.mailEnabled else { return }
+        await mail.refresh(checkForNewMail: checkForNewMail)
+    }
+
+    func markMailRead(_ message: MailMessage) async {
+        _ = reportMailOperation(await mail.markRead(message), successMessage: AppLocalization.text("已标记为已读"))
+    }
+
+    func markAllMailRead(accountName: String?) async {
+        _ = reportMailOperation(
+            await mail.markAllRead(accountName: accountName),
+            successMessage: AppLocalization.text("已将全部邮件标记为已读")
+        )
+    }
+
+    func markMailJunk(_ message: MailMessage) async {
+        _ = reportMailOperation(await mail.markJunk(message), successMessage: AppLocalization.text("已标记为垃圾邮件"))
+    }
+
+    func deleteMail(_ message: MailMessage) async {
+        _ = reportMailOperation(await mail.delete(message), successMessage: AppLocalization.text("已移到废纸篓"))
+    }
+
+    func sendMail(
+        fromAddress: String?,
+        to recipients: String,
+        subject: String,
+        body: String,
+        attachmentURLs: [URL]
+    ) async -> Bool {
+        reportMailOperation(
+            await mail.send(fromAddress: fromAddress, to: recipients, subject: subject, body: body, attachmentURLs: attachmentURLs),
+            successMessage: AppLocalization.text("邮件已发送")
+        )
+    }
+
+    func replyToMail(_ message: MailMessage, body: String, attachmentURLs: [URL]) async -> Bool {
+        reportMailOperation(
+            await mail.reply(to: message, body: body, attachmentURLs: attachmentURLs),
+            successMessage: AppLocalization.text("回复已发送")
+        )
+    }
+
+    func takeMailComposeRequest() -> MailComposeRequest? {
+        defer { mailComposeRequest = nil }
+        return mailComposeRequest
+    }
+
+    func checkForUpdates(manual: Bool) {
+        guard manual || settingsStore.settings.updateChecksEnabled else { return }
+        guard let sparkleUpdateController else {
+            if manual { updateState = .failed(AppLocalization.text("无法启动自动更新服务")) }
+            return
+        }
+        if manual {
+            updateState = .checking
+        }
+        updateFeedResolver.resolve(manual: manual) { [weak self] feedPreference in
+            guard let self else { return }
+            let settings = settingsStore.settings
+
+            if manual {
+                if !sparkleUpdateController.checkForUpdates(
+                    channel: settings.updateChannel,
+                    checksEnabled: settings.updateChecksEnabled,
+                    automaticDownloadEnabled: settings.automaticDownloadEnabled,
+                    feedPreference: feedPreference
+                ) {
+                    updateState = .failed(AppLocalization.text("无法启动自动更新服务"))
+                }
+            } else {
+                _ = sparkleUpdateController.configure(
+                    channel: settings.updateChannel,
+                    checksEnabled: settings.updateChecksEnabled,
+                    automaticDownloadEnabled: settings.automaticDownloadEnabled,
+                    feedPreference: feedPreference
+                )
+            }
+        }
+    }
+
+    func selectSystemMonitor() {
+        guard settingsStore.settings.systemMonitorEnabled else { return }
+        selectModule(.system)
+        Task { await systemMonitor.sampleOnce() }
+    }
+
+    func presentScreenRecording() {
+        guard settingsStore.settings.screenRecordingEnabled else { return }
+        islandCollapseRequested = true
+        onScreenRecordingRequested?()
+    }
+
+    func presentMirror() {
+        guard !isMirrorPresented else { return }
+        clearUserCareMessage()
+        wasPinnedBeforeMirror = isPinned
+        isPinned = true
+        isMirrorPresented = true
+    }
+
+    func dismissMirror() {
+        guard isMirrorPresented else { return }
+        isPinned = wasPinnedBeforeMirror
+        isMirrorPresented = false
+    }
+
+    func presentTeleprompter() {
+        guard !isTeleprompterPresented else { return }
+        clearUserCareMessage()
+        teleprompterPresentationPoint = NSEvent.mouseLocation
+        wasPinnedBeforeTeleprompter = isPinned
+        isPinned = true
+        isTeleprompterPresented = true
+    }
+
+    func dismissTeleprompter() {
+        guard isTeleprompterPresented else { return }
+        isPinned = wasPinnedBeforeTeleprompter
+        isTeleprompterPresented = false
+    }
+
+    func addToShelf(_ urls: [URL]) {
+        let count = shelf.add(urls)
+        guard count > 0 else { return }
+        transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
+        selectModule(.shelf)
+    }
+
+    func pasteFilesToShelf() {
+        let payloads = TransferPasteboard.readShelfItems()
+        guard !payloads.isEmpty else {
+            transientMessage = AppLocalization.text("剪贴板没有可暂存的内容")
+            return
+        }
+        receiveTransferItems(payloads.map(TransferDropItem.init(payload:)))
+    }
+
+    func copyShelfItems(_ items: [FileShelfItem]) {
+        let screenshots: [UUID: Data]
+        do {
+            screenshots = try Dictionary(uniqueKeysWithValues: items.filter { $0.screenshotMetadata != nil }.map {
+                ($0.id, try shelf.screenshotData(id: $0.id))
+            })
+        } catch {
+            transientMessage = error.localizedDescription
+            return
+        }
+        guard FileShelfPasteboard.writeItems(items, screenshotData: screenshots) else {
+            transientMessage = AppLocalization.text("无法写入剪贴板")
+            return
+        }
+        dailyBriefing.recordActivity(.shelfItemsCopied, count: items.count)
+        transientMessage = AppLocalization.text("已复制到剪贴板")
+    }
+
+    func stashScreenshot(_ data: Data, metadata: ShelfScreenshotMetadata) throws {
+        try shelf.stashScreenshot(png: data, metadata: metadata)
+        transientMessage = AppLocalization.text("已加入 %ld 个项目", 1)
+    }
+
+    func saveShelfScreenshot(_ item: FileShelfItem) {
+        do {
+            ScreenshotImageExport.presentSavePanel(for: try shelf.screenshotData(id: item.id)) { [weak self] message in
+                if let message { self?.transientMessage = message }
+            }
+        } catch { transientMessage = error.localizedDescription }
+    }
+
+    func shelfTransferItems(_ items: [FileShelfItem]) -> [TransferDropItem] {
+        do {
+            return try items.map { item in
+                let payload: TransferPasteboardPayload = item.screenshotMetadata == nil
+                    ? item.payload : .file(try shelf.screenshotFileURL(id: item.id))
+                return TransferDropItem(payload: payload)
+            }
+        } catch {
+            transientMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func performShelfContextAction(_ action: ShelfContextAction, items: [FileShelfItem]) {
+        let task = shelfContextActions.perform(action, items: items, createQuickNote: { [weak self] text in
+            guard let self else { return false }
+            let created = await quickNotes.create(markdown: text)
+            if created { selectModule(.quickNotes) }
+            return created
+        }, openStudio: { [weak self] urls in self?.onShelfVideosRequested?(urls) ?? false })
+        guard let task else {
+            transientMessage = shelfContextActions.message
+            return
+        }
+        Task { [weak self] in
+            await task.value
+            guard let self else { return }
+            transientMessage = shelfContextActions.message
+            if shelfContextActions.generatedItemID != nil {
+                selectedShelfCategory = .all
+                selectModule(.shelf)
+            }
+        }
+    }
+
+    func saveShelfContextNote() {
+        let isNew = contextNoteEditor.itemID == nil
+        let screenshotError = contextNoteEditor.draft?.screenshotError
+        guard let item = contextNoteEditor.save(in: shelf) else { return }
+        onContextNoteSaved?(item)
+        contextNoteDidSave(isNew: isNew, screenshotError: screenshotError)
+    }
+
+    func contextNoteDidSave(isNew: Bool, screenshotError: String?) {
+        if let screenshotError {
+            transientMessage = AppLocalization.text("已保存便签") + " · " + screenshotError
+        } else if settingsStore.settings.userCareEnabled {
+            presentUserCareMessage(isNew ? .noteCreated : .noteUpdated)
+        } else {
+            transientMessage = isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签")
+        }
+    }
+
+    func copyContextNoteText(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        let success = pasteboard.writeObjects([FileShelfPasteboard.pasteboardWriter(for: .text(text))])
+        transientMessage = success ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
+    }
+
+    func copyContextNoteScreenshot(_ png: Data) {
+        let copied = ClipboardHistoryPasteboard.write(.image(png))
+        transientMessage = copied ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
+    }
+
+    static func contextNoteCopyAction(id: UUID, in shelf: FileShelfStore) -> ClipboardAssistantAction? {
+        guard let text = shelf.items.first(where: { $0.id == id && $0.noteLocation != nil })?.text else { return nil }
+        return .copyText(text)
+    }
+
+    static func deleteContextNote(id: UUID, from shelf: FileShelfStore, editor: ContextNoteShelfEditor) -> Bool {
+        guard shelf.items.contains(where: { $0.id == id && $0.noteLocation != nil }) else { return false }
+        shelf.remove(id: id)
+        guard !shelf.items.contains(where: { $0.id == id }) else { return false }
+        editor.removed(id)
+        return true
+    }
+
+    func navigateToContextNote(_ location: ContextNoteLocation) {
+        guard ContextNoteNavigator().navigate(to: location) else {
+            transientMessage = AppLocalization.text("无法前往记录位置，窗口或显示器可能已关闭")
+            return
+        }
+        islandCollapseRequested = true
+    }
+
+    func joinMeeting(_ event: CalendarEventSnapshot) {
+        switch MeetingJoinAction.perform(event, resolve: calendar.resolveMeeting) {
+        case .opened:
+            break
+        case .unavailable:
+            transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
+            calendar.refreshMeetings()
+        case .failed:
+            transientMessage = AppLocalization.text("无法打开会议链接")
+        }
+    }
+
+    func joinMeetingNotice(_ eventID: String) {
+        calendar.refreshMeetings()
+        guard let event = calendar.meetingEvents.first(where: { $0.id == eventID }) else {
+            transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
+            return
+        }
+        joinMeeting(event)
+    }
+
+    func openMeetingNote(_ note: FileShelfItem) {
+        contextNoteEditor.open(note)
+        selectedShelfCategory = .note
+        selectModule(.shelf)
+    }
+
+    func createMeetingNote(_ event: CalendarEventSnapshot) {
+        guard let identity = event.eventIdentity, let url = event.meetingURL else { return }
+        let draft = ContextNoteDraft(location: .webPage(url: url, title: event.title,
+                                                        applicationName: AppLocalization.text("日历")), meetingID: identity)
+        contextNoteEditor.begin(draft)
+        selectedShelfCategory = .note
+        selectModule(.shelf)
+    }
+
+    func setMeeting(_ event: CalendarEventSnapshot, associated: Bool, with note: FileShelfItem) {
+        guard let identity = event.eventIdentity else { return }
+        if !shelf.setMeeting(identity, associated: associated, withNote: note.id) {
+            transientMessage = shelf.errorDescription ?? AppLocalization.text("无法关联会议便签")
+        }
+    }
+
+    func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
+        guard ClipboardHistoryPasteboard.write(item) else {
+            transientMessage = AppLocalization.text("无法写入剪贴板")
+            return
+        }
+        dailyBriefing.recordActivity(.clipboardReused)
+        transientMessage = AppLocalization.text("已复制到剪贴板")
+    }
+
+    // MARK: - Clipboard Assistant
+
+    /// Pasteboard changeCount written by an assistant action itself; the toast must not re-trigger
+    /// for its own "copy result" writes.
+    private var suppressedAssistantChangeCount: Int?
+    private var clipboardAssistantContent: ClipboardHistoryContent?
+    private var isClipboardCalendarEditorPresented = false
+    private var lastClipboardAssistantRoutingChangeCount: Int?
+    private var islandClipboardHandoff = IslandClipboardHandoff()
+    /// Live exchange-rate fetching for the assistant's currency conversion; quotes are fetched
+    /// fresh on every conversion and never cached.
+    private let exchangeRateService = ExchangeRateService.live()
+    private var clipboardAssistantDetectionTask: Task<Void, Never>?
+    private var currencyConversionTask: Task<Void, Never>?
+    private var clipboardServiceOpenTask: Task<Void, Never>?
+    private lazy var applicationOpenRepairPresenter = ApplicationOpenRepairPresenter(
+        controller: clipboardAssistant,
+        settings: { [weak self] in self?.settingsStore.settings ?? .default },
+        canPresent: { [weak self] in self?.canPresentApplicationRepair == true }
     )
-    guard !Task.isCancelled, changeCount == NSPasteboard.general.changeCount,
-          settings == settingsStore.settings,
-          !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else { return .ignored }
-    guard var detection = result else { return .unavailable }
-    detection = Self.augmentedClipboardAssistantDetection(
-      detection,
-      content: content,
-      sourceApplication: sourceApplication,
-      orders: settings.clipboardAssistantActionOrders
-    )
-    clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
-    clipboardAssistant.presentation.notchBackground = settings.islandNotchBackground
-    guard let presentationGeneration = clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle),
-          clipboardAssistant.presentation.detection == detection else { return .unavailable }
-    clipboardAssistantContent = content
-    scheduleCurrencyConversionUpdate(
-      for: detection,
-      content: content,
-      sourceApplication: sourceApplication,
-      orders: settings.clipboardAssistantActionOrders,
-      presentationGeneration: presentationGeneration
-    )
-    return .presented
-  }
+    private var applicationOpenRepairTask: Task<Void, Never>?
+    private let applicationOpenFailureMonitor = ApplicationOpenFailureMonitor()
 
-  func presentContextNoteReminder(_ item: FileShelfItem, at point: CGPoint) -> Bool {
-    guard ContextNoteReminderPresenter.present(item, at: point, on: clipboardAssistant, settings: settingsStore.settings) else { return false }
-    clipboardAssistantContent = nil
-    return true
-  }
-
-  private func presentCompletedTransfer(_ transfer: BrowserCompletedTransfer) {
-    guard BrowserDownloadQuickActionPresenter.present(
-      transfer,
-      on: clipboardAssistant,
-      settings: settingsStore.settings,
-      isVoiceRecording: voiceInput.isRecording,
-      isVoicePreparing: voiceInput.isPreparing,
-      isIslandVisible: isIslandVisible
-    ) else { return }
-    clipboardAssistantContent = nil
-  }
-
-  /// Keeps repair as a single explicit action; other detections retain the universal actions
-  /// and saved order when the async currency-conversion refresh rebuilds their presentation.
-  static func augmentedClipboardAssistantDetection(
-    _ detection: ClipboardAssistantDetection,
-    content: ClipboardHistoryContent,
-    sourceApplication: NSRunningApplication?,
-    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
-  ) -> ClipboardAssistantDetection {
-    var detection = detection
-    if detection.kind == .appCannotOpen { return detection }
-    detection.actions.append(.addToQuickNote)
-    detection.actions.append(.share)
-    if case .text = content,
-       [.text, .nonSystemLanguageText, .code, .shellCommand, .math, .conversion].contains(detection.kind) {
-      detection.actions.append(.sendToTeleprompter)
+    private var canPresentApplicationRepair: Bool {
+        !isIslandVisible && !voiceInput.isRecording && !voiceInput.isPreparing
     }
-    if let bundleIdentifier = sourceApplication?.bundleIdentifier,
-       !bundleIdentifier.isEmpty,
-       bundleIdentifier != Bundle.main.bundleIdentifier {
-      detection.actions.append(.blockSourceApp(
-        bundleIdentifier: bundleIdentifier,
-        appName: sourceApplication?.localizedName ?? bundleIdentifier
-      ))
-    }
-    detection.actions = ClipboardAssistantActionOrder.ordered(
-      detection.actions,
-      for: detection.kind,
-      using: orders
-    )
-    return detection
-  }
 
-  /// Currency conversions resolve in two steps: the detector recognizes the shape synchronously
-  /// and the toast shows the copied text, then the live rate is fetched here and the detection
-  /// is refreshed with the converted amount. The quote is always fetched at conversion time —
-  /// never cached — so the result reflects the market at the moment of the copy.
-  private func scheduleCurrencyConversionUpdate(
-    for detection: ClipboardAssistantDetection,
-    content: ClipboardHistoryContent,
-    sourceApplication: NSRunningApplication?,
-    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
-    presentationGeneration: Int
-  ) {
-    currencyConversionTask?.cancel()
-    guard detection.kind == .conversion,
-          case .currencyExpression(let amount, let amountText, let source, let target)? = detection.detail
-    else { return }
-    currencyConversionTask = Task { [weak self, exchangeRateService] in
-      do {
-        let quote = try await exchangeRateService.fetchRate(source, target)
-        guard !Task.isCancelled else { return }
-        await MainActor.run { [weak self] in
-          self?.presentCurrencyConversionResult(
-            amount: amount,
-            amountText: amountText,
-            sourceCurrencyCode: source,
-            targetCurrencyCode: target,
-            quote: quote,
-            moneyConversion: detection.moneyConversion,
+    private enum ClipboardAssistantPresentationResult {
+        case presented
+        case unavailable
+        case ignored
+    }
+
+    private func clipboardAssistantMessage(_ key: String) -> String {
+        AppLocalization.string(key, language: languageStore.language)
+    }
+
+    private func clipboardAssistantMessage(_ key: String, _ argument: CVarArg) -> String {
+        AppLocalization.format(key, locale: languageStore.language.locale, [argument])
+    }
+
+    /// Warms up the installed-application index in the background so copied names
+    /// can resolve as soon as the first snapshot lands; refreshed automatically
+    /// when watched application directories change.
+    private func startInstalledApplicationCatalog() {
+        InstalledApplicationCatalog.shared.start { [weak self] applications in
+            self?.installedApplications = applications
+        }
+    }
+
+    private func handleCapturedClipboardContent(_ content: ClipboardHistoryContent) {
+        let downloadableURL: URL?
+        if case .text(let text) = content,
+           DownloadURLClassifier.isLikelyDownloadable(text) {
+            downloadableURL = HTTPURLParser.url(from: text)
+        } else {
+            downloadableURL = nil
+        }
+        routeCapturedClipboardContent(content, downloadableURL: downloadableURL)
+    }
+
+    func quickNoteDidCopy() {
+        // WebKit can finish copying after the pointer has already collapsed the island.
+        defer { clipboardHistoryMonitor.pollNow() }
+        guard settingsStore.settings.clipboardAssistantEnabled,
+              isIslandVisible, !isExternalDragging,
+              !voiceInput.isRecording, !voiceInput.isPreparing else { return }
+        islandClipboardHandoff.noteDidCopy()
+        islandCollapseRequested = true
+    }
+
+    func islandDidBeginRecycling() {
+        islandClipboardHandoff.beginRecycle()
+    }
+
+    func islandDidFinishRecycling() {
+        let pending = islandClipboardHandoff.finishRecycle(
+            currentChangeCount: NSPasteboard.general.changeCount
+        )
+        guard !isIslandVisible, let pending else { return }
+        presentCapturedClipboardContent(
+            pending.content,
+            downloadableURL: pending.downloadableURL,
+            sourceApplication: pending.sourceApplication
+        )
+    }
+
+    func islandDidReexpand() {
+        islandClipboardHandoff.cancel()
+    }
+
+    private func routeCapturedClipboardContent(
+        _ content: ClipboardHistoryContent,
+        downloadableURL: URL?
+    ) {
+        let changeCount = NSPasteboard.general.changeCount
+        guard lastClipboardAssistantRoutingChangeCount != changeCount else { return }
+        lastClipboardAssistantRoutingChangeCount = changeCount
+        clipboardAssistantDetectionTask?.cancel()
+        if clipboardAssistant.presentation.translation != nil, suppressedAssistantChangeCount != changeCount {
+            clipboardAssistant.dismiss(animated: false)
+        }
+
+        let sourceApplication = NSWorkspace.shared.frontmostApplication
+        if islandClipboardHandoff.shouldDefer {
+            islandClipboardHandoff.hold(.init(
+                content: content,
+                downloadableURL: downloadableURL,
+                changeCount: changeCount,
+                sourceApplication: sourceApplication
+            ))
+            return
+        }
+        presentCapturedClipboardContent(
+            content,
+            downloadableURL: downloadableURL,
+            sourceApplication: sourceApplication
+        )
+    }
+
+    private func presentCapturedClipboardContent(
+        _ content: ClipboardHistoryContent,
+        downloadableURL: URL?,
+        sourceApplication: NSRunningApplication?
+    ) {
+        clipboardAssistantDetectionTask = Task { [weak self] in
+            guard let self else { return }
+            let result = await presentClipboardAssistant(for: content, sourceApplication: sourceApplication)
+            guard !Task.isCancelled else { return }
+            switch result {
+            case .presented, .ignored:
+                guard downloadableURL != nil else { return }
+                detectedLinkTask?.cancel()
+                detectedLink = nil
+            case .unavailable:
+                guard clipboardMonitor.isEnabled, let downloadableURL else { return }
+                presentDetectedLink(downloadableURL)
+            }
+        }
+    }
+
+    private func presentClipboardAssistant(
+        for content: ClipboardHistoryContent,
+        sourceApplication: NSRunningApplication?
+    ) async -> ClipboardAssistantPresentationResult {
+        let settings = settingsStore.settings
+        guard settings.clipboardAssistantEnabled else { return .unavailable }
+        guard !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else {
+            clipboardAssistant.dismiss(animated: false)
+            return .unavailable
+        }
+        if let suppressed = suppressedAssistantChangeCount,
+           suppressed == NSPasteboard.general.changeCount {
+            return .ignored
+        }
+        // The frontmost app at capture time is the app the user copied from.
+        if let bundleIdentifier = sourceApplication?.bundleIdentifier,
+           settings.clipboardAssistantBlacklist.contains(bundleIdentifier) {
+            return .unavailable
+        }
+        let enabledKinds = settings.clipboardAssistantEnabledKinds.isEmpty
+            ? Set(ClipboardAssistantKind.allCases)
+            : settings.clipboardAssistantEnabledKinds
+        let changeCount = NSPasteboard.general.changeCount
+        var shellCommand: String?
+        if enabledKinds.contains(.shellCommand), case .text(let text) = content {
+            shellCommand = await ClipboardShellCommandResolver.resolve(text)
+        }
+        guard !Task.isCancelled, changeCount == NSPasteboard.general.changeCount,
+              settings == settingsStore.settings,
+              !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else { return .ignored }
+        let shellCommandWasResolved = shellCommand != nil
+        let result = await ClipboardAssistantDetector.detectInBackground(
+            content: content,
+            enabledKinds: enabledKinds,
+            offersDownload: settings.downloaderEnabled,
+            preferredCurrencyCode: ClipboardAssistantDetector.currentPreferredCurrencyCode(
+                language: languageStore.language
+            ),
+            locale: languageStore.language.locale,
+            installedApplications: installedApplications,
+            shellCommandExists: { _ in shellCommandWasResolved }
+        )
+        guard !Task.isCancelled, changeCount == NSPasteboard.general.changeCount,
+              settings == settingsStore.settings,
+              !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else { return .ignored }
+        guard var detection = result else { return .unavailable }
+        detection = Self.augmentedClipboardAssistantDetection(
+            detection,
             content: content,
             sourceApplication: sourceApplication,
-            orders: orders,
+            orders: settings.clipboardAssistantActionOrders
+        )
+        clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
+        clipboardAssistant.presentation.notchBackground = settings.islandNotchBackground
+        guard let presentationGeneration = clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle),
+              clipboardAssistant.presentation.detection == detection else { return .unavailable }
+        clipboardAssistantContent = content
+        scheduleCurrencyConversionUpdate(
+            for: detection,
+            content: content,
+            sourceApplication: sourceApplication,
+            orders: settings.clipboardAssistantActionOrders,
             presentationGeneration: presentationGeneration
-          )
-        }
-      } catch {
-        guard !Task.isCancelled else { return }
-        await MainActor.run { [weak self] in
-          self?.presentCurrencyConversionFailure(
-            amountText: amountText,
-            sourceCurrencyCode: source,
-            targetCurrencyCode: target,
-            presentationGeneration: presentationGeneration
-          )
-        }
-      }
+        )
+        return .presented
     }
-  }
 
-  /// Replaces the pending conversion toast with the converted amount, rebuilding the universal
-  /// actions the same way the synchronous presentation did.
-  private func presentCurrencyConversionResult(
-    amount: Double,
-    amountText: String,
-    sourceCurrencyCode: String,
-    targetCurrencyCode: String,
-    quote: ExchangeRateQuote,
-    moneyConversion: ClipboardAssistantMoneyConversion?,
-    content: ClipboardHistoryContent,
-    sourceApplication: NSRunningApplication?,
-    orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
-    presentationGeneration: Int
-  ) {
-    guard let result = Self.currencyConversionResult(
-      amount: amount, amountText: amountText,
-      sourceCurrencyCode: sourceCurrencyCode, targetCurrencyCode: targetCurrencyCode,
-      quote: quote, moneyConversion: moneyConversion, locale: AppLocalization.currentLanguage.locale
-    ) else {
-      presentCurrencyConversionFailure(
-        amountText: amountText, sourceCurrencyCode: sourceCurrencyCode,
-        targetCurrencyCode: targetCurrencyCode, presentationGeneration: presentationGeneration
-      )
-      return
-    }
-    let detection = Self.augmentedClipboardAssistantDetection(
-      result,
-      content: content,
-      sourceApplication: sourceApplication,
-      orders: orders
-    )
-    clipboardAssistant.updateDetection(detection, for: presentationGeneration)
-  }
-
-  static func currencyConversionResult(
-    amount: Double,
-    amountText: String,
-    sourceCurrencyCode: String,
-    targetCurrencyCode: String,
-    quote: ExchangeRateQuote,
-    moneyConversion: ClipboardAssistantMoneyConversion?,
-    locale: Locale
-  ) -> ClipboardAssistantDetection? {
-    if let moneyConversion {
-      return ClipboardAssistantDetector.completedMoneyConversion(moneyConversion, rate: quote.rate, locale: locale)
-    }
-    let converted = amount * quote.rate
-    let title = Self.currencyConversionTitle(for: converted, currencyCode: targetCurrencyCode)
-    let rateText = ClipboardAssistantDetector.formatNumber(quote.rate)
-    let fullExpression =
-      "\(amountText) \(sourceCurrencyCode) = \(title) · 1 \(sourceCurrencyCode) = \(rateText) \(targetCurrencyCode)"
-    return ClipboardAssistantDetection(
-      kind: .conversion,
-      title: title,
-      detail: .currencyRate(
-        sourceCurrencyCode: sourceCurrencyCode,
-        targetCurrencyCode: targetCurrencyCode,
-        rate: quote.rate
-      ),
-      actions: [.copyText(title), .copyFullExpression(fullExpression)],
-      fullContent: fullExpression
-    )
-  }
-
-  /// Network failure keeps the toast on screen with the copied expression, but without actions:
-  /// there is no converted amount to copy and silently falling back to plain text would hide
-  /// that a conversion was attempted.
-  private func presentCurrencyConversionFailure(
-    amountText: String,
-    sourceCurrencyCode: String,
-    targetCurrencyCode: String,
-    presentationGeneration: Int
-  ) {
-    let detection = ClipboardAssistantDetection(
-      kind: .conversion,
-      title: clipboardAssistantMessage("汇率获取失败"),
-      detail: .currencyExpression(
-        amount: 0,
-        amountText: amountText,
-        sourceCurrencyCode: sourceCurrencyCode,
-        targetCurrencyCode: targetCurrencyCode
-      ),
-      actions: []
-    )
-    clipboardAssistant.updateDetection(detection, for: presentationGeneration)
-  }
-
-  /// Formats a converted amount with the current language's currency conventions
-  /// (e.g. "¥723.40" under zh-Hans, "$723.40" under en).
-  static func currencyConversionTitle(for value: Double, currencyCode: String) -> String {
-    let formatter = NumberFormatter()
-    formatter.numberStyle = .currency
-    formatter.currencyCode = currencyCode
-    formatter.locale = AppLocalization.currentLanguage.locale
-    return formatter.string(from: NSNumber(value: value))
-      ?? String(format: "%.2f %@", value, currencyCode)
-  }
-
-  private func presentDetectedLink(_ url: URL) {
-    setDownloadURL(url.absoluteString)
-    selectModule(.download)
-    detectedLink = url
-    detectedLinkTask?.cancel()
-    detectedLinkTask = Task { [weak self] in
-      do {
-        try await Task.sleep(for: .seconds(6))
-      } catch {
-        return
-      }
-      self?.detectedLink = nil
-    }
-  }
-
-  private func performClipboardAssistantAction(_ action: ClipboardAssistantAction) {
-    switch action {
-    case .openURL(let url):
-      NSWorkspace.shared.open(url)
-    case .openService(let service, let url):
-      clipboardServiceOpenTask?.cancel()
-      if service == .railway12306 {
-        clipboardServiceOpenTask = Task { @MainActor [weak self] in
-          do {
-            let destination = try await ClipboardAssistantRailwayURLResolver.resolve(url)
-            guard !Task.isCancelled else { return }
-            NSWorkspace.shared.open(destination)
-          } catch {
-            guard !Task.isCancelled else { return }
-            self?.transientMessage = self?.clipboardAssistantMessage("无法完成操作")
-          }
-        }
-      } else {
-        NSWorkspace.shared.open(url)
-      }
-    case .openApp(let bundleIdentifier, _):
-      openInstalledApplication(bundleIdentifier: bundleIdentifier)
-    case .repairAndOpenApp(let url):
-      guard applicationOpenRepairTask == nil else { return }
-      applicationOpenRepairTask = Task { [weak self] in
-        defer { self?.applicationOpenRepairTask = nil }
-        do {
-          try await ApplicationOpenRepairService().repairAndOpen(at: url)
-        } catch is CancellationError {
-          return
-        } catch let error as ApplicationOpenRepairError {
-          self?.transientMessage = self?.clipboardAssistantMessage(error.localizationKey)
-        } catch {
-          self?.transientMessage = self?.clipboardAssistantMessage("无法完成操作")
-        }
-      }
-    case .openDownload(let url):
-      setDownloadURL(url.absoluteString)
-      selectModule(.download)
-    case .revealInFinder(let url):
-      NSWorkspace.shared.activateFileViewerSelecting([url])
-    case .showContextNote(let id):
-      guard let item = shelf.items.first(where: { $0.id == id && $0.noteLocation != nil }) else { return }
-      contextNoteEditor.open(item)
-      selectModule(.shelf)
-      islandExpansionRequested = true
-    case .copyContextNote(let id):
-      guard let copyAction = Self.contextNoteCopyAction(id: id, in: shelf) else { return }
-      performClipboardAssistantAction(copyAction)
-    case .deleteContextNote(let id):
-      if !Self.deleteContextNote(id: id, from: shelf, editor: contextNoteEditor) {
-        transientMessage = shelf.errorDescription ?? clipboardAssistantMessage("无法完成操作")
-      }
-    case .openFolder(let url):
-      if !NSWorkspace.shared.open(url) {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
-      }
-    case .compress(let url):
-      compressAssistantFile(url)
-    case .share:
-      guard let content = clipboardAssistantContent else {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
-        clipboardAssistant.dismiss()
-        return
-      }
-      let items = transferItems(from: content)
-      guard !items.isEmpty else {
-        transientMessage = clipboardAssistantMessage("剪贴板没有可共享内容")
-        clipboardAssistant.dismiss()
-        return
-      }
-      guard let anchor = clipboardAssistant.sharingAnchorView else {
-        transientMessage = clipboardAssistantMessage("无法打开系统共享菜单")
-        clipboardAssistant.dismiss()
-        return
-      }
-      share(items, from: anchor)
-    case .search(let text):
-      let settings = settingsStore.settings
-      if let url = settings.clipboardAssistantSearchEngine.queryURL(
-        for: text,
-        customURL: settings.clipboardAssistantCustomSearchURL
-      ) {
-        NSWorkspace.shared.open(url)
-      } else {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
-      }
-    case .autoTranslate(let text):
-      translationTask?.cancel()
-      let sourceChangeCount = NSPasteboard.general.changeCount
-      guard lastClipboardAssistantRoutingChangeCount == sourceChangeCount else { return }
-      clipboardAssistant.translate(
-        text,
-        targetLanguage: languageStore.language.translateTargetCode,
-        isSourceCurrent: { NSPasteboard.general.changeCount == sourceChangeCount }
-      ) { [weak self] result in
-        guard let self, ClipboardHistoryPasteboard.write(.text(result), onlyIfChangeCount: sourceChangeCount) else {
-          return false
-        }
-        self.suppressedAssistantChangeCount = NSPasteboard.general.changeCount
+    func presentContextNoteReminder(_ item: FileShelfItem, at point: CGPoint) -> Bool {
+        guard ContextNoteReminderPresenter.present(item, at: point, on: clipboardAssistant, settings: settingsStore.settings) else { return false }
+        clipboardAssistantContent = nil
         return true
-      }
-    case .translate(let text):
-      // Translate in the browser using the interface language as the target.
-      let code = languageStore.language.translateTargetCode
-      translationTask?.cancel()
-      translationTask = Task { @MainActor [weak self] in
-        let provider = await Self.translationProviderForCurrentIP()
-        guard let self, !Task.isCancelled else { return }
-        if let url = ClipboardAssistantTranslate.url(
-          text: text,
-          targetLanguageCode: code,
-          provider: provider
-        ) {
-          NSWorkspace.shared.open(url)
-        } else {
-          transientMessage = clipboardAssistantMessage("无法完成操作")
+    }
+
+    private func presentCompletedTransfer(_ transfer: BrowserCompletedTransfer) {
+        guard BrowserDownloadQuickActionPresenter.present(
+            transfer,
+            on: clipboardAssistant,
+            settings: settingsStore.settings,
+            isVoiceRecording: voiceInput.isRecording,
+            isVoicePreparing: voiceInput.isPreparing,
+            isIslandVisible: isIslandVisible
+        ) else { return }
+        clipboardAssistantContent = nil
+    }
+
+    /// Keeps repair as a single explicit action; other detections retain the universal actions
+    /// and saved order when the async currency-conversion refresh rebuilds their presentation.
+    static func augmentedClipboardAssistantDetection(
+        _ detection: ClipboardAssistantDetection,
+        content: ClipboardHistoryContent,
+        sourceApplication: NSRunningApplication?,
+        orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
+    ) -> ClipboardAssistantDetection {
+        var detection = detection
+        if detection.kind == .appCannotOpen { return detection }
+        detection.actions.append(.addToQuickNote)
+        detection.actions.append(.share)
+        if case .text = content,
+           [.text, .nonSystemLanguageText, .code, .shellCommand, .math, .conversion].contains(detection.kind) {
+            detection.actions.append(.sendToTeleprompter)
         }
-      }
-    case .composeMail(let address):
-      if settingsStore.settings.mailEnabled {
-        mailComposeRequest = MailComposeRequest(recipient: address)
-        selectModule(.mail)
-        // The assistant fires from a collapsed island, so the compose page only becomes reachable
-        // once the island expands on its own.
-        islandExpansionRequested = true
-      } else {
-        openSystemMail(to: address)
-      }
-    case .copyText(let text), .copyFullExpression(let text), .copyEmoji(let text):
-      guard ClipboardHistoryPasteboard.write(.text(text)) else {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
-        return
-      }
-      suppressedAssistantChangeCount = NSPasteboard.general.changeCount
-      transientMessage = clipboardAssistantMessage("已复制")
-    case .callPhone(let number):
-      if let url = URL(string: "tel:\(number)") {
-        NSWorkspace.shared.open(url)
-      } else {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
-      }
-    case .blockSourceApp(let bundleIdentifier, _):
-      var settings = settingsStore.settings
-      settings.clipboardAssistantBlacklist.insert(bundleIdentifier)
-      settingsStore.settings = settings
-      clipboardAssistant.dismiss()
-    case .addToQuickNote:
-      guard let content = clipboardAssistantContent else {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
-        return
-      }
-      receiveQuickNoteTransferItems(transferItems(from: content))
-    case .sendToTeleprompter:
-      guard case .text(let text)? = clipboardAssistantContent else {
-        transientMessage = clipboardAssistantMessage("无法完成操作")
-        return
-      }
-      sendQuickNoteToTeleprompter(text)
-    case .saveImage(let data):
-      saveClipboardImage(data)
-    case .saveText(let text):
-      saveAssistantText(text)
-    case .runShellCommand(let command):
-      Task { [weak self] in
-        do {
-          try await ClipboardShellCommandRunner.runInTerminal(command)
-        } catch {
-          self?.transientMessage = self?.clipboardAssistantMessage("无法在终端运行命令")
-        }
-      }
-    case .runShellCommandInBackground(let command):
-      do {
-        try ClipboardShellCommandRunner.runInBackground(command)
-      } catch {
-        transientMessage = clipboardAssistantMessage("无法在后台运行命令")
-      }
-    case .createCalendarEvent(let title, let date, let isAllDay):
-      var calendar = Calendar(identifier: .gregorian)
-      calendar.timeZone = .current
-      let end = isAllDay
-        ? calendar.date(byAdding: .day, value: 1, to: date)!
-        : date.addingTimeInterval(3_600)
-      presentAssistantCalendarEditor(ClipboardCalendarDraft(
-        title: title, startDate: date, endDate: end, isAllDay: isAllDay
-      ))
-    case .editCalendarEvent(let draft):
-      presentAssistantCalendarEditor(draft)
-    }
-  }
-
-  private nonisolated static func countryCodeForCurrentIP() async -> String? {
-    guard let url = URL(string: "https://ipinfo.io/country") else { return nil }
-    var request = URLRequest(url: url)
-    request.timeoutInterval = 5
-    do {
-      let (data, response) = try await URLSession.shared.data(for: request)
-      guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-      return String(data: data, encoding: .utf8)
-    } catch {
-      return nil
-    }
-  }
-
-  private nonisolated static func translationProviderForCurrentIP() async -> ClipboardAssistantTranslate.Provider {
-    ClipboardAssistantTranslate.provider(forCountryCode: await countryCodeForCurrentIP())
-  }
-
-  /// Launches a locally installed application by bundle identifier. The assistant
-  /// fires from a collapsed island, so activation must go through the workspace
-  /// API rather than `open(_:)` on a file URL.
-  private func openInstalledApplication(bundleIdentifier: String) {
-    guard let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
-      transientMessage = clipboardAssistantMessage("无法打开应用")
-      return
-    }
-    let configuration = NSWorkspace.OpenConfiguration()
-    configuration.activates = true
-    NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) { [weak self] _, error in
-      guard error != nil else { return }
-      Task { @MainActor [weak self] in
-        self?.transientMessage = self?.clipboardAssistantMessage("无法打开应用")
-      }
-    }
-  }
-
-  private func openSystemMail(to address: String) {
-    guard let url = URL(string: "mailto:\(address)") else {
-      transientMessage = clipboardAssistantMessage("无法完成操作")
-      return
-    }
-    guard NSWorkspace.shared.open(url) else {
-      transientMessage = clipboardAssistantMessage("无法完成操作")
-      return
-    }
-  }
-
-  private func compressAssistantFile(_ source: URL) {
-    guard FileManager.default.fileExists(atPath: source.path) else {
-      transientMessage = clipboardAssistantMessage("无法完成操作")
-      return
-    }
-    let panel = NSSavePanel()
-    panel.directoryURL = source.deletingLastPathComponent()
-    panel.nameFieldStringValue = source.lastPathComponent + ".zip"
-    panel.allowedContentTypes = [.zip]
-    panel.canCreateDirectories = true
-    panel.prompt = clipboardAssistantMessage("压缩为 ZIP")
-    WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
-    guard panel.runModal() == .OK, let destination = panel.url else { return }
-
-    Task { @MainActor [weak self] in
-      let error = await Task.detached(priority: .userInitiated) {
-        await Self.zipArchiveError(source: source, destination: destination)
-      }.value
-      guard let self else { return }
-      if let error {
-        self.transientMessage = self.clipboardAssistantMessage("操作失败：%@", error)
-      } else {
-        self.transientMessage = self.clipboardAssistantMessage("已保存到 %@", destination.path)
-      }
-    }
-  }
-
-  nonisolated static func zipArchiveError(source: URL, destination: URL) async -> String? {
-    var isDirectory: ObjCBool = false
-    guard FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) else {
-      return AppLocalization.text("源文件不存在")
-    }
-    let sourceAccess = source.startAccessingSecurityScopedResource()
-    let destinationDirectory = destination.deletingLastPathComponent()
-    let destinationAccess = destinationDirectory.startAccessingSecurityScopedResource()
-    defer {
-      if sourceAccess { source.stopAccessingSecurityScopedResource() }
-      if destinationAccess { destinationDirectory.stopAccessingSecurityScopedResource() }
-    }
-
-    var arguments = ["-c", "-k", "--sequesterRsrc"]
-    if isDirectory.boolValue { arguments.append("--keepParent") }
-    arguments += [source.lastPathComponent, destination.path]
-    do {
-      let output = try await AIAgentProcessRunner.run(
-        executableURL: URL(fileURLWithPath: "/usr/bin/ditto"),
-        arguments: arguments,
-        workingDirectoryURL: source.deletingLastPathComponent(),
-        timeout: 5 * 60,
-        maximumOutputBytes: 1,
-        maximumErrorBytes: 256 * 1_024
-      )
-      if output.didTimeout {
-        return AppLocalization.text("压缩操作超时")
-      }
-      guard output.status == 0 else {
-        return output.standardError.isEmpty ? AppLocalization.text("无法创建 ZIP 文件") : output.standardError
-      }
-      return nil
-    } catch {
-      return error.localizedDescription
-    }
-  }
-
-  private func saveClipboardImage(_ data: Data) {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyyMMdd-HHmmss"
-    let name = "clipboard-\(formatter.string(from: Date())).png"
-    let destination: URL
-    if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
-      let panel = NSSavePanel()
-      panel.directoryURL = saveLocations[.quickActions]
-      panel.nameFieldStringValue = name
-      panel.allowedContentTypes = [.png]
-      panel.canCreateDirectories = true
-      panel.prompt = clipboardAssistantMessage("保存图片")
-      WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
-      guard panel.runModal() == .OK, let url = panel.url else { return }
-      destination = url
-    } else {
-      destination = saveLocations[.quickActions].appendingPathComponent(name)
-    }
-
-    let directory = destination.deletingLastPathComponent()
-    let scopedAccess = directory.startAccessingSecurityScopedResource()
-    defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
-    do {
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      try data.write(to: destination, options: .atomic)
-      transientMessage = clipboardAssistantMessage("已保存到 %@", destination.path)
-    } catch {
-      transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
-    }
-  }
-
-  /// Saves long copied text as a standalone file and reveals it.
-  private func saveAssistantText(_ text: String) {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyyMMdd-HHmmss"
-    let name = "clipboard-\(formatter.string(from: Date())).txt"
-    let destination: URL
-    if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
-      let panel = NSSavePanel()
-      panel.directoryURL = saveLocations[.quickActions]
-      panel.nameFieldStringValue = name
-      panel.allowedContentTypes = [.plainText]
-      panel.canCreateDirectories = true
-      panel.prompt = clipboardAssistantMessage("保存文本")
-      WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
-      guard panel.runModal() == .OK, let url = panel.url else { return }
-      destination = url
-    } else {
-      destination = saveLocations[.quickActions].appendingPathComponent(name)
-    }
-
-    let directory = destination.deletingLastPathComponent()
-    let scopedAccess = directory.startAccessingSecurityScopedResource()
-    defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
-    do {
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      try text.write(to: destination, atomically: true, encoding: .utf8)
-      NSWorkspace.shared.activateFileViewerSelecting([destination])
-      transientMessage = clipboardAssistantMessage("已保存到 %@", destination.path)
-    } catch {
-      transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
-    }
-  }
-
-  private func presentAssistantCalendarEditor(_ draft: ClipboardCalendarDraft) {
-    guard !isClipboardCalendarEditorPresented else { return }
-    isClipboardCalendarEditorPresented = true
-    clipboardAssistant.dismiss(animated: false)
-    Task { @MainActor [weak self] in
-      guard let self else { return }
-      defer { self.isClipboardCalendarEditorPresented = false }
-      await CalendarItemEditor.present(calendar: self.calendar, draft: draft, allowsReminders: false) { error in
-        self.transientMessage = self.clipboardAssistantMessage("操作失败：%@", error)
-      }
-    }
-  }
-
-  /// Applies the hold-left + right-click quick copy gesture from settings.
-  private func applyAssistantMouseGesture() {
-    let enabled = settingsStore.settings.clipboardAssistantEnabled
-      && settingsStore.settings.clipboardAssistantMouseGestureEnabled
-    // The gesture only simulates ⌘C; the shared pasteboard monitor picks up the new copy.
-    let granted = clipboardAssistant.setMouseGesture(enabled: enabled, onQuickCopy: {})
-    if enabled, !granted {
-      refreshAssistantAccessibility()
-    }
-  }
-
-  func sendQuickNoteToTeleprompter(_ content: String) {
-    let content = content.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !content.isEmpty else {
-      transientMessage = AppLocalization.text("随记没有可发送的内容")
-      return
-    }
-    UserDefaults.standard.set(content, forKey: "toolbox.teleprompterScript")
-    transientMessage = AppLocalization.text("已发送到提词器")
-    presentTeleprompter()
-  }
-
-  func receiveQuickNoteTransferItems(_ items: [TransferDropItem]) {
-    let content = transferableText(from: items)
-    guard !content.isEmpty else {
-      transientMessage = AppLocalization.text("没有可写入随记的内容")
-      return
-    }
-    Task {
-      if await quickNotes.create(markdown: content) {
-        if !settingsStore.settings.userCareEnabled {
-          transientMessage = AppLocalization.text("已创建随记")
-        }
-        selectModule(.quickNotes)
-      }
-    }
-  }
-
-  func sendClipboardHistoryItemToQuickNote(_ item: ClipboardHistoryItem) {
-    receiveQuickNoteTransferItems(transferItems(from: item.content))
-  }
-
-  private func transferItems(from content: ClipboardHistoryContent) -> [TransferDropItem] {
-    switch content {
-    case let .text(value):
-      [.text(value)]
-    case let .file(reference):
-      [.file(reference.url)]
-    case let .image(data):
-      [.image(data)]
-    }
-  }
-
-  private func transferableText(from items: [TransferDropItem]) -> String {
-    items.map { item in
-      switch item {
-      case let .text(value): value
-      case let .link(url): url.absoluteString
-      case let .file(url): "[\(url.lastPathComponent)](\(url.absoluteString))"
-      case .image: "剪贴板图片"
-      }
-    }
-    .joined(separator: "\n\n")
-    .trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-
-  func receiveTransferItems(_ items: [TransferDropItem]) {
-    let payloads = items.compactMap(\.shelfPayload)
-    guard !payloads.isEmpty else {
-      transientMessage = AppLocalization.text("中转站支持文件、链接或文本")
-      return
-    }
-    let count = shelf.add(payloads: payloads)
-    if let error = shelf.errorDescription {
-      transientMessage = AppLocalization.text("操作失败：%@", error)
-    } else if count > 0 {
-      transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
-    }
-    if count > 0 { selectModule(.shelf) }
-    let urls = payloads.compactMap { if case .file(let url) = $0 { url } else { nil } }
-    applicationOpenRepairPresenter.receive(urls)
-  }
-
-  func receiveShelfDropItems(_ items: [FileShelfDropItem]) {
-    let previousIDs = Set(shelf.items.map(\.id))
-    shelf.receive(items) { [weak self] count in
-      guard let self else { return }
-      if let error = self.shelf.errorDescription {
-        self.transientMessage = AppLocalization.text("操作失败：%@", error)
-      } else if count > 0 {
-        self.transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
-      }
-      if count > 0 { self.selectModule(.shelf) }
-      let directURLs = items.compactMap { if case .content(.file(let url)) = $0 { url } else { nil } }
-      let addedURLs = self.shelf.items.filter { !previousIDs.contains($0.id) && $0.text == nil }.map(\.url)
-      self.applicationOpenRepairPresenter.receive(directURLs + addedURLs)
-    }
-  }
-
-  func prepareDetectedLink() {
-    guard let detectedLink else { return }
-    prepareDownload(detectedLink)
-  }
-
-  func share(_ items: [TransferDropItem], from view: NSView? = nil) {
-    guard !items.isEmpty else { return }
-    let values = items.map(\.shareValue)
-    let anchor = Self.sharingPickerAnchor(from: view)
-    guard let anchor else {
-      transientMessage = AppLocalization.text("无法打开系统共享菜单")
-      return
-    }
-    let picker = NSSharingServicePicker(items: values)
-    picker.delegate = sharingPickerDelegate
-    let previousPicker = sharingPicker
-    sharingPicker = picker
-    sharingPickerDismissesClipboardAssistant = anchor === clipboardAssistant.sharingAnchorView
-    isSharingPickerVisible = anchor.window is IslandPanel && !sharingPickerDismissesClipboardAssistant
-    previousPicker?.close()
-    picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
-  }
-
-  static func sharingPickerAnchor(
-    from view: NSView?,
-    at point: CGPoint = NSEvent.mouseLocation,
-    windows: [NSWindow] = NSApp.windows
-  ) -> NSView? {
-    if let view { return view }
-    let interactivePanels = windows.compactMap { $0 as? IslandPanel }.filter {
-      $0.isVisible && !$0.ignoresMouseEvents
-    }
-    return interactivePanels.first(where: { $0.frame.contains(point) })?.contentView
-      ?? interactivePanels.first?.contentView
-  }
-
-  func shareFromPasteboard(from view: NSView? = nil) {
-    let payloads = TransferPasteboard.readShareableItems()
-    let items: [TransferDropItem] = payloads.map { payload in
-      switch payload {
-      case .file(let url): .file(url)
-      case .text(let value): .text(value)
-      }
-    }
-    guard !items.isEmpty else {
-      transientMessage = AppLocalization.text("剪贴板没有可共享内容")
-      return
-    }
-    share(items, from: view)
-  }
-
-  private func sharingPickerDidComplete(_ picker: NSSharingServicePicker) {
-    guard sharingPicker === picker else { return }
-    let dismissesClipboardAssistant = sharingPickerDismissesClipboardAssistant
-    sharingPicker = nil
-    sharingPickerDismissesClipboardAssistant = false
-    isSharingPickerVisible = false
-    if dismissesClipboardAssistant { clipboardAssistant.dismiss() }
-  }
-
-  private func prepareDownload(_ url: URL) {
-    setDownloadURL(url.absoluteString)
-    selectModule(.download)
-    detectedLinkTask?.cancel()
-    detectedLink = nil
-    transientMessage = AppLocalization.text("链接已放入下载中转")
-  }
-
-  var downloadFormatOptions: [DownloadFormatOption] {
-    guard downloadFormatSourceURL == normalizedDownloadURL else { return [] }
-    return DownloadFormatCatalog.options(for: downloadMode, formats: downloadFormats)
-  }
-
-  var selectedDownloadFormatOption: DownloadFormatOption? {
-    guard let selectedDownloadFormat else { return nil }
-    return downloadFormatOptions.first { $0.selection == selectedDownloadFormat }
-  }
-
-  var canSelectDownloadFormats: Bool {
-    downloadFormatSelectionEnabled
-      && !isLoadingDownloadFormats
-      && !downloadFormatOptions.isEmpty
-  }
-
-  var downloadFormatSelectionNeedsFFmpeg: Bool {
-    !downloadFormats.isEmpty && !downloadFormatSelectionEnabled
-  }
-
-  func setDownloadURL(_ value: String) {
-    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    let normalized = HTTPURLParser.url(from: trimmed)?.absoluteString ?? trimmed
-    guard downloadURL != normalized else { return }
-    downloadURL = normalized
-    downloadNeedsBrowserCookies = false
-    resetDownloadFormatState()
-  }
-
-  func clearDownloadURL() {
-    downloadURL = ""
-    downloadNeedsBrowserCookies = false
-    resetDownloadFormatState()
-    if !hasActiveDownloads { downloadState = .idle }
-  }
-
-  func downloadURLChangedByUser() {
-    guard downloadFormatSourceURL != normalizedDownloadURL else { return }
-    downloadNeedsBrowserCookies = false
-    resetDownloadFormatState()
-  }
-
-  func refreshDownloadBrowserCookieSources() {
-    Task { [weak self, downloadService] in
-      let sources = await downloadService.availableBrowserCookieSources()
-      await MainActor.run {
-        guard let self else { return }
-        self.downloadBrowserCookieSources = sources
-        if let selected = self.downloadBrowserCookieSource {
-          self.downloadBrowserCookieSource = sources.first { $0.id == selected.id }
-        }
-      }
-    }
-  }
-
-  func selectDownloadFormat(_ option: DownloadFormatOption?) {
-    guard option == nil || canSelectDownloadFormats else { return }
-    selectedDownloadFormat = option?.selection
-  }
-
-  func refreshDownloadFormats() {
-    refreshDownloadBrowserCookieSources()
-    guard let normalizedDownloadURL else {
-      resetDownloadFormatState()
-      let message = AppLocalization.text("链接或输出目录无效")
-      if hasActiveDownloads {
-        transientMessage = message
-      } else {
-        downloadState = .failed(message)
-      }
-      return
-    }
-
-    downloadURL = normalizedDownloadURL
-    resetDownloadFormatState()
-    downloadFormatSourceURL = normalizedDownloadURL
-    isLoadingDownloadFormats = true
-    let generation = downloadFormatProbeGeneration
-    let cookieSource = downloadBrowserCookieSource
-    let task = Task { [weak self, downloadService] in
-      do {
-        let result = try await downloadService.probeFormatsAutomatically(
-          urlString: normalizedDownloadURL,
-          browserCookieSource: cookieSource
-        )
-        guard !Task.isCancelled else { return }
-        await MainActor.run {
-          self?.finishDownloadFormatProbe(
-            result,
-            urlString: normalizedDownloadURL,
-            cookieSource: cookieSource,
-            generation: generation
-          )
-        }
-      } catch is CancellationError {
-        return
-      } catch {
-        await MainActor.run {
-          self?.failDownloadFormatProbe(
-            error,
-            urlString: normalizedDownloadURL,
-            cookieSource: cookieSource,
-            generation: generation
-          )
-        }
-      }
-    }
-    downloadFormatProbeTask = task
-  }
-
-  func retryDownloadWithBrowserCookies() {
-    guard downloadNeedsBrowserCookies, downloadBrowserCookieSource != nil else { return }
-    startDownload()
-  }
-
-  func startDownload() {
-    let request: DownloadRequest
-    do {
-      let parsedRequest = try DownloadRequest(
-        urlString: downloadURL,
-        mode: downloadMode,
-        outputDirectory: downloadDirectory
-      )
-      request = try DownloadRequest(
-        urlString: parsedRequest.urlString,
-        mode: downloadMode,
-        outputDirectory: downloadDirectory,
-        formatSelection: selectedDownloadFormat(for: parsedRequest.urlString),
-        browserCookieSource: downloadBrowserCookieSource
-      )
-      downloadURL = request.urlString
-      downloadNeedsBrowserCookies = false
-    } catch {
-      if hasActiveDownloads {
-        transientMessage = AppLocalization.text("链接或输出目录无效")
-      } else {
-        downloadState = .failed(AppLocalization.text("链接或输出目录无效"))
-      }
-      return
-    }
-
-    let taskID = UUID()
-    activeDownloadID = taskID
-    activeDownloadIDs.insert(taskID)
-    downloadTaskStates[taskID] = .preparing
-    downloadTaskURLs[taskID] = request.urlString
-    downloadTaskOrder.append(taskID)
-    refreshActiveDownloads()
-    downloadState = .preparing
-    beginVideoDownloadIsland(forURLString: request.urlString)
-    let scopedAccess = downloadDirectory.startAccessingSecurityScopedResource()
-    let task = Task { [weak self, downloadService] in
-      defer {
-        if scopedAccess { request.outputDirectory.stopAccessingSecurityScopedResource() }
-      }
-      do {
-        let result = try await downloadService.downloadAutomatically(
-          request,
-          taskID: taskID
-        ) { [weak self] event in
-          await MainActor.run {
-            guard let self, self.activeDownloadIDs.contains(taskID) else { return }
-            if case .progress(let fraction, let speed, let eta) = event {
-              let state = DownloadUIState.downloading(
-                fraction: fraction,
-                speed: speed,
-                eta: eta
-              )
-              self.downloadTaskStates[taskID] = state
-              self.refreshActiveDownloads()
-              guard self.activeDownloadID == taskID else { return }
-              self.downloadState = state
-              self.updateVideoDownloadIsland(fraction: fraction, isFinished: false)
-            }
-          }
-        }
-        guard !Task.isCancelled else {
-          await MainActor.run {
-            self?.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
-          }
-          return
-        }
-        await MainActor.run {
-          guard let self else { return }
-          if let browserCookieSource = result.browserCookieSource,
-             self.downloadBrowserCookieSource == nil {
-            self.downloadBrowserCookieSource = browserCookieSource
-          }
-          if let browserCookieSource = result.browserCookieSource,
-             !self.downloadBrowserCookieSources.contains(browserCookieSource) {
-            self.downloadBrowserCookieSources.append(browserCookieSource)
-          }
-          self.addToShelf([result.fileURL])
-          self.notices.enqueue(
-            IslandNotice(
-              id: "download-\(taskID.uuidString)",
-              title: "下载完成",
-              detail: result.fileURL.lastPathComponent,
-              kind: .success,
-              side: .right
+        if let bundleIdentifier = sourceApplication?.bundleIdentifier,
+           !bundleIdentifier.isEmpty,
+           bundleIdentifier != Bundle.main.bundleIdentifier {
+            detection.actions.append(.blockSourceApp(
+                bundleIdentifier: bundleIdentifier,
+                appName: sourceApplication?.localizedName ?? bundleIdentifier
             ))
-          self.finishDownloadTask(
-            taskID,
-            state: .completed(result.fileURL),
-            showsCompletion: true
-          )
         }
-      } catch is CancellationError {
-        await MainActor.run {
-          self?.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
-        }
-      } catch {
-        await MainActor.run {
-          guard let self else { return }
-          if Self.shouldRetryWithoutBrowserCookies(
-            error,
-            browserCookieSource: request.browserCookieSource
-          ), self.downloadBrowserCookieSource == request.browserCookieSource {
-            self.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
-            self.downloadBrowserCookieSource = nil
-            self.startDownload()
-            return
-          }
-          self.downloadNeedsBrowserCookies = Self.requiresBrowserCookies(
-            error,
-            urlString: request.urlString
-          )
-          self.finishDownloadTask(
-            taskID,
-            state: .failed(Self.downloadErrorText(error)),
-            showsCompletion: false
-          )
-        }
-      }
-    }
-    downloadTasks[taskID] = task
-  }
-
-  func cancelDownload(taskID: UUID) {
-    guard activeDownloadIDs.contains(taskID) else { return }
-    downloadTasks[taskID]?.cancel()
-    Task { [downloadService] in await downloadService.cancel(taskID: taskID) }
-  }
-
-  func cancelAllDownloads() {
-    for task in downloadTasks.values { task.cancel() }
-    Task { [downloadService] in await downloadService.cancelAll() }
-  }
-
-  private func finishDownloadTask(
-    _ taskID: UUID,
-    state: DownloadUIState,
-    showsCompletion: Bool
-  ) {
-    guard activeDownloadIDs.remove(taskID) != nil else { return }
-    downloadTasks[taskID] = nil
-    downloadTaskStates[taskID] = state
-
-    let wasActive = activeDownloadID == taskID
-    if wasActive,
-       let nextID = downloadTaskOrder.reversed().first(where: { activeDownloadIDs.contains($0) }),
-       let nextState = downloadTaskStates[nextID],
-       let nextURL = downloadTaskURLs[nextID] {
-      activeDownloadID = nextID
-      downloadState = nextState
-      beginVideoDownloadIsland(forURLString: nextURL)
-      if case .downloading(let fraction, _, _) = nextState {
-        updateVideoDownloadIsland(fraction: fraction, isFinished: false)
-      }
-    } else if wasActive {
-      activeDownloadID = nil
-      downloadState = state
-      if showsCompletion {
-        updateVideoDownloadIsland(fraction: 1, isFinished: true)
-      } else {
-        endVideoDownloadIsland()
-      }
-    }
-
-    downloadTaskStates[taskID] = nil
-    downloadTaskURLs[taskID] = nil
-    downloadTaskOrder.removeAll { $0 == taskID }
-    refreshActiveDownloads()
-  }
-
-  private func refreshActiveDownloads() {
-    activeDownloads = downloadTaskOrder.compactMap { taskID in
-      guard activeDownloadIDs.contains(taskID),
-            let state = downloadTaskStates[taskID],
-            let urlString = downloadTaskURLs[taskID]
-      else { return nil }
-      return DownloadTaskSnapshot(id: taskID, urlString: urlString, state: state)
-    }
-  }
-
-  private var normalizedDownloadURL: String? {
-    HTTPURLParser.url(from: downloadURL)?.absoluteString
-  }
-
-  private func selectedDownloadFormat(for urlString: String) -> DownloadFormatSelection? {
-    guard downloadFormatSelectionEnabled,
-          downloadFormatSourceURL == urlString,
-          let selectedDownloadFormat,
-          downloadFormatOptions.contains(where: { $0.selection == selectedDownloadFormat }) else {
-      return nil
-    }
-    return selectedDownloadFormat
-  }
-
-  private func resetDownloadFormatState() {
-    downloadFormatProbeGeneration += 1
-    downloadFormatProbeTask?.cancel()
-    downloadFormatProbeTask = nil
-    downloadFormatSourceURL = nil
-    downloadFormats = []
-    isLoadingDownloadFormats = false
-    downloadFormatSelectionEnabled = false
-    downloadFormatError = nil
-    selectedDownloadFormat = nil
-  }
-
-  private func finishDownloadFormatProbe(
-    _ result: DownloadFormatProbeResult,
-    urlString: String,
-    cookieSource: DownloadBrowserCookieSource?,
-    generation: Int
-  ) {
-    guard generation == downloadFormatProbeGeneration,
-          downloadFormatSourceURL == urlString,
-          downloadBrowserCookieSource == cookieSource else {
-      return
-    }
-    downloadFormatProbeTask = nil
-    if let browserCookieSource = result.browserCookieSource,
-       downloadBrowserCookieSource == nil {
-      downloadBrowserCookieSource = browserCookieSource
-    }
-    if let browserCookieSource = result.browserCookieSource,
-       !downloadBrowserCookieSources.contains(browserCookieSource) {
-      downloadBrowserCookieSources.append(browserCookieSource)
-    }
-    downloadFormatSourceURL = urlString
-    isLoadingDownloadFormats = false
-    downloadFormats = result.formats
-    downloadFormatSelectionEnabled = result.canSelectFormats
-    downloadFormatError = result.formats.isEmpty
-      ? AppLocalization.text("未找到可用格式")
-      : nil
-    downloadNeedsBrowserCookies = false
-  }
-
-  private func failDownloadFormatProbe(
-    _ error: Error,
-    urlString: String,
-    cookieSource: DownloadBrowserCookieSource?,
-    generation: Int
-  ) {
-    guard generation == downloadFormatProbeGeneration,
-          downloadFormatSourceURL == urlString,
-          downloadBrowserCookieSource == cookieSource else {
-      return
-    }
-    downloadFormatProbeTask = nil
-    if Self.shouldRetryWithoutBrowserCookies(error, browserCookieSource: cookieSource) {
-      downloadBrowserCookieSource = nil
-      refreshDownloadFormats()
-      return
-    }
-    isLoadingDownloadFormats = false
-    downloadFormatSelectionEnabled = false
-    selectedDownloadFormat = nil
-    let message = Self.downloadErrorText(error)
-    downloadFormatError = message
-    downloadNeedsBrowserCookies = Self.requiresBrowserCookies(
-      error,
-      urlString: urlString
-    )
-    if !hasActiveDownloads {
-      downloadState = .failed(message)
-    }
-  }
-
-  nonisolated static func headphoneMonitoringPolicy(
-    sideNoticesEnabled: Bool,
-    systemMonitorEnabled: Bool,
-    options: SystemMonitorHeadphoneOptions
-  ) -> Bool {
-    let needsHeadphones = options.replacesNetworkIcon || options.usesVolumeColor
-    return sideNoticesEnabled || (systemMonitorEnabled && needsHeadphones)
-  }
-
-  private func applyKeyboardSettings(_ settings: FeatureSettings) {
-    let allowsServices = FirstLaunchOnboardingRuntimePolicy.allowsKeyboardServices(
-      isOnboardingActive: isFirstLaunchOnboardingActive,
-      hasInputMonitoringAccess: GlobalHotkeyManager.hasInputMonitoringAccess
-    )
-    keyboardSound.apply(
-      enabled: settings.keyboardEnabled && allowsServices,
-      keyboardProfileID: settings.keyboardSelectedProfileID,
-      keyboardVolume: settings.keyboardVolume,
-      playsReleaseSound: settings.keyboardPlaysReleaseSound,
-      usesPitchVariation: settings.keyboardUsesPitchVariation,
-      typingStatsEnabled: settings.keyboardTypingStatsEnabled && allowsServices
-    )
-  }
-
-  /// Reconciles service lifecycles with settings; disabling AI stops pending quota work before notices are updated.
-  private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
-    dailyBriefing.configure(settings: settings.dailyBriefing, directory: saveLocations[.dailyBriefing],
-      language: languageStore.language)
-    if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
-      aiResultSweep.cancel()
-    }
-    windowPreview.setVisualStyle(settings.islandVisualStyle)
-    windowPreview.configure(
-      enabled: settings.windowPreviewsEnabled,
-      requestPermissions: requestWindowPreviewPermissions
-    )
-    // Regular UI appearance is controlled by user settings; the island panel is separately pinned to dark at the window level (see IslandPanel).
-    NSApp.appearance = settings.appearanceMode.nsAppearance
-    applyKeyboardSettings(settings)
-    media.setPreferredSource(settings.mediaSource)
-    voiceInput.setContextualStrings(
-      VoiceLexicon.contextualTerms(
-        for: settings.voiceEnabledLexicons,
-        customTerms: settings.voiceCustomHotwords
-      )
-    )
-    pomodoro.notificationsMuted = settings.notificationsMuted
-    pomodoro.userCareEnabled = settings.userCareEnabled
-    configureUpdatePolling(enabled: settings.updateChecksEnabled)
-    managedTools.setAutomaticUpdatesEnabled(
-      recommendedTools: settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled,
-      dependencyTools: settings.dependencyToolsAutomaticUpdatesEnabled
-    )
-    configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
-    clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
-    if settings.aiProgressEnabled {
-      aiMonitor.configureAccountBalanceProviders(settings.aiAccountBalanceMonitoredProviders,
-        qoderRegions: settings.aiAccountBalanceQoderRegions)
-      aiMonitor.start()
-      if selectedModule == .aiMonitor {
-        aiMonitor.loadUsageHistory()
-      }
-    } else {
-      aiMonitor.stop()
-      clearActiveAINotices()
-      powerAssertions.setAIActivityActive(false)
-    }
-    accountBalanceNotice.update(balances: aiMonitor.accountBalances, settings: settings, language: languageStore.language)
-    aiAgent.start()
-    syncAIActivityPowerAssertion(aiMonitor.state)
-    if settings.mediaEnabled || settings.dailyBriefing.enabled {
-      media.start()
-      updateSpectrumMonitoring()
-      consumeMediaSnapshot(media.snapshot)
-    } else {
-      media.stop()
-      clearMediaNotices()
-    }
-    if settings.volumeMixerEnabled {
-      applicationVolumes.start()
-    } else {
-      applicationVolumes.stop()
-    }
-    if !settings.weatherEnabled {
-      weatherTask?.cancel()
-      weatherSnapshotsByLocationID = [:]
-    }
-    systemMonitor.setHistoryRecordingEnabled(
-      settings.systemMonitorEnabled && settings.systemMetricsHistoryEnabled
-    )
-    systemAutoCleanup.apply(settings: settings)
-    if settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
-      systemMonitor.start()
-    } else {
-      systemMonitor.stop()
-    }
-    backgroundSounds.apply(
-      sound: settings.systemBackgroundSound,
-      enabled: settings.systemBackgroundSoundEnabled,
-      stopsWhenUnused: settings.systemBackgroundSoundStopsWhenUnused
-    )
-    consumeBackgroundSoundPlayback()
-    userCare.apply(settings: settings)
-    if settings.sideNoticesEnabled {
-      focusMode.start()
-    } else {
-      focusMode.stop()
-    }
-    let headphonePolicy = Self.headphoneMonitoringPolicy(
-      sideNoticesEnabled: settings.sideNoticesEnabled,
-      systemMonitorEnabled: settings.systemMonitorEnabled,
-      options: settings.systemMonitorMenuBarHeadphoneOptions
-    )
-    reconcileHeadphoneTransient(devices: audioOutput.devices)
-    SystemMonitorHeadphoneTransient.updateConnectionNotices(settings: settings, queue: notices)
-    if headphonePolicy {
-      audioOutput.start()
-    } else {
-      audioOutput.stop()
-    }
-    if settings.calendarEnabled {
-      calendar.start()
-    } else {
-      calendar.stop()
-    }
-    meetingCountdown.configure()
-    if settings.observesBrowserDownloads {
-      browserDownloads.start()
-      if settings.showsBrowserDownloadProgress {
-        consumeBrowserDownloadSnapshot(browserDownloads.snapshot)
-      } else {
-        clearBrowserDownloadNotices()
-      }
-    } else {
-      browserDownloads.stop()
-      clearBrowserDownloadNotices()
-    }
-    if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
-      battery.start()
-    } else {
-      battery.stop()
-    }
-    if automaticPowerModeLifecycleActive {
-      automaticPowerMode.apply(settings: settings, snapshot: battery.snapshot)
-    }
-    lowBatteryNotice.update(
-      snapshot: battery.snapshot,
-      enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
-    )
-    lowBatteryNotice.update(
-      devices: networkBattery.devices,
-      enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
-    )
-    if settings.systemMonitorEnabled {
-      networkBattery.start()
-    } else {
-      networkBattery.stop()
-    }
-    if settings.mailEnabled {
-      mail.start(accountNames: settings.mailAccountNames)
-    } else {
-      mail.stop()
-      hasLoadedMail = false
-      knownMailMessageIDs.removeAll()
-    }
-    if !settings.toolboxEnabled {
-      pomodoro.stop()
-      screenCleaning.stopAll()
-      cleaningPowerState = nil
-      powerAssertions.releaseAll()
-    }
-    if selectedModule == .agenda { refreshAgendaIfEnabled() }
-    clipboardMonitor.setEnabled(
-      settings.clipboardDetectionEnabled
-    )
-    // The shared pasteboard monitor feeds both history recording and the copy assistant.
-    clipboardHistoryMonitor.setEnabled(
-      settings.clipboardHistoryEnabled || settings.clipboardAssistantEnabled
-    )
-    clipboardAssistant.screenLayoutConfiguration = settings.islandScreenConfiguration
-    if settings.clipboardAssistantEnabled {
-      clipboardAssistant.setTriggers(
-        hotkey: settings.clipboardAssistantTriggerConfiguration.hotkey,
-        mouseButton: settings.clipboardAssistantMouseButton,
-        dismissHotkey: settings.clipboardAssistantDismissConfiguration.hotkey
-      )
-      clipboardAssistant.isLightweightMode = settings.clipboardAssistantLightweightMode
-      clipboardAssistant.displayDuration = settings.clipboardAssistantDisplayDuration
-      clipboardAssistant.presentation.visualStyle = settings.islandVisualStyle
-      clipboardAssistant.presentation.notchBackground = settings.islandNotchBackground
-      clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
-    } else {
-      clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil, dismissHotkey: nil)
-      clipboardAssistant.dismiss()
-    }
-    applyAssistantMouseGesture()
-    applicationOpenRepairPresenter.flush()
-    applicationOpenFailureMonitor.setEnabled(
-      settings.applicationOpenFailureMonitoringActive
-    ) { [weak self] url in self?.applicationOpenRepairPresenter.receive([url], fromSystemAlert: true) }
-    if !settings.downloaderEnabled, hasActiveDownloads {
-      cancelAllDownloads()
-    }
-    let durationChanged =
-      lastActivityNoticeDisplayDuration != settings.activityNoticeDisplayDuration
-    lastActivityNoticeDisplayDuration = settings.activityNoticeDisplayDuration
-    if settings.sideNoticesEnabled {
-      if durationChanged {
-        restartActivityNoticesForDurationChange()
-      }
-      consumeAIState(aiMonitor.state)
-      consumeMediaSnapshot(media.snapshot)
-      consumeFocusModeStatus(focusMode.status, showsTransition: false)
-      refreshUpdateNotices()
-    } else {
-      // Output tasks still belong on the dashboard when side notices are disabled.
-      for notice in notices.left + notices.right where !notice.id.hasPrefix(ScreenRecordingOperationNotice.prefix) {
-        notices.remove(id: notice.id)
-      }
-      activeAINoticeIDs.removeAll()
-      activityNoticeShownIDs.removeAll()
-      mediaActivityPresented = false
-      notices.removeAll(withIDPrefix: updateNoticePrefix)
-    }
-    voiceInputInputMonitoringAccessGranted = GlobalHotkeyManager.hasInputMonitoringAccess
-    if settings.voiceInputEnabled {
-      let preset = settings.voiceInputHotkeyPreset
-      let mode = settings.voiceInputMode
-      let registration = hotkeyManager.register(
-        hotkey: preset,
-        onKeyDown: { [weak self] in
-          guard let self else { return }
-          switch mode {
-          case .toggle:
-            self.voiceInput.toggle()
-          case .pushToTalk:
-            self.voiceInput.start()
-          }
-        },
-        onKeyUp: { [weak self] in
-          guard let self else { return }
-          if mode == .pushToTalk {
-            self.voiceInput.stop()
-          }
-        }
-      )
-      if registration == .registrationFailed {
-        transientMessage = AppLocalization.text("无法注册语音输入快捷键")
-      }
-    } else {
-      voiceInput.cancel()
-      hotkeyManager.unregister()
-    }
-    refreshToolboxReminderNotice()
-
-  }
-
-  private func configureUpdatePolling(enabled: Bool) {
-    if enabled {
-      checkForUpdates(manual: false)
-    } else {
-      updateFeedResolver.cancelAutomaticConfiguration()
-      _ = sparkleUpdateController?.configure(
-        channel: settingsStore.settings.updateChannel,
-        checksEnabled: false,
-        automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled,
-        feedPreference: updateFeedResolver.preference ?? .giteeFirst
-      ) == true
-    }
-    guard isUpdatePollingEnabled != enabled else { return }
-    isUpdatePollingEnabled = enabled
-    updatePollingTask?.cancel()
-    updatePollingTask = nil
-    guard enabled else {
-      return
-    }
-
-    updatePollingTask = Task { [weak self] in
-      while !Task.isCancelled {
-        guard let self else { return }
-        await self.aiAgent.refreshCLIs()
-        guard !Task.isCancelled else { return }
-        do {
-          try await Task.sleep(for: .seconds(600))
-        } catch {
-          return
-        }
-      }
-    }
-  }
-
-  private func configureVoiceRecordingCleanup(policy: VoiceRecordingCleanupPolicy) {
-    guard appliedVoiceRecordingCleanupPolicy != policy else { return }
-    appliedVoiceRecordingCleanupPolicy = policy
-    voiceRecordingCleanupTask?.cancel()
-    voiceRecordingCleanupTask = nil
-    voiceHistory.cleanupOldRecordings(policy: policy)
-    guard let days = policy.daysThreshold else { return }
-
-    voiceRecordingCleanupTask = Task { [weak self] in
-      while !Task.isCancelled {
-        do {
-          try await Task.sleep(for: .seconds(days * 24 * 60 * 60))
-        } catch {
-          return
-        }
-        guard let self, !Task.isCancelled else { return }
-        self.voiceHistory.cleanupOldRecordings(policy: policy)
-      }
-    }
-  }
-
-  private func refreshUpdateNotices() {
-    guard settingsStore.settings.sideNoticesEnabled else {
-      notices.removeAll(withIDPrefix: updateNoticePrefix)
-      return
-    }
-
-    let selectedUpdate: (id: String, title: String, symbol: String)?
-    if productUpdateAvailable {
-      selectedUpdate = ("product", "Zisla", "app.fill")
-    } else if let update = aiAgent.cliUpdates.first {
-      selectedUpdate = ("cli-\(update.kind.rawValue)", update.kind.displayName, "sparkles")
-    } else {
-      selectedUpdate = nil
-    }
-    guard let selectedUpdate else {
-      notices.removeAll(withIDPrefix: updateNoticePrefix)
-      return
-    }
-
-    let left = IslandNotice(
-      id: "\(updateNoticePrefix)\(selectedUpdate.id)-left",
-      title: selectedUpdate.title,
-      kind: .info,
-      side: .left,
-      style: .status,
-      symbolName: selectedUpdate.symbol
-    )
-    let right = IslandNotice(
-      id: "\(updateNoticePrefix)\(selectedUpdate.id)-right",
-      title: "查看更新",
-      kind: .info,
-      side: .right,
-      style: .status,
-      symbolName: "arrow.up.circle"
-    )
-    let activeIDs = Set([left.id, right.id])
-    for notice in notices.left + notices.right where notice.id.hasPrefix(updateNoticePrefix) && !activeIDs.contains(notice.id) {
-      notices.remove(id: notice.id)
-    }
-    if !notices.updateIfPresent(left) { notices.enqueue(left, expiresAfter: nil) }
-    if !notices.updateIfPresent(right) { notices.enqueue(right, expiresAfter: nil) }
-  }
-
-  // MARK: - Voice model discovery
-
-  private func deliverVoiceRecording(_ recording: VoiceRecordingResult) {
-    let inputTarget = voiceInputTarget
-    let targetProcessIdentifier = voiceInputTargetProcessIdentifier
-    let targetMouseLocation = voiceInputTargetMouseLocation
-    voiceInputTarget = nil
-    voiceInputTargetProcessIdentifier = nil
-    voiceInputTargetMouseLocation = nil
-    let rawTranscript = recording.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-    let retainsAudio = settingsStore.settings.voiceRecordingRetentionEnabled
-    let enabledVoiceLexicons = settingsStore.settings.voiceEnabledLexicons
-    let customVoiceHotwords = settingsStore.settings.voiceCustomHotwords
-    let structuredFormattingEnabled = settingsStore.settings.voiceStructuredFormattingEnabled
-    let historySaved = voiceHistory.record(recording, retainAudio: retainsAudio)
-    guard !rawTranscript.isEmpty else {
-      transientMessage = historySaved
-        ? (retainsAudio ? AppLocalization.text("录音已保存，但未识别到文字") : "未识别到文字")
-        : (retainsAudio ? AppLocalization.text("录音文件已保留，但记录索引保存失败") : AppLocalization.text("语音记录保存失败"))
-      return
-    }
-    let lexiconNormalizedTranscript = VoiceTranscriptPunctuation.normalize(
-      VoiceLexicon.normalizeTranscript(
-        rawTranscript,
-        for: enabledVoiceLexicons,
-        customTerms: customVoiceHotwords
-      ),
-      customHotwords: customVoiceHotwords
-    )
-    let localTranscriptSaved = lexiconNormalizedTranscript == rawTranscript
-      || voiceHistory.updateProcessedTranscript(
-        id: recording.id,
-        transcript: lexiconNormalizedTranscript
-      )
-    let processingTarget: AIProcessingTarget?
-    do {
-      processingTarget = try Self.voicePostProcessingTarget(
-        for: selectedVoiceModelConfiguration,
-        store: aiAgent.store
-      )
-    } catch {
-      deliverVoiceTranscript(
-        lexiconNormalizedTranscript,
-        to: targetProcessIdentifier,
-        at: targetMouseLocation,
-        target: inputTarget,
-        message: AppLocalization.text("语音转写完成；整理失败")
-      )
-      return
-    }
-    guard let target = processingTarget else {
-      deliverVoiceTranscript(
-        lexiconNormalizedTranscript,
-        to: targetProcessIdentifier,
-        at: targetMouseLocation,
-        target: inputTarget,
-        message: historySaved && localTranscriptSaved ? AppLocalization.text("语音转写已保存") : AppLocalization.text("语音转写完成；记录保存失败")
-      )
-      return
-    }
-    // Recording already ended and the island HUD is gone, so without this the cleanup round-trip
-    // looks like the shortcut simply swallowed the dictation.
-    transientMessage = AppLocalization.text("正在整理语音…")
-    beginVoiceProcessingIndicator()
-    voicePostProcessingQueue.enqueue { [weak self] in
-      guard let self else { return }
-      defer { self.endVoiceProcessingIndicator() }
-      do {
-        let processed = try await VoiceTranscriptPostProcessor.process(
-          rawTranscript: rawTranscript,
-          lexiconNormalizedTranscript: lexiconNormalizedTranscript,
-          enabledLexicons: enabledVoiceLexicons,
-          customHotwords: customVoiceHotwords,
-          structuredFormattingEnabled: structuredFormattingEnabled,
-          proofreadingEnabled: target.requiresVoiceProofreading
-        ) { systemPrompt, messages in
-          try await self.complete(using: target, systemPrompt: systemPrompt, messages: messages)
-        }
-        guard !Task.isCancelled else { return }
-        let delivered = VoiceLexicon.normalizeTranscript(
-          processed,
-          for: enabledVoiceLexicons,
-          customTerms: customVoiceHotwords,
-          contextualTranscript: rawTranscript
+        detection.actions = ClipboardAssistantActionOrder.ordered(
+            detection.actions,
+            for: detection.kind,
+            using: orders
         )
-        let processedTranscriptSaved = self.voiceHistory.updateProcessedTranscript(
-          id: recording.id,
-          transcript: delivered
-        )
-        self.deliverVoiceTranscript(
-          delivered,
-          to: targetProcessIdentifier,
-          at: targetMouseLocation,
-          target: inputTarget,
-          message: historySaved && processedTranscriptSaved
-            ? AppLocalization.text("语音整理结果已保存")
-            : AppLocalization.text("语音整理完成；记录保存失败")
-        )
-      } catch is CancellationError {
-        return
-      } catch {
-        guard !Task.isCancelled else { return }
-        self.deliverVoiceTranscript(
-          lexiconNormalizedTranscript,
-          to: targetProcessIdentifier,
-          at: targetMouseLocation,
-          target: inputTarget,
-          message: "语音转写完成；整理失败"
-        )
-      }
+        return detection
     }
-  }
 
-  /// Shows the collapsed-island "voice processing" wings (left: mic, right: a random thinking orb)
-  /// for the duration of AI transcript cleanup. Each run picks a fresh random orb animation.
-  private func beginVoiceProcessingIndicator() {
-    voiceProcessingOperationCount += 1
-    guard !isProcessingVoiceTranscript else { return }
-    isProcessingVoiceTranscript = true
-    let orbState = ThinkingOrbState.taskStates.randomElement() ?? .working
-    let left = IslandNotice(
-      id: "voice-processing-left",
-      title: "正在整理语音",
-      kind: .info,
-      side: .left,
-      style: .status,
-      symbolName: "mic.fill",
-      metadata: ["orbState": orbState.rawValue]
-    )
-    let right = IslandNotice(
-      id: "voice-processing-right",
-      title: "正在整理语音",
-      kind: .info,
-      side: .right,
-      style: .status,
-      metadata: ["orbState": orbState.rawValue]
-    )
-    for notice in [left, right] {
-      if !notices.updateIfPresent(notice) {
-        notices.enqueue(notice, expiresAfter: nil)
-      }
-    }
-  }
-
-  private func endVoiceProcessingIndicator() {
-    voiceProcessingOperationCount = max(0, voiceProcessingOperationCount - 1)
-    guard voiceProcessingOperationCount == 0, isProcessingVoiceTranscript else { return }
-    isProcessingVoiceTranscript = false
-    notices.remove(id: "voice-processing-left")
-    notices.remove(id: "voice-processing-right")
-  }
-
-  static func voicePostProcessingTarget(
-    for reference: AIModelConfigurationReference?,
-    store: AIAgentStore,
-    requiresModel: Bool = true
-  ) throws -> AIProcessingTarget? {
-    guard let reference else { return nil }
-    switch reference.source {
-    case .local:
-      guard let configuration = store.localModel(id: reference.id),
-            configuration.isEnabled else {
-        return nil
-      }
-      let model = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !requiresModel || !model.isEmpty else { return nil }
-      return .http(
-        endpoint: configuration.endpoint,
-        protocolKind: .openAICompatible,
-        model: model,
-        apiKey: try store.secret(for: configuration),
-        effort: nil,
-        localInference: true,
-        localThinkingEnabled: configuration.thinkingEnabled
-      )
-    case .channel:
-      guard let channel = store.channel(id: reference.id),
-            channel.isEnabled,
-            channel.protocolKind == .openAICompatible || channel.protocolKind == .anthropicMessages,
-            let endpointGroup = channel.endpointGroups.first,
-            let baseURL = endpointGroup.baseURLs.first?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !baseURL.isEmpty,
-            let accountID = endpointGroup.accountIDs.first,
-            let account = store.account(id: accountID),
-            account.credentialKind == .apiKey,
-            let apiKey = try? store.secret(for: account),
-            !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-        return nil
-      }
-      let model = channel.defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !model.isEmpty else { return nil }
-      return .http(
-        endpoint: AIEndpoint(name: channel.name, baseURL: baseURL, kind: .openAICompatible),
-        protocolKind: channel.protocolKind,
-        model: model,
-        apiKey: apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
-        effort: channel.effort,
-        localInference: false,
-        localThinkingEnabled: false
-      )
-    }
-  }
-
-  private func complete(
-    using target: AIProcessingTarget,
-    systemPrompt: String,
-    messages: [AIOutboundMessage]
-  ) async throws -> String {
-    switch target {
-    case let .http(endpoint, protocolKind, model, apiKey, effort, localInference, localThinkingEnabled):
-      return try await AIChatClient().complete(
-        endpoint: endpoint,
-        protocolKind: protocolKind,
-        model: model,
-        systemPrompt: systemPrompt,
-        messages: messages,
-        apiKey: apiKey,
-        effort: effort,
-        localInference: localInference,
-        localThinkingEnabled: localThinkingEnabled
-      ).content
-    case let .cliProfile(accountID, model):
-      return try await aiAgent.completeWithCLIProfile(
-        accountID: accountID,
-        systemPrompt: systemPrompt,
-        messages: messages,
-        model: model
-      )
-    }
-  }
-
-  private func deliverVoiceTranscript(
-    _ transcript: String,
-    to targetProcessIdentifier: pid_t?,
-    at targetMouseLocation: CGPoint?,
-    target: VoiceTranscriptDeliveryTarget?,
-    message: String
-  ) {
-    switch voiceTranscriptDelivery.deliver(
-      transcript,
-      to: targetProcessIdentifier,
-      at: targetMouseLocation,
-      target: target
+    /// Currency conversions resolve in two steps: the detector recognizes the shape synchronously
+    /// and the toast shows the copied text, then the live rate is fetched here and the detection
+    /// is refreshed with the converted amount. The quote is always fetched at conversion time —
+    /// never cached — so the result reflects the market at the moment of the copy.
+    private func scheduleCurrencyConversionUpdate(
+        for detection: ClipboardAssistantDetection,
+        content: ClipboardHistoryContent,
+        sourceApplication: NSRunningApplication?,
+        orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
+        presentationGeneration: Int
     ) {
-    case .copiedAndPasted:
-      transientMessage = AppLocalization.text("%@；已输入当前文本框并复制", message)
-    case .copiedOnly:
-      if targetProcessIdentifier != nil, !CGPreflightPostEventAccess() {
-        transientMessage = AppLocalization.text("%@；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试", message)
-      } else {
-        transientMessage = AppLocalization.text("%@；已复制，未能输入原文本框", message)
-      }
-    case .copyFailed:
-      transientMessage = AppLocalization.text("无法复制语音转写结果")
-    }
-  }
-
-  func playVoiceRecording(id: UUID) {
-    guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
-          let url = voiceHistory.audioURL(for: entry) else {
-      transientMessage = AppLocalization.text("无法播放该语音原文件")
-      return
-    }
-    if voiceRecordingPlayer.play(id: id, url: url) {
-      transientMessage = AppLocalization.text("正在播放原始录音")
-    } else {
-      transientMessage = AppLocalization.text("无法播放该语音原文件")
-    }
-  }
-
-  func revealVoiceRecording(id: UUID) {
-    guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
-          let url = voiceHistory.audioURL(for: entry) else {
-      transientMessage = AppLocalization.text("未找到该语音原文件")
-      return
-    }
-    NSWorkspace.shared.activateFileViewerSelecting([url])
-  }
-
-  func openVoiceRecordingsDirectory() {
-    do {
-      try FileManager.default.createDirectory(
-        at: AppPaths.voiceRecordings,
-        withIntermediateDirectories: true
-      )
-      NSWorkspace.shared.open(AppPaths.voiceRecordings)
-    } catch {
-      transientMessage = AppLocalization.text("无法打开语音记录目录：%@", error.localizedDescription)
-    }
-  }
-
-  func removeVoiceRecording(id: UUID) {
-    voiceRecordingPlayer.stop()
-    voiceHistory.remove(id: id)
-  }
-
-  func removeVoiceRecordings(ids: Set<UUID>) {
-    guard !ids.isEmpty else { return }
-    voiceRecordingPlayer.stop()
-    voiceHistory.removeBatch(ids: ids)
-  }
-
-  func removeAllVoiceRecordings() {
-    voiceRecordingPlayer.stop()
-    voiceHistory.removeAll()
-  }
-
-  private static func frontmostVoiceInputTargetProcessIdentifier() -> pid_t? {
-    guard let application = NSWorkspace.shared.frontmostApplication,
-          application.processIdentifier != NSRunningApplication.current.processIdentifier else {
-      return nil
-    }
-    return application.processIdentifier
-  }
-
-  /// Tests the current model endpoint and discovers available models.
-  func discoverModels() {
-    voiceModelDiscoveryTask?.cancel()
-    voiceModelDiscoveryTask = nil
-    voiceModelDiscoveryGeneration &+= 1
-    let generation = voiceModelDiscoveryGeneration
-    let processingTarget: AIProcessingTarget?
-    do {
-      processingTarget = try Self.voicePostProcessingTarget(
-        for: selectedVoiceModelConfiguration,
-        store: aiAgent.store,
-        requiresModel: false
-      )
-    } catch {
-      voiceModelDiscoveryState = .failed(AppLocalization.text("无法读取模型凭据"))
-      discoveredModels = []
-      return
-    }
-    guard let target = processingTarget else {
-      voiceModelDiscoveryState = .failed(AppLocalization.text("请先在上方添加、启用并选择一个模型配置"))
-      discoveredModels = []
-      return
-    }
-    guard case let .http(endpoint, _, _, apiKey, _, _, _) = target else {
-      voiceModelDiscoveryState = .failed(AppLocalization.text("官方 CLI 档案不支持 API 模型发现"))
-      discoveredModels = []
-      return
-    }
-    voiceModelDiscoveryState = .testing
-    voiceModelDiscoveryTask = Task { @MainActor [weak self] in
-      let service = AIModelDiscoveryService()
-      do {
-        let models = try await service.models(for: endpoint, apiKey: apiKey)
-        guard let self,
-              !Task.isCancelled,
-              self.voiceModelDiscoveryGeneration == generation
+        currencyConversionTask?.cancel()
+        guard detection.kind == .conversion,
+              case .currencyExpression(let amount, let amountText, let source, let target)? = detection.detail
         else { return }
-        self.discoveredModels = models
-        self.voiceModelDiscoveryState = .success(models.count)
-        self.voiceModelDiscoveryTask = nil
-      } catch is CancellationError {
-        return
-      } catch {
-        guard let self,
-              !Task.isCancelled,
-              self.voiceModelDiscoveryGeneration == generation
-        else { return }
-        self.voiceModelDiscoveryState = .failed(error.localizedDescription)
-        self.discoveredModels = []
-        self.voiceModelDiscoveryTask = nil
-      }
-    }
-  }
-
-  var selectedVoiceModelConfiguration: AIModelConfigurationReference? {
-    let reference = settingsStore.settings.voiceModelConfiguration
-    guard let reference, isSelectableVoiceModelConfiguration(reference) else { return nil }
-    return reference
-  }
-
-  func selectVoiceModelConfiguration(_ reference: AIModelConfigurationReference?) {
-    guard let reference else {
-      settingsStore.settings.voiceModelConfiguration = nil
-      resetVoiceModelDiscovery()
-      return
-    }
-    guard isSelectableVoiceModelConfiguration(reference) else {
-      settingsStore.settings.voiceModelConfiguration = nil
-      resetVoiceModelDiscovery()
-      return
-    }
-    settingsStore.settings.voiceModelConfiguration = reference
-    resetVoiceModelDiscovery()
-  }
-
-  private func isSelectableVoiceModelConfiguration(_ reference: AIModelConfigurationReference) -> Bool {
-    switch reference.source {
-    case .local:
-      aiAgent.store.localModel(id: reference.id)?.isEnabled == true
-    case .channel:
-      aiAgent.store.channel(id: reference.id)?.isEnabled == true
-    }
-  }
-
-  func voiceModelConfigurationTitle(_ reference: AIModelConfigurationReference) -> String {
-    switch reference.source {
-    case .local:
-      guard let configuration = aiAgent.store.localModel(id: reference.id) else { return "本地模型" }
-      let modelName = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
-      return modelName.isEmpty ? configuration.name : modelName
-    case .channel:
-      guard let channel = aiAgent.store.channel(id: reference.id) else { return AppLocalization.text("远端模型") }
-      let modelName = channel.defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
-      return modelName.isEmpty ? channel.name : modelName
-    }
-  }
-
-  func voiceModelConfigurationDetail(_ reference: AIModelConfigurationReference) -> String {
-    switch reference.source {
-    case .local:
-      guard let model = aiAgent.store.localModel(id: reference.id) else { return "" }
-      return AppLocalization.text("本地 · %@", "\(model.endpoint.baseURL)")
-    case .channel:
-      guard let channel = aiAgent.store.channel(id: reference.id) else { return "" }
-      let credentialKinds = channel.endpointGroups
-        .flatMap(\.accountIDs)
-        .compactMap { aiAgent.store.account(id: $0)?.credentialKind.displayName }
-        .map(AppLocalization.text(_:))
-      let credential = credentialKinds.first ?? AppLocalization.text("未配置凭据")
-      return AppLocalization.text("远端 · %@", credential)
-    }
-  }
-
-  private func resetVoiceModelDiscovery() {
-    voiceModelDiscoveryTask?.cancel()
-    voiceModelDiscoveryTask = nil
-    voiceModelDiscoveryGeneration &+= 1
-    discoveredModels = []
-    voiceModelDiscoveryState = .idle
-  }
-
-  private func restartActivityNoticesForDurationChange() {
-    for id in activeAINoticeIDs {
-      notices.remove(id: id)
-    }
-    activityNoticeShownIDs.removeAll()
-    clearMediaNotices()
-  }
-
-  private func consumeAIState(_ state: AIState) {
-    let settings = settingsStore.settings
-    syncAIActivityPowerAssertion(state)
-    guard settings.aiProgressEnabled else { return }
-
-    let activeTasks = state.tasks.filter(\.status.isActive)
-    let nextActiveNoticeIDs = Set(activeTasks.map(activeAINoticeID(for:)))
-    for id in activeAINoticeIDs.subtracting(nextActiveNoticeIDs) {
-      notices.remove(id: id)
-      activityNoticeShownIDs.remove(id)
-    }
-    activeAINoticeIDs = nextActiveNoticeIDs
-    if settings.sideNoticesEnabled {
-      let expiresAfter = settings.activityNoticeDisplayDuration.expiresAfter
-      for task in activeTasks {
-        let notice = IslandNotice(
-          id: activeAINoticeID(for: task),
-          title: task.title,
-          detail: task.detail,
-          kind: task.status.noticeKind,
-          side: noticeSide(for: task.provider),
-          createdAt: task.updatedAt,
-          progress: task.progress
-        )
-        if notices.updateIfPresent(notice) {
-          continue
+        currencyConversionTask = Task { [weak self, exchangeRateService] in
+            do {
+                let quote = try await exchangeRateService.fetchRate(source, target)
+                guard !Task.isCancelled else { return }
+                await MainActor.run { [weak self] in
+                    self?.presentCurrencyConversionResult(
+                        amount: amount,
+                        amountText: amountText,
+                        sourceCurrencyCode: source,
+                        targetCurrencyCode: target,
+                        quote: quote,
+                        moneyConversion: detection.moneyConversion,
+                        content: content,
+                        sourceApplication: sourceApplication,
+                        orders: orders,
+                        presentationGeneration: presentationGeneration
+                    )
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run { [weak self] in
+                    self?.presentCurrencyConversionFailure(
+                        amountText: amountText,
+                        sourceCurrencyCode: source,
+                        targetCurrencyCode: target,
+                        presentationGeneration: presentationGeneration
+                    )
+                }
+            }
         }
-        let statusChanged = taskStatuses[task.id].map { $0 != task.status } ?? false
-        guard !activityNoticeShownIDs.contains(notice.id) || statusChanged else { continue }
-        notices.enqueue(notice, expiresAfter: expiresAfter)
-        activityNoticeShownIDs.insert(notice.id)
-      }
     }
 
-    for notice in state.notices where notice.createdAt >= launchDate.addingTimeInterval(-2) {
-      guard knownNoticeIDs.insert(notice.id).inserted else { continue }
-      if settings.sideNoticesEnabled { notices.enqueue(notice) }
+    /// Replaces the pending conversion toast with the converted amount, rebuilding the universal
+    /// actions the same way the synchronous presentation did.
+    private func presentCurrencyConversionResult(
+        amount: Double,
+        amountText: String,
+        sourceCurrencyCode: String,
+        targetCurrencyCode: String,
+        quote: ExchangeRateQuote,
+        moneyConversion: ClipboardAssistantMoneyConversion?,
+        content: ClipboardHistoryContent,
+        sourceApplication: NSRunningApplication?,
+        orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
+        presentationGeneration: Int
+    ) {
+        guard let result = Self.currencyConversionResult(
+            amount: amount, amountText: amountText,
+            sourceCurrencyCode: sourceCurrencyCode, targetCurrencyCode: targetCurrencyCode,
+            quote: quote, moneyConversion: moneyConversion, locale: AppLocalization.currentLanguage.locale
+        ) else {
+            presentCurrencyConversionFailure(
+                amountText: amountText, sourceCurrencyCode: sourceCurrencyCode,
+                targetCurrencyCode: targetCurrencyCode, presentationGeneration: presentationGeneration
+            )
+            return
+        }
+        let detection = Self.augmentedClipboardAssistantDetection(
+            result,
+            content: content,
+            sourceApplication: sourceApplication,
+            orders: orders
+        )
+        clipboardAssistant.updateDetection(detection, for: presentationGeneration)
     }
 
-    for task in state.tasks {
-      let previous = taskStatuses[task.id]
-      taskStatuses[task.id] = task.status
-      aiResultSweep.receive(previous: previous, task: task, observedSince: launchDate, settings: settings)
-    }
-  }
-
-  private func syncAIActivityPowerAssertion(_ state: AIState) {
-    let isActive = settingsStore.settings.aiProgressEnabled
-      && state.tasks.contains { $0.status.isActive }
-    powerAssertions.setAIActivityActive(isActive)
-  }
-
-  private func clearActiveAINotices() {
-    for id in activeAINoticeIDs {
-      notices.remove(id: id)
-      activityNoticeShownIDs.remove(id)
-    }
-    activeAINoticeIDs.removeAll()
-  }
-
-  private func consumeMailMessages(_ messages: [MailMessage]) {
-    let currentIDs = Set(messages.map(\.id))
-    defer { knownMailMessageIDs = currentIDs }
-    notices.removeAll(withIDPrefix: "mail-notification-")
-    guard settingsStore.settings.mailEnabled else {
-      hasLoadedMail = false
-      return
-    }
-    guard hasLoadedMail else {
-      hasLoadedMail = true
-      return
-    }
-    guard settingsStore.settings.sideNoticesEnabled else { return }
-
-    let newMessages = messages.filter { !$0.isRead && !knownMailMessageIDs.contains($0.id) }
-    guard let latest = newMessages.max(by: { $0.receivedAt < $1.receivedAt }) else { return }
-    let pair = MailNotification(
-      message: latest,
-      newMessageCount: newMessages.count,
-      pairID: latest.id
-    ).makeNotices()
-    notices.enqueue(pair.left)
-    notices.enqueue(pair.right)
-  }
-
-  private func reportMailOperation(
-    _ result: MailOperationResult,
-    successMessage: String
-  ) -> Bool {
-    switch result {
-    case .success:
-      transientMessage = successMessage
-      return true
-    case .failed(let message):
-      transientMessage = message
-      return false
-    }
-  }
-
-  private func consumeMediaSnapshot(_ snapshot: NowPlayingSnapshot?) {
-    defer { refreshToolboxReminderNotice() }
-    guard snapshot == media.snapshot else { return }
-    let settings = settingsStore.settings
-    updateSpectrumMonitoring()
-    guard settings.mediaEnabled,
-      settings.sideNoticesEnabled,
-      let snapshot,
-      snapshot.isPlaying
-    else {
-      clearMediaNotices()
-      consumeBackgroundSoundPlayback()
-      return
+    static func currencyConversionResult(
+        amount: Double,
+        amountText: String,
+        sourceCurrencyCode: String,
+        targetCurrencyCode: String,
+        quote: ExchangeRateQuote,
+        moneyConversion: ClipboardAssistantMoneyConversion?,
+        locale: Locale
+    ) -> ClipboardAssistantDetection? {
+        if let moneyConversion {
+            return ClipboardAssistantDetector.completedMoneyConversion(moneyConversion, rate: quote.rate, locale: locale)
+        }
+        let converted = amount * quote.rate
+        let title = Self.currencyConversionTitle(for: converted, currencyCode: targetCurrencyCode)
+        let rateText = ClipboardAssistantDetector.formatNumber(quote.rate)
+        let fullExpression =
+            "\(amountText) \(sourceCurrencyCode) = \(title) · 1 \(sourceCurrencyCode) = \(rateText) \(targetCurrencyCode)"
+        return ClipboardAssistantDetection(
+            kind: .conversion,
+            title: title,
+            detail: .currencyRate(
+                sourceCurrencyCode: sourceCurrencyCode,
+                targetCurrencyCode: targetCurrencyCode,
+                rate: quote.rate
+            ),
+            actions: [.copyText(title), .copyFullExpression(fullExpression)],
+            fullContent: fullExpression
+        )
     }
 
-    clearBackgroundSoundNotices()
-
-    let source =
-      snapshot.sourceApplication
-      ?? snapshot.sourceBundleIdentifier
-      ?? AppLocalization.text("媒体播放器")
-    let artworkData = MediaArtworkImageCache.displayData(
-      from: snapshot.artworkData,
-      fallback: snapshot.sourceIconData
-    )
-    let compactMetadata = ["compactLyric": MediaTextFormatting.lyricLine(snapshot, lyrics: snapshot.lyrics, date: .now)]
-    let leftNotice = IslandNotice(
-      id: "media-active-left",
-      title: source,
-      detail: snapshot.title,
-      kind: .info,
-      side: .left,
-      artworkData: artworkData,
-      metadata: compactMetadata
-    )
-    let rightNotice = IslandNotice(
-      id: "media-active-right",
-      title: "正在播放",
-      detail: [snapshot.title, snapshot.artist]
-        .filter { !$0.isEmpty }
-        .joined(separator: " · "),
-      kind: .info,
-      side: .right,
-      artworkData: artworkData,
-      metadata: compactMetadata
-    )
-
-    let leftVisible = notices.updateIfPresent(leftNotice)
-    let rightVisible = notices.updateIfPresent(rightNotice)
-    if leftVisible || rightVisible {
-      return
-    }
-    guard !mediaActivityPresented else { return }
-
-    let expiresAfter = settings.activityNoticeDisplayDuration.expiresAfter
-    notices.enqueue(leftNotice, expiresAfter: expiresAfter)
-    notices.enqueue(rightNotice, expiresAfter: expiresAfter)
-    mediaActivityPresented = true
-  }
-
-  static func shouldMonitorSpectrum(
-    mediaEnabled: Bool,
-    sideNoticesEnabled: Bool,
-    voiceInputIsCapturing: Bool,
-    isIslandVisible: Bool,
-    isPlaying: Bool,
-    backgroundSoundsPlaying: Bool
-  ) -> Bool {
-    !voiceInputIsCapturing
-      && mediaEnabled
-      // Core Audio fallback needs audibility before it can publish the first playback snapshot.
-      && (
-        sideNoticesEnabled
-          || isIslandVisible
-          || isPlaying
-          || backgroundSoundsPlaying
-      )
-  }
-
-  private func updateSpectrumMonitoring() {
-    let settings = settingsStore.settings
-    let voiceInputIsCapturing = voiceInput.isCapturingInput
-    let isPlaying = media.snapshot?.isPlaying == true
-    let hasVisiblePlaybackNotice = notices.left.contains {
-      mediaNoticeIDs.contains($0.id) || backgroundSoundNoticeIDs.contains($0.id)
-    } || notices.right.contains {
-      mediaNoticeIDs.contains($0.id) || backgroundSoundNoticeIDs.contains($0.id)
-    }
-    // Background sound counts as media playback: its waveform animates while the island
-    // is expanded even when no music app is playing.
-    media.setSpectrumVisualizationEnabled(
-      !voiceInputIsCapturing
-        && settings.mediaEnabled
-        && (isPlaying || backgroundSounds.isPlaying)
-        && (isIslandVisible || hasVisiblePlaybackNotice)
-    )
-    media.setSpectrumMonitoringEnabled(
-      Self.shouldMonitorSpectrum(
-        mediaEnabled: settings.mediaEnabled,
-        sideNoticesEnabled: settings.sideNoticesEnabled,
-        voiceInputIsCapturing: voiceInputIsCapturing,
-        isIslandVisible: isIslandVisible,
-        isPlaying: isPlaying,
-        backgroundSoundsPlaying: backgroundSounds.isPlaying
-      )
-    )
-  }
-
-  private func clearMediaNotices() {
-    for id in mediaNoticeIDs { notices.remove(id: id) }
-    mediaActivityPresented = false
-  }
-
-  private func consumeBackgroundSoundPlayback() {
-    let settings = settingsStore.settings
-    guard settings.sideNoticesEnabled,
-          backgroundSounds.isPlaying,
-          media.snapshot?.isPlaying != true
-    else {
-      clearBackgroundSoundNotices()
-      return
+    /// Network failure keeps the toast on screen with the copied expression, but without actions:
+    /// there is no converted amount to copy and silently falling back to plain text would hide
+    /// that a conversion was attempted.
+    private func presentCurrencyConversionFailure(
+        amountText: String,
+        sourceCurrencyCode: String,
+        targetCurrencyCode: String,
+        presentationGeneration: Int
+    ) {
+        let detection = ClipboardAssistantDetection(
+            kind: .conversion,
+            title: clipboardAssistantMessage("汇率获取失败"),
+            detail: .currencyExpression(
+                amount: 0,
+                amountText: amountText,
+                sourceCurrencyCode: sourceCurrencyCode,
+                targetCurrencyCode: targetCurrencyCode
+            ),
+            actions: []
+        )
+        clipboardAssistant.updateDetection(detection, for: presentationGeneration)
     }
 
-    let soundName = backgroundSounds.playingSound.map { AppLocalization.text($0.title) }
-      ?? AppLocalization.text("背景音")
-    let leftNotice = IslandNotice(
-      id: "background-sound-left",
-      title: soundName,
-      kind: .info,
-      side: .left
-    )
-    let rightNotice = IslandNotice(
-      id: "background-sound-right",
-      title: soundName,
-      kind: .info,
-      side: .right
-    )
-
-    if !notices.updateIfPresent(leftNotice) {
-      notices.enqueue(leftNotice, expiresAfter: nil)
+    /// Formats a converted amount with the current language's currency conventions
+    /// (e.g. "¥723.40" under zh-Hans, "$723.40" under en).
+    static func currencyConversionTitle(for value: Double, currencyCode: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currencyCode
+        formatter.locale = AppLocalization.currentLanguage.locale
+        return formatter.string(from: NSNumber(value: value))
+            ?? String(format: "%.2f %@", value, currencyCode)
     }
-    if !notices.updateIfPresent(rightNotice) {
-      notices.enqueue(rightNotice, expiresAfter: nil)
+
+    private func presentDetectedLink(_ url: URL) {
+        setDownloadURL(url.absoluteString)
+        selectModule(.download)
+        detectedLink = url
+        detectedLinkTask?.cancel()
+        detectedLinkTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(6))
+            } catch {
+                return
+            }
+            self?.detectedLink = nil
+        }
     }
-  }
 
-  private func clearBackgroundSoundNotices() {
-    for id in backgroundSoundNoticeIDs { notices.remove(id: id) }
-  }
-
-  private var headphoneTransientEnabled: Bool {
-    let settings = settingsStore.settings
-    return headphoneTransientLifecycleActive && settings.systemMonitorEnabled && settings.systemMonitorMenuBarCombinedIconEnabled
-      && settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon
-  }
-
-  private func clearHeadphoneTransient() {
-    headphoneTransientTask?.cancel()
-    headphoneTransientTask = nil
-    systemMonitorHeadphoneTransient = SystemMonitorHeadphoneTransient()
-  }
-
-  private func reconcileHeadphoneTransient(devices: [AudioOutputDevice]) {
-    systemMonitorHeadphoneTransient.reconcile(
-      enabled: headphoneTransientEnabled, settings: settingsStore.settings, devices: devices
-    )
-    if systemMonitorHeadphoneTransient.connection == nil {
-      clearHeadphoneTransient()
+    private func performClipboardAssistantAction(_ action: ClipboardAssistantAction) {
+        switch action {
+        case .openURL(let url):
+            NSWorkspace.shared.open(url)
+        case .openService(let service, let url):
+            clipboardServiceOpenTask?.cancel()
+            if service == .railway12306 {
+                clipboardServiceOpenTask = Task { @MainActor [weak self] in
+                    do {
+                        let destination = try await ClipboardAssistantRailwayURLResolver.resolve(url)
+                        guard !Task.isCancelled else { return }
+                        NSWorkspace.shared.open(destination)
+                    } catch {
+                        guard !Task.isCancelled else { return }
+                        self?.transientMessage = self?.clipboardAssistantMessage("无法完成操作")
+                    }
+                }
+            } else {
+                NSWorkspace.shared.open(url)
+            }
+        case .openApp(let bundleIdentifier, _):
+            openInstalledApplication(bundleIdentifier: bundleIdentifier)
+        case .repairAndOpenApp(let url):
+            guard applicationOpenRepairTask == nil else { return }
+            applicationOpenRepairTask = Task { [weak self] in
+                defer { self?.applicationOpenRepairTask = nil }
+                do {
+                    try await ApplicationOpenRepairService().repairAndOpen(at: url)
+                } catch is CancellationError {
+                    return
+                } catch let error as ApplicationOpenRepairError {
+                    self?.transientMessage = self?.clipboardAssistantMessage(error.localizationKey)
+                } catch {
+                    self?.transientMessage = self?.clipboardAssistantMessage("无法完成操作")
+                }
+            }
+        case .openDownload(let url):
+            setDownloadURL(url.absoluteString)
+            selectModule(.download)
+        case .revealInFinder(let url):
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        case .showContextNote(let id):
+            guard let item = shelf.items.first(where: { $0.id == id && $0.noteLocation != nil }) else { return }
+            contextNoteEditor.open(item)
+            selectModule(.shelf)
+            islandExpansionRequested = true
+        case .copyContextNote(let id):
+            guard let copyAction = Self.contextNoteCopyAction(id: id, in: shelf) else { return }
+            performClipboardAssistantAction(copyAction)
+        case .deleteContextNote(let id):
+            if !Self.deleteContextNote(id: id, from: shelf, editor: contextNoteEditor) {
+                transientMessage = shelf.errorDescription ?? clipboardAssistantMessage("无法完成操作")
+            }
+        case .openFolder(let url):
+            if !NSWorkspace.shared.open(url) {
+                transientMessage = clipboardAssistantMessage("无法完成操作")
+            }
+        case .compress(let url):
+            compressAssistantFile(url)
+        case .share:
+            guard let content = clipboardAssistantContent else {
+                transientMessage = clipboardAssistantMessage("无法完成操作")
+                clipboardAssistant.dismiss()
+                return
+            }
+            let items = transferItems(from: content)
+            guard !items.isEmpty else {
+                transientMessage = clipboardAssistantMessage("剪贴板没有可共享内容")
+                clipboardAssistant.dismiss()
+                return
+            }
+            guard let anchor = clipboardAssistant.sharingAnchorView else {
+                transientMessage = clipboardAssistantMessage("无法打开系统共享菜单")
+                clipboardAssistant.dismiss()
+                return
+            }
+            share(items, from: anchor)
+        case .search(let text):
+            let settings = settingsStore.settings
+            if let url = settings.clipboardAssistantSearchEngine.queryURL(
+                for: text,
+                customURL: settings.clipboardAssistantCustomSearchURL
+            ) {
+                NSWorkspace.shared.open(url)
+            } else {
+                transientMessage = clipboardAssistantMessage("无法完成操作")
+            }
+        case .autoTranslate(let text):
+            translationTask?.cancel()
+            let sourceChangeCount = NSPasteboard.general.changeCount
+            guard lastClipboardAssistantRoutingChangeCount == sourceChangeCount else { return }
+            clipboardAssistant.translate(
+                text,
+                targetLanguage: languageStore.language.translateTargetCode,
+                isSourceCurrent: { NSPasteboard.general.changeCount == sourceChangeCount }
+            ) { [weak self] result in
+                guard let self, ClipboardHistoryPasteboard.write(.text(result), onlyIfChangeCount: sourceChangeCount) else {
+                    return false
+                }
+                self.suppressedAssistantChangeCount = NSPasteboard.general.changeCount
+                return true
+            }
+        case .translate(let text):
+            // Translate in the browser using the interface language as the target.
+            let code = languageStore.language.translateTargetCode
+            translationTask?.cancel()
+            translationTask = Task { @MainActor [weak self] in
+                let provider = await Self.translationProviderForCurrentIP()
+                guard let self, !Task.isCancelled else { return }
+                if let url = ClipboardAssistantTranslate.url(
+                    text: text,
+                    targetLanguageCode: code,
+                    provider: provider
+                ) {
+                    NSWorkspace.shared.open(url)
+                } else {
+                    transientMessage = clipboardAssistantMessage("无法完成操作")
+                }
+            }
+        case .composeMail(let address):
+            if settingsStore.settings.mailEnabled {
+                mailComposeRequest = MailComposeRequest(recipient: address)
+                selectModule(.mail)
+                // The assistant fires from a collapsed island, so the compose page only becomes reachable
+                // once the island expands on its own.
+                islandExpansionRequested = true
+            } else {
+                openSystemMail(to: address)
+            }
+        case .copyText(let text), .copyFullExpression(let text), .copyEmoji(let text):
+            guard ClipboardHistoryPasteboard.write(.text(text)) else {
+                transientMessage = clipboardAssistantMessage("无法完成操作")
+                return
+            }
+            suppressedAssistantChangeCount = NSPasteboard.general.changeCount
+            transientMessage = clipboardAssistantMessage("已复制")
+        case .callPhone(let number):
+            if let url = URL(string: "tel:\(number)") {
+                NSWorkspace.shared.open(url)
+            } else {
+                transientMessage = clipboardAssistantMessage("无法完成操作")
+            }
+        case .blockSourceApp(let bundleIdentifier, _):
+            var settings = settingsStore.settings
+            settings.clipboardAssistantBlacklist.insert(bundleIdentifier)
+            settingsStore.settings = settings
+            clipboardAssistant.dismiss()
+        case .addToQuickNote:
+            guard let content = clipboardAssistantContent else {
+                transientMessage = clipboardAssistantMessage("无法完成操作")
+                return
+            }
+            receiveQuickNoteTransferItems(transferItems(from: content))
+        case .sendToTeleprompter:
+            guard case .text(let text)? = clipboardAssistantContent else {
+                transientMessage = clipboardAssistantMessage("无法完成操作")
+                return
+            }
+            sendQuickNoteToTeleprompter(text)
+        case .saveImage(let data):
+            saveClipboardImage(data)
+        case .saveText(let text):
+            saveAssistantText(text)
+        case .runShellCommand(let command):
+            Task { [weak self] in
+                do {
+                    try await ClipboardShellCommandRunner.runInTerminal(command)
+                } catch {
+                    self?.transientMessage = self?.clipboardAssistantMessage("无法在终端运行命令")
+                }
+            }
+        case .runShellCommandInBackground(let command):
+            do {
+                try ClipboardShellCommandRunner.runInBackground(command)
+            } catch {
+                transientMessage = clipboardAssistantMessage("无法在后台运行命令")
+            }
+        case .createCalendarEvent(let title, let date, let isAllDay):
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = .current
+            let end = isAllDay
+                ? calendar.date(byAdding: .day, value: 1, to: date)!
+                : date.addingTimeInterval(3_600)
+            presentAssistantCalendarEditor(ClipboardCalendarDraft(
+                title: title, startDate: date, endDate: end, isAllDay: isAllDay
+            ))
+        case .editCalendarEvent(let draft):
+            presentAssistantCalendarEditor(draft)
+        }
     }
-  }
 
-  private func consumeHeadphoneConnection(_ connection: HeadphoneConnection) {
-    systemMonitorHeadphoneTransient.receive(
-      connection, enabled: headphoneTransientEnabled, settings: settingsStore.settings
-    )
-    if systemMonitorHeadphoneTransient.connection?.id == connection.id {
-      headphoneTransientTask?.cancel()
-      headphoneTransientTask = Task { @MainActor [weak self] in
+    private nonisolated static func countryCodeForCurrentIP() async -> String? {
+        guard let url = URL(string: "https://ipinfo.io/country") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 5
         do {
-          try await Task.sleep(for: .seconds(SystemMonitorHeadphoneTransient.duration))
-        } catch { return }
-        guard !Task.isCancelled, let self else { return }
-        self.systemMonitorHeadphoneTransient.expire(connectionID: connection.id)
-        self.headphoneTransientTask = nil
-      }
-    }
-    SystemMonitorHeadphoneTransient.updateConnectionNotices(
-      settings: settingsStore.settings, queue: notices, connection: connection
-    )
-  }
-
-  private func consumeFocusModeStatus(
-    _ status: FocusModeStatus,
-    showsTransition: Bool
-  ) {
-    let settings = settingsStore.settings
-    guard settings.sideNoticesEnabled else {
-      clearFocusModeNotices()
-      return
-    }
-
-    let presentation = status.presentation
-    if status.isActive {
-      let notices = [
-        IslandNotice(
-          id: "focus-mode-left",
-          title: presentation.title,
-          kind: .info,
-          side: .left,
-          style: .status,
-          symbolName: presentation.symbolName
-        ),
-        IslandNotice(
-          id: "focus-mode-right",
-          title: "ON",
-          kind: .success,
-          side: .right,
-          style: .status
-        ),
-      ]
-      for notice in notices {
-        self.notices.remove(id: notice.id)
-        self.notices.enqueue(
-          notice,
-          expiresAfter: settings.focusModeNoticeDisplayDuration.expiresAfter
-        )
-      }
-    } else {
-      clearFocusModeNotices()
-    }
-
-    guard showsTransition else { return }
-    notices.enqueue(
-      IslandNotice(
-        id: "focus-transition",
-        title: presentation.title,
-        detail: AppLocalization.text(status.isActive ? "已开启" : "已关闭"),
-        kind: status.isActive ? .success : .info,
-        side: .left,
-        style: .status,
-        symbolName: presentation.symbolName
-      ),
-      expiresAfter: 3
-    )
-  }
-
-  private func clearFocusModeNotices() {
-    for id in focusModeNoticeIDs { notices.remove(id: id) }
-  }
-
-  private func enablePowerAssertionsForCleaning() {
-    if cleaningPowerState == nil {
-      cleaningPowerState = (
-        keepDisplayAwake: powerAssertions.keepDisplayAwake,
-        preventIdleSystemSleep: powerAssertions.preventIdleSystemSleep
-      )
-    }
-    powerAssertions.setKeepDisplayAwake(true)
-    powerAssertions.setPreventIdleSystemSleep(true)
-  }
-
-  private func restorePowerAssertionsAfterCleaning() {
-    guard let state = cleaningPowerState else { return }
-    cleaningPowerState = nil
-    powerAssertions.setKeepDisplayAwake(state.keepDisplayAwake)
-    powerAssertions.setPreventIdleSystemSleep(state.preventIdleSystemSleep)
-    refreshToolboxReminderNotice()
-  }
-
-  nonisolated static func shouldPresentToolboxReminder(settings: FeatureSettings, hasMedia: Bool) -> Bool {
-    settings.toolboxEnabled && settings.toolboxReminderEnabled && settings.sideNoticesEnabled
-      && (!hasMedia || (settings.supportsStatusIconsInIsland && settings.islandShowMoreInformation))
-  }
-
-  private func refreshToolboxReminderNotice() {
-    let settings = settingsStore.settings
-    guard !isPomodoroCountdownActive else {
-      clearToolboxReminderNotices()
-      return
-    }
-    guard Self.shouldPresentToolboxReminder(settings: settings, hasMedia: media.snapshot != nil),
-      let content = ToolboxReminder.content(
-        isScreenCleaning: screenCleaning.isScreenCleaning,
-        isKeyboardCleaning: screenCleaning.isKeyboardCleaning,
-        pomodoroMode: pomodoro.mode,
-        pomodoroPhase: pomodoro.phase,
-        pomodoroClock: pomodoro.displayClock,
-        keepDisplayAwake: powerAssertions.keepDisplayAwake,
-        preventIdleSystemSleep: powerAssertions.preventIdleSystemSleep
-      )
-    else {
-      clearToolboxReminderNotices()
-      return
-    }
-
-    let reminders = [
-      IslandNotice(
-        id: "toolbox-reminder-left",
-        title: content.title,
-        detail: content.compactTitle,
-        kind: .info,
-        side: .left
-      ),
-      IslandNotice(
-        id: "toolbox-reminder-right",
-        title: content.title,
-        detail: content.compactTitle,
-        kind: .info,
-        side: .right
-      ),
-    ]
-    for reminder in reminders where !notices.updateIfPresent(reminder) {
-      notices.enqueue(reminder, expiresAfter: nil)
-    }
-  }
-
-  private func clearToolboxReminderNotices() {
-    for id in toolboxReminderIDs where noticeExists(id: id) {
-      notices.remove(id: id)
-    }
-  }
-
-  private var canPresentUserCareMessage: Bool {
-    userCarePresentationAllowed()
-      && !voiceInput.isCapturingInput
-      && clipboardAssistant.presentation.detection == nil
-      && !isMirrorPresented && !isTeleprompterPresented
-      && !screenCleaning.isScreenCleaning && !screenCleaning.isKeyboardCleaning
-  }
-
-  @discardableResult
-  func presentUserCareMessage(_ reminder: UserCareReminder, throttlesNoteUpdates: Bool = false) -> Bool {
-    let uptime = ProcessInfo.processInfo.systemUptime
-    guard let message = userCareFeedback.message(
-      for: reminder,
-      settings: settingsStore.settings,
-      presentationAllowed: canPresentUserCareMessage,
-      currentMessage: transientMessage,
-      uptime: uptime,
-      language: languageStore.language,
-      throttlesNoteUpdates: throttlesNoteUpdates
-    ) else { return false }
-    transientMessage = message
-    // The shared setter revokes ownership even when another message repeats the same text.
-    userCareFeedback.didPresent(reminder, at: uptime)
-    return true
-  }
-
-  func clearUserCareMessage(routineOnly: Bool = false) {
-    guard userCareFeedback.dismiss(routineOnly: routineOnly) else { return }
-    transientMessage = nil
-  }
-
-  static func shouldPresentPomodoroCountdown(
-    mode: PomodoroMode,
-    phase: PomodoroPhase,
-    isScreenCleaning: Bool,
-    isKeyboardCleaning: Bool
-  ) -> Bool {
-    guard phase != .idle,
-      !isScreenCleaning,
-      !isKeyboardCleaning
-    else { return false }
-
-    switch mode {
-    case .focus, .rest:
-      return true
-    }
-  }
-
-  private var isPomodoroCountdownActive: Bool {
-    Self.shouldPresentPomodoroCountdown(
-      mode: pomodoro.mode,
-      phase: pomodoro.phase,
-      isScreenCleaning: screenCleaning.isScreenCleaning,
-      isKeyboardCleaning: screenCleaning.isKeyboardCleaning
-    )
-  }
-
-  private func refreshFocusCountdownNotice() {
-    guard settingsStore.settings.sideNoticesEnabled,
-      settingsStore.settings.focusCountdownIslandEnabled,
-      isPomodoroCountdownActive
-    else {
-      clearFocusCountdownNotices()
-      return
-    }
-
-    Self.refreshFocusCountdownNotices(for: pomodoro, in: notices)
-  }
-
-  static func refreshFocusCountdownNotices(for pomodoro: PomodoroService, in queue: SideNoticeQueue) {
-    let notices = [
-      pomodoro.focusCountdownNotice(for: .left),
-      pomodoro.focusCountdownNotice(for: .right),
-    ]
-    queue.removeAll(
-      withIDPrefix: PomodoroService.focusCountdownNoticeIDPrefix,
-      except: Set(notices.map(\.id))
-    )
-    for notice in notices {
-      let existing = (notice.side == .left ? queue.left : queue.right)
-        .first { $0.id == notice.id }
-      guard existing?.title != notice.title || existing?.detail != notice.detail
-        || existing?.progress != notice.progress else { continue }
-      if !queue.updateIfPresent(notice) {
-        queue.enqueue(notice, expiresAfter: nil)
-      }
-    }
-  }
-
-  private func clearFocusCountdownNotices() {
-    notices.removeAll(withIDPrefix: focusCountdownNoticePrefix)
-  }
-
-  /// The 3-second linger after completion is timed by `BrowserDownloadMonitor`; here we enqueue a persistent notice that clears together with it.
-  private func consumeBrowserDownloadSnapshot(_ snapshot: BrowserDownloadSnapshot?) {
-    guard settingsStore.settings.sideNoticesEnabled,
-      settingsStore.settings.browserDownloadIslandEnabled,
-      let snapshot
-    else {
-      clearBrowserDownloadNotices()
-      return
-    }
-
-    let updates = [NoticeSide.left, .right].map { side in
-      IslandNotice(
-        id: side == .left ? "browser-download-left" : "browser-download-right",
-        title: snapshot.fileName,
-        detail: snapshot.progressText,
-        kind: snapshot.isFinished ? .success : .info,
-        side: side,
-        progress: snapshot.fraction,
-        appName: snapshot.agent?.displayName,
-        appBundleIdentifier: snapshot.agent?.bundleIdentifier,
-        symbolName: snapshot.agent?.symbolName ?? "arrow.down.circle.fill"
-      )
-    }
-    for notice in updates where !notices.updateIfPresent(notice) {
-      notices.enqueue(notice, expiresAfter: nil)
-    }
-  }
-
-  private func clearBrowserDownloadNotices() {
-    for id in browserDownloadNoticeIDs where noticeExists(id: id) {
-      notices.remove(id: id)
-    }
-  }
-
-  /// Progress strip for the native downloader in the collapsed island. The 3-second linger on completion is handled by the queue's own expiry timer.
-  private func consumeVideoDownloadSnapshot(_ snapshot: VideoDownloadSnapshot?) {
-    guard settingsStore.settings.sideNoticesEnabled,
-      settingsStore.settings.videoDownloadIslandEnabled,
-      let snapshot
-    else {
-      clearVideoDownloadNotices()
-      return
-    }
-
-    let updates = [NoticeSide.left, .right].map { side in
-      IslandNotice(
-        id: side == .left ? "video-download-left" : "video-download-right",
-        title: snapshot.sourceName,
-        detail: snapshot.progressText,
-        kind: snapshot.isFinished ? .success : .info,
-        side: side,
-        progress: snapshot.fraction,
-        artworkData: videoDownloadFaviconData,
-        appName: snapshot.platform?.displayName ?? snapshot.host,
-        // Platform rawValue is passed through so the view can look up the bundled logo; falls back to artworkData favicon if no bundled logo is found.
-        appBundleIdentifier: snapshot.platform?.rawValue,
-        symbolName: "arrow.down.circle.fill"
-      )
-    }
-    for notice in updates {
-      let expiry: Double? = snapshot.isFinished ? 3 : nil
-      if snapshot.isFinished {
-        // Finished notices must be re-enqueued to attach the 3-second expiry; updateIfPresent does not schedule a timer.
-        notices.enqueue(notice, expiresAfter: expiry)
-      } else if !notices.updateIfPresent(notice) {
-        notices.enqueue(notice, expiresAfter: nil)
-      }
-    }
-  }
-
-  private func clearVideoDownloadNotices() {
-    for id in videoDownloadNoticeIDs where noticeExists(id: id) {
-      notices.remove(id: id)
-    }
-  }
-
-  private func beginVideoDownloadIsland(forURLString urlString: String) {
-    videoDownloadPlatform = VideoDownloadPlatformResolver.platform(forURLString: urlString)
-    videoDownloadHost = VideoDownloadPlatformResolver.bareHost(ofURLString: urlString)
-    videoDownloadFaviconData = nil
-    updateVideoDownloadIsland(fraction: nil, isFinished: false)
-
-    // Platforms with a bundled logo don't need a network fetch; sites not in the bundled library (including long-tail sites) fetch their own favicon.
-    guard videoDownloadPlatform?.bundledIconURL == nil, let host = videoDownloadHost else { return }
-    Task { [weak self, videoDownloadFavicons] in
-      let data = await videoDownloadFavicons.icon(forHost: host)
-      await MainActor.run {
-        guard let self, self.videoDownloadHost == host, let data else { return }
-        self.videoDownloadFaviconData = data
-        guard case .downloading(let fraction, _, _) = self.downloadState else {
-          self.updateVideoDownloadIsland(fraction: nil, isFinished: false)
-          return
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            return String(data: data, encoding: .utf8)
+        } catch {
+            return nil
         }
-        self.updateVideoDownloadIsland(fraction: fraction, isFinished: false)
-      }
     }
-  }
 
-  private func updateVideoDownloadIsland(fraction: Double?, isFinished: Bool) {
-    guard videoDownloadPlatform != nil || videoDownloadHost != nil else { return }
-    consumeVideoDownloadSnapshot(
-      VideoDownloadSnapshot(
-        platform: videoDownloadPlatform,
-        host: videoDownloadHost,
-        sourceName: videoDownloadPlatform?.displayName ?? videoDownloadHost ?? "下载",
-        fraction: fraction,
-        isFinished: isFinished
-      )
-    )
-    if isFinished { resetVideoDownloadSource() }
-  }
-
-  private func endVideoDownloadIsland() {
-    resetVideoDownloadSource()
-    clearVideoDownloadNotices()
-  }
-
-  private func resetVideoDownloadSource() {
-    videoDownloadPlatform = nil
-    videoDownloadHost = nil
-    videoDownloadFaviconData = nil
-  }
-
-  private func noticeExists(id: String) -> Bool {
-    notices.left.contains { $0.id == id } || notices.right.contains { $0.id == id }
-  }
-
-  private func noticeSide(for provider: AIProvider) -> NoticeSide {
-    switch provider {
-    case .claude, .gemini, .qwen, .trae, .doubao: .left
-    case .pi, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot, .muse: .right
-    case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .zed, .opencode, .harness: .right
+    private nonisolated static func translationProviderForCurrentIP() async -> ClipboardAssistantTranslate.Provider {
+        ClipboardAssistantTranslate.provider(forCountryCode: await countryCodeForCurrentIP())
     }
-  }
 
-  private func activeAINoticeID(for task: AIProgressTask) -> String {
-    AIMascotLibrary.activeNoticeID(for: task)
-  }
+    /// Launches a locally installed application by bundle identifier. The assistant
+    /// fires from a collapsed island, so activation must go through the workspace
+    /// API rather than `open(_:)` on a file URL.
+    private func openInstalledApplication(bundleIdentifier: String) {
+        guard let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+            transientMessage = clipboardAssistantMessage("无法打开应用")
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) { [weak self] _, error in
+            guard error != nil else { return }
+            Task { @MainActor [weak self] in
+                self?.transientMessage = self?.clipboardAssistantMessage("无法打开应用")
+            }
+        }
+    }
 
-  private func refreshAgendaIfEnabled() {
-    let settings = settingsStore.settings
-    if settings.weatherEnabled, isWeatherStale { refreshWeather() }
-    if settings.calendarEnabled {
-      Task { await calendar.refresh() }
+    private func openSystemMail(to address: String) {
+        guard let url = URL(string: "mailto:\(address)") else {
+            transientMessage = clipboardAssistantMessage("无法完成操作")
+            return
+        }
+        guard NSWorkspace.shared.open(url) else {
+            transientMessage = clipboardAssistantMessage("无法完成操作")
+            return
+        }
     }
-  }
 
-  func setDownloadDirectory(_ url: URL) throws {
-    try saveLocations.setDirectory(url, for: .download)
-  }
+    private func compressAssistantFile(_ source: URL) {
+        guard FileManager.default.fileExists(atPath: source.path) else {
+            transientMessage = clipboardAssistantMessage("无法完成操作")
+            return
+        }
+        let panel = NSSavePanel()
+        panel.directoryURL = source.deletingLastPathComponent()
+        panel.nameFieldStringValue = source.lastPathComponent + ".zip"
+        panel.allowedContentTypes = [.zip]
+        panel.canCreateDirectories = true
+        panel.prompt = clipboardAssistantMessage("压缩为 ZIP")
+        WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
 
-  private func dailyBriefingObservation(at date: Date) -> DailyBriefingObservation {
-    let application = NSWorkspace.shared.frontmostApplication
-    let bundle = application?.bundleURL.flatMap(Bundle.init(url:))
-    let session = CGSessionCopyCurrentDictionary() as? [String: Any]
-    let locked = session?["CGSSessionScreenIsLocked"] as? Bool ?? false
-    let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState,
-      eventType: CGEventType(rawValue: UInt32.max)!)
-    let hardware = systemMonitor.snapshot.map { snapshot in
-      let record = SystemMetricsRecord(snapshot: snapshot)
-      return DailyBriefingHardware(date: record.timestamp, powerWatts: record.systemPowerWatts,
-        batteryLevel: record.batteryLevel, fanRPM: record.fanRPMs.max())
+        Task { @MainActor [weak self] in
+            let error = await Task.detached(priority: .userInitiated) {
+                await Self.zipArchiveError(source: source, destination: destination)
+            }.value
+            guard let self else { return }
+            if let error {
+                self.transientMessage = self.clipboardAssistantMessage("操作失败：%@", error)
+            } else {
+                self.transientMessage = self.clipboardAssistantMessage("已保存到 %@", destination.path)
+            }
+        }
     }
-    return DailyBriefingObservation(
-      date: date,
-      applicationID: application?.bundleIdentifier ?? "unknown",
-      applicationName: application?.localizedName ?? AppLocalization.text("未知应用"),
-      category: DailyBriefingCategory(applicationCategory: bundle?.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String),
-      isActive: !locked && idle < 60 && application != nil,
-      isListening: media.isAvailable ? (media.snapshot.map { $0.isPlaying && !$0.isVideo } ?? false) : nil,
-      hardware: hardware,
-      recordsKeyPresses: keyboardSound.isTypingStatsRecording
-    )
-  }
 
-  /// Resolver messages are catalog keys; external diagnostics must remain verbatim to preserve support details.
-  static func downloadErrorText(
-    _ error: Error, locale: Locale = AppLocalization.currentLanguage.locale
-  ) -> String {
-    if error is YTDLPResolverError {
-      return AppLocalization.string(error.localizedDescription, locale: locale)
-    }
-    guard let error = error as? DownloadServiceError else {
-      return error.localizedDescription
-    }
-    switch error {
-    case .duplicateTask: return "下载任务已在运行"
-    case .cannotPrepareDirectory: return "无法写入下载目录"
-    case .launchFailed: return "无法启动下载任务"
-    case .processFailed(_, let diagnostic): return diagnostic.isEmpty ? AppLocalization.text("下载失败") : diagnostic
-    case .browserCookieAccessDenied: return DownloadFailureDiagnostics.browserCookieAccessFailureMessage
-    case .formatSelectionRequiresFFmpeg: return AppLocalization.text("需要 FFmpeg 才能选择格式")
-    case .invalidFormatProbeResponse: return AppLocalization.text("无法读取下载格式")
-    case .missingCompletedFile: return "未获得下载文件"
-    case .unsafeCompletedFile: return "下载结果位于授权目录之外"
-    case .completedFileDoesNotExist: return "下载文件不存在"
-    }
-  }
+    nonisolated static func zipArchiveError(source: URL, destination: URL) async -> String? {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory) else {
+            return AppLocalization.text("源文件不存在")
+        }
+        let sourceAccess = source.startAccessingSecurityScopedResource()
+        let destinationDirectory = destination.deletingLastPathComponent()
+        let destinationAccess = destinationDirectory.startAccessingSecurityScopedResource()
+        defer {
+            if sourceAccess { source.stopAccessingSecurityScopedResource() }
+            if destinationAccess { destinationDirectory.stopAccessingSecurityScopedResource() }
+        }
 
-  private static func requiresBrowserCookies(_ error: Error, urlString: String) -> Bool {
-    guard let error = error as? DownloadServiceError,
-          case let .processFailed(_, diagnostic) = error else {
-      return false
+        var arguments = ["-c", "-k", "--sequesterRsrc"]
+        if isDirectory.boolValue { arguments.append("--keepParent") }
+        arguments += [source.lastPathComponent, destination.path]
+        do {
+            let output = try await AIAgentProcessRunner.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/ditto"),
+                arguments: arguments,
+                workingDirectoryURL: source.deletingLastPathComponent(),
+                timeout: 5 * 60,
+                maximumOutputBytes: 1,
+                maximumErrorBytes: 256 * 1_024
+            )
+            if output.didTimeout {
+                return AppLocalization.text("压缩操作超时")
+            }
+            guard output.status == 0 else {
+                return output.standardError.isEmpty ? AppLocalization.text("无法创建 ZIP 文件") : output.standardError
+            }
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
     }
-    return DownloadFailureDiagnostics.requiresBrowserCookies(
-      rawDiagnostic: diagnostic,
-      urlString: urlString
-    )
-  }
 
-  private static func shouldRetryWithoutBrowserCookies(
-    _ error: Error,
-    browserCookieSource: DownloadBrowserCookieSource?
-  ) -> Bool {
-    guard let error = error as? DownloadServiceError,
-          case let .processFailed(_, diagnostic) = error else {
-      return false
+    private func saveClipboardImage(_ data: Data) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let name = "clipboard-\(formatter.string(from: Date())).png"
+        let destination: URL
+        if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
+            let panel = NSSavePanel()
+            panel.directoryURL = saveLocations[.quickActions]
+            panel.nameFieldStringValue = name
+            panel.allowedContentTypes = [.png]
+            panel.canCreateDirectories = true
+            panel.prompt = clipboardAssistantMessage("保存图片")
+            WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            destination = url
+        } else {
+            destination = saveLocations[.quickActions].appendingPathComponent(name)
+        }
+
+        let directory = destination.deletingLastPathComponent()
+        let scopedAccess = directory.startAccessingSecurityScopedResource()
+        defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try data.write(to: destination, options: .atomic)
+            transientMessage = clipboardAssistantMessage("已保存到 %@", destination.path)
+        } catch {
+            transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
+        }
     }
-    return DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
-      rawDiagnostic: diagnostic,
-      browserCookieSource: browserCookieSource
-    )
-  }
+
+    /// Saves long copied text as a standalone file and reveals it.
+    private func saveAssistantText(_ text: String) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let name = "clipboard-\(formatter.string(from: Date())).txt"
+        let destination: URL
+        if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
+            let panel = NSSavePanel()
+            panel.directoryURL = saveLocations[.quickActions]
+            panel.nameFieldStringValue = name
+            panel.allowedContentTypes = [.plainText]
+            panel.canCreateDirectories = true
+            panel.prompt = clipboardAssistantMessage("保存文本")
+            WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            destination = url
+        } else {
+            destination = saveLocations[.quickActions].appendingPathComponent(name)
+        }
+
+        let directory = destination.deletingLastPathComponent()
+        let scopedAccess = directory.startAccessingSecurityScopedResource()
+        defer { if scopedAccess { directory.stopAccessingSecurityScopedResource() } }
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try text.write(to: destination, atomically: true, encoding: .utf8)
+            NSWorkspace.shared.activateFileViewerSelecting([destination])
+            transientMessage = clipboardAssistantMessage("已保存到 %@", destination.path)
+        } catch {
+            transientMessage = clipboardAssistantMessage("操作失败：%@", error.localizedDescription)
+        }
+    }
+
+    private func presentAssistantCalendarEditor(_ draft: ClipboardCalendarDraft) {
+        guard !isClipboardCalendarEditorPresented else { return }
+        isClipboardCalendarEditorPresented = true
+        clipboardAssistant.dismiss(animated: false)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.isClipboardCalendarEditorPresented = false }
+            await CalendarItemEditor.present(calendar: self.calendar, draft: draft, allowsReminders: false) { error in
+                self.transientMessage = self.clipboardAssistantMessage("操作失败：%@", error)
+            }
+        }
+    }
+
+    /// Applies the hold-left + right-click quick copy gesture from settings.
+    private func applyAssistantMouseGesture() {
+        let enabled = settingsStore.settings.clipboardAssistantEnabled
+            && settingsStore.settings.clipboardAssistantMouseGestureEnabled
+        // The gesture only simulates ⌘C; the shared pasteboard monitor picks up the new copy.
+        let granted = clipboardAssistant.setMouseGesture(enabled: enabled, onQuickCopy: {})
+        if enabled, !granted {
+            refreshAssistantAccessibility()
+        }
+    }
+
+    func sendQuickNoteToTeleprompter(_ content: String) {
+        let content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else {
+            transientMessage = AppLocalization.text("随记没有可发送的内容")
+            return
+        }
+        UserDefaults.standard.set(content, forKey: "toolbox.teleprompterScript")
+        transientMessage = AppLocalization.text("已发送到提词器")
+        presentTeleprompter()
+    }
+
+    func receiveQuickNoteTransferItems(_ items: [TransferDropItem]) {
+        let content = transferableText(from: items)
+        guard !content.isEmpty else {
+            transientMessage = AppLocalization.text("没有可写入随记的内容")
+            return
+        }
+        Task {
+            if await quickNotes.create(markdown: content) {
+                if !settingsStore.settings.userCareEnabled {
+                    transientMessage = AppLocalization.text("已创建随记")
+                }
+                selectModule(.quickNotes)
+            }
+        }
+    }
+
+    func sendClipboardHistoryItemToQuickNote(_ item: ClipboardHistoryItem) {
+        receiveQuickNoteTransferItems(transferItems(from: item.content))
+    }
+
+    private func transferItems(from content: ClipboardHistoryContent) -> [TransferDropItem] {
+        switch content {
+        case let .text(value):
+            [.text(value)]
+        case let .file(reference):
+            [.file(reference.url)]
+        case let .image(data):
+            [.image(data)]
+        }
+    }
+
+    private func transferableText(from items: [TransferDropItem]) -> String {
+        items.map { item in
+            switch item {
+            case let .text(value): value
+            case let .link(url): url.absoluteString
+            case let .file(url): "[\(url.lastPathComponent)](\(url.absoluteString))"
+            case .image: "剪贴板图片"
+            }
+        }
+        .joined(separator: "\n\n")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func receiveTransferItems(_ items: [TransferDropItem]) {
+        let payloads = items.compactMap(\.shelfPayload)
+        guard !payloads.isEmpty else {
+            transientMessage = AppLocalization.text("中转站支持文件、链接或文本")
+            return
+        }
+        let count = shelf.add(payloads: payloads)
+        if let error = shelf.errorDescription {
+            transientMessage = AppLocalization.text("操作失败：%@", error)
+        } else if count > 0 {
+            transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
+        }
+        if count > 0 { selectModule(.shelf) }
+        let urls = payloads.compactMap { if case .file(let url) = $0 { url } else { nil } }
+        applicationOpenRepairPresenter.receive(urls)
+    }
+
+    func receiveShelfDropItems(_ items: [FileShelfDropItem]) {
+        let previousIDs = Set(shelf.items.map(\.id))
+        shelf.receive(items) { [weak self] count in
+            guard let self else { return }
+            if let error = self.shelf.errorDescription {
+                self.transientMessage = AppLocalization.text("操作失败：%@", error)
+            } else if count > 0 {
+                self.transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
+            }
+            if count > 0 { self.selectModule(.shelf) }
+            let directURLs = items.compactMap { if case .content(.file(let url)) = $0 { url } else { nil } }
+            let addedURLs = self.shelf.items.filter { !previousIDs.contains($0.id) && $0.text == nil }.map(\.url)
+            self.applicationOpenRepairPresenter.receive(directURLs + addedURLs)
+        }
+    }
+
+    func prepareDetectedLink() {
+        guard let detectedLink else { return }
+        prepareDownload(detectedLink)
+    }
+
+    func share(_ items: [TransferDropItem], from view: NSView? = nil) {
+        guard !items.isEmpty else { return }
+        let values = items.map(\.shareValue)
+        let anchor = Self.sharingPickerAnchor(from: view)
+        guard let anchor else {
+            transientMessage = AppLocalization.text("无法打开系统共享菜单")
+            return
+        }
+        let picker = NSSharingServicePicker(items: values)
+        picker.delegate = sharingPickerDelegate
+        let previousPicker = sharingPicker
+        sharingPicker = picker
+        sharingPickerDismissesClipboardAssistant = anchor === clipboardAssistant.sharingAnchorView
+        isSharingPickerVisible = anchor.window is IslandPanel && !sharingPickerDismissesClipboardAssistant
+        previousPicker?.close()
+        picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+    }
+
+    static func sharingPickerAnchor(
+        from view: NSView?,
+        at point: CGPoint = NSEvent.mouseLocation,
+        windows: [NSWindow] = NSApp.windows
+    ) -> NSView? {
+        if let view { return view }
+        let interactivePanels = windows.compactMap { $0 as? IslandPanel }.filter {
+            $0.isVisible && !$0.ignoresMouseEvents
+        }
+        return interactivePanels.first(where: { $0.frame.contains(point) })?.contentView
+            ?? interactivePanels.first?.contentView
+    }
+
+    func shareFromPasteboard(from view: NSView? = nil) {
+        let payloads = TransferPasteboard.readShareableItems()
+        let items: [TransferDropItem] = payloads.map { payload in
+            switch payload {
+            case .file(let url): .file(url)
+            case .text(let value): .text(value)
+            }
+        }
+        guard !items.isEmpty else {
+            transientMessage = AppLocalization.text("剪贴板没有可共享内容")
+            return
+        }
+        share(items, from: view)
+    }
+
+    private func sharingPickerDidComplete(_ picker: NSSharingServicePicker) {
+        guard sharingPicker === picker else { return }
+        let dismissesClipboardAssistant = sharingPickerDismissesClipboardAssistant
+        sharingPicker = nil
+        sharingPickerDismissesClipboardAssistant = false
+        isSharingPickerVisible = false
+        if dismissesClipboardAssistant { clipboardAssistant.dismiss() }
+    }
+
+    private func prepareDownload(_ url: URL) {
+        setDownloadURL(url.absoluteString)
+        selectModule(.download)
+        detectedLinkTask?.cancel()
+        detectedLink = nil
+        transientMessage = AppLocalization.text("链接已放入下载中转")
+    }
+
+    var downloadFormatOptions: [DownloadFormatOption] {
+        guard downloadFormatSourceURL == normalizedDownloadURL else { return [] }
+        return DownloadFormatCatalog.options(for: downloadMode, formats: downloadFormats)
+    }
+
+    var selectedDownloadFormatOption: DownloadFormatOption? {
+        guard let selectedDownloadFormat else { return nil }
+        return downloadFormatOptions.first { $0.selection == selectedDownloadFormat }
+    }
+
+    var canSelectDownloadFormats: Bool {
+        downloadFormatSelectionEnabled
+            && !isLoadingDownloadFormats
+            && !downloadFormatOptions.isEmpty
+    }
+
+    var downloadFormatSelectionNeedsFFmpeg: Bool {
+        !downloadFormats.isEmpty && !downloadFormatSelectionEnabled
+    }
+
+    func setDownloadURL(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = HTTPURLParser.url(from: trimmed)?.absoluteString ?? trimmed
+        guard downloadURL != normalized else { return }
+        downloadURL = normalized
+        downloadNeedsBrowserCookies = false
+        resetDownloadFormatState()
+    }
+
+    func clearDownloadURL() {
+        downloadURL = ""
+        downloadNeedsBrowserCookies = false
+        resetDownloadFormatState()
+        if !hasActiveDownloads { downloadState = .idle }
+    }
+
+    func downloadURLChangedByUser() {
+        guard downloadFormatSourceURL != normalizedDownloadURL else { return }
+        downloadNeedsBrowserCookies = false
+        resetDownloadFormatState()
+    }
+
+    func refreshDownloadBrowserCookieSources() {
+        Task { [weak self, downloadService] in
+            let sources = await downloadService.availableBrowserCookieSources()
+            await MainActor.run {
+                guard let self else { return }
+                self.downloadBrowserCookieSources = sources
+                if let selected = self.downloadBrowserCookieSource {
+                    self.downloadBrowserCookieSource = sources.first { $0.id == selected.id }
+                }
+            }
+        }
+    }
+
+    func selectDownloadFormat(_ option: DownloadFormatOption?) {
+        guard option == nil || canSelectDownloadFormats else { return }
+        selectedDownloadFormat = option?.selection
+    }
+
+    func refreshDownloadFormats() {
+        refreshDownloadBrowserCookieSources()
+        guard let normalizedDownloadURL else {
+            resetDownloadFormatState()
+            let message = AppLocalization.text("链接或输出目录无效")
+            if hasActiveDownloads {
+                transientMessage = message
+            } else {
+                downloadState = .failed(message)
+            }
+            return
+        }
+
+        downloadURL = normalizedDownloadURL
+        resetDownloadFormatState()
+        downloadFormatSourceURL = normalizedDownloadURL
+        isLoadingDownloadFormats = true
+        let generation = downloadFormatProbeGeneration
+        let cookieSource = downloadBrowserCookieSource
+        let task = Task { [weak self, downloadService] in
+            do {
+                let result = try await downloadService.probeFormatsAutomatically(
+                    urlString: normalizedDownloadURL,
+                    browserCookieSource: cookieSource
+                )
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self?.finishDownloadFormatProbe(
+                        result,
+                        urlString: normalizedDownloadURL,
+                        cookieSource: cookieSource,
+                        generation: generation
+                    )
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                await MainActor.run {
+                    self?.failDownloadFormatProbe(
+                        error,
+                        urlString: normalizedDownloadURL,
+                        cookieSource: cookieSource,
+                        generation: generation
+                    )
+                }
+            }
+        }
+        downloadFormatProbeTask = task
+    }
+
+    func retryDownloadWithBrowserCookies() {
+        guard downloadNeedsBrowserCookies, downloadBrowserCookieSource != nil else { return }
+        startDownload()
+    }
+
+    func startDownload() {
+        let request: DownloadRequest
+        do {
+            let parsedRequest = try DownloadRequest(
+                urlString: downloadURL,
+                mode: downloadMode,
+                outputDirectory: downloadDirectory
+            )
+            request = try DownloadRequest(
+                urlString: parsedRequest.urlString,
+                mode: downloadMode,
+                outputDirectory: downloadDirectory,
+                formatSelection: selectedDownloadFormat(for: parsedRequest.urlString),
+                browserCookieSource: downloadBrowserCookieSource
+            )
+            downloadURL = request.urlString
+            downloadNeedsBrowserCookies = false
+        } catch {
+            if hasActiveDownloads {
+                transientMessage = AppLocalization.text("链接或输出目录无效")
+            } else {
+                downloadState = .failed(AppLocalization.text("链接或输出目录无效"))
+            }
+            return
+        }
+
+        let taskID = UUID()
+        activeDownloadID = taskID
+        activeDownloadIDs.insert(taskID)
+        downloadTaskStates[taskID] = .preparing
+        downloadTaskURLs[taskID] = request.urlString
+        downloadTaskOrder.append(taskID)
+        refreshActiveDownloads()
+        downloadState = .preparing
+        beginVideoDownloadIsland(forURLString: request.urlString)
+        let scopedAccess = downloadDirectory.startAccessingSecurityScopedResource()
+        let task = Task { [weak self, downloadService] in
+            defer {
+                if scopedAccess { request.outputDirectory.stopAccessingSecurityScopedResource() }
+            }
+            do {
+                let result = try await downloadService.downloadAutomatically(
+                    request,
+                    taskID: taskID
+                ) { [weak self] event in
+                    await MainActor.run {
+                        guard let self, self.activeDownloadIDs.contains(taskID) else { return }
+                        if case .progress(let fraction, let speed, let eta) = event {
+                            let state = DownloadUIState.downloading(
+                                fraction: fraction,
+                                speed: speed,
+                                eta: eta
+                            )
+                            self.downloadTaskStates[taskID] = state
+                            self.refreshActiveDownloads()
+                            guard self.activeDownloadID == taskID else { return }
+                            self.downloadState = state
+                            self.updateVideoDownloadIsland(fraction: fraction, isFinished: false)
+                        }
+                    }
+                }
+                guard !Task.isCancelled else {
+                    await MainActor.run {
+                        self?.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
+                    }
+                    return
+                }
+                await MainActor.run {
+                    guard let self else { return }
+                    if let browserCookieSource = result.browserCookieSource,
+                       self.downloadBrowserCookieSource == nil {
+                        self.downloadBrowserCookieSource = browserCookieSource
+                    }
+                    if let browserCookieSource = result.browserCookieSource,
+                       !self.downloadBrowserCookieSources.contains(browserCookieSource) {
+                        self.downloadBrowserCookieSources.append(browserCookieSource)
+                    }
+                    self.addToShelf([result.fileURL])
+                    self.notices.enqueue(
+                        IslandNotice(
+                            id: "download-\(taskID.uuidString)",
+                            title: "下载完成",
+                            detail: result.fileURL.lastPathComponent,
+                            kind: .success,
+                            side: .right
+                        )
+                    )
+                    self.finishDownloadTask(
+                        taskID,
+                        state: .completed(result.fileURL),
+                        showsCompletion: true
+                    )
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    self?.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
+                }
+            } catch {
+                await MainActor.run {
+                    guard let self else { return }
+                    if Self.shouldRetryWithoutBrowserCookies(
+                        error,
+                        browserCookieSource: request.browserCookieSource
+                    ), self.downloadBrowserCookieSource == request.browserCookieSource {
+                        self.finishDownloadTask(taskID, state: .idle, showsCompletion: false)
+                        self.downloadBrowserCookieSource = nil
+                        self.startDownload()
+                        return
+                    }
+                    self.downloadNeedsBrowserCookies = Self.requiresBrowserCookies(
+                        error,
+                        urlString: request.urlString
+                    )
+                    self.finishDownloadTask(
+                        taskID,
+                        state: .failed(Self.downloadErrorText(error)),
+                        showsCompletion: false
+                    )
+                }
+            }
+        }
+        downloadTasks[taskID] = task
+    }
+
+    func cancelDownload(taskID: UUID) {
+        guard activeDownloadIDs.contains(taskID) else { return }
+        downloadTasks[taskID]?.cancel()
+        Task { [downloadService] in await downloadService.cancel(taskID: taskID) }
+    }
+
+    func cancelAllDownloads() {
+        for task in downloadTasks.values { task.cancel() }
+        Task { [downloadService] in await downloadService.cancelAll() }
+    }
+
+    private func finishDownloadTask(
+        _ taskID: UUID,
+        state: DownloadUIState,
+        showsCompletion: Bool
+    ) {
+        guard activeDownloadIDs.remove(taskID) != nil else { return }
+        downloadTasks[taskID] = nil
+        downloadTaskStates[taskID] = state
+
+        let wasActive = activeDownloadID == taskID
+        if wasActive,
+           let nextID = downloadTaskOrder.reversed().first(where: { activeDownloadIDs.contains($0) }),
+           let nextState = downloadTaskStates[nextID],
+           let nextURL = downloadTaskURLs[nextID] {
+            activeDownloadID = nextID
+            downloadState = nextState
+            beginVideoDownloadIsland(forURLString: nextURL)
+            if case .downloading(let fraction, _, _) = nextState {
+                updateVideoDownloadIsland(fraction: fraction, isFinished: false)
+            }
+        } else if wasActive {
+            activeDownloadID = nil
+            downloadState = state
+            if showsCompletion {
+                updateVideoDownloadIsland(fraction: 1, isFinished: true)
+            } else {
+                endVideoDownloadIsland()
+            }
+        }
+
+        downloadTaskStates[taskID] = nil
+        downloadTaskURLs[taskID] = nil
+        downloadTaskOrder.removeAll { $0 == taskID }
+        refreshActiveDownloads()
+    }
+
+    private func refreshActiveDownloads() {
+        activeDownloads = downloadTaskOrder.compactMap { taskID in
+            guard activeDownloadIDs.contains(taskID),
+                  let state = downloadTaskStates[taskID],
+                  let urlString = downloadTaskURLs[taskID]
+            else { return nil }
+            return DownloadTaskSnapshot(id: taskID, urlString: urlString, state: state)
+        }
+    }
+
+    private var normalizedDownloadURL: String? {
+        HTTPURLParser.url(from: downloadURL)?.absoluteString
+    }
+
+    private func selectedDownloadFormat(for urlString: String) -> DownloadFormatSelection? {
+        guard downloadFormatSelectionEnabled,
+              downloadFormatSourceURL == urlString,
+              let selectedDownloadFormat,
+              downloadFormatOptions.contains(where: { $0.selection == selectedDownloadFormat }) else {
+            return nil
+        }
+        return selectedDownloadFormat
+    }
+
+    private func resetDownloadFormatState() {
+        downloadFormatProbeGeneration += 1
+        downloadFormatProbeTask?.cancel()
+        downloadFormatProbeTask = nil
+        downloadFormatSourceURL = nil
+        downloadFormats = []
+        isLoadingDownloadFormats = false
+        downloadFormatSelectionEnabled = false
+        downloadFormatError = nil
+        selectedDownloadFormat = nil
+    }
+
+    private func finishDownloadFormatProbe(
+        _ result: DownloadFormatProbeResult,
+        urlString: String,
+        cookieSource: DownloadBrowserCookieSource?,
+        generation: Int
+    ) {
+        guard generation == downloadFormatProbeGeneration,
+              downloadFormatSourceURL == urlString,
+              downloadBrowserCookieSource == cookieSource else {
+            return
+        }
+        downloadFormatProbeTask = nil
+        if let browserCookieSource = result.browserCookieSource,
+           downloadBrowserCookieSource == nil {
+            downloadBrowserCookieSource = browserCookieSource
+        }
+        if let browserCookieSource = result.browserCookieSource,
+           !downloadBrowserCookieSources.contains(browserCookieSource) {
+            downloadBrowserCookieSources.append(browserCookieSource)
+        }
+        downloadFormatSourceURL = urlString
+        isLoadingDownloadFormats = false
+        downloadFormats = result.formats
+        downloadFormatSelectionEnabled = result.canSelectFormats
+        downloadFormatError = result.formats.isEmpty
+            ? AppLocalization.text("未找到可用格式")
+            : nil
+        downloadNeedsBrowserCookies = false
+    }
+
+    private func failDownloadFormatProbe(
+        _ error: Error,
+        urlString: String,
+        cookieSource: DownloadBrowserCookieSource?,
+        generation: Int
+    ) {
+        guard generation == downloadFormatProbeGeneration,
+              downloadFormatSourceURL == urlString,
+              downloadBrowserCookieSource == cookieSource else {
+            return
+        }
+        downloadFormatProbeTask = nil
+        if Self.shouldRetryWithoutBrowserCookies(error, browserCookieSource: cookieSource) {
+            downloadBrowserCookieSource = nil
+            refreshDownloadFormats()
+            return
+        }
+        isLoadingDownloadFormats = false
+        downloadFormatSelectionEnabled = false
+        selectedDownloadFormat = nil
+        let message = Self.downloadErrorText(error)
+        downloadFormatError = message
+        downloadNeedsBrowserCookies = Self.requiresBrowserCookies(
+            error,
+            urlString: urlString
+        )
+        if !hasActiveDownloads {
+            downloadState = .failed(message)
+        }
+    }
+
+    nonisolated static func headphoneMonitoringPolicy(
+        sideNoticesEnabled: Bool,
+        systemMonitorEnabled: Bool,
+        options: SystemMonitorHeadphoneOptions
+    ) -> Bool {
+        let needsHeadphones = options.replacesNetworkIcon || options.usesVolumeColor
+        return sideNoticesEnabled || (systemMonitorEnabled && needsHeadphones)
+    }
+
+    private func applyKeyboardSettings(_ settings: FeatureSettings) {
+        let allowsServices = FirstLaunchOnboardingRuntimePolicy.allowsKeyboardServices(
+            isOnboardingActive: isFirstLaunchOnboardingActive,
+            hasInputMonitoringAccess: GlobalHotkeyManager.hasInputMonitoringAccess
+        )
+        keyboardSound.apply(
+            enabled: settings.keyboardEnabled && allowsServices,
+            keyboardProfileID: settings.keyboardSelectedProfileID,
+            keyboardVolume: settings.keyboardVolume,
+            playsReleaseSound: settings.keyboardPlaysReleaseSound,
+            usesPitchVariation: settings.keyboardUsesPitchVariation,
+            typingStatsEnabled: settings.keyboardTypingStatsEnabled && allowsServices
+        )
+    }
+
+    /// Reconciles service lifecycles with settings; disabling AI stops pending quota work before notices are updated.
+    private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
+        dailyBriefing.configure(settings: settings.dailyBriefing, directory: saveLocations[.dailyBriefing],
+                                language: languageStore.language)
+        if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
+            aiResultSweep.cancel()
+        }
+        windowPreview.setVisualStyle(settings.islandVisualStyle)
+        windowPreview.configure(
+            enabled: settings.windowPreviewsEnabled,
+            requestPermissions: requestWindowPreviewPermissions
+        )
+        // Regular UI appearance is controlled by user settings; the island panel is separately pinned to dark at the window level (see IslandPanel).
+        NSApp.appearance = settings.appearanceMode.nsAppearance
+        applyKeyboardSettings(settings)
+        media.setPreferredSource(settings.mediaSource)
+        voiceInput.setContextualStrings(
+            VoiceLexicon.contextualTerms(
+                for: settings.voiceEnabledLexicons,
+                customTerms: settings.voiceCustomHotwords
+            )
+        )
+        pomodoro.notificationsMuted = settings.notificationsMuted
+        pomodoro.userCareEnabled = settings.userCareEnabled
+        configureUpdatePolling(enabled: settings.updateChecksEnabled)
+        managedTools.setAutomaticUpdatesEnabled(
+            recommendedTools: settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled,
+            dependencyTools: settings.dependencyToolsAutomaticUpdatesEnabled
+        )
+        configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
+        clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
+        if settings.aiProgressEnabled {
+            aiMonitor.configureAccountBalanceProviders(settings.aiAccountBalanceMonitoredProviders,
+                                                       qoderRegions: settings.aiAccountBalanceQoderRegions)
+            aiMonitor.start()
+            if selectedModule == .aiMonitor {
+                aiMonitor.loadUsageHistory()
+            }
+        } else {
+            aiMonitor.stop()
+            clearActiveAINotices()
+            powerAssertions.setAIActivityActive(false)
+        }
+        accountBalanceNotice.update(balances: aiMonitor.accountBalances, settings: settings, language: languageStore.language)
+        aiAgent.start()
+        syncAIActivityPowerAssertion(aiMonitor.state)
+        if settings.mediaEnabled || settings.dailyBriefing.enabled {
+            media.start()
+            updateSpectrumMonitoring()
+            consumeMediaSnapshot(media.snapshot)
+        } else {
+            media.stop()
+            clearMediaNotices()
+        }
+        if settings.volumeMixerEnabled {
+            applicationVolumes.start()
+        } else {
+            applicationVolumes.stop()
+        }
+        if !settings.weatherEnabled {
+            weatherTask?.cancel()
+            weatherSnapshotsByLocationID = [:]
+        }
+        systemMonitor.setHistoryRecordingEnabled(
+            settings.systemMonitorEnabled && settings.systemMetricsHistoryEnabled
+        )
+        systemAutoCleanup.apply(settings: settings)
+        if settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
+            systemMonitor.start()
+        } else {
+            systemMonitor.stop()
+        }
+        backgroundSounds.apply(
+            sound: settings.systemBackgroundSound,
+            enabled: settings.systemBackgroundSoundEnabled,
+            stopsWhenUnused: settings.systemBackgroundSoundStopsWhenUnused
+        )
+        consumeBackgroundSoundPlayback()
+        userCare.apply(settings: settings)
+        if settings.sideNoticesEnabled {
+            focusMode.start()
+        } else {
+            focusMode.stop()
+        }
+        let headphonePolicy = Self.headphoneMonitoringPolicy(
+            sideNoticesEnabled: settings.sideNoticesEnabled,
+            systemMonitorEnabled: settings.systemMonitorEnabled,
+            options: settings.systemMonitorMenuBarHeadphoneOptions
+        )
+        reconcileHeadphoneTransient(devices: audioOutput.devices)
+        SystemMonitorHeadphoneTransient.updateConnectionNotices(settings: settings, queue: notices)
+        if headphonePolicy {
+            audioOutput.start()
+        } else {
+            audioOutput.stop()
+        }
+        if settings.calendarEnabled {
+            calendar.start()
+        } else {
+            calendar.stop()
+        }
+        meetingCountdown.configure()
+        if settings.observesBrowserDownloads {
+            browserDownloads.start()
+            if settings.showsBrowserDownloadProgress {
+                consumeBrowserDownloadSnapshot(browserDownloads.snapshot)
+            } else {
+                clearBrowserDownloadNotices()
+            }
+        } else {
+            browserDownloads.stop()
+            clearBrowserDownloadNotices()
+        }
+        if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
+            battery.start()
+        } else {
+            battery.stop()
+        }
+        if automaticPowerModeLifecycleActive {
+            automaticPowerMode.apply(settings: settings, snapshot: battery.snapshot)
+        }
+        lowBatteryNotice.update(
+            snapshot: battery.snapshot,
+            enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
+        )
+        lowBatteryNotice.update(
+            devices: networkBattery.devices,
+            enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
+        )
+        if settings.systemMonitorEnabled {
+            networkBattery.start()
+        } else {
+            networkBattery.stop()
+        }
+        if settings.mailEnabled {
+            mail.start(accountNames: settings.mailAccountNames)
+        } else {
+            mail.stop()
+            hasLoadedMail = false
+            knownMailMessageIDs.removeAll()
+        }
+        if !settings.toolboxEnabled {
+            pomodoro.stop()
+            screenCleaning.stopAll()
+            cleaningPowerState = nil
+            powerAssertions.releaseAll()
+        }
+        if selectedModule == .agenda { refreshAgendaIfEnabled() }
+        clipboardMonitor.setEnabled(
+            settings.clipboardDetectionEnabled
+        )
+        // The shared pasteboard monitor feeds both history recording and the copy assistant.
+        clipboardHistoryMonitor.setEnabled(
+            settings.clipboardHistoryEnabled || settings.clipboardAssistantEnabled
+        )
+        clipboardAssistant.screenLayoutConfiguration = settings.islandScreenConfiguration
+        if settings.clipboardAssistantEnabled {
+            clipboardAssistant.setTriggers(
+                hotkey: settings.clipboardAssistantTriggerConfiguration.hotkey,
+                mouseButton: settings.clipboardAssistantMouseButton,
+                dismissHotkey: settings.clipboardAssistantDismissConfiguration.hotkey
+            )
+            clipboardAssistant.isLightweightMode = settings.clipboardAssistantLightweightMode
+            clipboardAssistant.displayDuration = settings.clipboardAssistantDisplayDuration
+            clipboardAssistant.presentation.visualStyle = settings.islandVisualStyle
+            clipboardAssistant.presentation.notchBackground = settings.islandNotchBackground
+            clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
+        } else {
+            clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil, dismissHotkey: nil)
+            clipboardAssistant.dismiss()
+        }
+        applyAssistantMouseGesture()
+        applicationOpenRepairPresenter.flush()
+        applicationOpenFailureMonitor.setEnabled(
+            settings.applicationOpenFailureMonitoringActive
+        ) { [weak self] url in self?.applicationOpenRepairPresenter.receive([url], fromSystemAlert: true) }
+        if !settings.downloaderEnabled, hasActiveDownloads {
+            cancelAllDownloads()
+        }
+        let durationChanged =
+            lastActivityNoticeDisplayDuration != settings.activityNoticeDisplayDuration
+        lastActivityNoticeDisplayDuration = settings.activityNoticeDisplayDuration
+        if settings.sideNoticesEnabled {
+            if durationChanged {
+                restartActivityNoticesForDurationChange()
+            }
+            consumeAIState(aiMonitor.state)
+            consumeMediaSnapshot(media.snapshot)
+            consumeFocusModeStatus(focusMode.status, showsTransition: false)
+            refreshUpdateNotices()
+        } else {
+            // Output tasks still belong on the dashboard when side notices are disabled.
+            for notice in notices.left + notices.right where !notice.id.hasPrefix(ScreenRecordingOperationNotice.prefix) {
+                notices.remove(id: notice.id)
+            }
+            activeAINoticeIDs.removeAll()
+            activityNoticeShownIDs.removeAll()
+            mediaActivityPresented = false
+            notices.removeAll(withIDPrefix: updateNoticePrefix)
+        }
+        voiceInputInputMonitoringAccessGranted = GlobalHotkeyManager.hasInputMonitoringAccess
+        if settings.voiceInputEnabled {
+            let preset = settings.voiceInputHotkeyPreset
+            let mode = settings.voiceInputMode
+            let registration = hotkeyManager.register(
+                hotkey: preset,
+                onKeyDown: { [weak self] in
+                    guard let self else { return }
+                    switch mode {
+                    case .toggle:
+                        self.voiceInput.toggle()
+                    case .pushToTalk:
+                        self.voiceInput.start()
+                    }
+                },
+                onKeyUp: { [weak self] in
+                    guard let self else { return }
+                    if mode == .pushToTalk {
+                        self.voiceInput.stop()
+                    }
+                }
+            )
+            if registration == .registrationFailed {
+                transientMessage = AppLocalization.text("无法注册语音输入快捷键")
+            }
+        } else {
+            voiceInput.cancel()
+            hotkeyManager.unregister()
+        }
+        refreshToolboxReminderNotice()
+
+    }
+
+    private func configureUpdatePolling(enabled: Bool) {
+        if enabled {
+            checkForUpdates(manual: false)
+        } else {
+            updateFeedResolver.cancelAutomaticConfiguration()
+            _ = sparkleUpdateController?.configure(
+                channel: settingsStore.settings.updateChannel,
+                checksEnabled: false,
+                automaticDownloadEnabled: settingsStore.settings.automaticDownloadEnabled,
+                feedPreference: updateFeedResolver.preference ?? .giteeFirst
+            ) == true
+        }
+        guard isUpdatePollingEnabled != enabled else { return }
+        isUpdatePollingEnabled = enabled
+        updatePollingTask?.cancel()
+        updatePollingTask = nil
+        guard enabled else {
+            return
+        }
+
+        updatePollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.aiAgent.refreshCLIs()
+                guard !Task.isCancelled else { return }
+                do {
+                    try await Task.sleep(for: .seconds(600))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func configureVoiceRecordingCleanup(policy: VoiceRecordingCleanupPolicy) {
+        guard appliedVoiceRecordingCleanupPolicy != policy else { return }
+        appliedVoiceRecordingCleanupPolicy = policy
+        voiceRecordingCleanupTask?.cancel()
+        voiceRecordingCleanupTask = nil
+        voiceHistory.cleanupOldRecordings(policy: policy)
+        guard let days = policy.daysThreshold else { return }
+
+        voiceRecordingCleanupTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(days * 24 * 60 * 60))
+                } catch {
+                    return
+                }
+                guard let self, !Task.isCancelled else { return }
+                self.voiceHistory.cleanupOldRecordings(policy: policy)
+            }
+        }
+    }
+
+    private func refreshUpdateNotices() {
+        guard settingsStore.settings.sideNoticesEnabled else {
+            notices.removeAll(withIDPrefix: updateNoticePrefix)
+            return
+        }
+
+        let selectedUpdate: (id: String, title: String, symbol: String)?
+        if productUpdateAvailable {
+            selectedUpdate = ("product", "Zisla", "app.fill")
+        } else if let update = aiAgent.cliUpdates.first {
+            selectedUpdate = ("cli-\(update.kind.rawValue)", update.kind.displayName, "sparkles")
+        } else {
+            selectedUpdate = nil
+        }
+        guard let selectedUpdate else {
+            notices.removeAll(withIDPrefix: updateNoticePrefix)
+            return
+        }
+
+        let left = IslandNotice(
+            id: "\(updateNoticePrefix)\(selectedUpdate.id)-left",
+            title: selectedUpdate.title,
+            kind: .info,
+            side: .left,
+            style: .status,
+            symbolName: selectedUpdate.symbol
+        )
+        let right = IslandNotice(
+            id: "\(updateNoticePrefix)\(selectedUpdate.id)-right",
+            title: "查看更新",
+            kind: .info,
+            side: .right,
+            style: .status,
+            symbolName: "arrow.up.circle"
+        )
+        let activeIDs = Set([left.id, right.id])
+        for notice in notices.left + notices.right where notice.id.hasPrefix(updateNoticePrefix) && !activeIDs.contains(notice.id) {
+            notices.remove(id: notice.id)
+        }
+        if !notices.updateIfPresent(left) { notices.enqueue(left, expiresAfter: nil) }
+        if !notices.updateIfPresent(right) { notices.enqueue(right, expiresAfter: nil) }
+    }
+
+    // MARK: - Voice model discovery
+
+    private func deliverVoiceRecording(_ recording: VoiceRecordingResult) {
+        let inputTarget = voiceInputTarget
+        let targetProcessIdentifier = voiceInputTargetProcessIdentifier
+        let targetMouseLocation = voiceInputTargetMouseLocation
+        voiceInputTarget = nil
+        voiceInputTargetProcessIdentifier = nil
+        voiceInputTargetMouseLocation = nil
+        let rawTranscript = recording.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let retainsAudio = settingsStore.settings.voiceRecordingRetentionEnabled
+        let enabledVoiceLexicons = settingsStore.settings.voiceEnabledLexicons
+        let customVoiceHotwords = settingsStore.settings.voiceCustomHotwords
+        let structuredFormattingEnabled = settingsStore.settings.voiceStructuredFormattingEnabled
+        let historySaved = voiceHistory.record(recording, retainAudio: retainsAudio)
+        guard !rawTranscript.isEmpty else {
+            transientMessage = historySaved
+                ? (retainsAudio ? AppLocalization.text("录音已保存，但未识别到文字") : "未识别到文字")
+                : (retainsAudio ? AppLocalization.text("录音文件已保留，但记录索引保存失败") : AppLocalization.text("语音记录保存失败"))
+            return
+        }
+        let lexiconNormalizedTranscript = VoiceTranscriptPunctuation.normalize(
+            VoiceLexicon.normalizeTranscript(
+                rawTranscript,
+                for: enabledVoiceLexicons,
+                customTerms: customVoiceHotwords
+            ),
+            customHotwords: customVoiceHotwords
+        )
+        let localTranscriptSaved = lexiconNormalizedTranscript == rawTranscript
+            || voiceHistory.updateProcessedTranscript(
+                id: recording.id,
+                transcript: lexiconNormalizedTranscript
+            )
+        let processingTarget: AIProcessingTarget?
+        do {
+            processingTarget = try Self.voicePostProcessingTarget(
+                for: selectedVoiceModelConfiguration,
+                store: aiAgent.store
+            )
+        } catch {
+            deliverVoiceTranscript(
+                lexiconNormalizedTranscript,
+                to: targetProcessIdentifier,
+                at: targetMouseLocation,
+                target: inputTarget,
+                message: AppLocalization.text("语音转写完成；整理失败")
+            )
+            return
+        }
+        guard let target = processingTarget else {
+            deliverVoiceTranscript(
+                lexiconNormalizedTranscript,
+                to: targetProcessIdentifier,
+                at: targetMouseLocation,
+                target: inputTarget,
+                message: historySaved && localTranscriptSaved ? AppLocalization.text("语音转写已保存") : AppLocalization.text("语音转写完成；记录保存失败")
+            )
+            return
+        }
+        // Recording already ended and the island HUD is gone, so without this the cleanup round-trip
+        // looks like the shortcut simply swallowed the dictation.
+        transientMessage = AppLocalization.text("正在整理语音…")
+        beginVoiceProcessingIndicator()
+        voicePostProcessingQueue.enqueue { [weak self] in
+            guard let self else { return }
+            defer { self.endVoiceProcessingIndicator() }
+            do {
+                let processed = try await VoiceTranscriptPostProcessor.process(
+                    rawTranscript: rawTranscript,
+                    lexiconNormalizedTranscript: lexiconNormalizedTranscript,
+                    enabledLexicons: enabledVoiceLexicons,
+                    customHotwords: customVoiceHotwords,
+                    structuredFormattingEnabled: structuredFormattingEnabled,
+                    proofreadingEnabled: target.requiresVoiceProofreading
+                ) { systemPrompt, messages in
+                    try await self.complete(using: target, systemPrompt: systemPrompt, messages: messages)
+                }
+                guard !Task.isCancelled else { return }
+                let delivered = VoiceLexicon.normalizeTranscript(
+                    processed,
+                    for: enabledVoiceLexicons,
+                    customTerms: customVoiceHotwords,
+                    contextualTranscript: rawTranscript
+                )
+                let processedTranscriptSaved = self.voiceHistory.updateProcessedTranscript(
+                    id: recording.id,
+                    transcript: delivered
+                )
+                self.deliverVoiceTranscript(
+                    delivered,
+                    to: targetProcessIdentifier,
+                    at: targetMouseLocation,
+                    target: inputTarget,
+                    message: historySaved && processedTranscriptSaved
+                        ? AppLocalization.text("语音整理结果已保存")
+                        : AppLocalization.text("语音整理完成；记录保存失败")
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.deliverVoiceTranscript(
+                    lexiconNormalizedTranscript,
+                    to: targetProcessIdentifier,
+                    at: targetMouseLocation,
+                    target: inputTarget,
+                    message: "语音转写完成；整理失败"
+                )
+            }
+        }
+    }
+
+    /// Shows the collapsed-island "voice processing" wings (left: mic, right: a random thinking orb)
+    /// for the duration of AI transcript cleanup. Each run picks a fresh random orb animation.
+    private func beginVoiceProcessingIndicator() {
+        voiceProcessingOperationCount += 1
+        guard !isProcessingVoiceTranscript else { return }
+        isProcessingVoiceTranscript = true
+        let orbState = ThinkingOrbState.taskStates.randomElement() ?? .working
+        let left = IslandNotice(
+            id: "voice-processing-left",
+            title: "正在整理语音",
+            kind: .info,
+            side: .left,
+            style: .status,
+            symbolName: "mic.fill",
+            metadata: ["orbState": orbState.rawValue]
+        )
+        let right = IslandNotice(
+            id: "voice-processing-right",
+            title: "正在整理语音",
+            kind: .info,
+            side: .right,
+            style: .status,
+            metadata: ["orbState": orbState.rawValue]
+        )
+        for notice in [left, right] {
+            if !notices.updateIfPresent(notice) {
+                notices.enqueue(notice, expiresAfter: nil)
+            }
+        }
+    }
+
+    private func endVoiceProcessingIndicator() {
+        voiceProcessingOperationCount = max(0, voiceProcessingOperationCount - 1)
+        guard voiceProcessingOperationCount == 0, isProcessingVoiceTranscript else { return }
+        isProcessingVoiceTranscript = false
+        notices.remove(id: "voice-processing-left")
+        notices.remove(id: "voice-processing-right")
+    }
+
+    static func voicePostProcessingTarget(
+        for reference: AIModelConfigurationReference?,
+        store: AIAgentStore,
+        requiresModel: Bool = true
+    ) throws -> AIProcessingTarget? {
+        guard let reference else { return nil }
+        switch reference.source {
+        case .local:
+            guard let configuration = store.localModel(id: reference.id),
+                  configuration.isEnabled else {
+                return nil
+            }
+            let model = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !requiresModel || !model.isEmpty else { return nil }
+            return .http(
+                endpoint: configuration.endpoint,
+                protocolKind: .openAICompatible,
+                model: model,
+                apiKey: try store.secret(for: configuration),
+                effort: nil,
+                localInference: true,
+                localThinkingEnabled: configuration.thinkingEnabled
+            )
+        case .channel:
+            guard let channel = store.channel(id: reference.id),
+                  channel.isEnabled,
+                  channel.protocolKind == .openAICompatible || channel.protocolKind == .anthropicMessages,
+                  let endpointGroup = channel.endpointGroups.first,
+                  let baseURL = endpointGroup.baseURLs.first?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !baseURL.isEmpty,
+                  let accountID = endpointGroup.accountIDs.first,
+                  let account = store.account(id: accountID),
+                  account.credentialKind == .apiKey,
+                  let apiKey = try? store.secret(for: account),
+                  !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return nil
+            }
+            let model = channel.defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !model.isEmpty else { return nil }
+            return .http(
+                endpoint: AIEndpoint(name: channel.name, baseURL: baseURL, kind: .openAICompatible),
+                protocolKind: channel.protocolKind,
+                model: model,
+                apiKey: apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
+                effort: channel.effort,
+                localInference: false,
+                localThinkingEnabled: false
+            )
+        }
+    }
+
+    private func complete(
+        using target: AIProcessingTarget,
+        systemPrompt: String,
+        messages: [AIOutboundMessage]
+    ) async throws -> String {
+        switch target {
+        case let .http(endpoint, protocolKind, model, apiKey, effort, localInference, localThinkingEnabled):
+            return try await AIChatClient().complete(
+                endpoint: endpoint,
+                protocolKind: protocolKind,
+                model: model,
+                systemPrompt: systemPrompt,
+                messages: messages,
+                apiKey: apiKey,
+                effort: effort,
+                localInference: localInference,
+                localThinkingEnabled: localThinkingEnabled
+            ).content
+        case let .cliProfile(accountID, model):
+            return try await aiAgent.completeWithCLIProfile(
+                accountID: accountID,
+                systemPrompt: systemPrompt,
+                messages: messages,
+                model: model
+            )
+        }
+    }
+
+    private func deliverVoiceTranscript(
+        _ transcript: String,
+        to targetProcessIdentifier: pid_t?,
+        at targetMouseLocation: CGPoint?,
+        target: VoiceTranscriptDeliveryTarget?,
+        message: String
+    ) {
+        switch voiceTranscriptDelivery.deliver(
+            transcript,
+            to: targetProcessIdentifier,
+            at: targetMouseLocation,
+            target: target
+        ) {
+        case .copiedAndPasted:
+            transientMessage = AppLocalization.text("%@；已输入当前文本框并复制", message)
+        case .copiedOnly:
+            if targetProcessIdentifier != nil, !CGPreflightPostEventAccess() {
+                transientMessage = AppLocalization.text("%@；已复制。请在系统设置的“隐私与安全性 > 辅助功能”中允许 zisla 后重试", message)
+            } else {
+                transientMessage = AppLocalization.text("%@；已复制，未能输入原文本框", message)
+            }
+        case .copyFailed:
+            transientMessage = AppLocalization.text("无法复制语音转写结果")
+        }
+    }
+
+    func playVoiceRecording(id: UUID) {
+        guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
+              let url = voiceHistory.audioURL(for: entry) else {
+            transientMessage = AppLocalization.text("无法播放该语音原文件")
+            return
+        }
+        if voiceRecordingPlayer.play(id: id, url: url) {
+            transientMessage = AppLocalization.text("正在播放原始录音")
+        } else {
+            transientMessage = AppLocalization.text("无法播放该语音原文件")
+        }
+    }
+
+    func revealVoiceRecording(id: UUID) {
+        guard let entry = voiceHistory.entries.first(where: { $0.id == id }),
+              let url = voiceHistory.audioURL(for: entry) else {
+            transientMessage = AppLocalization.text("未找到该语音原文件")
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    func openVoiceRecordingsDirectory() {
+        do {
+            try FileManager.default.createDirectory(
+                at: AppPaths.voiceRecordings,
+                withIntermediateDirectories: true
+            )
+            NSWorkspace.shared.open(AppPaths.voiceRecordings)
+        } catch {
+            transientMessage = AppLocalization.text("无法打开语音记录目录：%@", error.localizedDescription)
+        }
+    }
+
+    func removeVoiceRecording(id: UUID) {
+        voiceRecordingPlayer.stop()
+        voiceHistory.remove(id: id)
+    }
+
+    func removeVoiceRecordings(ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        voiceRecordingPlayer.stop()
+        voiceHistory.removeBatch(ids: ids)
+    }
+
+    func removeAllVoiceRecordings() {
+        voiceRecordingPlayer.stop()
+        voiceHistory.removeAll()
+    }
+
+    private static func frontmostVoiceInputTargetProcessIdentifier() -> pid_t? {
+        guard let application = NSWorkspace.shared.frontmostApplication,
+              application.processIdentifier != NSRunningApplication.current.processIdentifier else {
+            return nil
+        }
+        return application.processIdentifier
+    }
+
+    /// Tests the current model endpoint and discovers available models.
+    func discoverModels() {
+        voiceModelDiscoveryTask?.cancel()
+        voiceModelDiscoveryTask = nil
+        voiceModelDiscoveryGeneration &+= 1
+        let generation = voiceModelDiscoveryGeneration
+        let processingTarget: AIProcessingTarget?
+        do {
+            processingTarget = try Self.voicePostProcessingTarget(
+                for: selectedVoiceModelConfiguration,
+                store: aiAgent.store,
+                requiresModel: false
+            )
+        } catch {
+            voiceModelDiscoveryState = .failed(AppLocalization.text("无法读取模型凭据"))
+            discoveredModels = []
+            return
+        }
+        guard let target = processingTarget else {
+            voiceModelDiscoveryState = .failed(AppLocalization.text("请先在上方添加、启用并选择一个模型配置"))
+            discoveredModels = []
+            return
+        }
+        guard case let .http(endpoint, _, _, apiKey, _, _, _) = target else {
+            voiceModelDiscoveryState = .failed(AppLocalization.text("官方 CLI 档案不支持 API 模型发现"))
+            discoveredModels = []
+            return
+        }
+        voiceModelDiscoveryState = .testing
+        voiceModelDiscoveryTask = Task { @MainActor [weak self] in
+            let service = AIModelDiscoveryService()
+            do {
+                let models = try await service.models(for: endpoint, apiKey: apiKey)
+                guard let self,
+                      !Task.isCancelled,
+                      self.voiceModelDiscoveryGeneration == generation
+                else { return }
+                self.discoveredModels = models
+                self.voiceModelDiscoveryState = .success(models.count)
+                self.voiceModelDiscoveryTask = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self,
+                      !Task.isCancelled,
+                      self.voiceModelDiscoveryGeneration == generation
+                else { return }
+                self.voiceModelDiscoveryState = .failed(error.localizedDescription)
+                self.discoveredModels = []
+                self.voiceModelDiscoveryTask = nil
+            }
+        }
+    }
+
+    var selectedVoiceModelConfiguration: AIModelConfigurationReference? {
+        let reference = settingsStore.settings.voiceModelConfiguration
+        guard let reference, isSelectableVoiceModelConfiguration(reference) else { return nil }
+        return reference
+    }
+
+    func selectVoiceModelConfiguration(_ reference: AIModelConfigurationReference?) {
+        guard let reference else {
+            settingsStore.settings.voiceModelConfiguration = nil
+            resetVoiceModelDiscovery()
+            return
+        }
+        guard isSelectableVoiceModelConfiguration(reference) else {
+            settingsStore.settings.voiceModelConfiguration = nil
+            resetVoiceModelDiscovery()
+            return
+        }
+        settingsStore.settings.voiceModelConfiguration = reference
+        resetVoiceModelDiscovery()
+    }
+
+    private func isSelectableVoiceModelConfiguration(_ reference: AIModelConfigurationReference) -> Bool {
+        switch reference.source {
+        case .local:
+            aiAgent.store.localModel(id: reference.id)?.isEnabled == true
+        case .channel:
+            aiAgent.store.channel(id: reference.id)?.isEnabled == true
+        }
+    }
+
+    func voiceModelConfigurationTitle(_ reference: AIModelConfigurationReference) -> String {
+        switch reference.source {
+        case .local:
+            guard let configuration = aiAgent.store.localModel(id: reference.id) else { return "本地模型" }
+            let modelName = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return modelName.isEmpty ? configuration.name : modelName
+        case .channel:
+            guard let channel = aiAgent.store.channel(id: reference.id) else { return AppLocalization.text("远端模型") }
+            let modelName = channel.defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            return modelName.isEmpty ? channel.name : modelName
+        }
+    }
+
+    func voiceModelConfigurationDetail(_ reference: AIModelConfigurationReference) -> String {
+        switch reference.source {
+        case .local:
+            guard let model = aiAgent.store.localModel(id: reference.id) else { return "" }
+            return AppLocalization.text("本地 · %@", "\(model.endpoint.baseURL)")
+        case .channel:
+            guard let channel = aiAgent.store.channel(id: reference.id) else { return "" }
+            let credentialKinds = channel.endpointGroups
+                .flatMap(\.accountIDs)
+                .compactMap { aiAgent.store.account(id: $0)?.credentialKind.displayName }
+                .map(AppLocalization.text(_:))
+            let credential = credentialKinds.first ?? AppLocalization.text("未配置凭据")
+            return AppLocalization.text("远端 · %@", credential)
+        }
+    }
+
+    private func resetVoiceModelDiscovery() {
+        voiceModelDiscoveryTask?.cancel()
+        voiceModelDiscoveryTask = nil
+        voiceModelDiscoveryGeneration &+= 1
+        discoveredModels = []
+        voiceModelDiscoveryState = .idle
+    }
+
+    private func restartActivityNoticesForDurationChange() {
+        for id in activeAINoticeIDs {
+            notices.remove(id: id)
+        }
+        activityNoticeShownIDs.removeAll()
+        clearMediaNotices()
+    }
+
+    private func consumeAIState(_ state: AIState) {
+        let settings = settingsStore.settings
+        syncAIActivityPowerAssertion(state)
+        guard settings.aiProgressEnabled else { return }
+
+        let activeTasks = state.tasks.filter(\.status.isActive)
+        let nextActiveNoticeIDs = Set(activeTasks.map(activeAINoticeID(for:)))
+        for id in activeAINoticeIDs.subtracting(nextActiveNoticeIDs) {
+            notices.remove(id: id)
+            activityNoticeShownIDs.remove(id)
+        }
+        activeAINoticeIDs = nextActiveNoticeIDs
+        if settings.sideNoticesEnabled {
+            let expiresAfter = settings.activityNoticeDisplayDuration.expiresAfter
+            for task in activeTasks {
+                let notice = IslandNotice(
+                    id: activeAINoticeID(for: task),
+                    title: task.title,
+                    detail: task.detail,
+                    kind: task.status.noticeKind,
+                    side: noticeSide(for: task.provider),
+                    createdAt: task.updatedAt,
+                    progress: task.progress
+                )
+                if notices.updateIfPresent(notice) {
+                    continue
+                }
+                let statusChanged = taskStatuses[task.id].map { $0 != task.status } ?? false
+                guard !activityNoticeShownIDs.contains(notice.id) || statusChanged else { continue }
+                notices.enqueue(notice, expiresAfter: expiresAfter)
+                activityNoticeShownIDs.insert(notice.id)
+            }
+        }
+
+        for notice in state.notices where notice.createdAt >= launchDate.addingTimeInterval(-2) {
+            guard knownNoticeIDs.insert(notice.id).inserted else { continue }
+            if settings.sideNoticesEnabled { notices.enqueue(notice) }
+        }
+
+        for task in state.tasks {
+            let previous = taskStatuses[task.id]
+            taskStatuses[task.id] = task.status
+            aiResultSweep.receive(previous: previous, task: task, observedSince: launchDate, settings: settings)
+        }
+    }
+
+    private func syncAIActivityPowerAssertion(_ state: AIState) {
+        let isActive = settingsStore.settings.aiProgressEnabled
+            && state.tasks.contains { $0.status.isActive }
+        powerAssertions.setAIActivityActive(isActive)
+    }
+
+    private func clearActiveAINotices() {
+        for id in activeAINoticeIDs {
+            notices.remove(id: id)
+            activityNoticeShownIDs.remove(id)
+        }
+        activeAINoticeIDs.removeAll()
+    }
+
+    private func consumeMailMessages(_ messages: [MailMessage]) {
+        let currentIDs = Set(messages.map(\.id))
+        defer { knownMailMessageIDs = currentIDs }
+        notices.removeAll(withIDPrefix: "mail-notification-")
+        guard settingsStore.settings.mailEnabled else {
+            hasLoadedMail = false
+            return
+        }
+        guard hasLoadedMail else {
+            hasLoadedMail = true
+            return
+        }
+        guard settingsStore.settings.sideNoticesEnabled else { return }
+
+        let newMessages = messages.filter { !$0.isRead && !knownMailMessageIDs.contains($0.id) }
+        guard let latest = newMessages.max(by: { $0.receivedAt < $1.receivedAt }) else { return }
+        let pair = MailNotification(
+            message: latest,
+            newMessageCount: newMessages.count,
+            pairID: latest.id
+        ).makeNotices()
+        notices.enqueue(pair.left)
+        notices.enqueue(pair.right)
+    }
+
+    private func reportMailOperation(
+        _ result: MailOperationResult,
+        successMessage: String
+    ) -> Bool {
+        switch result {
+        case .success:
+            transientMessage = successMessage
+            return true
+        case .failed(let message):
+            transientMessage = message
+            return false
+        }
+    }
+
+    private func consumeMediaSnapshot(_ snapshot: NowPlayingSnapshot?) {
+        defer { refreshToolboxReminderNotice() }
+        guard snapshot == media.snapshot else { return }
+        let settings = settingsStore.settings
+        updateSpectrumMonitoring()
+        guard settings.mediaEnabled,
+              settings.sideNoticesEnabled,
+              let snapshot,
+              snapshot.isPlaying
+        else {
+            clearMediaNotices()
+            consumeBackgroundSoundPlayback()
+            return
+        }
+
+        clearBackgroundSoundNotices()
+
+        let source =
+            snapshot.sourceApplication
+                ?? snapshot.sourceBundleIdentifier
+                ?? AppLocalization.text("媒体播放器")
+        let artworkData = MediaArtworkImageCache.displayData(
+            from: snapshot.artworkData,
+            fallback: snapshot.sourceIconData
+        )
+        let compactMetadata = ["compactLyric": MediaTextFormatting.lyricLine(snapshot, lyrics: snapshot.lyrics, date: .now)]
+        let leftNotice = IslandNotice(
+            id: "media-active-left",
+            title: source,
+            detail: snapshot.title,
+            kind: .info,
+            side: .left,
+            artworkData: artworkData,
+            metadata: compactMetadata
+        )
+        let rightNotice = IslandNotice(
+            id: "media-active-right",
+            title: "正在播放",
+            detail: [snapshot.title, snapshot.artist]
+                .filter { !$0.isEmpty }
+                .joined(separator: " · "),
+            kind: .info,
+            side: .right,
+            artworkData: artworkData,
+            metadata: compactMetadata
+        )
+
+        let leftVisible = notices.updateIfPresent(leftNotice)
+        let rightVisible = notices.updateIfPresent(rightNotice)
+        if leftVisible || rightVisible {
+            return
+        }
+        guard !mediaActivityPresented else { return }
+
+        let expiresAfter = settings.activityNoticeDisplayDuration.expiresAfter
+        notices.enqueue(leftNotice, expiresAfter: expiresAfter)
+        notices.enqueue(rightNotice, expiresAfter: expiresAfter)
+        mediaActivityPresented = true
+    }
+
+    static func shouldMonitorSpectrum(
+        mediaEnabled: Bool,
+        sideNoticesEnabled: Bool,
+        voiceInputIsCapturing: Bool,
+        isIslandVisible: Bool,
+        isPlaying: Bool,
+        backgroundSoundsPlaying: Bool
+    ) -> Bool {
+        !voiceInputIsCapturing
+            && mediaEnabled
+            // Core Audio fallback needs audibility before it can publish the first playback snapshot.
+            && (
+                sideNoticesEnabled
+                    || isIslandVisible
+                    || isPlaying
+                    || backgroundSoundsPlaying
+            )
+    }
+
+    private func updateSpectrumMonitoring() {
+        let settings = settingsStore.settings
+        let voiceInputIsCapturing = voiceInput.isCapturingInput
+        let isPlaying = media.snapshot?.isPlaying == true
+        let hasVisiblePlaybackNotice = notices.left.contains {
+            mediaNoticeIDs.contains($0.id) || backgroundSoundNoticeIDs.contains($0.id)
+        } || notices.right.contains {
+            mediaNoticeIDs.contains($0.id) || backgroundSoundNoticeIDs.contains($0.id)
+        }
+        // Background sound counts as media playback: its waveform animates while the island
+        // is expanded even when no music app is playing.
+        media.setSpectrumVisualizationEnabled(
+            !voiceInputIsCapturing
+                && settings.mediaEnabled
+                && (isPlaying || backgroundSounds.isPlaying)
+                && (isIslandVisible || hasVisiblePlaybackNotice)
+        )
+        media.setSpectrumMonitoringEnabled(
+            Self.shouldMonitorSpectrum(
+                mediaEnabled: settings.mediaEnabled,
+                sideNoticesEnabled: settings.sideNoticesEnabled,
+                voiceInputIsCapturing: voiceInputIsCapturing,
+                isIslandVisible: isIslandVisible,
+                isPlaying: isPlaying,
+                backgroundSoundsPlaying: backgroundSounds.isPlaying
+            )
+        )
+    }
+
+    private func clearMediaNotices() {
+        for id in mediaNoticeIDs { notices.remove(id: id) }
+        mediaActivityPresented = false
+    }
+
+    private func consumeBackgroundSoundPlayback() {
+        let settings = settingsStore.settings
+        guard settings.sideNoticesEnabled,
+              backgroundSounds.isPlaying,
+              media.snapshot?.isPlaying != true
+        else {
+            clearBackgroundSoundNotices()
+            return
+        }
+
+        let soundName = backgroundSounds.playingSound.map { AppLocalization.text($0.title) }
+            ?? AppLocalization.text("背景音")
+        let leftNotice = IslandNotice(
+            id: "background-sound-left",
+            title: soundName,
+            kind: .info,
+            side: .left
+        )
+        let rightNotice = IslandNotice(
+            id: "background-sound-right",
+            title: soundName,
+            kind: .info,
+            side: .right
+        )
+
+        if !notices.updateIfPresent(leftNotice) {
+            notices.enqueue(leftNotice, expiresAfter: nil)
+        }
+        if !notices.updateIfPresent(rightNotice) {
+            notices.enqueue(rightNotice, expiresAfter: nil)
+        }
+    }
+
+    private func clearBackgroundSoundNotices() {
+        for id in backgroundSoundNoticeIDs { notices.remove(id: id) }
+    }
+
+    private var headphoneTransientEnabled: Bool {
+        let settings = settingsStore.settings
+        return headphoneTransientLifecycleActive && settings.systemMonitorEnabled && settings.systemMonitorMenuBarCombinedIconEnabled
+            && settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon
+    }
+
+    private func clearHeadphoneTransient() {
+        headphoneTransientTask?.cancel()
+        headphoneTransientTask = nil
+        systemMonitorHeadphoneTransient = SystemMonitorHeadphoneTransient()
+    }
+
+    private func reconcileHeadphoneTransient(devices: [AudioOutputDevice]) {
+        systemMonitorHeadphoneTransient.reconcile(
+            enabled: headphoneTransientEnabled, settings: settingsStore.settings, devices: devices
+        )
+        if systemMonitorHeadphoneTransient.connection == nil {
+            clearHeadphoneTransient()
+        }
+    }
+
+    private func consumeHeadphoneConnection(_ connection: HeadphoneConnection) {
+        systemMonitorHeadphoneTransient.receive(
+            connection, enabled: headphoneTransientEnabled, settings: settingsStore.settings
+        )
+        if systemMonitorHeadphoneTransient.connection?.id == connection.id {
+            headphoneTransientTask?.cancel()
+            headphoneTransientTask = Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(for: .seconds(SystemMonitorHeadphoneTransient.duration))
+                } catch { return }
+                guard !Task.isCancelled, let self else { return }
+                self.systemMonitorHeadphoneTransient.expire(connectionID: connection.id)
+                self.headphoneTransientTask = nil
+            }
+        }
+        SystemMonitorHeadphoneTransient.updateConnectionNotices(
+            settings: settingsStore.settings, queue: notices, connection: connection
+        )
+    }
+
+    private func consumeFocusModeStatus(
+        _ status: FocusModeStatus,
+        showsTransition: Bool
+    ) {
+        let settings = settingsStore.settings
+        guard settings.sideNoticesEnabled else {
+            clearFocusModeNotices()
+            return
+        }
+
+        let presentation = status.presentation
+        if status.isActive {
+            let notices = [
+                IslandNotice(
+                    id: "focus-mode-left",
+                    title: presentation.title,
+                    kind: .info,
+                    side: .left,
+                    style: .status,
+                    symbolName: presentation.symbolName
+                ),
+                IslandNotice(
+                    id: "focus-mode-right",
+                    title: "ON",
+                    kind: .success,
+                    side: .right,
+                    style: .status
+                ),
+            ]
+            for notice in notices {
+                self.notices.remove(id: notice.id)
+                self.notices.enqueue(
+                    notice,
+                    expiresAfter: settings.focusModeNoticeDisplayDuration.expiresAfter
+                )
+            }
+        } else {
+            clearFocusModeNotices()
+        }
+
+        guard showsTransition else { return }
+        notices.enqueue(
+            IslandNotice(
+                id: "focus-transition",
+                title: presentation.title,
+                detail: AppLocalization.text(status.isActive ? "已开启" : "已关闭"),
+                kind: status.isActive ? .success : .info,
+                side: .left,
+                style: .status,
+                symbolName: presentation.symbolName
+            ),
+            expiresAfter: 3
+        )
+    }
+
+    private func clearFocusModeNotices() {
+        for id in focusModeNoticeIDs { notices.remove(id: id) }
+    }
+
+    private func enablePowerAssertionsForCleaning() {
+        if cleaningPowerState == nil {
+            cleaningPowerState = (
+                keepDisplayAwake: powerAssertions.keepDisplayAwake,
+                preventIdleSystemSleep: powerAssertions.preventIdleSystemSleep
+            )
+        }
+        powerAssertions.setKeepDisplayAwake(true)
+        powerAssertions.setPreventIdleSystemSleep(true)
+    }
+
+    private func restorePowerAssertionsAfterCleaning() {
+        guard let state = cleaningPowerState else { return }
+        cleaningPowerState = nil
+        powerAssertions.setKeepDisplayAwake(state.keepDisplayAwake)
+        powerAssertions.setPreventIdleSystemSleep(state.preventIdleSystemSleep)
+        refreshToolboxReminderNotice()
+    }
+
+    nonisolated static func shouldPresentToolboxReminder(settings: FeatureSettings, hasMedia: Bool) -> Bool {
+        settings.toolboxEnabled && settings.toolboxReminderEnabled && settings.sideNoticesEnabled
+            && (!hasMedia || (settings.supportsStatusIconsInIsland && settings.islandShowMoreInformation))
+    }
+
+    private func refreshToolboxReminderNotice() {
+        let settings = settingsStore.settings
+        guard !isPomodoroCountdownActive else {
+            clearToolboxReminderNotices()
+            return
+        }
+        guard Self.shouldPresentToolboxReminder(settings: settings, hasMedia: media.snapshot != nil),
+              let content = ToolboxReminder.content(
+                  isScreenCleaning: screenCleaning.isScreenCleaning,
+                  isKeyboardCleaning: screenCleaning.isKeyboardCleaning,
+                  pomodoroMode: pomodoro.mode,
+                  pomodoroPhase: pomodoro.phase,
+                  pomodoroClock: pomodoro.displayClock,
+                  keepDisplayAwake: powerAssertions.keepDisplayAwake,
+                  preventIdleSystemSleep: powerAssertions.preventIdleSystemSleep
+              )
+        else {
+            clearToolboxReminderNotices()
+            return
+        }
+
+        let reminders = [
+            IslandNotice(
+                id: "toolbox-reminder-left",
+                title: content.title,
+                detail: content.compactTitle,
+                kind: .info,
+                side: .left
+            ),
+            IslandNotice(
+                id: "toolbox-reminder-right",
+                title: content.title,
+                detail: content.compactTitle,
+                kind: .info,
+                side: .right
+            ),
+        ]
+        for reminder in reminders where !notices.updateIfPresent(reminder) {
+            notices.enqueue(reminder, expiresAfter: nil)
+        }
+    }
+
+    private func clearToolboxReminderNotices() {
+        for id in toolboxReminderIDs where noticeExists(id: id) {
+            notices.remove(id: id)
+        }
+    }
+
+    private var canPresentUserCareMessage: Bool {
+        userCarePresentationAllowed()
+            && !voiceInput.isCapturingInput
+            && clipboardAssistant.presentation.detection == nil
+            && !isMirrorPresented && !isTeleprompterPresented
+            && !screenCleaning.isScreenCleaning && !screenCleaning.isKeyboardCleaning
+    }
+
+    @discardableResult
+    func presentUserCareMessage(_ reminder: UserCareReminder, throttlesNoteUpdates: Bool = false) -> Bool {
+        let uptime = ProcessInfo.processInfo.systemUptime
+        guard let message = userCareFeedback.message(
+            for: reminder,
+            settings: settingsStore.settings,
+            presentationAllowed: canPresentUserCareMessage,
+            currentMessage: transientMessage,
+            uptime: uptime,
+            language: languageStore.language,
+            throttlesNoteUpdates: throttlesNoteUpdates
+        ) else { return false }
+        transientMessage = message
+        // The shared setter revokes ownership even when another message repeats the same text.
+        userCareFeedback.didPresent(reminder, at: uptime)
+        return true
+    }
+
+    func clearUserCareMessage(routineOnly: Bool = false) {
+        guard userCareFeedback.dismiss(routineOnly: routineOnly) else { return }
+        transientMessage = nil
+    }
+
+    static func shouldPresentPomodoroCountdown(
+        mode: PomodoroMode,
+        phase: PomodoroPhase,
+        isScreenCleaning: Bool,
+        isKeyboardCleaning: Bool
+    ) -> Bool {
+        guard phase != .idle,
+              !isScreenCleaning,
+              !isKeyboardCleaning
+        else { return false }
+
+        switch mode {
+        case .focus, .rest:
+            return true
+        }
+    }
+
+    private var isPomodoroCountdownActive: Bool {
+        Self.shouldPresentPomodoroCountdown(
+            mode: pomodoro.mode,
+            phase: pomodoro.phase,
+            isScreenCleaning: screenCleaning.isScreenCleaning,
+            isKeyboardCleaning: screenCleaning.isKeyboardCleaning
+        )
+    }
+
+    private func refreshFocusCountdownNotice() {
+        guard settingsStore.settings.sideNoticesEnabled,
+              settingsStore.settings.focusCountdownIslandEnabled,
+              isPomodoroCountdownActive
+        else {
+            clearFocusCountdownNotices()
+            return
+        }
+
+        Self.refreshFocusCountdownNotices(for: pomodoro, in: notices)
+    }
+
+    static func refreshFocusCountdownNotices(for pomodoro: PomodoroService, in queue: SideNoticeQueue) {
+        let notices = [
+            pomodoro.focusCountdownNotice(for: .left),
+            pomodoro.focusCountdownNotice(for: .right),
+        ]
+        queue.removeAll(
+            withIDPrefix: PomodoroService.focusCountdownNoticeIDPrefix,
+            except: Set(notices.map(\.id))
+        )
+        for notice in notices {
+            let existing = (notice.side == .left ? queue.left : queue.right)
+                .first { $0.id == notice.id }
+            guard existing?.title != notice.title || existing?.detail != notice.detail
+                || existing?.progress != notice.progress else { continue }
+            if !queue.updateIfPresent(notice) {
+                queue.enqueue(notice, expiresAfter: nil)
+            }
+        }
+    }
+
+    private func clearFocusCountdownNotices() {
+        notices.removeAll(withIDPrefix: focusCountdownNoticePrefix)
+    }
+
+    /// The 3-second linger after completion is timed by `BrowserDownloadMonitor`; here we enqueue a persistent notice that clears together with it.
+    private func consumeBrowserDownloadSnapshot(_ snapshot: BrowserDownloadSnapshot?) {
+        guard settingsStore.settings.sideNoticesEnabled,
+              settingsStore.settings.browserDownloadIslandEnabled,
+              let snapshot
+        else {
+            clearBrowserDownloadNotices()
+            return
+        }
+
+        let updates = [NoticeSide.left, .right].map { side in
+            IslandNotice(
+                id: side == .left ? "browser-download-left" : "browser-download-right",
+                title: snapshot.fileName,
+                detail: snapshot.progressText,
+                kind: snapshot.isFinished ? .success : .info,
+                side: side,
+                progress: snapshot.fraction,
+                appName: snapshot.agent?.displayName,
+                appBundleIdentifier: snapshot.agent?.bundleIdentifier,
+                symbolName: snapshot.agent?.symbolName ?? "arrow.down.circle.fill"
+            )
+        }
+        for notice in updates where !notices.updateIfPresent(notice) {
+            notices.enqueue(notice, expiresAfter: nil)
+        }
+    }
+
+    private func clearBrowserDownloadNotices() {
+        for id in browserDownloadNoticeIDs where noticeExists(id: id) {
+            notices.remove(id: id)
+        }
+    }
+
+    /// Progress strip for the native downloader in the collapsed island. The 3-second linger on completion is handled by the queue's own expiry timer.
+    private func consumeVideoDownloadSnapshot(_ snapshot: VideoDownloadSnapshot?) {
+        guard settingsStore.settings.sideNoticesEnabled,
+              settingsStore.settings.videoDownloadIslandEnabled,
+              let snapshot
+        else {
+            clearVideoDownloadNotices()
+            return
+        }
+
+        let updates = [NoticeSide.left, .right].map { side in
+            IslandNotice(
+                id: side == .left ? "video-download-left" : "video-download-right",
+                title: snapshot.sourceName,
+                detail: snapshot.progressText,
+                kind: snapshot.isFinished ? .success : .info,
+                side: side,
+                progress: snapshot.fraction,
+                artworkData: videoDownloadFaviconData,
+                appName: snapshot.platform?.displayName ?? snapshot.host,
+                // Platform rawValue is passed through so the view can look up the bundled logo; falls back to artworkData favicon if no bundled logo is found.
+                appBundleIdentifier: snapshot.platform?.rawValue,
+                symbolName: "arrow.down.circle.fill"
+            )
+        }
+        for notice in updates {
+            let expiry: Double? = snapshot.isFinished ? 3 : nil
+            if snapshot.isFinished {
+                // Finished notices must be re-enqueued to attach the 3-second expiry; updateIfPresent does not schedule a timer.
+                notices.enqueue(notice, expiresAfter: expiry)
+            } else if !notices.updateIfPresent(notice) {
+                notices.enqueue(notice, expiresAfter: nil)
+            }
+        }
+    }
+
+    private func clearVideoDownloadNotices() {
+        for id in videoDownloadNoticeIDs where noticeExists(id: id) {
+            notices.remove(id: id)
+        }
+    }
+
+    private func beginVideoDownloadIsland(forURLString urlString: String) {
+        videoDownloadPlatform = VideoDownloadPlatformResolver.platform(forURLString: urlString)
+        videoDownloadHost = VideoDownloadPlatformResolver.bareHost(ofURLString: urlString)
+        videoDownloadFaviconData = nil
+        updateVideoDownloadIsland(fraction: nil, isFinished: false)
+
+        // Platforms with a bundled logo don't need a network fetch; sites not in the bundled library (including long-tail sites) fetch their own favicon.
+        guard videoDownloadPlatform?.bundledIconURL == nil, let host = videoDownloadHost else { return }
+        Task { [weak self, videoDownloadFavicons] in
+            let data = await videoDownloadFavicons.icon(forHost: host)
+            await MainActor.run {
+                guard let self, self.videoDownloadHost == host, let data else { return }
+                self.videoDownloadFaviconData = data
+                guard case .downloading(let fraction, _, _) = self.downloadState else {
+                    self.updateVideoDownloadIsland(fraction: nil, isFinished: false)
+                    return
+                }
+                self.updateVideoDownloadIsland(fraction: fraction, isFinished: false)
+            }
+        }
+    }
+
+    private func updateVideoDownloadIsland(fraction: Double?, isFinished: Bool) {
+        guard videoDownloadPlatform != nil || videoDownloadHost != nil else { return }
+        consumeVideoDownloadSnapshot(
+            VideoDownloadSnapshot(
+                platform: videoDownloadPlatform,
+                host: videoDownloadHost,
+                sourceName: videoDownloadPlatform?.displayName ?? videoDownloadHost ?? "下载",
+                fraction: fraction,
+                isFinished: isFinished
+            )
+        )
+        if isFinished { resetVideoDownloadSource() }
+    }
+
+    private func endVideoDownloadIsland() {
+        resetVideoDownloadSource()
+        clearVideoDownloadNotices()
+    }
+
+    private func resetVideoDownloadSource() {
+        videoDownloadPlatform = nil
+        videoDownloadHost = nil
+        videoDownloadFaviconData = nil
+    }
+
+    private func noticeExists(id: String) -> Bool {
+        notices.left.contains { $0.id == id } || notices.right.contains { $0.id == id }
+    }
+
+    private func noticeSide(for provider: AIProvider) -> NoticeSide {
+        switch provider {
+        case .claude, .gemini, .qwen, .trae, .doubao: .left
+        case .pi, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot, .muse: .right
+        case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .zed, .opencode, .harness: .right
+        }
+    }
+
+    private func activeAINoticeID(for task: AIProgressTask) -> String {
+        AIMascotLibrary.activeNoticeID(for: task)
+    }
+
+    private func refreshAgendaIfEnabled() {
+        let settings = settingsStore.settings
+        if settings.weatherEnabled, isWeatherStale { refreshWeather() }
+        if settings.calendarEnabled {
+            Task { await calendar.refresh() }
+        }
+    }
+
+    func setDownloadDirectory(_ url: URL) throws {
+        try saveLocations.setDirectory(url, for: .download)
+    }
+
+    private func dailyBriefingObservation(at date: Date) -> DailyBriefingObservation {
+        let application = NSWorkspace.shared.frontmostApplication
+        let bundle = application?.bundleURL.flatMap(Bundle.init(url:))
+        let session = CGSessionCopyCurrentDictionary() as? [String: Any]
+        let locked = session?["CGSSessionScreenIsLocked"] as? Bool ?? false
+        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState,
+                                                           eventType: CGEventType(rawValue: UInt32.max)!)
+        let hardware = systemMonitor.snapshot.map { snapshot in
+            let record = SystemMetricsRecord(snapshot: snapshot)
+            return DailyBriefingHardware(date: record.timestamp, powerWatts: record.systemPowerWatts,
+                                         batteryLevel: record.batteryLevel, fanRPM: record.fanRPMs.max())
+        }
+        return DailyBriefingObservation(
+            date: date,
+            applicationID: application?.bundleIdentifier ?? "unknown",
+            applicationName: application?.localizedName ?? AppLocalization.text("未知应用"),
+            category: DailyBriefingCategory(applicationCategory: bundle?.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String),
+            isActive: !locked && idle < 60 && application != nil,
+            isListening: media.isAvailable ? (media.snapshot.map { $0.isPlaying && !$0.isVideo } ?? false) : nil,
+            hardware: hardware,
+            recordsKeyPresses: keyboardSound.isTypingStatsRecording
+        )
+    }
+
+    /// Resolver messages are catalog keys; external diagnostics must remain verbatim to preserve support details.
+    static func downloadErrorText(
+        _ error: Error, locale: Locale = AppLocalization.currentLanguage.locale
+    ) -> String {
+        if error is YTDLPResolverError {
+            return AppLocalization.string(error.localizedDescription, locale: locale)
+        }
+        guard let error = error as? DownloadServiceError else {
+            return error.localizedDescription
+        }
+        switch error {
+        case .duplicateTask: return "下载任务已在运行"
+        case .cannotPrepareDirectory: return "无法写入下载目录"
+        case .launchFailed: return "无法启动下载任务"
+        case .processFailed(_, let diagnostic): return diagnostic.isEmpty ? AppLocalization.text("下载失败") : diagnostic
+        case .browserCookieAccessDenied: return DownloadFailureDiagnostics.browserCookieAccessFailureMessage
+        case .formatSelectionRequiresFFmpeg: return AppLocalization.text("需要 FFmpeg 才能选择格式")
+        case .invalidFormatProbeResponse: return AppLocalization.text("无法读取下载格式")
+        case .missingCompletedFile: return "未获得下载文件"
+        case .unsafeCompletedFile: return "下载结果位于授权目录之外"
+        case .completedFileDoesNotExist: return "下载文件不存在"
+        }
+    }
+
+    private static func requiresBrowserCookies(_ error: Error, urlString: String) -> Bool {
+        guard let error = error as? DownloadServiceError,
+              case let .processFailed(_, diagnostic) = error else {
+            return false
+        }
+        return DownloadFailureDiagnostics.requiresBrowserCookies(
+            rawDiagnostic: diagnostic,
+            urlString: urlString
+        )
+    }
+
+    private static func shouldRetryWithoutBrowserCookies(
+        _ error: Error,
+        browserCookieSource: DownloadBrowserCookieSource?
+    ) -> Bool {
+        guard let error = error as? DownloadServiceError,
+              case let .processFailed(_, diagnostic) = error else {
+            return false
+        }
+        return DownloadFailureDiagnostics.shouldRetryWithoutBrowserCookies(
+            rawDiagnostic: diagnostic,
+            browserCookieSource: browserCookieSource
+        )
+    }
 }
 
 extension AppearanceMode {
-  /// The corresponding NSApp-level appearance; `nil` means follow the system.
-  var nsAppearance: NSAppearance? {
-    switch self {
-    case .system: nil
-    case .light: NSAppearance(named: .aqua)
-    case .dark: NSAppearance(named: .darkAqua)
+    /// The corresponding NSApp-level appearance; `nil` means follow the system.
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
     }
-  }
 }

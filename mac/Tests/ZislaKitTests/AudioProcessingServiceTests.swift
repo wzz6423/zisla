@@ -67,7 +67,7 @@ struct AudioProcessingServiceTests {
         try Data("#!/bin/sh\nexit 0\n".utf8).write(to: ffprobe)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: ffprobe.path)
         let tools = try AudioProcessingService.resolveTools(bundle: root, managedTools: managed,
-                                                           candidates: [fallback.appendingPathComponent("ffmpeg")])
+                                                            candidates: [fallback.appendingPathComponent("ffmpeg")])
         #expect(tools == .init(ffmpeg: fallback.appendingPathComponent("ffmpeg"), ffprobe: ffprobe))
     }
 
@@ -350,12 +350,12 @@ struct AudioProcessingServiceTests {
         let input = fixture.root.appendingPathComponent("recording.aac")
         try Data("AAC fixture".utf8).write(to: input)
         let service = AudioProcessingService(tools: { .init(ffmpeg: URL(fileURLWithPath: "/fixture/ffmpeg"),
-                                                           ffprobe: URL(fileURLWithPath: "/fixture/ffprobe")) }, run: { executable, _ in
-            if executable.lastPathComponent == "ffprobe" {
-                return .init(status: 0, standardOutput: Data(AudioFixture.probeJSON.utf8), standardError: "", didTimeout: false)
-            }
-            return .init(status: fails ? 1 : 0, standardOutput: Data("progress=end".utf8), standardError: "scan failure", didTimeout: false)
-        })
+                                                            ffprobe: URL(fileURLWithPath: "/fixture/ffprobe")) }, run: { executable, _ in
+                if executable.lastPathComponent == "ffprobe" {
+                    return .init(status: 0, standardOutput: Data(AudioFixture.probeJSON.utf8), standardError: "", didTimeout: false)
+                }
+                return .init(status: fails ? 1 : 0, standardOutput: Data("progress=end".utf8), standardError: "scan failure", didTimeout: false)
+            })
         await #expect(throws: fails ? AudioProcessingError.processFailed("scan failure") : AudioProcessingError.noAudio(input)) {
             try await service.process(.init(operation: .split, inputURLs: [input]), outputURL: fixture.root)
         }
@@ -368,18 +368,18 @@ struct AudioProcessingServiceTests {
         defer { fixture.clean() }
         let source = try Data(contentsOf: fixture.input)
         let service = AudioProcessingService(tools: { .init(ffmpeg: URL(fileURLWithPath: "/fixture/ffmpeg"),
-                                                           ffprobe: URL(fileURLWithPath: "/fixture/ffprobe")) }, run: { executable, arguments in
-            if executable.lastPathComponent == "ffprobe" {
-                return .init(status: 0, standardOutput: Data(AudioFixture.probeJSON.utf8), standardError: "", didTimeout: false)
-            }
-            if failure == "cancelled" { throw CancellationError() }
-            #expect(arguments.last == "-", "Invalid measurement must never reach encoding")
-            let stats = failure == "malformed stats" ? "{invalid}" : failure == "nonfinite stats"
-                ? #"{"input_i":"nan","input_tp":"-1","input_lra":"3","input_thresh":"-30","target_offset":"0"}"#
-                : failure == "unmeasurable audio"
-                ? #"{"input_i":"-inf","input_tp":"-20","input_lra":"0","input_thresh":"-70","target_offset":"inf"}"# : ""
-            return .init(status: failure == "process failure" ? 1 : 0, standardOutput: Data(), standardError: stats, didTimeout: false)
-        })
+                                                            ffprobe: URL(fileURLWithPath: "/fixture/ffprobe")) }, run: { executable, arguments in
+                if executable.lastPathComponent == "ffprobe" {
+                    return .init(status: 0, standardOutput: Data(AudioFixture.probeJSON.utf8), standardError: "", didTimeout: false)
+                }
+                if failure == "cancelled" { throw CancellationError() }
+                #expect(arguments.last == "-", "Invalid measurement must never reach encoding")
+                let stats = failure == "malformed stats" ? "{invalid}" : failure == "nonfinite stats"
+                    ? #"{"input_i":"nan","input_tp":"-1","input_lra":"3","input_thresh":"-30","target_offset":"0"}"#
+                    : failure == "unmeasurable audio"
+                    ? #"{"input_i":"-inf","input_tp":"-20","input_lra":"0","input_thresh":"-70","target_offset":"inf"}"# : ""
+                return .init(status: failure == "process failure" ? 1 : 0, standardOutput: Data(), standardError: stats, didTimeout: false)
+            })
         do {
             _ = try await service.process(.init(operation: .normalize, inputURLs: [fixture.input]), outputURL: fixture.output)
             Issue.record("Invalid normalization measurement must fail")

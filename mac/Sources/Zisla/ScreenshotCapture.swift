@@ -112,7 +112,7 @@ enum ScreenshotCaptureService {
 
     static var supportsHDRCapture: Bool {
         #if arch(arm64)
-        if #available(macOS 15.0, *) { return true }
+            if #available(macOS 15.0, *) { return true }
         #endif
         return false
     }
@@ -650,7 +650,7 @@ enum ScreenshotSnapTargetProvider {
         guard let displayID = ScreenshotCaptureService.displayID(for: screen),
               let windows = CGWindowListCopyWindowInfo(
                   [.optionOnScreenOnly, .excludeDesktopElements],
-                kCGNullWindowID
+                  kCGNullWindowID
               ) as? [[String: Any]]
         else { return [] }
 
@@ -714,13 +714,13 @@ enum ScreenshotSnapTargetProvider {
         let point = ScreenshotSnapTargetGeometry.globalPoint(localPoint, in: displayBounds)
         var element: AXUIElement?
         guard AXUIElementCopyElementAtPosition(
-            application,
-            Float(point.x),
-            Float(point.y),
-            &element
-        ) == .success,
-        let element,
-        let frame = frame(of: element)
+                  application,
+                  Float(point.x),
+                  Float(point.y),
+                  &element
+              ) == .success,
+              let element,
+              let frame = frame(of: element)
         else { return nil }
         guard let local = ScreenshotSnapTargetGeometry.localRect(frame, in: displayBounds) else {
             return nil
@@ -738,19 +738,19 @@ enum ScreenshotSnapTargetProvider {
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
-            element,
-            kAXPositionAttribute as CFString,
-            &positionRef
-        ) == .success,
-        AXUIElementCopyAttributeValue(
-            element,
-            kAXSizeAttribute as CFString,
-            &sizeRef
-        ) == .success,
-        let positionRef,
-        let sizeRef,
-        CFGetTypeID(positionRef) == AXValueGetTypeID(),
-        CFGetTypeID(sizeRef) == AXValueGetTypeID()
+                  element,
+                  kAXPositionAttribute as CFString,
+                  &positionRef
+              ) == .success,
+              AXUIElementCopyAttributeValue(
+                  element,
+                  kAXSizeAttribute as CFString,
+                  &sizeRef
+              ) == .success,
+              let positionRef,
+              let sizeRef,
+              CFGetTypeID(positionRef) == AXValueGetTypeID(),
+              CFGetTypeID(sizeRef) == AXValueGetTypeID()
         else { return nil }
 
         var position = CGPoint.zero
@@ -1173,7 +1173,7 @@ struct ScreenshotSelectionView: View {
                         Button(action: onCancel) {
                             Label(AppLocalization.text("取消"), systemImage: "xmark")
                         }
-                            .buttonStyle(.bordered)
+                        .buttonStyle(.bordered)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 14)

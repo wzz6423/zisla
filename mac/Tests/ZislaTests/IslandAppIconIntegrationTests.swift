@@ -11,7 +11,7 @@ struct IslandAppIconIntegrationTests {
     @Test
     func informationPageLogoControlUsesTheSavedSettingAndAllLanguages() throws {
         let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"),
-            encoding: .utf8)
+                                encoding: .utf8)
         let start = try #require(source.range(of: "    private var infoContent: some View {"))
         let end = try #require(source.range(of: "    private var dailyBriefingContent:", range: start.upperBound..<source.endIndex))
         let section = String(source[start.lowerBound..<end.lowerBound])
@@ -19,7 +19,7 @@ struct IslandAppIconIntegrationTests {
             pattern: #"featureToggle\("([^"]+)"[^\n]*keyPath: \\\.islandAppIconEnabled\)"#
         )
         let match = try #require(call.firstMatch(in: section, range: NSRange(section.startIndex..., in: section)),
-            "The information page must bind the logo switch to its own persisted preference")
+                                 "The information page must bind the logo switch to its own persisted preference")
         let range = try #require(Range(match.range(at: 1), in: section))
         let key = String(section[range])
         #expect(key == "显示应用标识")
@@ -36,25 +36,25 @@ struct IslandAppIconIntegrationTests {
         #expect(AppLocalization.string(key, locale: Locale(identifier: "en")) == "Show App Logo")
         #expect(AppLocalization.string(key, locale: Locale(identifier: "ar")) == "عرض شعار التطبيق")
         let applicationSource = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/ZislaApp.swift"),
-            encoding: .utf8)
+                                           encoding: .utf8)
         let routingCall = try NSRegularExpression(pattern:
             #"IslandStatusIconRouting\.update\([\s\S]*?islandAppIconEnabled:\s*settings\.islandAppIconEnabled\)"#)
         #expect(routingCall.firstMatch(in: applicationSource,
-            range: NSRange(applicationSource.startIndex..., in: applicationSource)) != nil,
-            "Changing the saved preference must feed the production icon routing call")
+                                       range: NSRange(applicationSource.startIndex..., in: applicationSource)) != nil,
+                "Changing the saved preference must feed the production icon routing call")
     }
 
     @Test(arguments: AppLanguage.allCases)
     func logoControlRemainsSearchableWhenOtherInformationFeaturesAreOff(language: AppLanguage) {
         var settings = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false, lockScreenInfoEnabled: false,
-            sideNoticesEnabled: false, userCareEnabled: false, islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom))
+                                       sideNoticesEnabled: false, userCareEnabled: false, islandLayoutStyle: .pill,
+                                       islandPlacement: IslandPlacement(mode: .custom))
         settings.dailyBriefing.enabled = false
         for showsLogo in [false, true] {
             settings.islandAppIconEnabled = showsLogo
             #expect(SettingsSection.info.isVisible(settings: settings))
             let matches = SettingsSearchIndex.results(for: AppLocalization.string("显示应用标识", locale: language.locale),
-                settings: settings, locale: language.locale)
+                                                      settings: settings, locale: language.locale)
             #expect(matches.first?.section == .info)
             #expect(matches.first?.anchor == .row("显示应用标识"))
         }
@@ -90,11 +90,11 @@ struct IslandAppIconIntegrationTests {
         let title = style == .detailed ? "\(SystemMonitorMenuBarPresentation.label(for: .cpu)) 93%" : "93%"
         let metrics = [(SystemMonitorMenuBarMetric.cpu, metric, title)]
         let visible = IslandStatusIconRouting.update(destination: .island, application: application,
-            metrics: metrics, stacked: stacked, readings: readings, combined: combined, style: style,
-            islandAppIconEnabled: true)
+                                                     metrics: metrics, stacked: stacked, readings: readings, combined: combined, style: style,
+                                                     islandAppIconEnabled: true)
         let hidden = IslandStatusIconRouting.update(destination: .island, application: application,
-            metrics: metrics, stacked: stacked, readings: readings, combined: combined, style: style,
-            islandAppIconEnabled: false)
+                                                    metrics: metrics, stacked: stacked, readings: readings, combined: combined, style: style,
+                                                    islandAppIconEnabled: false)
         #expect(visible.map(\.id) == ["status-icon-application"] + hidden.map(\.id))
         #expect(hidden.map(\.id) == ["status-icon-combined", "status-icon-cpu", "status-icon-stacked"])
         #expect(hidden.allSatisfy { $0.isSystemMonitor })
@@ -106,13 +106,13 @@ struct IslandAppIconIntegrationTests {
             #expect(routedReadings.map(\.text) == ["93%", "22%"])
         } else { Issue.record("The merged monitor must retain both readings") }
         #expect(IslandStatusIconRouting.update(destination: .menuBar, application: application, metrics: metrics,
-            stacked: stacked, readings: readings, combined: combined, style: style,
-            islandAppIconEnabled: false).isEmpty)
+                                               stacked: stacked, readings: readings, combined: combined, style: style,
+                                               islandAppIconEnabled: false).isEmpty)
         #expect(items.allSatisfy { $0.isVisible })
         #expect(application.menu === menu)
         #expect(metric.button?.target === application && metric.button?.action == #selector(NSObject.description))
         #expect(IslandStatusIconRouting.update(destination: .island, application: nil, metrics: [],
-            stacked: nil, readings: [], combined: nil, style: style, islandAppIconEnabled: false).isEmpty)
+                                               stacked: nil, readings: [], combined: nil, style: style, islandAppIconEnabled: false).isEmpty)
     }
 
     @Test(arguments: [false, true], [false, true]) @MainActor
@@ -125,20 +125,20 @@ struct IslandAppIconIntegrationTests {
         items.forEach { $0.isVisible = false }
         defer { items.forEach { NSStatusBar.system.removeStatusItem($0) } }
         let settings = FeatureSettings(menuBarAppIconEnabled: showsMenuBarIcon, islandAppIconEnabled: showsIslandLogo,
-            islandLayoutStyle: .pill, islandPlacement: IslandPlacement(mode: .custom))
+                                       islandLayoutStyle: .pill, islandPlacement: IslandPlacement(mode: .custom))
         for hasMonitor in [false, true] {
             monitor.isVisible = false
             let icons = IslandStatusIconRouting.update(destination: settings.effectiveStatusIconDestination,
-                application: application, metrics: [], stacked: nil, readings: [],
-                combined: hasMonitor ? monitor : nil, style: .compact, islandAppIconEnabled: settings.islandAppIconEnabled)
+                                                       application: application, metrics: [], stacked: nil, readings: [],
+                                                       combined: hasMonitor ? monitor : nil, style: .compact, islandAppIconEnabled: settings.islandAppIconEnabled)
             #expect(icons.map(\.id) == (showsIslandLogo ? ["status-icon-application"] : [])
                 + (hasMonitor ? ["status-icon-combined"] : []))
             #expect(items.allSatisfy { !$0.isVisible })
             #expect(settings.menuBarAppIconEnabled == showsMenuBarIcon)
             #expect(settings.islandAppIconEnabled == showsIslandLogo)
             #expect(IslandStatusIconRouting.update(destination: .menuBar, application: application,
-                metrics: [], stacked: nil, readings: [], combined: hasMonitor ? monitor : nil,
-                style: .compact, islandAppIconEnabled: settings.islandAppIconEnabled).isEmpty)
+                                                   metrics: [], stacked: nil, readings: [], combined: hasMonitor ? monitor : nil,
+                                                   style: .compact, islandAppIconEnabled: settings.islandAppIconEnabled).isEmpty)
             #expect((application?.isVisible ?? false) == showsMenuBarIcon)
             #expect(monitor.isVisible == hasMonitor)
         }
@@ -166,17 +166,17 @@ struct IslandAppIconIntegrationTests {
         var dimensions: [Bool: CGSize] = [:]
         for showsLogo in [false, true] {
             let settings = FeatureSettings(islandAppIconEnabled: showsLogo, islandLayoutStyle: .pill,
-                islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                                           islandPlacement: IslandPlacement(mode: .custom, edge: edge))
             let icons = IslandStatusIconRouting.update(destination: settings.effectiveStatusIconDestination,
-                application: application, metrics: [], stacked: nil, readings: [], combined: monitor,
-                style: .compact, islandAppIconEnabled: settings.islandAppIconEnabled)
+                                                       application: application, metrics: [], stacked: nil, readings: [], combined: monitor,
+                                                       style: .compact, islandAppIconEnabled: settings.islandAppIconEnabled)
             let layout = try #require(FloatingIslandInformationLayout(notices: [], icons: icons,
-                settings: settings, item: nil, at: date))
+                                                                      settings: settings, item: nil, at: date))
             #expect(layout.icons.map(\.id) == (showsLogo
-                ? ["status-icon-application", "status-icon-combined"] : ["status-icon-combined"]))
+                    ? ["status-icon-application", "status-icon-combined"] : ["status-icon-combined"]))
             frames[showsLogo] = try await StatusIconDestinationIntegrationTests().renderOffscreen(FloatingIslandInformationView(layout: layout,
-                visualizationStyle: .waveform, item: nil, date: date)
-                .environment(\.layoutDirection, direction), size: layout.size)
+                                                                                                                                visualizationStyle: .waveform, item: nil, date: date)
+                    .environment(\.layoutDirection, direction), size: layout.size)
             dimensions[showsLogo] = layout.size
         }
         let shown = try #require(frames[true])
@@ -211,8 +211,8 @@ struct IslandAppIconIntegrationTests {
         state.compactWingHeight = 24
         state.compactStatusHidden = hidesActivity
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         if hidesActivity {
             fixture.queue.enqueue(IslandNotice(id: "toolbox-reminder-logo-setting", title: "Reminder"), expiresAfter: nil)
         }
@@ -229,7 +229,7 @@ struct IslandAppIconIntegrationTests {
         #expect(view.pausesCompactTimeline, "A hidden mark must stop its idle animation clock")
         fixture.settings.settings.islandAppIconEnabled = true
         #expect(try pixels(view.statusBarContent(at: date)
-            .frame(width: size.width, height: size.height)) == enabled)
+                .frame(width: size.width, height: size.height)) == enabled)
     }
 
     @MainActor

@@ -21,10 +21,10 @@ struct AIAccountBalanceCookieInputTests {
     func successfulMutationClearsManualInputAndRefreshesOnlyAfterPersistence(action: AIAccountBalanceCookieInputModel.Action) async {
         let calls = BalanceInputCalls()
         let input = AIAccountBalanceCookieInputModel(website: .qoderChina, importCookie: { website in calls.add("import:" + website.rawValue) },
-            saveCookie: { value, website, removing in
-                #expect(value == "manual=fixture")
-                calls.add((removing ? "remove:" : "save:") + website.rawValue)
-            })
+                                                     saveCookie: { value, website, removing in
+                                                         #expect(value == "manual=fixture")
+                                                         calls.add((removing ? "remove:" : "save:") + website.rawValue)
+                                                     })
         input.cookie = "manual=fixture"
         var refreshes = 0
         await input.perform(action, didChange: {
@@ -50,7 +50,7 @@ struct AIAccountBalanceCookieInputTests {
     @Test func duplicateActionWhileImportIsRunningDoesNotReplaceItsStateOrSaveTheWebsite() async {
         let gate = BalanceInputGate()
         let input = AIAccountBalanceCookieInputModel(website: .zed, importCookie: { _ in gate.block() },
-            saveCookie: { _, _, _ in Issue.record("Duplicate action must not mutate storage") })
+                                                     saveCookie: { _, _, _ in Issue.record("Duplicate action must not mutate storage") })
         input.cookie = "manual=retained"
         let first = Task { await input.perform(.importBrowser, didChange: {}) }
         await gate.waitUntilStarted()

@@ -28,7 +28,7 @@ struct ScheduledCleanupSettingsTests {
         for (key, section) in [("剪贴板历史", SettingsSection.features),
                                ("自动删除剪贴板历史", .scheduledCleanup), ("定时倾倒废纸篓", .scheduledCleanup)] {
             let matches = SettingsSearchIndex.results(for: AppLocalization.string(key, locale: language.locale),
-                settings: settings, locale: language.locale)
+                                                      settings: settings, locale: language.locale)
             #expect(matches.first?.section == section)
             #expect(matches.first?.anchor == .row(key))
         }
@@ -50,7 +50,7 @@ struct ScheduledCleanupSettingsTests {
         #expect(items.filter { $0.title == title }.map(\.section) == [.scheduledCleanup])
         for key in [title, "按所选周期删除过期音频，文字记录继续保留"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle) {
             let matches = SettingsSearchIndex.results(for: AppLocalization.string(key, locale: language.locale),
-                settings: settings, locale: language.locale)
+                                                      settings: settings, locale: language.locale)
             #expect(matches.contains { $0.section == .scheduledCleanup && $0.title == title && $0.anchor == .row(title) })
         }
     }
@@ -167,8 +167,8 @@ struct ScheduledCleanupSettingsTests {
             }
         }
         let newKeys: Set<String> = ["系统状态与清理", "管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。", "定时倾倒废纸篓",
-            "按所选间隔永久删除废纸篓中的所有项目，无法恢复", "启用定时倾倒废纸篓？",
-            "自动清理录音", "按所选周期删除过期音频，文字记录继续保留"]
+                                    "按所选间隔永久删除废纸篓中的所有项目，无法恢复", "启用定时倾倒废纸篓？",
+                                    "自动清理录音", "按所选周期删除过期音频，文字记录继续保留"]
         #expect(newKeys.isSubset(of: keys))
         keys.formUnion(VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
         keys.formUnion(BatteryPowerMode.allCases.map(\.menuTitle))

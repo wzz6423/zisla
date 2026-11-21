@@ -96,7 +96,7 @@ struct ShelfDetailTests {
             if failure == "invalid image" {
                 let database = ShelfScreenshotDatabase(directory: directory.appendingPathComponent("shelf.screenshots"))
                 try database.insert(ShelfScreenshotRecord(id: unreadable.id, addedAt: Self.date, shelfOrder: 1,
-                    metadata: Self.metadata, png: Data("not an image".utf8)))
+                                                          metadata: Self.metadata, png: Data("not an image".utf8)))
             } else if failure == "missing metadata" {
                 unreadable.screenshotMetadata = nil
             }
@@ -116,8 +116,8 @@ struct ShelfDetailTests {
         draft.text = "保留这次截图对应的评审记录，稍后继续编辑。"
         var noteActions: [String] = []
         let note = DetailHost(ContextNoteDetailView(draft: draft,
-            onCopy: { noteActions.append("copy") }, onNavigate: { noteActions.append("navigate") },
-            onSave: { noteActions.append("save") }, onClose: { noteActions.append("close") }, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
+                                                    onCopy: { noteActions.append("copy") }, onNavigate: { noteActions.append("navigate") },
+                                                    onSave: { noteActions.append("save") }, onClose: { noteActions.append("close") }, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
         defer { note.panel.close() }
         await note.settle()
         try note.render(name: "note")
@@ -135,7 +135,8 @@ struct ShelfDetailTests {
         let screenshot = DetailHost(ShelfScreenshotDetailView(
             detail: ShelfScreenshotDetail(id: UUID(), metadata: Self.metadata, image: try makeImage()),
             onCopy: { screenshotActions.append("copy") }, onSave: { screenshotActions.append("save") },
-            onClose: { screenshotActions.append("close") }))
+            onClose: { screenshotActions.append("close") }
+        ))
         defer { screenshot.panel.close() }
         await screenshot.settle()
         try screenshot.render(name: "screenshot")
@@ -168,7 +169,7 @@ struct ShelfDetailTests {
         let draft = ContextNoteDraft(location: Self.location)
         var saves = 0
         let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {},
-            onSave: { saves += 1; draft.error = "写入失败，请重试" }, onClose: {}, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
+                                                       onSave: { saves += 1; draft.error = "写入失败，请重试" }, onClose: {}, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
         defer { fixture.panel.close() }
         await fixture.settle()
         let save = try #require(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("保存") })
@@ -215,9 +216,9 @@ struct ShelfDetailTests {
             window.orderFrontRegardless()
         })
         let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {}, onSave: {}, onClose: {},
-            onCopyScreenshot: copy, onOpenScreenshot: { screenshot in
-                controller.present(screenshot, onCopy: copy, onSave: { saves.append($0) })
-            }), height: 520)
+                                                       onCopyScreenshot: copy, onOpenScreenshot: { screenshot in
+                                                           controller.present(screenshot, onCopy: copy, onSave: { saves.append($0) })
+                                                       }), height: 520)
         defer { fixture.panel.close(); controller.window?.close() }
         await fixture.settle()
         try fixture.render(name: "note-attachment")
@@ -240,8 +241,8 @@ struct ShelfDetailTests {
         fixture.panel.orderOut(nil)
         #expect(preview.isVisible, "Hiding the island detail must not hide the native preview")
         let commandC = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
-            timestamp: 0, windowNumber: preview.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
-            isARepeat: false, keyCode: 8))
+                                                     timestamp: 0, windowNumber: preview.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
+                                                     isARepeat: false, keyCode: 8))
         #expect(preview.performKeyEquivalent(with: commandC))
         #expect(copies == [png, png])
         #expect(pasteboard.data(forType: .png) == png)
@@ -266,7 +267,7 @@ struct ShelfDetailTests {
         await gate.waitUntilStarted()
         var saves = 0
         let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {},
-            onSave: { saves += 1 }, onClose: {}, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
+                                                       onSave: { saves += 1 }, onClose: {}, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
         defer { fixture.panel.close() }
         await fixture.settle()
         #expect(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("保存") }?.isEnabled == false)
@@ -295,8 +296,8 @@ struct ShelfDetailTests {
 
     private func makeImage() throws -> NSImage {
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 320, pixelsHigh: 160,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         for y in 0..<160 {
             for x in 0..<320 {
                 bitmap.setColor(NSColor(calibratedRed: CGFloat(x) / 320, green: CGFloat(y) / 160, blue: 0.3, alpha: 1), atX: x, y: y)
@@ -309,8 +310,8 @@ struct ShelfDetailTests {
 
     private func saveEvent(in window: NSWindow) throws -> NSEvent {
         try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
-            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
-            context: nil, characters: "s", charactersIgnoringModifiers: "s", isARepeat: false, keyCode: 1))
+                                      timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                      context: nil, characters: "s", charactersIgnoringModifiers: "s", isARepeat: false, keyCode: 1))
     }
 
     private static let date = Date(timeIntervalSince1970: 1_728_460_800)
@@ -319,7 +320,8 @@ struct ShelfDetailTests {
         source: ScreenshotSourceSnapshot(applicationName: "评审应用", bundleIdentifier: "test.review", processIdentifier: 42, capturedAt: date),
         isLongScreenshot: false, initialCaptureRect: CGRect(x: 10, y: 20, width: 320, height: 160),
         captureRect: CGRect(x: 10, y: 20, width: 320, height: 160), screenFrame: nil, displayIdentifier: nil,
-        pixelWidth: 320, pixelHeight: 160)
+        pixelWidth: 320, pixelHeight: 160
+    )
 }
 
 @MainActor
@@ -367,7 +369,7 @@ private final class DetailHost<Content: View> {
                     .compactMap { value($0) as? String }.first { !$0.isEmpty }
                 let role = (value("accessibilityRole") as? String).map(NSAccessibility.Role.init(rawValue:))
                 result.append(Element(label: label, role: role, frame: element.accessibilityFrame(),
-                    isEnabled: value("isAccessibilityEnabled") as? Bool))
+                                      isEnabled: value("isAccessibilityEnabled") as? Bool))
             }
             for child in value("accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
         }
@@ -380,8 +382,8 @@ private final class DetailHost<Content: View> {
         let point = window.convertPoint(fromScreen: CGPoint(x: frame.midX, y: frame.midY))
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
             let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
-                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-                eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                                                        timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                                                        eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
             window.sendEvent(event)
         }
     }

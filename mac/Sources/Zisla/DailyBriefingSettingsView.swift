@@ -120,7 +120,7 @@ struct DailyBriefingSettingsView: View {
         .task(id: request) { await renderThumbnails(request) }
         .onChange(of: request) { _, request in
             previewWindowController?.update(template: settingsStore.settings.dailyBriefing.template,
-                language: request.language, selectedContent: request.selectedContent)
+                                            language: request.language, selectedContent: request.selectedContent)
         }
         .onChange(of: settingsStore.settings.dailyBriefing.template) { _, template in
             previewWindowController?.update(template: template, language: language, selectedContent: selectedContent)

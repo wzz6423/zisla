@@ -114,12 +114,12 @@ public struct DailyBriefingScreenTimeReader: Sendable {
 
     private static func readLocalUsage(_ database: OpaquePointer?, within range: DateInterval) throws -> [ScreenTimeUsageInterval] {
         let query = """
-            SELECT o.ZVALUESTRING, o.ZSTARTDATE, o.ZENDDATE
-            FROM ZOBJECT o LEFT JOIN ZSOURCE s ON s.Z_PK = o.ZSOURCE
-            WHERE o.ZSTREAMNAME = '/app/usage' AND s.ZDEVICEID IS NULL
-              AND o.ZENDDATE > ? AND o.ZSTARTDATE < ?
-            ORDER BY o.ZSTARTDATE LIMIT 100000
-            """
+        SELECT o.ZVALUESTRING, o.ZSTARTDATE, o.ZENDDATE
+        FROM ZOBJECT o LEFT JOIN ZSOURCE s ON s.Z_PK = o.ZSOURCE
+        WHERE o.ZSTREAMNAME = '/app/usage' AND s.ZDEVICEID IS NULL
+          AND o.ZENDDATE > ? AND o.ZSTARTDATE < ?
+        ORDER BY o.ZSTARTDATE LIMIT 100000
+        """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK else {
             throw CocoaError(.fileReadCorruptFile)
@@ -135,7 +135,7 @@ public struct DailyBriefingScreenTimeReader: Sendable {
                 let end = sqlite3_column_double(statement, 2)
                 if start.isFinite, end.isFinite, end > start {
                     intervals.append(.init(deviceID: "local", bundleID: String(cString: bundle),
-                        start: Date(timeIntervalSinceReferenceDate: start), end: Date(timeIntervalSinceReferenceDate: end)))
+                                           start: Date(timeIntervalSinceReferenceDate: start), end: Date(timeIntervalSinceReferenceDate: end)))
                 }
             }
             status = sqlite3_step(statement)
@@ -147,11 +147,11 @@ public struct DailyBriefingScreenTimeReader: Sendable {
     private static func readNotificationCount(_ database: OpaquePointer?, within range: DateInterval) throws -> Int? {
         // SUM preserves NULL when there is no local receipt history to establish coverage.
         let query = """
-            SELECT SUM(CASE WHEN o.ZSTARTDATE >= ? AND o.ZSTARTDATE < ? THEN 1 ELSE 0 END)
-            FROM ZOBJECT o LEFT JOIN ZSOURCE s ON s.Z_PK = o.ZSOURCE
-            WHERE o.ZSTREAMNAME = '/notification/usage' AND o.ZVALUESTRING = 'Receive'
-              AND s.ZDEVICEID IS NULL AND typeof(o.ZSTARTDATE) IN ('integer', 'real')
-            """
+        SELECT SUM(CASE WHEN o.ZSTARTDATE >= ? AND o.ZSTARTDATE < ? THEN 1 ELSE 0 END)
+        FROM ZOBJECT o LEFT JOIN ZSOURCE s ON s.Z_PK = o.ZSOURCE
+        WHERE o.ZSTREAMNAME = '/notification/usage' AND o.ZVALUESTRING = 'Receive'
+          AND s.ZDEVICEID IS NULL AND typeof(o.ZSTARTDATE) IN ('integer', 'real')
+        """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK else {
             throw CocoaError(.fileReadCorruptFile)
@@ -175,7 +175,7 @@ public struct DailyBriefingScreenTimeReader: Sendable {
                 throw CocoaError(.fileReadNoPermission)
             }
             let files = try FileManager.default.contentsOfDirectory(at: device,
-                includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
+                                                                    includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
                 .filter { UInt64($0.lastPathComponent) != nil }
                 .sorted { UInt64($0.lastPathComponent)! < UInt64($1.lastPathComponent)! }
             let start = range.start.timeIntervalSinceReferenceDate * 1_000_000
@@ -210,7 +210,7 @@ public struct DailyBriefingScreenTimeReader: Sendable {
                 if transition.gainedFocus || transition.bundleID == previous.bundleID {
                     if transition.date > previous.date {
                         intervals.append(.init(deviceID: deviceID, bundleID: previous.bundleID,
-                            start: previous.date, end: transition.date))
+                                               start: previous.date, end: transition.date))
                     }
                     current = nil
                 }

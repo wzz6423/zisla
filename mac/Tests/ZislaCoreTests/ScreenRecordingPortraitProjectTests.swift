@@ -5,7 +5,7 @@ import Testing
 struct ScreenRecordingPortraitProjectTests {
     private func project() -> ScreenRecordingProject {
         .init(name: "Portrait", videoFile: "screen.mp4", cameraFile: "camera.mp4", microphoneFile: "microphone.mp4",
-            duration: 2, width: 320, height: 240)
+              duration: 2, width: 320, height: 240)
     }
 
     @Test func legacyProjectsKeepEffectsOffAndUseExistingMedia() throws {
@@ -24,9 +24,9 @@ struct ScreenRecordingPortraitProjectTests {
 
     @Test func captureResultsKeepBothOriginalsAndAuthoredEffectsAcrossSaveAndMigration() throws {
         let result = ScreenRecordingResult(videoFile: "screen.mp4", cameraFile: "camera.mp4", microphoneFile: "microphone.mp4",
-            duration: 2, width: 320, height: 240, rawCameraFile: "camera-original.mp4", rawMicrophoneFile: "mic-original.mp4",
-            portraitEffects: .init(smoothing: 0.4, brightening: 0.3, faceSlimming: 0.2, bodySlimming: 0.1),
-            voiceEffects: .init(preset: .warm, amount: 0.7))
+                                           duration: 2, width: 320, height: 240, rawCameraFile: "camera-original.mp4", rawMicrophoneFile: "mic-original.mp4",
+                                           portraitEffects: .init(smoothing: 0.4, brightening: 0.3, faceSlimming: 0.2, bodySlimming: 0.1),
+                                           voiceEffects: .init(preset: .warm, amount: 0.7))
         var source = ScreenRecordingProject(result: result, name: "Portrait")
         source.timeline = .migrating(source)
         source.timeline?.clips[0].portraitEffects = .init(bodySlimming: 0.5)

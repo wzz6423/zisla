@@ -4,32 +4,32 @@ import Testing
 
 struct AIAccountBalanceTests {
     @Test(arguments: [([AIProvider.codex], "Codex"), ([.gpt], "ChatGPT"),
-        ([.codex, .gpt], "Codex"), ([.gpt, .codex], "ChatGPT")], AppLanguage.allCases)
+                      ([.codex, .gpt], "Codex"), ([.gpt, .codex], "ChatGPT")], AppLanguage.allCases)
     func sharedAccountKeepsSelectedProviderBrandsAndTwoRealDurationReadings(selection: ([AIProvider], String), language: AppLanguage) {
         let (providers, title) = selection
         let reading = AIAccountBalance(id: "shared", providers: providers, status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                                                 .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
         #expect(reading.displayProvider == providers.first)
         #expect(reading.providerTitle(language: language) == title)
         #expect(reading.compactLines(language: language) == ["5h 10%", "7d 51%"])
         let weeklyOnly = AIAccountBalance(id: "weekly", providers: providers, status: .available,
-            windows: [reading.windows[1]])
+                                          windows: [reading.windows[1]])
         #expect(weeklyOnly.compactLines(language: language) == ["7d 51%"])
     }
 
     @Test func additionalAndNamedWindowsKeepTheirLabelsBesideTheRealCanonicalDurations() {
         let extras = [AIAccountQuotaWindow(id: "additional:spark:primary_window", kind: .fiveHours,
-            remainingPercent: 20, durationSeconds: 18_000, name: "Codex Spark"),
-            .init(id: "additional:spark:secondary_window", kind: .weekly, remainingPercent: 70,
-                durationSeconds: 604_800, name: "Codex Spark"),
-            .init(id: "named-weekly", kind: .weekly, remainingPercent: 30, durationSeconds: 604_800, name: "Sonnet"),
-            .init(id: "localized-weekly", kind: .weekly, remainingPercent: 40, nameKey: "模型额度")]
+                                           remainingPercent: 20, durationSeconds: 18_000, name: "Codex Spark"),
+                      .init(id: "additional:spark:secondary_window", kind: .weekly, remainingPercent: 70,
+                            durationSeconds: 604_800, name: "Codex Spark"),
+                      .init(id: "named-weekly", kind: .weekly, remainingPercent: 30, durationSeconds: 604_800, name: "Sonnet"),
+                      .init(id: "localized-weekly", kind: .weekly, remainingPercent: 40, nameKey: "模型额度")]
         var reading = AIAccountBalance(id: "shared", providers: [.codex], status: .available, windows: extras)
         let all = "全部 Codex Spark · 5h 20% · Codex Spark · 每周额度 70% · Sonnet · 每周额度 30% · 模型额度 40%"
         #expect(reading.compactLines(language: .simplifiedChinese) == [all])
         reading.windows += [.init(id: "primary_window", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
-            .init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)]
+                            .init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)]
         #expect(reading.compactLines(language: .simplifiedChinese) == ["5h 10%", "7d 51% · " + all])
         reading.windows = [reading.windows[4]]
         #expect(reading.compactLines(language: .simplifiedChinese) == ["5h 10%"])
@@ -37,9 +37,9 @@ struct AIAccountBalanceTests {
 
     @Test func detailedSummaryKeepsRealFiveHoursAndPutsExhaustionFirstInAllWindows() {
         let reading = AIAccountBalance(id: "claude", providers: [.claude], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 90),
-                .init(id: "extra", kind: .budget, remaining: 0, unit: .usd)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                                                 .init(id: "weekly", kind: .weekly, remainingPercent: 90),
+                                                 .init(id: "extra", kind: .budget, remaining: 0, unit: .usd)])
         #expect(reading.compactLines(language: .simplifiedChinese) == ["5h 70%", "7d 90% · 全部 可用预算 $0"])
     }
 
@@ -50,28 +50,28 @@ struct AIAccountBalanceTests {
         #expect(amount.remainingFraction == 0.25)
         #expect(amount.severity == .normal, "Amount-only visualization must preserve the existing alert semantics")
         for window in [AIAccountQuotaWindow(id: "unknown", kind: .credits, remaining: 20, unit: .credits),
-            .init(id: "zero", kind: .credits, remaining: 0, limit: 0, unit: .credits),
-            .init(id: "unlimited", kind: .all, remainingPercent: 100, unlimited: true),
-            .init(id: "invalid", kind: .all, remainingPercent: .nan)] {
+                       .init(id: "zero", kind: .credits, remaining: 0, limit: 0, unit: .credits),
+                       .init(id: "unlimited", kind: .all, remainingPercent: 100, unlimited: true),
+                       .init(id: "invalid", kind: .all, remainingPercent: .nan)] {
             #expect(window.remainingFraction == nil)
         }
     }
 
     @Test func visibleSharedAccountRequiresTheSameMonitoredAndDisplayedAlias() {
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
-            windows: [.init(id: "quota", kind: .all, remainingPercent: 70)])
+                                       windows: [.init(id: "quota", kind: .all, remainingPercent: 70)])
         #expect(AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [.codex],
-            displayedProviders: [.gpt]).isEmpty)
+                                                          displayedProviders: [.gpt]).isEmpty)
         let selected = AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [.gpt],
-            displayedProviders: [.gpt])
+                                                                 displayedProviders: [.gpt])
         #expect(selected.count == 1 && selected.first?.providers == [.gpt])
         #expect(selected.first?.displayProvider == .gpt)
         let codex = AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [.codex],
-            displayedProviders: [.codex])
+                                                              displayedProviders: [.codex])
         #expect(codex.count == 1 && codex.first?.providers == [.codex])
         #expect(codex.first?.displayProvider == .codex)
         #expect(AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [],
-            displayedProviders: [.gpt]).isEmpty)
+                                                          displayedProviders: [.gpt]).isEmpty)
     }
 
     @Test func emptyAndOtherSharedProviderIdentitiesKeepTheirExistingMeaning() {
@@ -85,11 +85,11 @@ struct AIAccountBalanceTests {
     @Test func debugBalancesOverrideRealProviderSelectionsAndKeepExplicitAliases() {
         let rows = [AIProvider.claude, .gpt, .cursor].map {
             AIAccountBalance(id: "debug:" + $0.rawValue, providers: [$0], status: .available,
-                windows: [.init(id: "quota", kind: .all, remainingPercent: 10)], isDebug: true)
+                             windows: [.init(id: "quota", kind: .all, remainingPercent: 10)], isDebug: true)
         }
         for selection in [Set<AIProvider>(), [.codex]] {
             #expect(AIAccountBalanceCatalog.displayedBalances(rows, monitoredProviders: selection,
-                displayedProviders: selection) == rows)
+                                                              displayedProviders: selection) == rows)
         }
         var live = rows
         for index in live.indices { live[index].isDebug = false }
@@ -103,7 +103,7 @@ struct AIAccountBalanceTests {
 
     /// Boundary pairs distinguish inclusive remaining-quota thresholds from consumed-percentage thresholds.
     @Test(arguments: [(100.0, AIAccountQuotaSeverity.normal), (20.1, .normal), (20, .warning), (10.1, .warning),
-                       (10, .critical), (0.1, .critical), (0, .exhausted)])
+                      (10, .critical), (0.1, .critical), (0, .exhausted)])
     func thresholdsUseRemainingQuota(percent: Double, expected: AIAccountQuotaSeverity) {
         #expect(AIAccountQuotaWindow(id: "quota", kind: .all, remainingPercent: percent).severity == expected)
     }
@@ -112,7 +112,7 @@ struct AIAccountBalanceTests {
     @Test func unavailableAndMalformedReadingsCannotTriggerLowOrZeroAlerts() {
         for status in AIAccountBalanceStatus.allFixtureCases {
             let balance = AIAccountBalance(id: "fixture", providers: [.claude], status: status,
-                windows: [.init(id: "quota", kind: .all, remainingPercent: 0)])
+                                           windows: [.init(id: "quota", kind: .all, remainingPercent: 0)])
             #expect(balance.severity == nil)
             #expect(balance.compactLines(language: .english).isEmpty)
         }
@@ -165,15 +165,15 @@ struct AIAccountBalanceTests {
         #expect(future.aiAccountBalanceMonitoredProviders == [.claude] && future.aiAccountBalanceDisplayedProviders.isEmpty)
         #expect(future.aiAccountBalanceQoderRegions.isEmpty)
         let settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
-            aiAccountBalanceDisplayedProviders: [.codex], aiAccountBalanceQoderRegions: [.china])
+                                       aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
+                                       aiAccountBalanceDisplayedProviders: [.codex], aiAccountBalanceQoderRegions: [.china])
         #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings)) == settings)
     }
 
     @Test(arguments: [Set<AIAccountBalanceQoderRegion>(), [.global], [.china], [.global, .china]])
     func qoderRegionSelectionsRoundTripWithoutChangingOtherProviders(regions: Set<AIAccountBalanceQoderRegion>) throws {
         let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.coder, .trae, .zed],
-            aiAccountBalanceDisplayedProviders: [.coder, .zed], aiAccountBalanceQoderRegions: regions)
+                                       aiAccountBalanceDisplayedProviders: [.coder, .zed], aiAccountBalanceQoderRegions: regions)
         let data = try JSONEncoder().encode(settings)
         #expect(try JSONDecoder().decode(FeatureSettings.self, from: data) == settings)
         let payload = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -184,7 +184,7 @@ struct AIAccountBalanceTests {
     @Test(arguments: AIAccountBalanceQoderRegion.allCases)
     func legacySingleQoderRegionMigratesAndPreservesExplicitProviders(region: AIAccountBalanceQoderRegion) throws {
         let data = try JSONSerialization.data(withJSONObject: ["aiAccountBalanceMonitoredProviders": ["coder", "trae", "zed"],
-            "aiAccountBalanceDisplayedProviders": ["coder"], "aiAccountBalanceQoderRegion": region.rawValue])
+                                                               "aiAccountBalanceDisplayedProviders": ["coder"], "aiAccountBalanceQoderRegion": region.rawValue])
         let settings = try JSONDecoder().decode(FeatureSettings.self, from: data)
         #expect(settings.aiAccountBalanceQoderRegions == [region])
         #expect(settings.aiAccountBalanceMonitoredProviders == [.coder, .trae, .zed])
@@ -201,14 +201,14 @@ struct AIAccountBalanceTests {
     }
 
     @Test(arguments: [([String](), Set<AIAccountBalanceQoderRegion>()), (["future"], Set<AIAccountBalanceQoderRegion>()),
-        (["china", "future", "china"], Set<AIAccountBalanceQoderRegion>([.china])),
-        (["global", "china", "future"], Set<AIAccountBalanceQoderRegion>([.global, .china]))])
+                      (["china", "future", "china"], Set<AIAccountBalanceQoderRegion>([.china])),
+                      (["global", "china", "future"], Set<AIAccountBalanceQoderRegion>([.global, .china]))])
     func currentQoderRegionsSupersedeLegacyValueAndIgnoreUnknownRegions(selection: ([String], Set<AIAccountBalanceQoderRegion>)) throws {
         let data = try JSONSerialization.data(withJSONObject: ["aiAccountBalanceQoderRegions": selection.0,
-            "aiAccountBalanceQoderRegion": "global"])
+                                                               "aiAccountBalanceQoderRegion": "global"])
         let settings = try JSONDecoder().decode(FeatureSettings.self, from: data)
         #expect(settings.aiAccountBalanceQoderRegions == selection.1,
-            "A new empty or unknown selection must not fall back to the old region")
+                "A new empty or unknown selection must not fall back to the old region")
     }
 
     @Test(arguments: AppLanguage.allCases)
@@ -236,5 +236,5 @@ struct AIAccountBalanceTests {
 
 private extension AIAccountBalanceStatus {
     static let allFixtureCases: [Self] = [.notSignedIn, .credentialsUnavailable, .credentialsExpired,
-        .additionalCredentialsRequired, .queryUnsupported, .connectedAccount, .unavailable, .rateLimited, .invalidResponse]
+                                          .additionalCredentialsRequired, .queryUnsupported, .connectedAccount, .unavailable, .rateLimited, .invalidResponse]
 }

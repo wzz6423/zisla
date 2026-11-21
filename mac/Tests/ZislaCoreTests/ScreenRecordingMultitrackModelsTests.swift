@@ -55,7 +55,7 @@ struct ScreenRecordingMultitrackModelsTests {
     @Test func importingAssetsAloneDoesNotCreateTracksOrExtendOutputDuration() throws {
         let image = RecordingMediaAsset(name: "Picture", file: "picture.png", kind: .image, duration: 5, width: 64, height: 48)
         var project = ScreenRecordingProject(name: "Library", videoFile: "", duration: 5, width: 64, height: 48,
-            edits: .init(segments: []), timeline: .init(assets: [image]))
+                                             edits: .init(segments: []), timeline: .init(assets: [image]))
         try project.validate()
         #expect(project.outputDuration == 0 && project.timeline?.tracks.isEmpty == true && project.timeline?.clips.isEmpty == true)
         let added = project.timeline?.addAssetClip(image.id, at: 3)
@@ -88,7 +88,7 @@ struct ScreenRecordingMultitrackModelsTests {
         timeline["assets"] = assets
         manifest["timeline"] = timeline
         let old = try JSONDecoder().decode(ScreenRecordingProject.self,
-            from: JSONSerialization.data(withJSONObject: manifest))
+                                           from: JSONSerialization.data(withJSONObject: manifest))
         try old.validate()
         project.timeline?.assets[0].importedAt = nil
         project.timeline?.assets[0].capturedAt = nil
@@ -131,22 +131,22 @@ struct ScreenRecordingMultitrackModelsTests {
         let image = RecordingMediaAsset(name: "Picture", file: "picture.png", kind: .image, duration: 2, width: 64, height: 48)
         let audio = RecordingMediaAsset(name: "Sound", file: "tone.wav", kind: .audio, duration: 2)
         let source = RecordingMediaAsset(id: project.id, name: project.name, file: project.videoFile,
-            kind: .video, duration: project.duration, width: project.width, height: project.height, hasAudio: true)
+                                         kind: .video, duration: project.duration, width: project.width, height: project.height, hasAudio: true)
         let annotation = try #require(project.edits.annotations?.first)
         let contents: [RecordingTimelineContent] = [.recording(source.id), .video(source.id), .image(image.id),
-            .audio(audio.id), .annotation(annotation.id), .caption(project.captions[0].id)]
+                                                    .audio(audio.id), .annotation(annotation.id), .caption(project.captions[0].id)]
         project.timeline = .init(assets: [source, image, audio],
-            tracks: [.init(id: "mixed", kind: kind, name: "My legacy track", isMuted: true)],
-            clips: contents.enumerated().map {
-                .init(id: "content\($0.offset)", trackID: "mixed", content: $0.element, start: 0, sourceEnd: 1)
-            })
+                                 tracks: [.init(id: "mixed", kind: kind, name: "My legacy track", isMuted: true)],
+                                 clips: contents.enumerated().map {
+                                     .init(id: "content\($0.offset)", trackID: "mixed", content: $0.element, start: 0, sourceEnd: 1)
+                                 })
         try project.validate()
         let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(project))
         try decoded.validate()
         #expect(decoded == project && decoded.timeline?.tracks[0].kind == kind)
         #expect(decoded.timeline?.tracks[0].name == "My legacy track")
         #expect(decoded.timeline?.visibleClips(at: 0.5).map(\.content) == contents.filter { $0 != .audio(audio.id) },
-            "Track metadata and mute state must not suppress visual content, and audio must never become a visual layer")
+                "Track metadata and mute state must not suppress visual content, and audio must never become a visual layer")
         project.timeline?.tracks[0].isHidden = true
         #expect(project.timeline?.visibleClips(at: 0.5).isEmpty == true)
     }
@@ -154,8 +154,8 @@ struct ScreenRecordingMultitrackModelsTests {
     @Test(arguments: [0.1, 0.5, 1.0, 2.0, 8.0])
     func splittingPreservesSourceContinuitySpeedAndLayerProperties(_ speed: Double) throws {
         let original = RecordingTimelineClip(id: "cut", trackID: "v", content: .video(UUID()),
-            start: 3, sourceStart: 2, sourceEnd: 6, speed: speed,
-            layout: .init(x: 0.1, y: 0.2, width: 0.6, height: 0.7), volume: 0.3, audioEnabled: false)
+                                             start: 3, sourceStart: 2, sourceEnd: 6, speed: speed,
+                                             layout: .init(x: 0.1, y: 0.2, width: 0.6, height: 0.7), volume: 0.3, audioEnabled: false)
         var timeline = RecordingMultitrackTimeline(clips: [original])
         let cut = original.start + 2 / speed
         let splitID = timeline.splitClip(original.id, at: cut)
@@ -196,7 +196,7 @@ struct ScreenRecordingMultitrackModelsTests {
     @Test func visibleLayersRespectTrackOrderHiddenTracksAndClipOrder() {
         let id = UUID()
         let tracks: [RecordingTimelineTrack] = [.init(id: "back", kind: .video), .init(id: "front", kind: .video),
-            .init(id: "hidden", kind: .video, isHidden: true), .init(id: "audio", kind: .audio)]
+                                                .init(id: "hidden", kind: .video, isHidden: true), .init(id: "audio", kind: .audio)]
         let clips = ["front", "back", "hidden", "audio", "front"].enumerated().map {
             RecordingTimelineClip(id: String($0.offset), trackID: $0.element, content: .video(id), start: 1, sourceEnd: 2)
         }

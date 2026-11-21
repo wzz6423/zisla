@@ -565,7 +565,7 @@ actor AudioSplitService {
               estimatedFrames > 0,
               estimatedFrames <= Double(AVAudioFrameCount.max - 64),
               estimatedFrames + 64
-                <= Double(configuration.maximumDecodedBytes / Int64(MemoryLayout<Float>.size)) else {
+              <= Double(configuration.maximumDecodedBytes / Int64(MemoryLayout<Float>.size)) else {
             throw AudioSplitError.conversionFailed
         }
         guard let output = AVAudioPCMBuffer(
@@ -717,8 +717,8 @@ actor AudioSplitService {
         let usedFallback: Bool
         if let bestScore = candidates.map(\.score).max(),
            let earliestStrongCandidate = candidates
-            .filter({ $0.score >= bestScore * 0.50 })
-            .min(by: { $0.onsetIndex < $1.onsetIndex }) {
+               .filter({ $0.score >= bestScore * 0.50 })
+               .min(by: { $0.onsetIndex < $1.onsetIndex }) {
             selected = earliestStrongCandidate
             usedFallback = false
         } else {
@@ -915,14 +915,14 @@ actor AudioSplitService {
         guard !samples.isEmpty,
               samples.count <= Int(AVAudioFrameCount.max),
               let format = AVAudioFormat(
-                commonFormat: .pcmFormatInt16,
-                sampleRate: Self.outputSampleRate,
-                channels: 1,
-                interleaved: false
+                  commonFormat: .pcmFormatInt16,
+                  sampleRate: Self.outputSampleRate,
+                  channels: 1,
+                  interleaved: false
               ),
               let buffer = AVAudioPCMBuffer(
-                pcmFormat: format,
-                frameCapacity: AVAudioFrameCount(samples.count)
+                  pcmFormat: format,
+                  frameCapacity: AVAudioFrameCount(samples.count)
               ),
               let channel = buffer.int16ChannelData?[0] else {
             throw AudioSplitError.cannotCreateOutputBuffer
@@ -956,7 +956,7 @@ actor AudioSplitService {
 
         do {
             for destination in [pressDestination, releaseDestination]
-            where fileManager.fileExists(atPath: destination.path) {
+                where fileManager.fileExists(atPath: destination.path) {
                 guard overwriteExisting else {
                     throw AudioSplitError.destinationAlreadyExists(destination)
                 }

@@ -2,7 +2,6 @@ import Combine
 import Foundation
 import SQLite3
 import Testing
-import XCTest
 import ZislaCore
 
 @testable import ZislaKit
@@ -208,9 +207,9 @@ struct ClipboardHistoryStoreTests {
         await store.waitUntilLoaded()
         defer { store.flushPendingChanges() }
         try executeSQL("""
-            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected reload write failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected reload write failure'); END;
+        """, at: storageURL)
 
         store.remove(id: original.id)
         store.updateQuery(scope: .history, searchText: "target", category: .text)
@@ -342,9 +341,9 @@ struct ClipboardHistoryStoreTests {
         await store.waitUntilLoaded()
         defer { store.flushPendingChanges() }
         try executeSQL("""
-            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected navigation failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected navigation failure'); END;
+        """, at: storageURL)
         store.remove(id: original[5].id)
         let previousItems = store.items
         let previousCount = store.totalItemCount
@@ -379,9 +378,9 @@ struct ClipboardHistoryStoreTests {
         await store.waitUntilLoaded()
         defer { store.flushPendingChanges() }
         try executeSQL("""
-            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected superseded load failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected superseded load failure'); END;
+        """, at: storageURL)
 
         store.remove(id: original.id)
         store.updateQuery(scope: .history, searchText: "")
@@ -421,9 +420,9 @@ struct ClipboardHistoryStoreTests {
         await store.waitUntilLoaded()
         defer { store.flushPendingChanges() }
         try executeSQL("""
-            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected query change failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected query change failure'); END;
+        """, at: storageURL)
         store.remove(id: removed.id)
         let previousCounts = store.categoryCounts
 
@@ -441,7 +440,7 @@ struct ClipboardHistoryStoreTests {
         #expect(store.errorDescription?.contains("injected query change failure") == true)
         #expect(store.record(.text("copy after failure")))
         #expect(store.items.map(\.content) == [.text("copy after failure"), .text("kept")],
-            "Later copies must match the query whose items are still visible")
+                "Later copies must match the query whose items are still visible")
 
         try executeSQL("DROP TRIGGER reject_removal", at: storageURL)
         store.updateQuery(scope: .all, searchText: "")
@@ -466,13 +465,13 @@ struct ClipboardHistoryStoreTests {
         await store.waitUntilLoaded()
         defer { store.flushPendingChanges() }
         try executeSQL("""
-            CREATE TRIGGER reject_insert BEFORE INSERT ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected query interleaving failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_insert BEFORE INSERT ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected query interleaving failure'); END;
+        """, at: storageURL)
         try executeSQL("""
-            CREATE TRIGGER reject_update BEFORE UPDATE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected query interleaving failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_update BEFORE UPDATE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected query interleaving failure'); END;
+        """, at: storageURL)
 
         switch action {
         case "pin":
@@ -488,7 +487,7 @@ struct ClipboardHistoryStoreTests {
         await store.waitUntilLoaded()
 
         #expect(store.items.map(\.content) == (action == "copy" ? [.text("A target")] : []),
-            "Optimistic actions must preserve the query corresponding to the page that remains visible")
+                "Optimistic actions must preserve the query corresponding to the page that remains visible")
         #expect(store.errorDescription?.contains("injected query interleaving failure") == true)
 
         try executeSQL("DROP TRIGGER reject_insert", at: storageURL)
@@ -520,9 +519,9 @@ struct ClipboardHistoryStoreTests {
         await store.waitUntilLoaded()
         defer { store.flushPendingChanges() }
         try executeSQL("""
-            CREATE TRIGGER reject_insert BEFORE INSERT ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected preview failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_insert BEFORE INSERT ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected preview failure'); END;
+        """, at: storageURL)
         #expect(store.recordPinned(.text("pending favorite")))
         store.loadFullHistory()
         await store.waitUntilLoaded()
@@ -1349,8 +1348,7 @@ struct ClipboardHistoryStoreTests {
         #expect(store.items.isEmpty)
     }
 
-
-    @Test
+    @Test(.timeLimit(.minutes(1)))
     func immediateCleanupWaitsForPersistenceAndKeepsTheExistingTimer() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -1360,7 +1358,7 @@ struct ClipboardHistoryStoreTests {
         let pinned = ClipboardHistoryItem(content: .text("pinned"), lastCopiedAt: .distantPast, isPinned: true)
         let database = ClipboardHistoryDatabase(storageURL: storageURL)
         try database.flush([expired, pinned].map { .upsert($0, capacity: nil) })
-        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60), now: { now })
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(600), now: { now })
         await store.waitUntilLoaded()
         store.configureCleanup(policy: .sevenDays)
         defer { store.stopCleanup(); store.flushPendingChanges() }
@@ -1369,15 +1367,7 @@ struct ClipboardHistoryStoreTests {
         let deadline = timer.fireDate
         now.addTimeInterval(2 * 86_400)
 
-        let completed = XCTestExpectation(description: "Immediate cleanup bypasses the persistence delay")
-        let operation = Task {
-            #expect(await store.cleanupOldHistoryNow(policy: .sevenDays, now: now) == nil)
-            completed.fulfill()
-        }
-        let completion = await XCTWaiter.fulfillment(of: [completed], timeout: 2)
-        #expect(completion == .completed)
-        if completion != .completed { store.flushPendingChanges() }
-        await operation.value
+        #expect(await store.cleanupOldHistoryNow(policy: .sevenDays, now: now) == nil)
 
         #expect(store.items.map(\.id) == [pinned.id])
         let reopened = ClipboardHistoryStore(storageURL: storageURL)
@@ -1437,9 +1427,9 @@ struct ClipboardHistoryStoreTests {
         let store = ClipboardHistoryStore(storageURL: storageURL)
         await store.waitUntilLoaded()
         try executeSQL("""
-            CREATE TRIGGER reject_immediate_cleanup BEFORE DELETE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected immediate cleanup failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_immediate_cleanup BEFORE DELETE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected immediate cleanup failure'); END;
+        """, at: storageURL)
 
         #expect(await store.cleanupOldHistoryNow(policy: .sevenDays, now: Date())?.contains("injected immediate cleanup failure") == true)
         #expect(store.errorDescription?.contains("injected immediate cleanup failure") == true)
@@ -1620,9 +1610,9 @@ struct ClipboardHistoryStoreTests {
         let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60), now: { now })
         await store.waitUntilLoaded()
         try executeSQL("""
-            CREATE TRIGGER reject_cleanup BEFORE DELETE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected cleanup failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_cleanup BEFORE DELETE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected cleanup failure'); END;
+        """, at: storageURL)
         #expect(store.record(.text("pending new copy")))
 
         store.cleanupOldHistory(policy: .sevenDays, now: now)
@@ -1719,13 +1709,13 @@ struct ClipboardHistoryStoreTests {
         let database = ClipboardHistoryDatabase(storageURL: storageURL)
         try database.flush([.upsert(old, capacity: nil)])
         let store = ClipboardHistoryStore(storageURL: storageURL,
-            persistenceDelay: asynchronous ? .zero : .seconds(60), now: { now })
+                                          persistenceDelay: asynchronous ? .zero : .seconds(60), now: { now })
         await store.waitUntilLoaded()
         defer { store.stopCleanup(); store.flushPendingChanges() }
         try executeSQL("""
-            CREATE TRIGGER reject_cleanup BEFORE DELETE ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'injected cleanup failure'); END;
-            """, at: storageURL)
+        CREATE TRIGGER reject_cleanup BEFORE DELETE ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'injected cleanup failure'); END;
+        """, at: storageURL)
         #expect(store.record(.text("pending copy")))
         store.configureCleanup(policy: .sevenDays)
         if asynchronous {
@@ -1760,9 +1750,9 @@ struct ClipboardHistoryStoreTests {
         defer { store.stopCleanup(); store.flushPendingChanges() }
         if failingCopy {
             try executeSQL("""
-                CREATE TRIGGER reject_copy BEFORE INSERT ON clipboard_history
-                BEGIN SELECT RAISE(ABORT, 'injected copy failure'); END;
-                """, at: storageURL)
+            CREATE TRIGGER reject_copy BEFORE INSERT ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected copy failure'); END;
+            """, at: storageURL)
         }
 
         var blockingDatabase: OpaquePointer?

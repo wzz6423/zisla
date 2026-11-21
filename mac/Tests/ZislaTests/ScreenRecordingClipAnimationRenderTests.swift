@@ -19,10 +19,10 @@ struct ScreenRecordingClipAnimationRenderTests {
         project.edits.shadow = 0
         project.edits.cornerRadius = 0
         let asset = RecordingMediaAsset(name: "Red", file: video ? "red.mp4" : "red.png",
-            kind: video ? .video : .image, duration: 3, width: 128, height: 96)
+                                        kind: video ? .video : .image, duration: 3, width: 128, height: 96)
         if !video { _ = try fixture.createImage("red.png", size: size, color: .init(red: 1, green: 0, blue: 0)) }
         var clip = RecordingTimelineClip(id: "red", trackID: "visual", content: video ? .video(asset.id) : .image(asset.id),
-            start: 0, sourceEnd: 3, layout: .init(x: 0.25, y: 0.25, width: 0.5, height: 0.5), audioEnabled: false)
+                                         start: 0, sourceEnd: 3, layout: .init(x: 0.25, y: 0.25, width: 0.5, height: 0.5), audioEnabled: false)
         project.timeline = .init(assets: [asset], tracks: [.init(id: "visual")], clips: [clip])
         let frame = CIImage(color: .red).cropped(to: CGRect(origin: .zero, size: size))
         let frames = video ? [clip.id: frame] : [:]
@@ -49,13 +49,13 @@ struct ScreenRecordingClipAnimationRenderTests {
                 if kind == .scale { #expect(redPixels(middle) < originalRed * 3 / 4) }
             case .slideLeft, .slideRight, .slideUp, .slideDown:
                 #expect(abs(redPixels(middle) * 2 - originalRed) <= 100,
-                    "At half progress, half of the original media must remain on screen")
+                        "At half progress, half of the original media must remain on screen")
                 #expect(middle.pixel(x: 64, y: 48)[0] < 10)
             case .typewriter: Issue.record("Typewriter does not apply to media")
             }
         }
         #expect(try RecordingImageFixture.pixels(renderer.image(frames: frames, at: 1.5)).bytes == originalPixels.bytes,
-            "Completed entrance and unstarted exit must preserve the unanimated pixels")
+                "Completed entrance and unstarted exit must preserve the unanimated pixels")
     }
 
     @Test func absentAnimationsKeepTheExistingLayerOrderAndLegacyPixels() throws {
@@ -73,10 +73,10 @@ struct ScreenRecordingClipAnimationRenderTests {
         #expect(!String(decoding: oldManifest, as: UTF8.self).contains("Animation"))
         let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: oldManifest)
         let renderer = try RecordingMultitrackRenderer(project: decoded, directory: fixture.directory,
-            size: CGSize(width: 64, height: 48))
+                                                       size: CGSize(width: 64, height: 48))
         let pixels = try RecordingImageFixture.pixels(renderer.image(frames: [:], at: 1.5))
         #expect(pixels.pixel(x: 32, y: 24) == [255, 0, 0, 255],
-            "Unconfigured effects must retain stored layer order even when it differs from time order")
+                "Unconfigured effects must retain stored layer order even when it differs from time order")
         #expect(decoded == project)
     }
 
@@ -94,13 +94,13 @@ struct ScreenRecordingClipAnimationRenderTests {
         let green = RecordingTimelineClip(id: "green", trackID: "bottom", content: .image(assets[0].id), start: 0, sourceEnd: 4)
         let red = RecordingTimelineClip(id: "red", trackID: "top", content: .image(assets[1].id), start: 0, sourceEnd: 4)
         let blue = RecordingTimelineClip(id: "blue", trackID: "top", content: .image(assets[2].id),
-            start: 1, sourceEnd: 3, transition: .init(kind: .dissolve, duration: 1))
+                                         start: 1, sourceEnd: 3, transition: .init(kind: .dissolve, duration: 1))
         let white = RecordingTimelineClip(id: "white", trackID: "top", content: .image(assets[3].id),
-            start: 1.25, sourceEnd: 2.75, transition: .init(kind: .dissolve, duration: 0.5))
+                                          start: 1.25, sourceEnd: 2.75, transition: .init(kind: .dissolve, duration: 0.5))
         project.timeline = .init(assets: assets, tracks: [.init(id: "bottom"), .init(id: "top")],
-            clips: [white, green, blue, red])
+                                 clips: [white, green, blue, red])
         let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory,
-            size: CGSize(width: 64, height: 48))
+                                                       size: CGSize(width: 64, height: 48))
         let middle = try RecordingImageFixture.pixels(renderer.image(frames: [:], at: 1.5)).pixel(x: 32, y: 24)
         #expect(abs(Int(middle[0]) - 96) <= 2 && abs(Int(middle[1]) - 191) <= 2
             && abs(Int(middle[2]) - 96) <= 2 && middle[3] == 255,
@@ -121,14 +121,14 @@ struct ScreenRecordingClipAnimationRenderTests {
     private func expectFixedTypewriterPixels(caption: Bool, text: String, fontSize: Double) throws {
         let canvas = CGRect(x: 0, y: 0, width: 400, height: 300)
         let annotation = RecordingAnnotation(kind: .text, start: 0, end: 3, x: 0.1, y: 0.1, endX: 0.75, endY: 0.8,
-            text: text, color: .init(red: 1, green: 1, blue: 1), fontSize: fontSize)
+                                             text: text, color: .init(red: 1, green: 1, blue: 1), fontSize: fontSize)
         let subtitle = RecordingCaption(start: 0, end: 3, text: text,
-            layout: .init(x: 0.1, y: 0.1, width: 0.8, height: 0.8), fontSize: fontSize)
+                                        layout: .init(x: 0.1, y: 0.1, width: 0.8, height: 0.8), fontSize: fontSize)
         func render(_ count: Int?) throws -> RecordingImageFixture.Pixels {
             let image = try caption ? RecordingExportRenderer.captionImage(subtitle, canvas: canvas, visibleCharacters: count)
                 : RecordingExportRenderer.annotationImage(annotation, canvas: canvas, visibleCharacters: count)
             let raster = try #require(CIContext().createCGImage(image, from: canvas, format: .RGBA8,
-                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)))
+                                                                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)))
             return try RecordingImageFixture.pixels(raster)
         }
         let complete = try render(nil)
@@ -160,7 +160,7 @@ struct ScreenRecordingClipAnimationRenderTests {
         #expect(try render(-1).bytes == empty.bytes)
         #expect(try render(Int.max).bytes == complete.bytes)
         let emojiOnly = RecordingAnnotation(kind: .text, start: 0, end: 1, x: 0.1, y: 0.1, endX: 0.9, endY: 0.8,
-            text: "👩‍❤️‍💋‍👨", fontSize: 0.15)
+                                            text: "👩‍❤️‍💋‍👨", fontSize: 0.15)
         let fullEmoji = try RecordingExportRenderer.annotationImage(emojiOnly, canvas: canvas)
         let typedEmoji = try RecordingExportRenderer.annotationImage(emojiOnly, canvas: canvas, visibleCharacters: 1)
         let context = CIContext()
@@ -178,16 +178,16 @@ struct ScreenRecordingClipAnimationRenderTests {
         project.videoFile = ""
         project.edits.segments = []
         let annotation = RecordingAnnotation(kind: .text, start: 0, end: 2, x: 0.1, y: 0.1, endX: 0.9, endY: 0.4,
-            text: "字幕👩🏽‍💻e\u{301}", color: .init(red: 1, green: 1, blue: 1), fontSize: 0.1)
+                                             text: "字幕👩🏽‍💻e\u{301}", color: .init(red: 1, green: 1, blue: 1), fontSize: 0.1)
         let caption = RecordingCaption(start: 0, end: 2, text: "第二行👨‍👩‍👧‍👦",
-            layout: .init(x: 0.1, y: 0.6, width: 0.8, height: 0.3), fontSize: 0.1)
+                                       layout: .init(x: 0.1, y: 0.6, width: 0.8, height: 0.3), fontSize: 0.1)
         project.edits.annotations = [annotation]
         project.captions = [caption]
         project.timeline = .init(tracks: [.init(id: "text")], clips: [
             .init(id: "annotation", trackID: "text", content: .annotation(annotation.id), start: 0, sourceEnd: 2,
-                entranceAnimation: .init(kind: .typewriter, duration: 1)),
+                  entranceAnimation: .init(kind: .typewriter, duration: 1)),
             .init(id: "caption", trackID: "text", content: .caption(caption.id), start: 0, sourceEnd: 2,
-                entranceAnimation: .init(kind: .typewriter, duration: 1)),
+                  entranceAnimation: .init(kind: .typewriter, duration: 1)),
         ])
         try project.validate()
         let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: size)
@@ -213,14 +213,14 @@ struct ScreenRecordingClipAnimationRenderTests {
         project.edits.annotations = [annotation]
         let red = RecordingTimelineClip(id: "red", trackID: "mixed", content: .image(asset.id), start: 0, sourceEnd: 3)
         let subtitle = RecordingTimelineClip(id: "caption", trackID: "mixed", content: .caption(caption.id),
-            start: 0.5, sourceEnd: 2, transition: .init(kind: .dissolve, duration: 0.5))
+                                             start: 0.5, sourceEnd: 2, transition: .init(kind: .dissolve, duration: 0.5))
         let text = RecordingTimelineClip(id: "annotation", trackID: "mixed", content: .annotation(annotation.id),
-            start: 0.5, sourceEnd: 2, transition: .init(kind: .dissolve, duration: 0.5))
+                                         start: 0.5, sourceEnd: 2, transition: .init(kind: .dissolve, duration: 0.5))
         project.timeline = .init(assets: [asset], tracks: [.init(id: "mixed")], clips: [red, subtitle])
         project.edits.showCaptions = false
         var renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: .init(width: 64, height: 48))
         #expect(try RecordingImageFixture.pixels(renderer.image(frames: [:], at: 1.5)).pixel(x: 32, y: 24) == [255, 0, 0, 255],
-            "A caption removed by the visibility toggle cannot replace another visible clip")
+                "A caption removed by the visibility toggle cannot replace another visible clip")
         project.timeline?.clips = [red, text]
         renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: .init(width: 64, height: 48))
         #expect(try RecordingImageFixture.pixels(renderer.image(frames: [:], at: 1.5, editingText: .annotation(annotation.id)))
@@ -236,7 +236,7 @@ struct ScreenRecordingClipAnimationRenderTests {
         ])
         let path = CGPath(rect: CGRect(x: 19.8, y: 19.8, width: 280.4, height: 200.4), transform: nil)
         let original = CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(attributed),
-            CFRange(location: 0, length: 0), path, nil)
+                                                CFRange(location: 0, length: 0), path, nil)
         let signature = frameSignature(original)
         for count in 1..<text.count {
             let partial = try RecordingExportRenderer.typewriterFrame(attributed, frame: original, visibleCharacters: count)
@@ -252,7 +252,7 @@ struct ScreenRecordingClipAnimationRenderTests {
                     let range = CTRunGetStringRange(run)
                     if color.alpha != 0 {
                         #expect(range.location + range.length <= boundary,
-                            "A visible ligature must not expose a character beyond the grapheme boundary")
+                                "A visible ligature must not expose a character beyond the grapheme boundary")
                     }
                 }
             }

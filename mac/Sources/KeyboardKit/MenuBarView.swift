@@ -31,45 +31,45 @@ struct MenuBarView: View {
                             .frame(height: 1)
                             .id("keyboard-menu-top")
 
-                if !permission.isGranted {
-                    permissionCard
-                }
+                        if !permission.isGranted {
+                            permissionCard
+                        }
 
-                if let message = monitoringFailureMessage {
-                    monitoringFailureCard(message)
-                }
+                        if let message = monitoringFailureMessage {
+                            monitoringFailureCard(message)
+                        }
 
-                if !audioFailures.isEmpty {
-                    audioFailureCard(audioFailures)
-                }
+                        if !audioFailures.isEmpty {
+                            audioFailureCard(audioFailures)
+                        }
 
-                TypingStatsSummarySection(
-                    model: model.typingStats,
-                    settings: settings
-                ) {
-                    model.openTypingStats()
-                    dismiss()
-                }
+                        TypingStatsSummarySection(
+                            model: model.typingStats,
+                            settings: settings
+                        ) {
+                            model.openTypingStats()
+                            dismiss()
+                        }
 
-                KeyboardSoundSection(
-                    model: model,
-                    settings: settings,
-                    onOpenEditor: {
-                        model.openSoundPackEditor()
-                        dismiss()
-                    }
-                )
-                InterfacePreferencesSection(settings: settings)
-                LaunchAtLoginSection(
-                    settings: settings,
-                    controller: model.launchAtLogin,
-                    onRetry: model.retryLaunchAtLogin,
-                    onOpenSettings: {
-                        model.openLoginItemsSettings()
-                        dismiss()
-                    }
-                )
-                UpdateSection(controller: model.updates)
+                        KeyboardSoundSection(
+                            model: model,
+                            settings: settings,
+                            onOpenEditor: {
+                                model.openSoundPackEditor()
+                                dismiss()
+                            }
+                        )
+                        InterfacePreferencesSection(settings: settings)
+                        LaunchAtLoginSection(
+                            settings: settings,
+                            controller: model.launchAtLogin,
+                            onRetry: model.retryLaunchAtLogin,
+                            onOpenSettings: {
+                                model.openLoginItemsSettings()
+                                dismiss()
+                            }
+                        )
+                        UpdateSection(controller: model.updates)
                     }
                     .padding(14)
                 }
@@ -90,8 +90,8 @@ struct MenuBarView: View {
             MenuBarFooter(model: model) {
                 dismiss()
             }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
         .keyboardWindowGlass()
         .frame(width: 360)

@@ -18,7 +18,7 @@ struct ScreenRecordingExportDialogTests {
         #expect(panel.title == AppLocalization.text("导出设置"))
         #expect(panel.prompt == AppLocalization.text("导出录屏"))
         let accessory = try #require(panel.accessoryView as? NSHostingView<ScreenRecordingExportSettingsView>,
-            "Format, resolution and frame rate must be available in the destination panel")
+                                     "Format, resolution and frame rate must be available in the destination panel")
         #expect(accessory.rootView.settings.configuration == fixture.model.exportConfiguration)
         #expect(accessory.frame.width > 0 && accessory.frame.height > 0)
         #expect(panel.directoryURL?.standardizedFileURL == fixture.root.standardizedFileURL)
@@ -58,7 +58,7 @@ struct ScreenRecordingExportDialogTests {
             #expect(type.tags[.filenameExtension]?.contains("livephoto") == true)
         } else {
             let resolved = try #require(UTType(tag: format.fileExtension, tagClass: .filenameExtension,
-                conformingTo: format.isAudioOnly ? .audio : format == .gif ? .image : .movie))
+                                               conformingTo: format.isAudioOnly ? .audio : format == .gif ? .image : .movie))
             #expect(type == resolved)
             #expect(resolved.tags[.filenameExtension]?.map { $0.lowercased() }.contains(format.fileExtension) == true)
         }
@@ -143,7 +143,7 @@ struct ScreenRecordingExportDialogTests {
     @Test(arguments: RecordingExportResolution.allCases,
           [(RecordingExportFormat.mp4, 30), (.mp4, 60), (.gif, 10), (.gif, 15), (.gif, 30)])
     func confirmingCommitsTheFinalDialogOptionsBeforeTheOutputTask(_ resolution: RecordingExportResolution,
-                                                                _ selection: (RecordingExportFormat, Int)) async throws {
+                                                                   _ selection: (RecordingExportFormat, Int)) async throws {
         let fixture = try Fixture(write: { _, _, _ in throw CocoaError(.fileWriteOutOfSpace) })
         defer { fixture.close() }
         fixture.model.export()
@@ -211,7 +211,7 @@ struct ScreenRecordingExportDialogTests {
         let presented = try #require(fixture.panels.presented.first)
         let host = try #require(presented.panel.accessoryView as? NSHostingView<ScreenRecordingExportSettingsView>)
         let window = NSPanel(contentRect: CGRect(origin: .zero, size: host.fittingSize),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close(); presented.complete(nil) }
@@ -247,7 +247,7 @@ struct ScreenRecordingExportDialogTests {
         let settings = ScreenRecordingExportSettings(configuration: .init(), panel: panel, duration: 4)
         let host = NSHostingView(rootView: ScreenRecordingExportSettingsView(settings: settings))
         let window = NSPanel(contentRect: CGRect(origin: .zero, size: host.fittingSize),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -291,7 +291,7 @@ struct ScreenRecordingExportDialogTests {
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
         let data = try Data(contentsOf: package.appendingPathComponent("Resources/Localization/" + language.rawValue
-            + ".lproj/Localizable.strings"))
+                + ".lproj/Localizable.strings"))
         let table = try #require(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String])
         #expect(AppLanguage.allCases.count == 17)
         for key in ["导出设置", "导出录屏", "导出音频", "导出内容", "仅音频", "视频", "Live Photo", "Live Photo 最长支持 3 秒，请缩短时间线", "格式", "分辨率", "帧率", "原始分辨率", "1080p", "1440p", "4K"] {
@@ -440,15 +440,15 @@ struct ScreenRecordingExportDialogTests {
             let project = ScreenRecordingProject(name: "Output", videoFile: "screen.mp4", duration: 1, width: 16, height: 16)
             try store.save(project, in: directory)
             let context = try #require(CGContext(data: nil, width: 16, height: 16, bitsPerComponent: 8, bytesPerRow: 64,
-                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             let preview = try #require(context.makeImage())
             let directoryStore = ScreenRecordingOutputDirectoryStore(defaults: defaults)
             if customDirectory { try directoryStore.setDirectory(root) }
             model = ScreenRecordingStudioModel(outputDirectoryStore: directoryStore,
-                renderPreview: { _, _, _ in preview }, presentExportPanel: panels.present,
-                notices: notices, writeProjectFiles: write ?? { project, directory, _ in
-                    try ScreenRecordingProjectStore(root: directory).save(project, in: directory)
-                })
+                                               renderPreview: { _, _, _ in preview }, presentExportPanel: panels.present,
+                                               notices: notices, writeProjectFiles: write ?? { project, directory, _ in
+                                                   try ScreenRecordingProjectStore(root: directory).save(project, in: directory)
+                                               })
             model.install(project, directory: directory)
         }
 

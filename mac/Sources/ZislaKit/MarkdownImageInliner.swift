@@ -53,8 +53,8 @@ public enum MarkdownImageInliner {
             let attrs = match[1]
             guard let regex = try? NSRegularExpression(pattern: #"(?i)\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)')"#),
                   let srcMatch = regex.firstMatch(
-                    in: attrs,
-                    range: NSRange(attrs.startIndex..., in: attrs)
+                      in: attrs,
+                      range: NSRange(attrs.startIndex..., in: attrs)
                   )
             else { return match[0] }
 
@@ -157,14 +157,14 @@ public enum MarkdownImageInliner {
     private static func mimeType(for ext: String) -> String {
         switch ext {
         case "jpg", "jpeg": return "image/jpeg"
-        case "png":         return "image/png"
-        case "gif":         return "image/gif"
-        case "webp":        return "image/webp"
+        case "png": return "image/png"
+        case "gif": return "image/gif"
+        case "webp": return "image/webp"
         case "heic", "heif": return "image/heic"
         case "tiff", "tif": return "image/tiff"
-        case "bmp":         return "image/bmp"
-        case "svg":         return "image/svg+xml"
-        default:            return "application/octet-stream"
+        case "bmp": return "image/bmp"
+        case "svg": return "image/svg+xml"
+        default: return "application/octet-stream"
         }
     }
 

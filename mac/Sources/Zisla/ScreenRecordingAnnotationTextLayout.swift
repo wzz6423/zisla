@@ -21,9 +21,9 @@ struct RecordingAnnotationTextLayout {
         let setter = CTFramesetterCreateWithAttributedString(measurement)
         let width = stored.width * canvas.width
         let suggested = CTFramesetterSuggestFrameSizeWithConstraints(setter, CFRange(location: 0, length: 0),
-            nil, CGSize(width: width, height: CGFloat.infinity), nil)
+                                                                     nil, CGSize(width: width, height: CGFloat.infinity), nil)
         bounds = CGRect(x: stored.x * canvas.width, y: stored.y * canvas.height,
-            width: min(width, max(fontSize / 2, ceil(suggested.width))),
-            height: min((1 - stored.y) * canvas.height, ceil(suggested.height)))
+                        width: min(width, max(fontSize / 2, ceil(suggested.width))),
+                        height: min((1 - stored.y) * canvas.height, ceil(suggested.height)))
     }
 }

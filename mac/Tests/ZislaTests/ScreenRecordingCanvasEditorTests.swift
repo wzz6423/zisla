@@ -26,7 +26,7 @@ struct ScreenRecordingCanvasEditorTests {
         let defaults = try #require(UserDefaults(suiteName: defaultsName))
         defer { defaults.removePersistentDomain(forName: defaultsName) }
         let host = NSHostingView(rootView: ScreenRecordingStudioView(model: fixture.model,
-            languageStore: AppLanguageStore(defaults: defaults), prepareCapture: {}))
+                                                                     languageStore: AppLanguageStore(defaults: defaults), prepareCapture: {}))
         host.sizingOptions = []
         host.frame = CGRect(x: 0, y: 0, width: 1_180, height: 760)
         let window = NSWindow(contentRect: host.bounds, styleMask: .borderless, backing: .buffered, defer: false)
@@ -37,8 +37,8 @@ struct ScreenRecordingCanvasEditorTests {
         let canvas = try #require(descendants(RecordingCanvasEditorView.self, in: host).first)
         let point = fixture.selectionPoint(in: canvas)
         let event = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: canvas.convert(point, to: nil),
-            modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
-            eventNumber: 0, clickCount: 2, pressure: 1))
+                                                    modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                                    eventNumber: 0, clickCount: 2, pressure: 1))
         canvas.mouseDown(with: event)
         let editor = try #require(canvas.textEditor)
         editor.insertText("Typed", replacementRange: editor.selectedRange())
@@ -207,7 +207,7 @@ struct ScreenRecordingCanvasEditorTests {
         let defaults = try #require(UserDefaults(suiteName: defaultsName))
         defer { defaults.removePersistentDomain(forName: defaultsName) }
         let host = NSHostingView(rootView: ScreenRecordingStudioView(model: fixture.model,
-            languageStore: AppLanguageStore(defaults: defaults), prepareCapture: {}))
+                                                                     languageStore: AppLanguageStore(defaults: defaults), prepareCapture: {}))
         host.sizingOptions = []
         host.frame = CGRect(x: 0, y: 0, width: 1_180, height: 760)
         let window = NSWindow(contentRect: host.bounds, styleMask: .borderless, backing: .buffered, defer: false)
@@ -220,8 +220,8 @@ struct ScreenRecordingCanvasEditorTests {
         #expect(canvas.canvasRect.width > 300 && canvas.canvasRect.height > 200)
         let point = fixture.selectionPoint(in: canvas)
         let event = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: canvas.convert(point, to: nil),
-            modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
-            eventNumber: 0, clickCount: 2, pressure: 1))
+                                                    modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                                    eventNumber: 0, clickCount: 2, pressure: 1))
         canvas.mouseDown(with: event)
         await settle(host)
         let editor = try #require(canvas.textEditor, "Double-clicking the real canvas must open its text editor")
@@ -328,7 +328,8 @@ struct ScreenRecordingCanvasEditorTests {
         weak var removedCanvas: RecordingCanvasEditorView?
         do {
             var host: NSHostingView<ScreenRecordingStudioView>? = NSHostingView(rootView: ScreenRecordingStudioView(
-                model: fixture.model, languageStore: AppLanguageStore(defaults: defaults), prepareCapture: {}))
+                model: fixture.model, languageStore: AppLanguageStore(defaults: defaults), prepareCapture: {}
+            ))
             host?.sizingOptions = []
             host?.frame = CGRect(x: 0, y: 0, width: 1_180, height: 760)
             let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 1_180, height: 760),
@@ -342,8 +343,8 @@ struct ScreenRecordingCanvasEditorTests {
                 removedCanvas = canvas
                 let point = fixture.selectionPoint(in: canvas)
                 let event = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: canvas.convert(point, to: nil),
-                    modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
-                    eventNumber: 0, clickCount: 2, pressure: 1))
+                                                            modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                                            eventNumber: 0, clickCount: 2, pressure: 1))
                 canvas.mouseDown(with: event)
                 let editor = try #require(canvas.textEditor)
                 editor.string = "Closed without Enter"
@@ -589,7 +590,7 @@ struct ScreenRecordingCanvasEditorTests {
         editor.string = "Uncommitted"
         fixture.view.textDidChange(Notification(name: NSText.didChangeNotification, object: editor))
         fixture.view.configure(project: fixture.model.project, sourceTime: 0, baseImage: fixture.model.canvasPreview,
-            selection: fixture.selection, editable: false)
+                               selection: fixture.selection, editable: false)
         #expect(fixture.view.textEditor == nil && fixture.view.draft == nil && fixture.commits == 0)
         #expect(fixture.view.hitTest(CGPoint(x: 300, y: 200)) == nil,
                 "The editor must not capture playback clicks when editing is disabled")
@@ -599,7 +600,7 @@ struct ScreenRecordingCanvasEditorTests {
         var removed = try #require(fixture.model.project)
         removed.edits.annotations = []
         fixture.view.configure(project: removed, sourceTime: 0, baseImage: fixture.model.canvasPreview,
-            selection: fixture.selection, editable: true)
+                               selection: fixture.selection, editable: true)
         #expect(fixture.view.textEditor == nil && fixture.view.draft == nil && fixture.commits == 0)
     }
 
@@ -607,8 +608,8 @@ struct ScreenRecordingCanvasEditorTests {
         var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try pixels.withUnsafeMutableBytes { pointer in
             let context = try #require(CGContext(data: pointer.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         return pixels
@@ -678,15 +679,15 @@ struct ScreenRecordingCanvasEditorTests {
                 project.timeline?.clips.removeAll { $0.content.assetID != nil }
                 let imageURL = directory.appendingPathComponent("background.png")
                 let image = try #require(CIContext().createCGImage(CIImage(color: .black),
-                    from: CGRect(x: 0, y: 0, width: 400, height: 300)))
+                                                                   from: CGRect(x: 0, y: 0, width: 400, height: 300)))
                 let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
                 try data.write(to: imageURL)
                 let asset = RecordingMediaAsset(name: "Background", file: "background.png", kind: .image,
-                    duration: 2, width: 400, height: 300)
+                                                duration: 2, width: 400, height: 300)
                 project.timeline?.assets = [asset]
                 let mediaTrack = try #require(project.timeline?.tracks.first)
                 project.timeline?.clips.insert(.init(trackID: mediaTrack.id, content: .image(asset.id),
-                    start: 0, sourceEnd: 2), at: 0)
+                                                     start: 0, sourceEnd: 2), at: 0)
             }
             base = try #require(CIContext().createCGImage(CIImage(color: .black), from: CGRect(x: 0, y: 0, width: 400, height: 300)))
             let base = self.base
@@ -716,7 +717,7 @@ struct ScreenRecordingCanvasEditorTests {
         func mouse(_ type: NSEvent.EventType, x: Double, y: Double, clicks: Int = 1) -> NSEvent {
             let point = view.convert(CGPoint(x: x * view.bounds.width, y: y * view.bounds.height), to: nil)
             return NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
-                windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)!
+                                      windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)!
         }
 
         func selectionPoint(in canvas: RecordingCanvasEditorView) -> CGPoint {
@@ -729,14 +730,14 @@ struct ScreenRecordingCanvasEditorTests {
 
         func textMouse() -> NSEvent {
             NSEvent.mouseEvent(with: .leftMouseDown, location: view.convert(selectionPoint(in: view), to: nil),
-                modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
-                eventNumber: 0, clickCount: 2, pressure: 1)!
+                               modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                               eventNumber: 0, clickCount: 2, pressure: 1)!
         }
 
         func key(_ code: UInt16, characters: String = "", modifiers: NSEvent.ModifierFlags = []) -> NSEvent {
             NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
-                windowNumber: window.windowNumber, context: nil, characters: characters, charactersIgnoringModifiers: characters,
-                isARepeat: false, keyCode: code)!
+                             windowNumber: window.windowNumber, context: nil, characters: characters, charactersIgnoringModifiers: characters,
+                             isARepeat: false, keyCode: code)!
         }
 
         func render(_ project: ScreenRecordingProject) throws -> CGImage {

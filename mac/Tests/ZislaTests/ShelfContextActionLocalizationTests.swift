@@ -7,8 +7,8 @@ struct ShelfContextActionLocalizationTests {
     @Test func newRuntimeKeysArePresentAndPreservePlaceholderOrderInEveryLanguage() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let keys = Set(["多选", "取消选择", "操作", "已选择 %ld 个项目", "选择顺序 %ld", "识图并发送到随记",
-            "在录屏工作室中编辑", "所选项目不支持此操作", "文件已失效或无法读取：%@",
-            "无法写入随记，请检查备忘录权限后重试", "录屏工作室当前不可用，请稍后重试", "已发送到录屏工作室", "已取消操作"])
+                        "在录屏工作室中编辑", "所选项目不支持此操作", "文件已失效或无法读取：%@",
+                        "无法写入随记，请检查备忘录权限后重试", "录屏工作室当前不可用，请稍后重试", "已发送到录屏工作室", "已取消操作"])
         let sources = try ["ShelfModuleView.swift", "ShelfContextActions.swift"].map {
             try String(contentsOf: root.appendingPathComponent("Sources/Zisla/" + $0), encoding: .utf8)
         }.joined(separator: "\n")

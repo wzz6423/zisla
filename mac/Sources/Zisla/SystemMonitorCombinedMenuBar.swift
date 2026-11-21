@@ -132,7 +132,7 @@ struct IslandStatusIcon: Identifiable, Equatable {
 
     static func readingSize(_ text: String) -> CGSize {
         CGSize(width: 32, height: 30 + CGFloat(CompactPillStatusPresentation.verticalTextRows(text,
-            availableWidth: 32, availableHeight: CGFloat(text.count) * 14).count) * 14)
+                                                                                              availableWidth: 32, availableHeight: CGFloat(text.count) * 14).count) * 14)
     }
 
     static let stackedReadingFont = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
@@ -143,7 +143,7 @@ struct IslandStatusIcon: Identifiable, Equatable {
         let width = min(40, rows.reduce(CGFloat(24)) { max($0, ceil(($1 as NSString).size(withAttributes: attributes).width)) })
         let height = rows.reduce(CGFloat(0)) { height, row in
             height + ceil((row as NSString).boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude),
-                options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes).height)
+                                                         options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes).height)
         }
         return CGSize(width: width, height: max(24, height))
     }
@@ -174,26 +174,26 @@ enum IslandStatusIconRouting {
         }
         if let combined {
             icons.append(IslandStatusIcon(id: "status-icon-combined", content: .combined(combined.button?.image),
-                tooltip: (combined.button?.toolTip ?? "zisla")
-                    .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)))
+                                          tooltip: (combined.button?.toolTip ?? "zisla")
+                                              .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
+                                              .trimmingCharacters(in: .whitespacesAndNewlines)))
         }
         for (metric, item, title) in metrics {
             let text = style == .detailed
                 ? String(title.dropFirst(SystemMonitorMenuBarPresentation.label(for: metric).count + 1))
                 : title
             icons.append(IslandStatusIcon(id: "status-icon-\(metric.rawValue)",
-                content: .metric(metric, text: text, image: item.button?.image, style: style),
-                tooltip: (item.button?.toolTip ?? text)
-                    .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)))
+                                          content: .metric(metric, text: text, image: item.button?.image, style: style),
+                                          tooltip: (item.button?.toolTip ?? text)
+                                              .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
+                                              .trimmingCharacters(in: .whitespacesAndNewlines)))
         }
         if let stacked {
             icons.append(IslandStatusIcon(id: "status-icon-stacked",
-                content: .stacked(image: stacked.button?.image, readings: readings),
-                tooltip: (stacked.button?.toolTip ?? readings.map(\.text).joined(separator: ", "))
-                    .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)))
+                                          content: .stacked(image: stacked.button?.image, readings: readings),
+                                          tooltip: (stacked.button?.toolTip ?? readings.map(\.text).joined(separator: ", "))
+                                              .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
+                                              .trimmingCharacters(in: .whitespacesAndNewlines)))
         }
         return icons
     }
@@ -236,10 +236,10 @@ struct IslandStatusIconStrip: View {
             ForEach(icons) { icon in
                 let size = icon.size(edge: edge)
                 iconView(icon)
-                .frame(width: size.width, height: size.height)
-                .accessibilityLabel(icon.tooltip)
-                .accessibilityIdentifier(icon.id)
-                .help(icon.tooltip)
+                    .frame(width: size.width, height: size.height)
+                    .accessibilityLabel(icon.tooltip)
+                    .accessibilityIdentifier(icon.id)
+                    .help(icon.tooltip)
             }
         }
     }

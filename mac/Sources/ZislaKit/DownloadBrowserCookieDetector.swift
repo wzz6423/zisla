@@ -164,9 +164,9 @@ public struct DownloadBrowserCookieDetector: @unchecked Sendable {
     private func cookieDatabaseFiles(in root: URL) -> [URL] {
         guard fileManager.fileExists(atPath: root.path),
               let enumerator = fileManager.enumerator(
-                at: root,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                  at: root,
+                  includingPropertiesForKeys: [.isRegularFileKey],
+                  options: [.skipsHiddenFiles, .skipsPackageDescendants]
               ) else {
             return []
         }

@@ -194,8 +194,8 @@ struct IslandSurface<Content: View>: View {
                     // Collapse folds straight back into the pill; expand gets a spring with a hint
                     // of bounce, matching the iOS Dynamic Island reveal feel.
                     : maskIsCollapsed
-                        ? ZislaMotion.islandRecycle
-                        : ZislaMotion.islandReveal,
+                    ? ZislaMotion.islandRecycle
+                    : ZislaMotion.islandReveal,
                 value: maskIsCollapsed
             )
         }

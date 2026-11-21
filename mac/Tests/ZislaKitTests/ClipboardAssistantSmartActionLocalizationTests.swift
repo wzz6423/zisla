@@ -81,8 +81,8 @@ extension ClipboardAssistantSmartActionsTests {
         for uiLanguage in AppLanguage.allCases {
             for text in ["\(title) 2026-09-22 14:30", "2026-09-22 14:30 \(title)"] {
                 let result = try #require(ClipboardAssistantDetector.detect(text: text,
-                    enabledKinds: Set(ClipboardAssistantKind.allCases), systemLanguageIdentifier: uiLanguage.rawValue,
-                    now: now, timeZone: utc, locale: uiLanguage.locale, countryCode: "US"))
+                                                                            enabledKinds: Set(ClipboardAssistantKind.allCases), systemLanguageIdentifier: uiLanguage.rawValue,
+                                                                            now: now, timeZone: utc, locale: uiLanguage.locale, countryCode: "US"))
                 #expect(result.kind == .meeting, "Input \(sample.language.rawValue), UI \(uiLanguage.rawValue)")
                 let value = try #require(draft(result))
                 #expect(value.title == title)
@@ -90,8 +90,8 @@ extension ClipboardAssistantSmartActionsTests {
             }
             let address = "10 Downing Street, London #4"
             let result = try #require(ClipboardAssistantDetector.detect(text: "\(sample.labels.address): \(address)",
-                enabledKinds: Set(ClipboardAssistantKind.allCases), systemLanguageIdentifier: uiLanguage.rawValue,
-                now: now, timeZone: utc, locale: uiLanguage.locale, countryCode: "CN"))
+                                                                        enabledKinds: Set(ClipboardAssistantKind.allCases), systemLanguageIdentifier: uiLanguage.rawValue,
+                                                                        now: now, timeZone: utc, locale: uiLanguage.locale, countryCode: "CN"))
             #expect(result.kind == .address)
             #expect(result.title == address)
             let url = try #require(serviceURL(result, .googleMaps))
@@ -107,12 +107,13 @@ extension ClipboardAssistantSmartActionsTests {
                                (sample.relativeDates.yesterday, -1), (sample.relativeDates.afterTomorrow, 2)] {
             let text = "\(sample.meeting) \(word) 14:30"
             let result = try #require(ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: kinds,
-                now: date(2026, 9, 21, 18, 0), timeZone: utc), "\(sample.language.rawValue): \(text)")
+                                                                                      now: date(2026, 9, 21, 18, 0), timeZone: utc), "\(sample.language.rawValue): \(text)")
             #expect(draft(result)?.startDate == date(2026, 9, 21 + offset, 14, 30))
             #expect(draft(result)?.title == sample.meeting)
             let zoned = try #require(ClipboardAssistantDetector.smartActionDetection(
                 text + " " + sample.zone, enabledKinds: kinds,
-                now: date(2026, 9, 21, 18, 0), timeZone: utc))
+                now: date(2026, 9, 21, 18, 0), timeZone: utc
+            ))
             #expect(draft(zoned)?.startDate == date(2026, 9, 22 + offset, 6, 30))
         }
     }
@@ -173,9 +174,9 @@ extension ClipboardAssistantSmartActionsTests {
         let address = "\(sample.labels.address): 10 Downing Street, London"
         for (text, kind) in [(meeting, ClipboardAssistantKind.meeting), (address, .address)] {
             #expect(ClipboardAssistantDetector.detect(text: text,
-                enabledKinds: Set(ClipboardAssistantKind.allCases).subtracting([kind]),
-                systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"),
-                countryCode: "US")?.kind != kind)
+                                                      enabledKinds: Set(ClipboardAssistantKind.allCases).subtracting([kind]),
+                                                      systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"),
+                                                      countryCode: "US")?.kind != kind)
             #expect(ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: [], now: now, timeZone: utc) == nil)
         }
     }
@@ -186,7 +187,7 @@ extension ClipboardAssistantSmartActionsTests {
             + ["\(sample.negated) 2026-09-22 14:30"]
         for text in texts {
             let result = ClipboardAssistantDetector.detect(text: text, enabledKinds: Set(ClipboardAssistantKind.allCases),
-                systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"))
+                                                           systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"))
             #expect(result?.kind != .meeting, "\(sample.language.rawValue): \(text)")
             #expect(result?.actions.contains { if case .editCalendarEvent = $0 { return true }; return false } != true)
         }
@@ -217,7 +218,7 @@ extension ClipboardAssistantSmartActionsTests {
         }
         for text in ["\(sample.meeting) 2026-03-08 02:30", "\(sample.meeting) 2026-11-01 01:30"] {
             #expect(ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: kinds,
-                now: now, timeZone: TimeZone(identifier: "America/New_York")!) == nil)
+                                                                    now: now, timeZone: TimeZone(identifier: "America/New_York")!) == nil)
         }
     }
 
@@ -227,7 +228,7 @@ extension ClipboardAssistantSmartActionsTests {
             let text = "\(sample.meeting) 2026-09-22 14:30" + suffix
             #expect(detect(text) == nil, "\(sample.language.rawValue): suffix \(suffix.debugDescription)")
             #expect(ClipboardAssistantDetector.detect(text: text, enabledKinds: Set(ClipboardAssistantKind.allCases),
-                systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"))?.kind != .meeting)
+                                                      systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"))?.kind != .meeting)
         }
         for suffix in ["\u{0}", "\u{202E}", "\n123", "&next=https://evil.example", String(repeating: "a", count: 256)] {
             #expect(detect("\(sample.labels.address): 10 Downing Street, London" + suffix) == nil)

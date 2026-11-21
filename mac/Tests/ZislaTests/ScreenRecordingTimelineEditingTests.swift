@@ -205,10 +205,10 @@ struct ScreenRecordingTimelineEditingTests {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let host = NSHostingView(rootView: ScreenRecordingTimelineStrip(model: model,
-            selectedID: Binding(get: { selected }, set: { selected = $0 })).frame(width: 700))
+                                                                        selectedID: Binding(get: { selected }, set: { selected = $0 })).frame(width: 700))
         host.sizingOptions = []
         let window = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 700, height: 150),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -252,10 +252,10 @@ struct ScreenRecordingTimelineEditingTests {
         model.seekTimeline(to: 3)
         let time = model.currentTime
         let host = NSHostingView(rootView: ScreenRecordingTimelineStrip(model: model,
-            selectedID: .constant(nil)).frame(width: 700))
+                                                                        selectedID: .constant(nil)).frame(width: 700))
         host.sizingOptions = []
         let window = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 700, height: 150),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -285,8 +285,8 @@ struct ScreenRecordingTimelineEditingTests {
         var project = ScreenRecordingProject(name: "Timeline", videoFile: "screen.mp4", duration: 20, width: 64, height: 48)
         project.edits.segments = segments
         let model = ScreenRecordingStudioModel(projectStore: ScreenRecordingProjectStore(root: root),
-            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
-            aiCompletion: { _, _, _ in throw CancellationError() })
+                                               renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
+                                               aiCompletion: { _, _, _ in throw CancellationError() })
         model.install(project, directory: root)
         return (model, root, project)
     }
@@ -320,8 +320,8 @@ struct ScreenRecordingTimelineEditingTests {
         let point = window.convertPoint(fromScreen: CGPoint(x: frame.midX, y: frame.midY))
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
             let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
-                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-                eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                                                        timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                                                        eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
             window.sendEvent(event)
         }
     }

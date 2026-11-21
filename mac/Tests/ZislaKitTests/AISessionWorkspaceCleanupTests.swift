@@ -641,10 +641,10 @@ struct AISessionWorkspaceCleanupTests {
         let retained = fixture.workspace("Codex", "2026-07-02")
         let orphan = fixture.workspace("Codex", "2026-07-06")
         fixture.jsonLog(".codex/\(folder)/2026/07/02/rollout-retained.jsonl", """
-            {"type":"session_meta","timestamp":"2026-07-02T12:00:00Z","payload":{"id":"retained","cwd":"\(retained.path)/new-chat","timestamp":"2026-07-02T12:00:00Z"}}
-            {"type":"response_item","payload":{"content":"irrelevant"}}
+        {"type":"session_meta","timestamp":"2026-07-02T12:00:00Z","payload":{"id":"retained","cwd":"\(retained.path)/new-chat","timestamp":"2026-07-02T12:00:00Z"}}
+        {"type":"response_item","payload":{"content":"irrelevant"}}
 
-            """)
+        """)
 
         #expect(fixture.scan().map(\.url) == [orphan])
     }
@@ -658,9 +658,9 @@ struct AISessionWorkspaceCleanupTests {
         let paths = ["Claude Code": ".claude/projects/project/session.jsonl", "Pi": ".pi/agent/sessions/project/session.jsonl",
                      "Qwen": ".qwen/projects/project/session.jsonl"]
         fixture.jsonLog(try #require(paths[tool]), """
-            {"type":"session","id":"retained","cwd":"\(day.path)/new-chat","timestamp":"2026-07-02T12:00:00Z"}
+        {"type":"session","id":"retained","cwd":"\(day.path)/new-chat","timestamp":"2026-07-02T12:00:00Z"}
 
-            """)
+        """)
 
         #expect(fixture.scan().map(\.url) == [orphan])
     }
@@ -733,9 +733,9 @@ struct AISessionWorkspaceCleanupTests {
         let day = fixture.workspace("Codex", "2026-07-02")
         try fixture.codexDatabase(rows: [])
         fixture.jsonLog(".claude/projects/project/session.jsonl", """
-            {"type":"user","sessionId":"retained","cwd":"\(day.path)/new-chat","timestamp":"2026-07-20T12:00:00Z"}
+        {"type":"user","sessionId":"retained","cwd":"\(day.path)/new-chat","timestamp":"2026-07-20T12:00:00Z"}
 
-            """)
+        """)
 
         #expect(fixture.scan().isEmpty)
     }
@@ -749,17 +749,17 @@ struct AISessionWorkspaceCleanupTests {
         let referenced = fixture.workspace("Codex", "2026-07-16")
         try fixture.codexDatabase(rows: [("retained", orphan.deletingLastPathComponent().path, "2026-07-06", true)])
         fixture.jsonLog(".claude/projects/project/parent.jsonl", """
-            {"type":"user","sessionId":"home","cwd":"\(fixture.home.path)","timestamp":"2026-07-20T12:00:00Z"}
+        {"type":"user","sessionId":"home","cwd":"\(fixture.home.path)","timestamp":"2026-07-20T12:00:00Z"}
 
-            """)
+        """)
         fixture.jsonLog(".pi/agent/sessions/project/parent.jsonl", """
-            {"type":"session","id":"documents","cwd":"\(fixture.home.path)/Documents","timestamp":"2026-07-20T12:00:00Z"}
+        {"type":"session","id":"documents","cwd":"\(fixture.home.path)/Documents","timestamp":"2026-07-20T12:00:00Z"}
 
-            """)
+        """)
         fixture.jsonLog(".claude/projects/project/referenced.jsonl", """
-            {"type":"user","sessionId":"referenced","cwd":"\(referenced.path)/new-chat","timestamp":"2026-07-20T12:00:00Z"}
+        {"type":"user","sessionId":"referenced","cwd":"\(referenced.path)/new-chat","timestamp":"2026-07-20T12:00:00Z"}
 
-            """)
+        """)
 
         let candidates = fixture.scan()
 
@@ -866,10 +866,10 @@ struct AISessionWorkspaceCleanupTests {
         let day = fixture.workspace("Qoder", "2026-07-02")
         let orphan = fixture.workspace("Qoder", "2026-07-06")
         fixture.jsonLog(".qoderworkcn/projects/project/session.jsonl", """
-            {"type":"runtime-config","sessionId":"retained","timestamp":"2026-07-02T12:00:00Z"}
-            {"type":"user","sessionId":"retained","cwd":"\(day.path)","timestamp":"2026-07-02T12:00:00Z"}
+        {"type":"runtime-config","sessionId":"retained","timestamp":"2026-07-02T12:00:00Z"}
+        {"type":"user","sessionId":"retained","cwd":"\(day.path)","timestamp":"2026-07-02T12:00:00Z"}
 
-            """)
+        """)
         fixture.jsonLog(".qoderworkcn/logs/sessions/other/segments/0.jsonl", "broken activity log")
 
         #expect(fixture.scan().map(\.url) == [orphan])
@@ -882,9 +882,9 @@ struct AISessionWorkspaceCleanupTests {
         let day = fixture.workspace("Qoder", "2026-07-02")
         let orphan = fixture.workspace("Qoder", "2026-07-06")
         fixture.jsonLog(".qoder/logs/sessions/id/segments/0.jsonl", """
-            {"type":"session.config.loaded","ts":"2026-07-02T12:00:00Z","data":{"target_dir":"\(day.path)","project_root":"\(day.path)"}}
+        {"type":"session.config.loaded","ts":"2026-07-02T12:00:00Z","data":{"target_dir":"\(day.path)","project_root":"\(day.path)"}}
 
-            """)
+        """)
 
         #expect(fixture.scan().isEmpty)
         let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
@@ -917,8 +917,8 @@ struct AISessionWorkspaceCleanupTests {
         let file = fixture.home.appendingPathComponent(".claude/projects/project/session.jsonl")
         var seed: UInt64 = 0x542
         let fixedCorpus: [Data] = [Data(), Data("{\n".utf8), Data("null\n".utf8), Data("[]\n".utf8),
-                                 Data("{\"cwd\":\"../../outside\",\"timestamp\":\"2026-07-02T12:00:00Z\"}\n".utf8),
-                                 Data(repeating: 0x20, count: 256 * 1024 + 1)]
+                                   Data("{\"cwd\":\"../../outside\",\"timestamp\":\"2026-07-02T12:00:00Z\"}\n".utf8),
+                                   Data(repeating: 0x20, count: 256 * 1024 + 1)]
         for bytes in fixedCorpus {
             fixture.file(file, data: bytes)
             #expect(fixture.scan().isEmpty)

@@ -32,16 +32,16 @@ final class VoiceHistoryDatabase {
         try execute("PRAGMA journal_mode = WAL")
         if version == 0 {
             try execute("""
-                CREATE TABLE IF NOT EXISTS voice_history_entries (
-                    id TEXT PRIMARY KEY NOT NULL,
-                    payload BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS voice_history_state (
-                    id INTEGER PRIMARY KEY CHECK(id = 1),
-                    revision TEXT NOT NULL,
-                    statistics BLOB NOT NULL
-                );
-                """)
+            CREATE TABLE IF NOT EXISTS voice_history_entries (
+                id TEXT PRIMARY KEY NOT NULL,
+                payload BLOB NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS voice_history_state (
+                id INTEGER PRIMARY KEY CHECK(id = 1),
+                revision TEXT NOT NULL,
+                statistics BLOB NOT NULL
+            );
+            """)
         }
     }
 
@@ -148,9 +148,9 @@ final class VoiceHistoryDatabase {
             }
             if !changedEntries.isEmpty {
                 let statement = try prepare("""
-                    INSERT INTO voice_history_entries(id, payload) VALUES(?, ?)
-                    ON CONFLICT(id) DO UPDATE SET payload = excluded.payload
-                    """)
+                INSERT INTO voice_history_entries(id, payload) VALUES(?, ?)
+                ON CONFLICT(id) DO UPDATE SET payload = excluded.payload
+                """)
                 defer { sqlite3_finalize(statement) }
                 for (id, data) in changedEntries {
                     sqlite3_reset(statement)
@@ -161,8 +161,7 @@ final class VoiceHistoryDatabase {
             }
             let statement = try prepare(revision == nil
                 ? "INSERT INTO voice_history_state(statistics, revision, id) VALUES(?, ?, 1)"
-                : "UPDATE voice_history_state SET statistics = ?, revision = ? WHERE id = 1 AND revision = ?"
-            )
+                : "UPDATE voice_history_state SET statistics = ?, revision = ? WHERE id = 1 AND revision = ?")
             defer { sqlite3_finalize(statement) }
             try bind(statisticsData, to: 1, in: statement)
             try bind(nextRevision, to: 2, in: statement)

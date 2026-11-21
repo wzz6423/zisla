@@ -88,15 +88,13 @@ final class MediaAppSpecialist {
               hasQQMusicAccessibilityAccess()
         else { return false }
         if let item = Self.qqMusicFavoriteMenuItem(pid: pid),
-           Self.performPress(on: item, pid: pid)
-        {
+           Self.performPress(on: item, pid: pid) {
             return true
         }
         if let button = Self.qqMusicControlRoots(pid: pid).lazy.compactMap({
-            Self.findFavoriteButton(in: $0, depth: 0)
-        }).first,
-           Self.performPress(on: button, pid: pid)
-        {
+               Self.findFavoriteButton(in: $0, depth: 0)
+           }).first,
+           Self.performPress(on: button, pid: pid) {
             return true
         }
         return false
@@ -118,8 +116,7 @@ final class MediaAppSpecialist {
               AXIsProcessTrusted()
         else { return nil }
         if let item = Self.qqMusicFavoriteMenuItem(pid: pid),
-           let state = Self.favoriteState(for: Self.accessibilityLabels(of: item))
-        {
+           let state = Self.favoriteState(for: Self.accessibilityLabels(of: item)) {
             return state
         }
         return Self.qqMusicControlRoots(pid: pid).lazy.compactMap {
@@ -613,11 +610,11 @@ final class MediaAppSpecialist {
 
             var parentRef: CFTypeRef?
             guard AXUIElementCopyAttributeValue(
-                candidate,
-                kAXParentAttribute as CFString,
-                &parentRef
-            ) == .success,
-                let parentRef
+                      candidate,
+                      kAXParentAttribute as CFString,
+                      &parentRef
+                  ) == .success,
+                  let parentRef
             else { return nil }
             candidate = unsafeDowncast(parentRef, to: AXUIElement.self)
         }
@@ -641,8 +638,7 @@ final class MediaAppSpecialist {
         guard depth < maximumAccessibilityDepth else { return nil }
         if role(of: element) == kAXMenuItemRole as String,
            supportsPress(element),
-           matchesControlLabels(accessibilityLabels(of: element), expected: labels)
-        {
+           matchesControlLabels(accessibilityLabels(of: element), expected: labels) {
             return element
         }
         for child in children(of: element) {
@@ -668,8 +664,7 @@ final class MediaAppSpecialist {
         }
         for child in children(of: element) {
             if let match = findQQMusicFavoriteMenuItem(in: child, depth: depth + 1),
-               best == nil || match.rank > best!.rank
-            {
+               best == nil || match.rank > best!.rank {
                 best = match
             }
         }
@@ -786,12 +781,12 @@ final class MediaAppSpecialist {
         ]
         var valuesRef: CFArray?
         guard AXUIElementCopyMultipleAttributeValues(
-            element,
-            attributes as CFArray,
-            [],
-            &valuesRef
-        ) == .success,
-            let values = valuesRef as? [Any]
+                  element,
+                  attributes as CFArray,
+                  [],
+                  &valuesRef
+              ) == .success,
+              let values = valuesRef as? [Any]
         else { return [] }
         return values.compactMap { value in
             guard let text = value as? String else { return nil }
@@ -925,11 +920,11 @@ final class MediaAppSpecialist {
         configureAccessibilityTimeout(for: element)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
-            element,
-            attribute as CFString,
-            &value
-        ) == .success,
-        let value else { return nil }
+                  element,
+                  attribute as CFString,
+                  &value
+              ) == .success,
+              let value else { return nil }
         return unsafeDowncast(value, to: AXUIElement.self)
     }
 

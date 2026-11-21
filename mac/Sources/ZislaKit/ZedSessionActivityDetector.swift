@@ -46,11 +46,11 @@ public final class ZedSessionActivityDetector: AIActivityDetecting {
         sqlite3_busy_timeout(database, 500)
 
         let sql = """
-            SELECT id, updated_at, created_at
-            FROM threads
-            ORDER BY updated_at DESC
-            LIMIT ?
-            """
+        SELECT id, updated_at, created_at
+        FROM threads
+        ORDER BY updated_at DESC
+        LIMIT ?
+        """
         var statement: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
         guard prepareResult == SQLITE_OK, let statement else {

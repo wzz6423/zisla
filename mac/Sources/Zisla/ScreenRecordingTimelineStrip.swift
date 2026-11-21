@@ -33,7 +33,7 @@ struct ScreenRecordingTimelineStripGeometry {
             let end = cursor + segment.outputDuration
             defer { cursor = end }
             let slice = RecordingExportSlice(index: index, sourceStart: segment.start, sourceEnd: segment.end,
-                speed: segment.speed, outputStart: cursor, outputEnd: end)
+                                             speed: segment.speed, outputStart: cursor, outputEnd: end)
             return Item(segment: segment, slice: slice, x: cursor * scale, width: segment.outputDuration * scale)
         }
     }
@@ -146,11 +146,11 @@ struct ScreenRecordingTimelineStrip: View {
             }.buttonStyle(.plain)
             GeometryReader { proxy in
                 if let geometry = ScreenRecordingTimelineStripGeometry(segments: project.edits.segments,
-                    viewportWidth: proxy.size.width - 16, zoom: zoom) {
+                                                                       viewportWidth: proxy.size.width - 16, zoom: zoom) {
                     ScrollView(.horizontal) {
                         timeline(geometry, project: project).padding(.horizontal, 8)
                             .background(ScreenRecordingTimelineMagnification(zoom: $zoom,
-                                isEnabled: isEnabled && model.canEdit, onBegan: { trim = nil }))
+                                                                             isEnabled: isEnabled && model.canEdit, onBegan: { trim = nil }))
                     }
                 }
             }.frame(height: 98)

@@ -7,8 +7,8 @@ import ZislaCore
 @MainActor
 struct OverlayCoordinatorPlacementTests {
     private let screen = ScreenSnapshot(displayID: 7,
-        frame: CGRect(x: 20000, y: 0, width: 1440, height: 900),
-        visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
+                                        frame: CGRect(x: 20000, y: 0, width: 1440, height: 900),
+                                        visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
 
     @Test
     func placementChangesPublishTheCurrentLayoutBeforePresentation() throws {
@@ -22,8 +22,8 @@ struct OverlayCoordinatorPlacementTests {
         coordinator.onCollapsedSizeChanged = { sizes.append($0) }
         coordinator.selectActiveDisplay(at: CGPoint(x: screen.frame.midX, y: screen.frame.midY))
         coordinator.updatePlacement(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: .left, inwardDistance: 48),
-            pillSize: CGSize(width: 220, height: 40), edgeInset: 12)
+                                    placement: IslandPlacement(mode: .custom, edge: .left, inwardDistance: 48),
+                                    pillSize: CGSize(width: 220, height: 40), edgeInset: 12)
         let layout = try #require(coordinator.activeLayout)
         #expect(layout.edge == .left)
         #expect(layout.collapsedFrame.size == CGSize(width: 40, height: 40))
@@ -35,7 +35,7 @@ struct OverlayCoordinatorPlacementTests {
         let sizeCount = sizes.count
 
         coordinator.updatePlacement(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: .left, inwardDistance: 48))
+                                    placement: IslandPlacement(mode: .custom, edge: .left, inwardDistance: 48))
         #expect(changes.count == 2)
         #expect(sizes.count == sizeCount, "An unchanged placement does not restart its collapsed resize")
         coordinator.refreshScreens()
@@ -47,8 +47,8 @@ struct OverlayCoordinatorPlacementTests {
     @Test
     func removingTheActiveDisplayPublishesItsReplacementAndThenNil() {
         let other = ScreenSnapshot(displayID: 8,
-            frame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
-            visibleFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1056))
+                                   frame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
+                                   visibleFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1056))
         let coordinator = OverlayCoordinator(contentView: NSView())
         coordinator.updateScreens([screen, other])
         var changes: [CGDirectDisplayID?] = []
@@ -71,7 +71,7 @@ struct OverlayCoordinatorPlacementTests {
         coordinator.prewarmPanel()
         let panel = try #require(content.window)
         coordinator.updatePlacement(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: .bottom, offset: 0.1))
+                                    placement: IslandPlacement(mode: .custom, edge: .bottom, offset: 0.1))
         let layout = try #require(coordinator.activeLayout)
         #expect(panel.frame == layout.expandedFrame)
         #expect(panel.frame.minY == layout.collapsedFrame.minY)
@@ -82,8 +82,8 @@ struct OverlayCoordinatorPlacementTests {
     func statusIconsExpandOnHoverAndExplicitRevealStillWorks(edge: IslandEdge, iconLength: CGFloat) throws {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content,
-            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
-                placement: IslandPlacement(mode: .custom, edge: edge, inwardDistance: 40))), collapseDelay: .zero)
+                                             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                                                                                                                       placement: IslandPlacement(mode: .custom, edge: edge, inwardDistance: 40))), collapseDelay: .zero)
         coordinator.screenSnapshotProvider = { [screen] }
         coordinator.start()
         defer { coordinator.stop() }
@@ -93,8 +93,8 @@ struct OverlayCoordinatorPlacementTests {
         var expanded = false
         coordinator.onVisibilityChanged = { expanded = $0 }
         coordinator.updateCompactStatus(expandsForDetailedStatus: false,
-            statusIconSize: edge.isVertical ? CGSize(width: 24, height: iconLength)
-                : CGSize(width: iconLength, height: 24))
+                                        statusIconSize: edge.isVertical ? CGSize(width: 24, height: iconLength)
+                                            : CGSize(width: iconLength, height: 24))
         let layout = try #require(coordinator.activeLayout)
         #expect(ScreenLayoutEngine.edgeDistance(of: layout.collapsedFrame, in: screen.frame, edge: edge) == 40)
         let point = CGPoint(x: layout.collapsedFrame.midX, y: layout.collapsedFrame.midY)
@@ -149,11 +149,11 @@ struct OverlayCoordinatorPlacementTests {
     @Test(arguments: IslandEdge.allCases)
     func collapsedControlsDoNotKeepAnotherDisplayExpanded(edge: IslandEdge) throws {
         let other = ScreenSnapshot(displayID: 8,
-            frame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
-            visibleFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1056))
+                                   frame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
+                                   visibleFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1056))
         let coordinator = OverlayCoordinator(contentView: NSView(),
-            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
-                placement: IslandPlacement(mode: .custom, edge: edge))), collapseDelay: .zero)
+                                             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                                                                                                                       placement: IslandPlacement(mode: .custom, edge: edge))), collapseDelay: .zero)
         coordinator.screenSnapshotProvider = { [screen, other] }
         coordinator.start()
         defer { coordinator.stop() }
@@ -169,7 +169,7 @@ struct OverlayCoordinatorPlacementTests {
         coordinator.handlePointer(at: controlPoint)
         #expect(!expanded, "Entering another display's quick controls must release the first island")
         #expect(coordinator.activeDisplayID == screen.displayID,
-            "Quick controls must not activate or move the expanded island")
+                "Quick controls must not activate or move the expanded island")
         coordinator.handlePointer(at: controlPoint)
         #expect(!expanded, "Repeated pointer samples over a control must stay collapsed")
     }
@@ -178,8 +178,8 @@ struct OverlayCoordinatorPlacementTests {
     func statusIconHoverRespectsInteractionSuspensionAndStop(edge: IslandEdge) throws {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content,
-            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
-                placement: IslandPlacement(mode: .custom, edge: edge, inwardDistance: 40))), collapseDelay: .zero)
+                                             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                                                                                                                       placement: IslandPlacement(mode: .custom, edge: edge, inwardDistance: 40))), collapseDelay: .zero)
         coordinator.screenSnapshotProvider = { [screen] }
         coordinator.start()
         defer { coordinator.stop() }
@@ -187,7 +187,7 @@ struct OverlayCoordinatorPlacementTests {
         coordinator.prewarmPanel()
         let panel = try #require(content.window as? IslandPanel)
         coordinator.updateCompactStatus(expandsForDetailedStatus: false,
-            statusIconSize: edge.isVertical ? CGSize(width: 24, height: 120) : CGSize(width: 120, height: 24))
+                                        statusIconSize: edge.isVertical ? CGSize(width: 24, height: 120) : CGSize(width: 120, height: 24))
         let layout = try #require(coordinator.activeLayout)
         let point = CGPoint(x: layout.collapsedFrame.midX, y: layout.collapsedFrame.midY)
         let outside = CGPoint(x: screen.frame.minX - 100, y: screen.frame.minY - 100)
@@ -267,7 +267,7 @@ struct OverlayCoordinatorPlacementTests {
             notifiedLayout = layout
         }
         coordinator.updatePlacement(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: .right))
+                                    placement: IslandPlacement(mode: .custom, edge: .right))
         #expect(frameAtNotification == originalFrame)
         #expect(notifiedLayout?.edge == .right)
         #expect(panel.frame == notifiedLayout?.expandedFrame)
@@ -278,9 +278,9 @@ struct OverlayCoordinatorPlacementTests {
     func naturalStatusUpdatesTheHoverAnchorAndRestoresTheCompactPill(edge: IslandEdge) throws {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content,
-            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
-                layoutStyle: .pill, placement: IslandPlacement(mode: .custom, edge: edge)
-            )))
+                                             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
+                                                 layoutStyle: .pill, placement: IslandPlacement(mode: .custom, edge: edge)
+                                             )))
         coordinator.screenSnapshotProvider = { [screen] }
         coordinator.start()
         defer { coordinator.stop() }
@@ -317,15 +317,15 @@ struct OverlayCoordinatorPlacementTests {
         let content = NSView()
         var petWindows: [NSView] = []
         let coordinator = OverlayCoordinator(contentView: content,
-            persistentContentViewProvider: { _ in
-                let pet = NSView()
-                petWindows.append(pet)
-                return pet
-            },
-            persistentPanelFrameProvider: { $0.collapsedFrame })
+                                             persistentContentViewProvider: { _ in
+                                                 let pet = NSView()
+                                                 petWindows.append(pet)
+                                                 return pet
+                                             },
+                                             persistentPanelFrameProvider: { $0.collapsedFrame })
         let other = ScreenSnapshot(displayID: 8,
-            frame: screen.frame.offsetBy(dx: 1440, dy: 0),
-            visibleFrame: screen.visibleFrame.offsetBy(dx: 1440, dy: 0))
+                                   frame: screen.frame.offsetBy(dx: 1440, dy: 0),
+                                   visibleFrame: screen.visibleFrame.offsetBy(dx: 1440, dy: 0))
         coordinator.screenSnapshotProvider = { [screen, other] }
         coordinator.start()
         defer { coordinator.stop() }
@@ -335,7 +335,7 @@ struct OverlayCoordinatorPlacementTests {
         let panel = try #require(content.window)
         coordinator.setHoverActivationSuspended(true)
         coordinator.updatePlacement(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: .left))
+                                    placement: IslandPlacement(mode: .custom, edge: .left))
         coordinator.updateCompactStatus(expandsForDetailedStatus: true)
         coordinator.refreshPersistentPanels()
         coordinator.refreshScreens()
@@ -379,7 +379,7 @@ struct OverlayCoordinatorPlacementTests {
         #expect(OverlayCoordinator.containsPopoverAttachment(bridge, island: island, popover: popover, anchor: anchor))
         #expect(!OverlayCoordinator.containsPopoverAttachment(outside, island: island, popover: popover, anchor: anchor))
         let distant = popover.offsetBy(dx: edge == .left ? -100 : edge == .right ? 100 : 0,
-                                      dy: edge == .bottom ? -100 : edge == .top ? 100 : 0)
+                                       dy: edge == .bottom ? -100 : edge == .top ? 100 : 0)
         #expect(!OverlayCoordinator.containsPopoverAttachment(bridge, island: island, popover: distant, anchor: anchor))
     }
 
@@ -387,7 +387,7 @@ struct OverlayCoordinatorPlacementTests {
     func cameraStatusUpdatesUseTheShortDetailLimitAndRestoreTheDefault() throws {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content,
-            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill)))
+                                             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill)))
         coordinator.screenSnapshotProvider = { [screen] }
         coordinator.start()
         defer { coordinator.stop() }
@@ -415,16 +415,16 @@ struct OverlayCoordinatorPlacementTests {
                 .frame(width: container.width, height: container.height))
         }
         let coordinator = OverlayCoordinator(contentView: NSView(),
-            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
-                placement: IslandPlacement(mode: .custom, edge: edge))),
-            persistentContentViewProvider: { layout in
-                content.rootView = petContent(for: layout)
-                return content
-            },
-            persistentPanelFrameProvider: { CollapsedPetLayout.frame(for: $0, petAspectRatio: ratio) },
-            persistentContentViewUpdater: { _, layout in
-                content.rootView = petContent(for: layout)
-            })
+                                             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                                                                                                                       placement: IslandPlacement(mode: .custom, edge: edge))),
+                                             persistentContentViewProvider: { layout in
+                                                 content.rootView = petContent(for: layout)
+                                                 return content
+                                             },
+                                             persistentPanelFrameProvider: { CollapsedPetLayout.frame(for: $0, petAspectRatio: ratio) },
+                                             persistentContentViewUpdater: { _, layout in
+                                                 content.rootView = petContent(for: layout)
+                                             })
         coordinator.screenSnapshotProvider = { [screen] }
         coordinator.updateScreens([screen])
         defer { coordinator.stop() }
@@ -451,7 +451,7 @@ struct OverlayCoordinatorPlacementTests {
         }
         try expectPlacement()
         coordinator.updateCompactStatus(expandsForDetailedStatus: false,
-            statusIconSize: edge.isVertical ? CGSize(width: 40, height: 120) : CGSize(width: 120, height: 32))
+                                        statusIconSize: edge.isVertical ? CGSize(width: 40, height: 120) : CGSize(width: 120, height: 32))
         try expectPlacement()
         coordinator.updateCompactStatus(expandsForDetailedStatus: false)
         try expectPlacement()

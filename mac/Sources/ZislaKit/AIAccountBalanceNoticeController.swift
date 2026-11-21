@@ -59,7 +59,7 @@ public final class AIAccountBalanceNoticeController {
             let escalates = previous.map { severity > $0.0 } ?? true
             let createdAt = escalates ? date : previous!.1
             let notice = Self.notice(balance, id: balance.noticeID, style: settings.aiAccountBalanceCompactStyle,
-                language: language, createdAt: createdAt)
+                                     language: language, createdAt: createdAt)
             if escalates {
                 notified[balance.noticeID] = (severity, createdAt)
                 queue.enqueue(notice, expiresAfter: max(6, readingSeconds(for: notice)))
@@ -86,8 +86,8 @@ public final class AIAccountBalanceNoticeController {
         guard settings.aiProgressEnabled, settings.sideNoticesEnabled, settings.islandPlacement.mode == .custom,
               settings.aiAccountBalancePinnedInCustomIsland else { return [] }
         return AIAccountBalanceCatalog.displayedBalances(balances,
-            monitoredProviders: settings.aiAccountBalanceMonitoredProviders,
-            displayedProviders: settings.aiAccountBalanceDisplayedProviders).sorted { $0.id < $1.id }
+                                                         monitoredProviders: settings.aiAccountBalanceMonitoredProviders,
+                                                         displayedProviders: settings.aiAccountBalanceDisplayedProviders).sorted { $0.id < $1.id }
     }
 
     /// Polling retains the current account's reading; a changed summary gets time to reach its new tail.
@@ -103,7 +103,7 @@ public final class AIAccountBalanceNoticeController {
         let currentIndex = rows.firstIndex { $0.id == pinnedAccountID }
         var index = currentIndex ?? 0
         var notice = Self.notice(rows[index], id: Self.pinnedID, style: settings.aiAccountBalanceCompactStyle,
-            language: language, createdAt: date)
+                                 language: language, createdAt: date)
         let lines = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "").accountBalanceLines
         let candidates = (queue.left + queue.right).filter { $0.id != Self.pinnedID } + [notice]
         let isSelected = SideNoticeLayoutEngine.selectedCompactStatusPriority(for: candidates, settings: settings) == .aiAccountBalance
@@ -116,7 +116,7 @@ public final class AIAccountBalanceNoticeController {
         } else if let start = pinnedReadingStart, date.timeIntervalSince(start) >= max(5, readingSeconds(for: notice)) {
             index = (index + 1) % rows.count
             notice = Self.notice(rows[index], id: Self.pinnedID, style: settings.aiAccountBalanceCompactStyle,
-                language: language, createdAt: date)
+                                 language: language, createdAt: date)
             pinnedReadingStart = date
         }
         pinnedAccountID = rows[index].id
@@ -132,12 +132,12 @@ public final class AIAccountBalanceNoticeController {
     private func readingSeconds(for notice: IslandNotice) -> Double {
         let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
         return presentation.accountBalanceReadingSeconds(thickness: max(32, CGFloat(settings.islandPillHeight)),
-            edge: settings.islandPlacement.edge)
+                                                         edge: settings.islandPlacement.edge)
     }
 
     /// Both styles retain canonical quota rows; compact mode singles out a limiting extra allowance.
     private nonisolated static func notice(_ balance: AIAccountBalance, id: String, style: MediaCompactStyle,
-                                          language: AppLanguage, createdAt: Date) -> IslandNotice {
+                                           language: AppLanguage, createdAt: Date) -> IslandNotice {
         let provider = balance.providerTitle(language: language)
         let summary = balance.compactLines(language: language)
         let short = balance.fiveHourWindow
@@ -167,13 +167,14 @@ public final class AIAccountBalanceNoticeController {
             else if index == 0, let weekly = balance.weeklyWindow { lineSeverity = weekly.severity }
             else {
                 let remaining = balance.windows.filter { $0.id != short?.id
-                    && (short != nil || $0.id != balance.weeklyWindow?.id) }
+                    && (short != nil || $0.id != balance.weeklyWindow?.id)
+                }
                 lineSeverity = remaining.map(\.severity).max() ?? .normal
             }
             metadata["quotaLineSeverity\(index)"] = String(lineSeverity.rawValue)
         }
         return IslandNotice(id: id, title: provider, detail: lines.joined(separator: " · "),
-            kind: balance.severity == .normal ? .info : .warning, side: .left, createdAt: createdAt,
-            style: .status, symbolName: "gauge.with.dots.needle.67percent", metadata: metadata)
+                            kind: balance.severity == .normal ? .info : .warning, side: .left, createdAt: createdAt,
+                            style: .status, symbolName: "gauge.with.dots.needle.67percent", metadata: metadata)
     }
 }

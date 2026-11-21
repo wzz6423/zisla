@@ -294,8 +294,7 @@ struct ClipboardAssistantIslandPresentationTests {
     @Test
     func capturedImagePayloadProducesASharingImage() throws {
         let pngData = try #require(Data(base64Encoded:
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-        ))
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="))
         #expect(TransferDropItem.image(pngData).shareValue is NSImage)
     }
 
@@ -375,8 +374,7 @@ struct ClipboardAssistantIslandPresentationTests {
     @Test
     func imageThumbnailUsesImageActionEvenWhenItIsNotPrimary() throws {
         let pngData = try #require(Data(base64Encoded:
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-        ))
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="))
         let detection = ClipboardAssistantDetection(
             kind: .image,
             title: "image",

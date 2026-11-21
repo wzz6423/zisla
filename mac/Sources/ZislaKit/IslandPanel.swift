@@ -17,18 +17,18 @@ private final class ClickBlockingContentView: NSView {
 
 @MainActor
 public final class IslandPanel: NSPanel {
-  internal var applicationActivationHandler: () -> Void = {
-    NSApp.activate(ignoringOtherApps: true)
-  }
-  public var allowsKeyWindow = false
-  /// Records that the transparent style's native glass surface is on screen. The active-appearance
-  /// override below is what keeps that surface rendering, so this never influences focus.
-  public var keepsNativeGlassActive = false
-  /// Prevents app activation while recording, preserving focus in the target input.
-  public var avoidsAppActivation = false
-  public var isPinned = false
-  private var transitionGeneration: UInt64 = 0
-  private nonisolated(unsafe) var clickMonitor: Any?
+    internal var applicationActivationHandler: () -> Void = {
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    public var allowsKeyWindow = false
+    /// Records that the transparent style's native glass surface is on screen. The active-appearance
+    /// override below is what keeps that surface rendering, so this never influences focus.
+    public var keepsNativeGlassActive = false
+    /// Prevents app activation while recording, preserving focus in the target input.
+    public var avoidsAppActivation = false
+    public var isPinned = false
+    private var transitionGeneration: UInt64 = 0
+    private nonisolated(unsafe) var clickMonitor: Any?
 
     /// Window level used when the collapsed island sits above other windows (same layer as the menu bar).
     public static let onTopLevel = NSWindow.Level.statusBar
@@ -109,7 +109,7 @@ public final class IslandPanel: NSPanel {
         backgroundColor = .clear
         // The island is always dark; it does not follow the system light/dark mode toggle.
         appearance = NSAppearance(named: .darkAqua)
-    hasShadow = false
+        hasShadow = false
         hidesOnDeactivate = false
         isMovable = false
         isReleasedWhenClosed = false
@@ -160,58 +160,57 @@ public final class IslandPanel: NSPanel {
     /// `canJoinAllSpaces`, and `orderFrontRegardless()` is the only thing that rejoins it. The
     /// active-Space observer's re-present is the recovery path, so it may not resolve to a no-op.
     static func presentationPlan(isVisible: Bool, currentFrame: CGRect, targetFrame: CGRect)
-        -> PresentationPlan
-    {
+        -> PresentationPlan {
         guard isVisible else { return .show }
         return currentFrame == targetFrame ? .refront : .reposition
     }
 
-  public func present(
-    at frame: CGRect,
-    from collapsedFrame: CGRect? = nil,
-    animated: Bool = true
-  ) {
-    _ = collapsedFrame
-    _ = animated
-    let plan = Self.presentationPlan(
-      isVisible: isVisible,
-      currentFrame: self.frame,
-      targetFrame: frame
-    )
-    // Supersedes any in-flight dismiss fade so its completion cannot order this panel back out.
-    transitionGeneration &+= 1
-    alphaValue = 1
-    if plan != .refront { setFrameWithoutReordering(frame) }
-    orderFrontRegardless()
-  }
-
-  public func resize(to frame: CGRect, animated: Bool = true) {
-    guard self.frame != frame else { return }
-    transitionGeneration &+= 1
-    _ = animated
-    setFrameWithoutReordering(frame)
-    if isVisible { orderFrontRegardless() }
-  }
-
-  public func dismiss(to collapsedFrame: CGRect? = nil, animated: Bool = true) {
-    guard isVisible else { return }
-    transitionGeneration &+= 1
-    let generation = transitionGeneration
-    guard animated, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-      orderOut(nil)
-      return
+    public func present(
+        at frame: CGRect,
+        from collapsedFrame: CGRect? = nil,
+        animated: Bool = true
+    ) {
+        _ = collapsedFrame
+        _ = animated
+        let plan = Self.presentationPlan(
+            isVisible: isVisible,
+            currentFrame: self.frame,
+            targetFrame: frame
+        )
+        // Supersedes any in-flight dismiss fade so its completion cannot order this panel back out.
+        transitionGeneration &+= 1
+        alphaValue = 1
+        if plan != .refront { setFrameWithoutReordering(frame) }
+        orderFrontRegardless()
     }
-    _ = collapsedFrame
-    NSAnimationContext.runAnimationGroup { context in
-      context.duration = 0.14
-      context.allowsImplicitAnimation = true
-      animator().alphaValue = 0
-    } completionHandler: { [weak self] in
-      Task { @MainActor in
-        guard let self, self.transitionGeneration == generation else { return }
-        self.orderOut(nil)
-        self.alphaValue = 1
-      }
+
+    public func resize(to frame: CGRect, animated: Bool = true) {
+        guard self.frame != frame else { return }
+        transitionGeneration &+= 1
+        _ = animated
+        setFrameWithoutReordering(frame)
+        if isVisible { orderFrontRegardless() }
     }
-  }
+
+    public func dismiss(to collapsedFrame: CGRect? = nil, animated: Bool = true) {
+        guard isVisible else { return }
+        transitionGeneration &+= 1
+        let generation = transitionGeneration
+        guard animated, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            orderOut(nil)
+            return
+        }
+        _ = collapsedFrame
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.14
+            context.allowsImplicitAnimation = true
+            animator().alphaValue = 0
+        } completionHandler: { [weak self] in
+            Task { @MainActor in
+                guard let self, self.transitionGeneration == generation else { return }
+                self.orderOut(nil)
+                self.alphaValue = 1
+            }
+        }
+    }
 }

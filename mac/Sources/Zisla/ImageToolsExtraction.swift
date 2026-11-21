@@ -26,7 +26,7 @@ extension ImageToolsModel {
     ) -> Task<Void, Never>? {
         start(service: service, options: .init(formats: [.png]), rasterTransform: { source, _ in
             let operation = ScreenshotExtractionOperation(mode: mode,
-                imageSize: CGSize(width: source.width, height: source.height))
+                                                          imageSize: CGSize(width: source.width, height: source.height))
             let work = Task.detached(priority: .userInitiated) {
                 do {
                     let result = try await extractImage(source, operation)

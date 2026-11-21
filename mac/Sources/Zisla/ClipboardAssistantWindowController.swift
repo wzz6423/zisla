@@ -793,10 +793,10 @@ final class ClipboardAssistantController: ObservableObject {
         let rowHeight = initial.style == .pill
             ? (initial.edge.isVertical ? initial.collapsedFrame.width : initial.collapsedFrame.height)
             : initial.topology.hasPhysicalNotch
-                ? SideNoticeLayoutEngine().compactWingHeight(
-                    for: screen, progressGlowEnabled: presentation.progressGlowEnabled
-                )
-                : initial.collapsedFrame.height
+            ? SideNoticeLayoutEngine().compactWingHeight(
+                for: screen, progressGlowEnabled: presentation.progressGlowEnabled
+            )
+            : initial.collapsedFrame.height
         let notchWidth = initial.style == .pill
             ? initial.centerOcclusionWidth
             : initial.topology.hasPhysicalNotch ? initial.collapsedFrame.width : 0
@@ -826,7 +826,7 @@ final class ClipboardAssistantController: ObservableObject {
         } else {
             compactLength = translation != nil
                 ? initial.collapsedFrame.width
-                    + (initial.style == .notch && notchWidth > 0 ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
+                + (initial.style == .notch && notchWidth > 0 ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
                 : ClipboardAssistantToastView.requiredRowWidth(
                     baseWidth: Self.islandRowWidth, maximumWidth: max(320, screen.frame.width - 48),
                     notchWidth: notchWidth, trailingControlsWidth: controlsWidth
@@ -1091,10 +1091,10 @@ struct ClipboardAssistantToastView: View {
                     }
                     .help(loc("更多操作"))
                     .popover(isPresented: Binding(get: { controller.isMoreActionsPresented },
-                                                 set: { controller.setMoreActionsPresented($0) }),
+                                                  set: { controller.setMoreActionsPresented($0) }),
                              arrowEdge: Self.verticalMoreActionsPopoverArrowEdge(
-                                for: presentation.layout?.edge ?? .top,
-                                layoutDirection: layoutDirection
+                                 for: presentation.layout?.edge ?? .top,
+                                 layoutDirection: layoutDirection
                              )) {
                         moreActionsPopover(for: detection)
                     }
@@ -1595,7 +1595,6 @@ struct ClipboardAssistantToastView: View {
         return loc(Self.actionLabel(action))
     }
 }
-
 
 /// Fires the assistant's primary action from user-configured quick triggers:
 /// - Ordinary hotkey combos register through Carbon (no permission needed).

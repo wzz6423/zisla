@@ -205,8 +205,7 @@ public enum DownloadFailureDiagnostics {
     private static func isBrowserCookieDatabaseUnavailable(_ rawDiagnostic: String) -> Bool {
         let diagnostic = rawDiagnostic.lowercased()
         return (diagnostic.contains("could not find")
-            && diagnostic.contains("cookies database")
-        ) || (
+            && diagnostic.contains("cookies database")) || (
             diagnostic.contains("cookies")
                 && (diagnostic.contains("cannot decrypt") || diagnostic.contains("failed to decrypt"))
         ) || diagnostic.range(
@@ -309,9 +308,9 @@ public enum HTTPURLParser {
               host == "douyin.com" || host == "www.douyin.com",
               url.path == "/jingxuan" || url.path == "/jingxuan/",
               let videoID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?
-                .first(where: { $0.name == "modal_id" })?
-                .value,
+                  .queryItems?
+                  .first(where: { $0.name == "modal_id" })?
+                  .value,
               (1...30).contains(videoID.utf8.count),
               videoID.utf8.allSatisfy({ (48...57).contains($0) }) else {
             return url

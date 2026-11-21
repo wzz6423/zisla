@@ -65,7 +65,7 @@ struct AIUsageLogDetectorTests {
             codexTokenLine(timestamp: "2026-11-10T00:00:00Z", input: 100, output: 20),
         ], to: file)
         let detector = codexUsageDetector(codex: root.appendingPathComponent("sessions"),
-            empty: root.appendingPathComponent("empty"), scanInterval: 0)
+                                          empty: root.appendingPathComponent("empty"), scanInterval: 0)
         #expect(try detector.usageSamples().map(\.model) == ["gpt-6.1-sol"])
         try appendJSONL(#"{"type":"turn_context","payload":{"model":"gpt-6-astra"}}"#, to: file)
         try appendJSONL(codexTokenLine(timestamp: "2026-11-10T00:01:00Z", input: 150, output: 30), to: file)
@@ -98,7 +98,7 @@ struct AIUsageLogDetectorTests {
             #"{"timestamp":1794268800,"method":"_x.ai/session/update","params":{"sessionId":"session","update":{"prompt_id":"one","usage":{"inputTokens":100,"outputTokens":20,"modelUsage":{"grok-4":{},"grok-5":{}}}}}}"#,
         ], to: root.appendingPathComponent("grok/session/updates.jsonl"))
         let detector = AIUsageLogDetector(grokSessionsDirectory: root.appendingPathComponent("grok"),
-            scanInterval: 0, enabledProviders: [.grok])
+                                          scanInterval: 0, enabledProviders: [.grok])
         let samples = try detector.usageSamples()
         #expect(samples.map(\.totalTokens) == [120])
         #expect(samples.map(\.model) == [nil])
@@ -115,7 +115,7 @@ struct AIUsageLogDetectorTests {
         for _ in 0..<64 {
             seed = seed &* 6_364_136_223_846_793_005 &+ 1
             let bad = [#"{"type":"turn_context","payload":{"model":123}}"#,
-                #"{"type":"turn_context","payload":null}"#, "{truncated", #"{"usage":true}"#][Int(seed % 4)]
+                       #"{"type":"turn_context","payload":null}"#, "{truncated", #"{"usage":true}"#][Int(seed % 4)]
             lines.append(bad)
         }
         lines.append(#"{"type":"turn_context","payload":{"model":"gpt-6.1-sol"}}"#)
@@ -131,7 +131,7 @@ struct AIUsageLogDetectorTests {
         let root = temporaryDirectory(named: "usage-gemini-message-models")
         defer { try? FileManager.default.removeItem(at: root) }
         try writeJSON(#"{"timestamp":"2026-11-09T00:00:00Z","messages":[{"model":"gemini-pro","timestamp":"2026-11-09T23:59:00Z","tokens":{"input_tokens":100,"output_tokens":20}},{"model":"gemini-flash","timestamp":"2026-11-10T00:01:00Z","tokens":{"input_tokens":30,"output_tokens":5}}]}"#,
-            to: root.appendingPathComponent("session-models.json"))
+                      to: root.appendingPathComponent("session-models.json"))
         let detector = AIUsageLogDetector(geminiSessionsDirectory: root, enabledProviders: [.gemini])
         let samples = try detector.usageSamples()
         #expect(samples.map(\.model) == ["gemini-pro", "gemini-flash"])
@@ -198,12 +198,12 @@ struct AIUsageLogDetectorTests {
         let root = temporaryDirectory(named: "usage-generic-legacy-index")
         defer { try? FileManager.default.removeItem(at: root) }
         try writeJSON(#"{"timestamp":"2026-11-10T00:00:00Z","a":{"model":"model-a","usage":{"input_tokens":100,"output_tokens":20}},"b":{"model":"model-b","usage":{"input_tokens":30,"output_tokens":5}}}"#,
-            to: root.appendingPathComponent("logs/session-legacy.json"))
+                      to: root.appendingPathComponent("logs/session-legacy.json"))
         let samples = try AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("logs"), enabledProviders: [.gemini]).usageSamples()
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         let legacy = samples.enumerated().map { index, sample in
             AIUsageSample(sourceID: sample.legacySourceID! + String(1 - index), provider: sample.provider,
-                timestamp: sample.timestamp, inputTokens: sample.inputTokens, outputTokens: sample.outputTokens, model: "unreliable-old-model")
+                          timestamp: sample.timestamp, inputTokens: sample.inputTokens, outputTokens: sample.outputTokens, model: "unreliable-old-model")
         }
         try repository.recordDetectedUsage(legacy)
         #expect(try repository.recordDetectedUsage(samples) == 0)
@@ -227,7 +227,7 @@ struct AIUsageLogDetectorTests {
         let old = try #require(samples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: old.provider,
-            timestamp: old.timestamp, inputTokens: old.inputTokens, outputTokens: old.outputTokens, model: "unreliable-first-model")])
+                                                          timestamp: old.timestamp, inputTokens: old.inputTokens, outputTokens: old.outputTokens, model: "unreliable-first-model")])
         let input = changedOldTokens ? 150 : 100
         try writeJSON("{\"timestamp\":\"2026-11-10T00:00:00Z\",\"messages\":[{\"id\":\"old\",\"model\":\"model-a\",\"usage\":{\"input_tokens\":\(input),\"output_tokens\":20}},{\"id\":\"new\",\"model\":\"model-b\",\"usage\":{\"input_tokens\":30,\"output_tokens\":5}}]}", to: file)
         try repository.recordDetectedUsage(samples())
@@ -255,7 +255,7 @@ struct AIUsageLogDetectorTests {
         let old = try #require(samples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: old.provider,
-            timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
         try writeJSON(#"{"timestamp":"2026-11-10T00:01:00Z","messages":[{"id":"old","timestamp":"2026-11-10T00:00:00Z","model":"model-a","usage":{"input_tokens":150,"output_tokens":20}},{"id":"new","timestamp":"2026-11-10T00:02:00Z","model":"model-b","usage":{"input_tokens":30,"output_tokens":5}}]}"#, to: file)
         try repository.recordDetectedUsage(samples())
         #expect(try repository.loadUsageSamples().map(\.totalTokens).reduce(0, +) == 205)
@@ -281,7 +281,7 @@ struct AIUsageLogDetectorTests {
         let old = try #require(samples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: old.provider,
-            timestamp: old.timestamp, inputTokens: old.inputTokens, outputTokens: old.outputTokens)])
+                                                          timestamp: old.timestamp, inputTokens: old.inputTokens, outputTokens: old.outputTokens)])
         let fresh = #"{"id":"new","timestamp":"2026-11-09T00:00:00Z","model":"new-model","usage":{"input_tokens":30,"output_tokens":5}}"#
         let historical = #"{"id":"historical","timestamp":"2026-11-10T00:00:00Z","model":"old-model","usage":{"input_tokens":150,"output_tokens":20}}"#
         try writeJSON("{\"timestamp\":\"2026-11-08T00:00:00Z\",\"messages\":[\(newFirst ? fresh + "," + historical : historical + "," + fresh)]}", to: file)
@@ -313,7 +313,7 @@ struct AIUsageLogDetectorTests {
         let old = try #require(samples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: .gemini,
-            timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
         try writeJSON(#"{"timestamp":"2026-11-08T00:00:00Z","messages":[{"id":"new-a","timestamp":"2026-11-09T00:00:00Z","model":"same-model","usage":{"input_tokens":100,"output_tokens":20}},{"id":"new-b","timestamp":"2026-11-09T00:00:00Z","model":"same-model","usage":{"input_tokens":100,"output_tokens":20}},{"id":"old","timestamp":"2026-11-10T00:00:00Z","model":"same-model","usage":{"input_tokens":150,"output_tokens":20}}]}"#, to: file)
         let current = try samples()
         try repository.recordDetectedUsage(current)
@@ -336,7 +336,7 @@ struct AIUsageLogDetectorTests {
         let old = try #require(samples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: .gemini,
-            timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
         try writeJSON(#"{"id":"session","content":"changed-text","timestamp":"2026-11-08T00:00:00Z","messages":[{"id":"new","model":"model-b","usage":{"input_tokens":30,"output_tokens":5}},{"id":"old","model":"model-a","usage":{"input_tokens":150,"output_tokens":20}}]}"#, to: file)
         #expect(try repository.recordDetectedUsage(samples()) == 0)
         #expect(try repository.loadUsageSamples().first?.totalTokens == 120)
@@ -360,7 +360,7 @@ struct AIUsageLogDetectorTests {
         let old = try #require(detector.usageSamples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: .qwen,
-            timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
         try appendJSONL(#"{"id":"new","timestamp":"2026-11-09T00:00:00Z","model":"new-model","usage":{"input_tokens":30,"output_tokens":5}}"#, to: file)
         let appended = try detector.usageSamples()
         #expect(appended.first { $0.model == "old-model" }?.genericContext == nil)
@@ -416,16 +416,16 @@ struct AIUsageLogDetectorTests {
         let old = try #require(oldDetector.usageSamples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: .gemini,
-            timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
         let before = try repository.loadUsageHistory()
         try writeJSON(#"{"timestamp":"2026-11-08T00:00:00Z","messages":[{"id":"old","model":"current","usage":{"input_tokens":150,"output_tokens":20}},{"id":"new","model":"fresh","usage":{"input_tokens":30,"output_tokens":5}}]}"#, to: file)
         let detector = AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("logs"), scanInterval: 60, enabledProviders: [.gemini])
         let current = try detector.usageSamples()
         try executeUsageFixtureSQL(repository.databaseURL, """
-            CREATE TRIGGER fail_generic_baseline BEFORE INSERT ON detected_usage_events
-            WHEN NEW.source_id LIKE '%-usage-v2-%'
-            BEGIN SELECT RAISE(ABORT, 'fixture baseline write failure'); END
-            """)
+        CREATE TRIGGER fail_generic_baseline BEFORE INSERT ON detected_usage_events
+        WHEN NEW.source_id LIKE '%-usage-v2-%'
+        BEGIN SELECT RAISE(ABORT, 'fixture baseline write failure'); END
+        """)
         #expect(throws: (any Error).self) { try repository.recordDetectedUsage(current) }
         #expect(try repository.loadUsageHistory() == before)
         try executeUsageFixtureSQL(repository.databaseURL, "DROP TRIGGER fail_generic_baseline")
@@ -454,7 +454,7 @@ struct AIUsageLogDetectorTests {
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         let old = try #require(first.first)
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: .qwen,
-            timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
         #expect(try repository.recordDetectedUsage(cached) == 0)
         try writeJSON(document.replacingOccurrences(of: "input_tokens\":100", with: "input_tokens\":150")
             + (extensionName == "jsonl" ? "\n" : ""), to: file)
@@ -478,7 +478,7 @@ struct AIUsageLogDetectorTests {
         let old = try #require(samples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: .gemini,
-            timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          timestamp: old.timestamp, inputTokens: 100, outputTokens: 20)])
         let fresh = (1..<messageCount).map { "{\"id\":\"new-\($0)\",\"model\":\"fresh\",\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}" }.joined(separator: ",")
         try writeJSON("{\"timestamp\":\"2026-11-08T00:00:00Z\",\"messages\":[{\"id\":\"old\",\"usage\":{\"input_tokens\":150,\"output_tokens\":20}},\(fresh)]}", to: file)
         let current = try samples()
@@ -498,8 +498,8 @@ struct AIUsageLogDetectorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let file = root.appendingPathComponent("logs/session-bytes.json")
         let template: [String: Any] = ["timestamp": "2026-11-08T00:00:00Z", "padding": "",
-            "messages": [["id": "one", "usage": ["input_tokens": 10, "output_tokens": 2]],
-                ["id": "two", "usage": ["input_tokens": 30, "output_tokens": 5]]]]
+                                       "messages": [["id": "one", "usage": ["input_tokens": 10, "output_tokens": 2]],
+                                                    ["id": "two", "usage": ["input_tokens": 30, "output_tokens": 5]]]]
         let empty = try JSONSerialization.data(withJSONObject: template, options: [.sortedKeys])
         var document = template
         document["padding"] = String(repeating: "p", count: byteCount - empty.count)
@@ -519,10 +519,10 @@ struct AIUsageLogDetectorTests {
         let legacyPrefix = try #require(samples.first?.legacySourceID)
         try repository.recordDetectedUsage(samples.enumerated().map { index, sample in
             AIUsageSample(sourceID: legacyPrefix + String(index), provider: sample.provider,
-                timestamp: sample.timestamp, inputTokens: sample.inputTokens, outputTokens: sample.outputTokens)
+                          timestamp: sample.timestamp, inputTokens: sample.inputTokens, outputTokens: sample.outputTokens)
         })
         document["messages"] = [["id": "one", "usage": ["input_tokens": 20, "output_tokens": 2]],
-            ["id": "two", "usage": ["input_tokens": 30, "output_tokens": 5]]]
+                                ["id": "two", "usage": ["input_tokens": 30, "output_tokens": 5]]]
         try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]).write(to: file)
         let current = try AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("logs"), enabledProviders: [.gemini]).usageSamples()
         #expect(try repository.recordDetectedUsage(current) == 0)
@@ -548,22 +548,22 @@ struct AIUsageLogDetectorTests {
             let text = "{\"timestamp\":\"2026-11-08T00:00:00Z\",\"messages\":[{\"id\":\"old-\(index)\",\"usage\":{\"input_tokens\":100,\"output_tokens\":20}}],\"padding\":\"\(String(repeating: "p", count: 58_000))\"}"
             try writeJSON(text, to: file)
             let prior = try AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("empty"),
-                enabledProviders: [.gemini], additionalLogFiles: [.gemini: [file]]).usageSamples()
+                                               enabledProviders: [.gemini], additionalLogFiles: [.gemini: [file]]).usageSamples()
             let sample = try #require(prior.first)
             old.append(AIUsageSample(sourceID: sample.legacySourceID! + "0", provider: .gemini,
-                timestamp: sample.timestamp, inputTokens: 100, outputTokens: 20))
+                                     timestamp: sample.timestamp, inputTokens: 100, outputTokens: 20))
             try writeJSON(text.replacingOccurrences(of: "input_tokens\":100", with: "input_tokens\":150"), to: file)
         }
         try repository.recordDetectedUsage(old)
         let detector = AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("empty"),
-            scanInterval: 0, enabledProviders: [.gemini], additionalLogFiles: [.gemini: reverse ? Array(files.reversed()) : files])
+                                          scanInterval: 0, enabledProviders: [.gemini], additionalLogFiles: [.gemini: reverse ? Array(files.reversed()) : files])
         let current = try detector.usageSamples()
         let documents = Set(current.compactMap { $0.genericContext?.document })
         #expect(documents.reduce(0) { $0 + $1.count } <= AIGenericUsageContext.maximumEvidenceBytes)
         #expect(current.compactMap(\.genericContext).count == 4)
         #expect(try detector.usageSamples().compactMap(\.genericContext).isEmpty)
         let reordered = try AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("empty"),
-            enabledProviders: [.gemini], additionalLogFiles: [.gemini: Array(files.reversed())]).usageSamples()
+                                               enabledProviders: [.gemini], additionalLogFiles: [.gemini: Array(files.reversed())]).usageSamples()
         #expect(Set(reordered.filter { $0.genericContext != nil }.compactMap(\.sourceID))
             == Set(current.filter { $0.genericContext != nil }.compactMap(\.sourceID)))
         try repository.recordDetectedUsage(reverse ? Array(current.reversed()) : current)
@@ -573,7 +573,7 @@ struct AIUsageLogDetectorTests {
         try repository.recordDetectedUsage([growth])
         #expect(try repository.loadUsageSamples().first?.totalTokens == 810)
         let other = AIUsageSample(sourceID: "another-provider", provider: .qwen,
-            timestamp: growth.timestamp, inputTokens: 30, outputTokens: 5, model: "qwen")
+                                  timestamp: growth.timestamp, inputTokens: 30, outputTokens: 5, model: "qwen")
         #expect(try repository.recordDetectedUsage([other]) == 1)
         #expect(try repository.loadUsageSamples().first?.totalTokens == 845)
         #expect(try repository.recordDetectedUsage(current) == 0)
@@ -591,14 +591,14 @@ struct AIUsageLogDetectorTests {
             #"{"id":"old","timestamp":"2026-11-08T00:00:00Z","model":"model-a","usage":{"input_tokens":100,"output_tokens":20}}"#,
         ], to: session)
         let prior = try #require(AIUsageLogDetector(qwenProjectsDirectory: empty, enabledProviders: [.qwen],
-            additionalLogFiles: [.qwen: [session]]).usageSamples().first)
+                                                    additionalLogFiles: [.qwen: [session]]).usageSamples().first)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
         let legacyPrefix = try #require(prior.legacySourceID)
         try repository.recordDetectedUsage([AIUsageSample(sourceID: legacyPrefix + "0", provider: .qwen,
-            timestamp: prior.timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          timestamp: prior.timestamp, inputTokens: 100, outputTokens: 20)])
         let lines = try (0..<4).map { index -> String in
             var document: [String: Any] = ["id": "noise-\(index)", "type": ["metadata", "user", "tool"][index % 3],
-                "padding": ""]
+                                           "padding": ""]
             switch kind {
             case "zero": document["usage"] = ["input_tokens": 0, "output_tokens": 0]
             case "invalid": document["usage"] = ["input_tokens": -10, "output_tokens": "invalid", "prompt_tokens": NSNull()]
@@ -615,7 +615,7 @@ struct AIUsageLogDetectorTests {
             #"{"id":"old","timestamp":"2026-11-10T00:00:00Z","model":"model-a","usage":{"input_tokens":150,"output_tokens":20}}"#,
         ], to: session)
         let detector = AIUsageLogDetector(qwenProjectsDirectory: empty, scanInterval: 0, enabledProviders: [.qwen],
-            additionalLogFiles: [.qwen: [session, noise]])
+                                          additionalLogFiles: [.qwen: [session, noise]])
         let current = try detector.usageSamples()
         #expect(current.count == 1)
         #expect(current.first?.genericContext != nil)
@@ -637,7 +637,7 @@ struct AIUsageLogDetectorTests {
             "{\"id\":\"cached\",\"timestamp\":\"2026-11-08T00:00:00Z\",\"model\":\"cache-model\",\"usage\":{\"input_tokens\":0,\"output_tokens\":0,\"\(cacheKey)\":10}}",
         ], to: file)
         let detector = AIUsageLogDetector(qwenProjectsDirectory: root.appendingPathComponent("empty"),
-            scanInterval: 0, enabledProviders: [.qwen], additionalLogFiles: [.qwen: [file]])
+                                          scanInterval: 0, enabledProviders: [.qwen], additionalLogFiles: [.qwen: [file]])
         let samples = try detector.usageSamples()
         #expect(samples.count == 1)
         let sample = try #require(samples.first)
@@ -1785,7 +1785,7 @@ struct AIUsageLogDetectorTests {
         let root = temporaryDirectory(named: "usage-monitor-model-enrichment")
         defer { try? FileManager.default.removeItem(at: root) }
         let sample = AIUsageSample(sourceID: "enrichment", provider: .codex,
-            timestamp: Date(timeIntervalSince1970: 1_800_000_000), inputTokens: 10, outputTokens: 2)
+                                   timestamp: Date(timeIntervalSince1970: 1_800_000_000), inputTokens: 10, outputTokens: 2)
         let detector = MutableUsageDetector(samples: [sample])
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], usageDetectors: [detector])
         monitor.reload()

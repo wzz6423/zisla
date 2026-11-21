@@ -101,12 +101,13 @@ struct ScreenRecordingMultitrackTimelineView: View {
                         GeometryReader { proxy in
                             if let geometry = ScreenRecordingTimelineStripGeometry(
                                 segments: [.init(start: 0, end: max(10, timeline.duration))],
-                                viewportWidth: max(1, proxy.size.width - 16), zoom: zoom) {
+                                viewportWidth: max(1, proxy.size.width - 16), zoom: zoom
+                            ) {
                                 ScrollView(.horizontal) {
                                     lanes(timeline, geometry: geometry)
                                         .padding(.horizontal, 8)
                                         .background(ScreenRecordingTimelineMagnification(zoom: $zoom,
-                                            isEnabled: isEnabled && model.canEdit, onBegan: { drag?.isCancelled = true }))
+                                                                                         isEnabled: isEnabled && model.canEdit, onBegan: { drag?.isCancelled = true }))
                                 }
                             }
                         }
@@ -134,9 +135,9 @@ struct ScreenRecordingMultitrackTimelineView: View {
                 isTimelineFocused = true
                 model.addTimelineTrack()
             } label: { Image(systemName: "plus.square.on.square") }
-            .help(AppLocalization.text("添加轨道"))
-            .accessibilityLabel(AppLocalization.text("添加轨道"))
-            .accessibilityIdentifier("screenRecording.multitrackAddTrack")
+                .help(AppLocalization.text("添加轨道"))
+                .accessibilityLabel(AppLocalization.text("添加轨道"))
+                .accessibilityIdentifier("screenRecording.multitrackAddTrack")
             Button { if let id = model.selectedTimelineClipID { split(id) } } label: { Image(systemName: "scissors") }
                 .help(AppLocalization.text("在播放头处分割"))
                 .accessibilityLabel(AppLocalization.text("在播放头处分割"))
@@ -182,8 +183,8 @@ struct ScreenRecordingMultitrackTimelineView: View {
                 Button(AppLocalization.text("移到下一层")) { model.moveTimelineTrack(track.id, by: -1) }
                     .disabled(timeline.tracks.first?.id == track.id)
             } label: { Image(systemName: "ellipsis") }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 16)
-            .accessibilityLabel(AppLocalization.text("添加轨道"))
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 16)
+                .accessibilityLabel(AppLocalization.text("添加轨道"))
         }
         .buttonStyle(.plain).font(.system(size: 10)).padding(.trailing, 8)
         .background(model.selectedTimelineTrackID == track.id ? Color.accentColor.opacity(0.1) : .clear)
@@ -233,7 +234,7 @@ struct ScreenRecordingMultitrackTimelineView: View {
                 .offset(x: model.playbackTime * geometry.pointsPerSecond).allowsHitTesting(false)
             if let drag, let changed = replacement(for: drag, timeline: timeline),
                let time = drag.alignedSnapPoint(for: changed,
-                   points: drag.snappingPoints(in: timeline, playhead: model.playbackTime)) {
+                                                points: drag.snappingPoints(in: timeline, playhead: model.playbackTime)) {
                 Rectangle().fill(Color.accentColor).frame(width: 1)
                     .offset(x: time * geometry.pointsPerSecond).allowsHitTesting(false)
             }
@@ -348,7 +349,7 @@ struct ScreenRecordingMultitrackTimelineView: View {
         let media = timeline.assets.first { $0.id == drag.original.content.assetID }
         let duration = media?.kind == .image ? nil : media?.duration
         return drag.replacement(sourceDuration: duration, tracks: Array(timeline.tracks.reversed()), rowHeight: rowHeight,
-            snappingPoints: drag.snappingPoints(in: timeline, playhead: model.playbackTime))
+                                snappingPoints: drag.snappingPoints(in: timeline, playhead: model.playbackTime))
     }
 
     private func canSplit(_ clip: RecordingTimelineClip?) -> Bool {

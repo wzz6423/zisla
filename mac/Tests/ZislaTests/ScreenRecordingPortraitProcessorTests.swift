@@ -54,13 +54,13 @@ struct ScreenRecordingPortraitProcessorTests {
         let processor = RecordingPortraitProcessor(detector: { _, _, _ in .init(faces: [face], bodies: [body]) }, kernels: nil)
         #expect(throws: ScreenRecordingExportError.cannotRender) { try processor.apply(image, effects: effects) }
         #expect(try bytes(processor.apply(image, effects: .init())) == bytes(image),
-            "Disabling effects after a kernel failure must preserve the frame")
+                "Disabling effects after a kernel failure must preserve the frame")
         let emptyScene = RecordingPortraitProcessor(detector: { _, _, _ in .init() }, kernels: nil)
         #expect(try bytes(emptyScene.apply(image, effects: effects)) == bytes(image),
-            "A frame without portraits must not require the Metal library")
+                "A frame without portraits must not require the Metal library")
         let recovered = RecordingPortraitProcessor { _, _, _ in .init(faces: [face], bodies: [body]) }
         #expect(try bytes(recovered.apply(image, effects: effects)) != bytes(image),
-            "The packaged kernels must render after an unavailable dependency")
+                "The packaged kernels must render after an unavailable dependency")
     }
 
     @Test(arguments: [Data(), Data("invalid metallib".utf8)])
@@ -72,7 +72,7 @@ struct ScreenRecordingPortraitProcessorTests {
         let image = CIImage(color: CIColor(red: 0.3, green: 0.3, blue: 0.3))
             .cropped(to: CGRect(x: 0, y: 0, width: 192, height: 192))
         let output = try RecordingPortraitProcessor().apply(image,
-            effects: .init(smoothing: 1, brightening: 1, faceSlimming: 1, bodySlimming: 1))
+                                                            effects: .init(smoothing: 1, brightening: 1, faceSlimming: 1, bodySlimming: 1))
         #expect(try bytes(output) == bytes(image), "A scene without a person must remain unchanged through real Vision detection")
     }
 
@@ -146,7 +146,7 @@ struct ScreenRecordingPortraitProcessorTests {
         let region = faceEffect ? face : body
         let extent = CGRect(x: 0, y: 0, width: 192, height: 192)
         let silhouette = CGRect(x: (region.midX - region.width * 0.25) * 192, y: region.minY * 192,
-            width: region.width * 0.5 * 192, height: region.height * 192)
+                                width: region.width * 0.5 * 192, height: region.height * 192)
         let image = CIImage(color: .white).cropped(to: silhouette)
             .composited(over: CIImage(color: .black).cropped(to: extent))
         let processor = RecordingPortraitProcessor { _, _, _ in .init(faces: [face], bodies: [body]) }
@@ -177,11 +177,11 @@ struct ScreenRecordingPortraitProcessorTests {
         let output = try processor.apply(image, effects: .init(brightening: 0.6))
         let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
         for (x, y, feather) in [(96, 96, 1.0), (124, 96, 1.0), (130, 96, 0.5),
-            (136, 96, 0.0), (96, 113, 0.5), (120, 112, 0.0), (40, 40, 0.0)] {
+                                (136, 96, 0.0), (96, 113, 0.5), (120, 112, 0.0), (40, 40, 0.0)] {
             let result = pixel(output, x: x, y: y, context: context)
             let expected = Float(0.25 * (1 + (pow(2, 0.35) - 1) * 0.6 * feather))
             #expect(result.prefix(3).allSatisfy { abs($0 - expected) < 0.000_01 },
-                "Brightening must retain the original elliptical inner area, feather, and protected background at (\(x), \(y))")
+                    "Brightening must retain the original elliptical inner area, feather, and protected background at (\(x), \(y))")
             #expect(result[3] == 1)
         }
     }
@@ -199,7 +199,7 @@ struct ScreenRecordingPortraitProcessorTests {
         }
         let image = pixels.withUnsafeBytes { pointer in
             CIImage(bitmapData: Data(pointer), bytesPerRow: 192 * 4 * MemoryLayout<Float>.size,
-                size: CGSize(width: 192, height: 192), format: .RGBAf, colorSpace: nil)
+                    size: CGSize(width: 192, height: 192), format: .RGBAf, colorSpace: nil)
         }
         let region = CGRect(x: 56.5 / 192, y: 76.5 / 192, width: 80.0 / 192, height: 40.0 / 192)
         let processor = RecordingPortraitProcessor { _, _, _ in .init(faces: [region], bodies: [region]) }
@@ -207,10 +207,10 @@ struct ScreenRecordingPortraitProcessorTests {
         let amount = 0.6 * (faceEffect ? 0.22 : 0.18)
         let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
         for (x, y, displacement) in [(96, 96, 0.0), (116, 96, 11.25 * amount),
-            (116, 106, 5 * amount), (136, 96, 0.0), (20, 20, 0.0)] {
+                                     (116, 106, 5 * amount), (136, 96, 0.0), (20, 20, 0.0)] {
             let result = pixel(output, x: x, y: y, context: context)
             #expect(abs(result[0] - Float((Double(x) + displacement) / 192)) < 0.000_01,
-                "Slimming must retain its original horizontal sampling displacement at (\(x), \(y))")
+                    "Slimming must retain its original horizontal sampling displacement at (\(x), \(y))")
             #expect(abs(result[1] - 0.2) < 0.000_01 && abs(result[2] - 0.3) < 0.000_01 && result[3] == 1)
         }
     }
@@ -225,8 +225,8 @@ struct ScreenRecordingPortraitProcessorTests {
         var cropped = [UInt8](repeating: 0, count: 4 * 4 * 4)
         cropped.withUnsafeMutableBytes { pointer in
             CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!]).render(output,
-                toBitmap: pointer.baseAddress!, rowBytes: 4 * 4, bounds: rectangle, format: .RGBA8,
-                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+                                                                                                    toBitmap: pointer.baseAddress!, rowBytes: 4 * 4, bounds: rectangle, format: .RGBA8,
+                                                                                                    colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
         }
         for y in 0..<4 {
             for x in 0..<4 {
@@ -293,7 +293,7 @@ struct ScreenRecordingPortraitProcessorTests {
     @Test func malformedRegionsAreDiscardedAndWorkIsLimitedToFourPortraits() throws {
         let image = try chart()
         let invalid = [CGRect(x: Double.nan, y: 0, width: 1, height: 1), CGRect.zero,
-            CGRect(x: 2, y: 2, width: 1, height: 1), CGRect(x: 0, y: 0, width: -1, height: 1)]
+                       CGRect(x: 2, y: 2, width: 1, height: 1), CGRect(x: 0, y: 0, width: -1, height: 1)]
         let rejects = RecordingPortraitProcessor { _, _, _ in .init(faces: invalid, bodies: invalid) }
         #expect(try bytes(rejects.apply(image, effects: .init(brightening: 1, bodySlimming: 1))) == bytes(image))
         let crowded = RecordingPortraitProcessor { _, _, _ in .init(faces: Array(repeating: face, count: 40)) }
@@ -370,15 +370,15 @@ struct ScreenRecordingPortraitProcessorTests {
             }
         }
         return CIImage(bitmapData: Data(pixels), bytesPerRow: 192 * 4,
-            size: CGSize(width: 192, height: 192), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                       size: CGSize(width: 192, height: 192), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
     }
 
     private func bytes(_ image: CIImage) throws -> [UInt8] {
         var bytes = [UInt8](repeating: 0, count: 192 * 192 * 4)
         bytes.withUnsafeMutableBytes { pointer in
             CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!]).render(image,
-                toBitmap: pointer.baseAddress!, rowBytes: 192 * 4, bounds: image.extent, format: .RGBA8,
-                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+                                                                                                    toBitmap: pointer.baseAddress!, rowBytes: 192 * 4, bounds: image.extent, format: .RGBA8,
+                                                                                                    colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
         }
         return bytes
     }
@@ -387,7 +387,7 @@ struct ScreenRecordingPortraitProcessorTests {
         var pixel = [Float](repeating: 0, count: 4)
         pixel.withUnsafeMutableBytes { pointer in
             context.render(image, toBitmap: pointer.baseAddress!, rowBytes: 4 * MemoryLayout<Float>.size,
-                bounds: CGRect(x: x, y: y, width: 1, height: 1), format: .RGBAf, colorSpace: nil)
+                           bounds: CGRect(x: x, y: y, width: 1, height: 1), format: .RGBAf, colorSpace: nil)
         }
         return pixel
     }

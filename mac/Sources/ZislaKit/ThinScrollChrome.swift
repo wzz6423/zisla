@@ -77,7 +77,7 @@ final class ThinScrollChromeHost: NSView {
            isThinScroller(scrollView.verticalScroller),
            isThinScroller(scrollView.horizontalScroller),
            !visibleWhenScrollable || (scrollView.scrollerStyle == scrollerStyle
-                && scrollView.autohidesScrollers && scrollView.hasVerticalScroller) {
+               && scrollView.autohidesScrollers && scrollView.hasVerticalScroller) {
             return
         }
         ThinScrollChrome.apply(
@@ -135,9 +135,9 @@ public enum ThinScrollChrome {
     static let width: CGFloat = 3
 
     public nonisolated static let webStyle = """
-        ::-webkit-scrollbar { width: 3px; }
-        ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.65); border-radius: 1.5px; }
-        """
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.65); border-radius: 1.5px; }
+    """
 
     public static func apply(
         to scrollView: NSScrollView,

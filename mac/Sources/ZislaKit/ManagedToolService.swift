@@ -25,7 +25,7 @@ public final class ManagedToolService: ObservableObject {
     private var automaticUpdateTools: [ManagedTool] = []
     private var automaticUpdatePassInProgress = false
     #if DEBUG
-    private var debugHomebrewErrors: [String: String] = [:]
+        private var debugHomebrewErrors: [String: String] = [:]
     #endif
 
     private static let dependencyTools: Set<ManagedTool> = [.ytDLP, .ffmpeg, .libreOffice, .libvips, .libavif]
@@ -63,26 +63,26 @@ public final class ManagedToolService: ObservableObject {
         for tool in ManagedTool.allCases { states[tool] = ManagedToolState() }
         restoreCachedStates()
         #if DEBUG
-        if environment["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS"] == "1" {
-            for tool in [ManagedTool.pipx, .uv] {
-                let diagnostic = """
-                Warning: The following taps are not trusted:
-                  carvel-dev/carvel
-                Homebrew is currently ignoring formulae, casks and commands from these taps.
-                ==> Downloading bottle manifests
-                \u{001B}[31mError: Failed to download resource "\(tool.displayName)"\u{001B}[0m
-                Download failed: https://example.com/\(tool.executableName)
-                curl: (35) TLS connect error
-                ==> Fetching downloads for: \(tool.executableName)
-                Error: Failed to download resource "\(tool.displayName)"
-                curl: (35) TLS connect error
-                """
-                let output = AIAgentProcessOutput(status: 1, standardOutput: Data(), standardError: diagnostic, didTimeout: false)
-                let summary = Self.homebrewFailureSummary(output, executable: URL(fileURLWithPath: "/usr/bin/brew"))
-                debugHomebrewErrors[tool.executableName] = summary
-                states[tool]?.errorMessage = ManagedToolError.homebrewFailed(summary).message
+            if environment["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS"] == "1" {
+                for tool in [ManagedTool.pipx, .uv] {
+                    let diagnostic = """
+                    Warning: The following taps are not trusted:
+                      carvel-dev/carvel
+                    Homebrew is currently ignoring formulae, casks and commands from these taps.
+                    ==> Downloading bottle manifests
+                    \u{001B}[31mError: Failed to download resource "\(tool.displayName)"\u{001B}[0m
+                    Download failed: https://example.com/\(tool.executableName)
+                    curl: (35) TLS connect error
+                    ==> Fetching downloads for: \(tool.executableName)
+                    Error: Failed to download resource "\(tool.displayName)"
+                    curl: (35) TLS connect error
+                    """
+                    let output = AIAgentProcessOutput(status: 1, standardOutput: Data(), standardError: diagnostic, didTimeout: false)
+                    let summary = Self.homebrewFailureSummary(output, executable: URL(fileURLWithPath: "/usr/bin/brew"))
+                    debugHomebrewErrors[tool.executableName] = summary
+                    states[tool]?.errorMessage = ManagedToolError.homebrewFailed(summary).message
+                }
             }
-        }
         #endif
     }
 
@@ -579,9 +579,9 @@ public final class ManagedToolService: ObservableObject {
 
     private func runHomebrew(_ arguments: [String]) async throws -> String {
         #if DEBUG
-        if let name = arguments.last, let error = debugHomebrewErrors[name] {
-            throw ManagedToolError.homebrewFailed(error)
-        }
+            if let name = arguments.last, let error = debugHomebrewErrors[name] {
+                throw ManagedToolError.homebrewFailed(error)
+            }
         #endif
         if let homebrewRunner { return try await homebrewRunner(arguments, processEnvironment) }
         guard let homebrewExecutable else { throw ManagedToolError.homebrewUnavailable }
@@ -903,8 +903,8 @@ public final class ManagedToolService: ObservableObject {
               trustedExecutable(executable) != nil,
               let version = await Self.readVersion(of: tool, at: executable),
               case .success = await Self.runProcess(
-                URL(fileURLWithPath: "/usr/bin/codesign"),
-                arguments: ["--verify", "--deep", "--strict", application.path], timeout: 30
+                  URL(fileURLWithPath: "/usr/bin/codesign"),
+                  arguments: ["--verify", "--deep", "--strict", application.path], timeout: 30
               )
         else {
             throw ManagedToolError.notExecutable(tool.displayName)

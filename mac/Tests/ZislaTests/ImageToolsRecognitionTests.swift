@@ -25,18 +25,18 @@ struct ImageToolsRecognitionTests {
             ScreenshotRecognizedFragment(text: "first", boundingBox: CGRect(x: 0.1, y: 0.7, width: 0.5, height: 0.1)),
         ]
         let pendingTask = model.start(urls: urls, service: service,
-            loadImage: { url in
-                Self.checkBackgroundThread()
-                if url.lastPathComponent == "corrupt.png" { throw SyntheticFailure() }
-                return image
-            }, recognizeImage: { _, operation in
-                Self.checkBackgroundThread()
-                let call = await gate.nextCall()
-                if call == 1 { return try await gate.recognize(operation) }
-                if call == 2 { return [] }
-                if call == 3 { throw ImageProcessingError.engineUnavailable }
-                return fragments
-            })
+                                      loadImage: { url in
+                                          Self.checkBackgroundThread()
+                                          if url.lastPathComponent == "corrupt.png" { throw SyntheticFailure() }
+                                          return image
+                                      }, recognizeImage: { _, operation in
+                                          Self.checkBackgroundThread()
+                                          let call = await gate.nextCall()
+                                          if call == 1 { return try await gate.recognize(operation) }
+                                          if call == 2 { return [] }
+                                          if call == 3 { throw ImageProcessingError.engineUnavailable }
+                                          return fragments
+                                      })
         let task = try #require(pendingTask)
         await gate.waitUntilStarted()
         #expect(model.isProcessing && model.completed == 0 && model.total == 5)
@@ -179,7 +179,7 @@ struct ImageToolsRecognitionTests {
         let old = try #require(pendingOld)
         await gate.waitUntilStarted()
         let duplicate = model.start(urls: [fixture.root.appendingPathComponent("duplicate.png")], service: service,
-            loadImage: { _ in Issue.record("Repeated start must not load another image"); return image })
+                                    loadImage: { _ in Issue.record("Repeated start must not load another image"); return image })
         #expect(duplicate == nil)
         #expect(model.total == 1 && model.currentInputURL == fixture.image)
         model.cancel()
@@ -275,7 +275,7 @@ struct ImageToolsRecognitionTests {
         let tableTask = try #require(model.exportTable(result, to: workbook))
         await tableTask.value
         let output = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/unzip"),
-            arguments: ["-p", workbook.path, "xl/worksheets/sheet1.xml"], workingDirectoryURL: fixture.root)
+                                                        arguments: ["-p", workbook.path, "xl/worksheets/sheet1.xml"], workingDirectoryURL: fixture.root)
         #expect(output.status == 0)
         #expect(String(data: output.standardOutput, encoding: .utf8) == ScreenshotXLSXExporter.worksheetXML(for: result.table))
         #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
@@ -309,7 +309,7 @@ struct ImageToolsRecognitionTests {
             for document in documents {
                 let attributes = try FileManager.default.attributesOfItem(atPath: document.destination.path)
                 #expect((attributes[.posixPermissions] as? NSNumber)?.uint16Value == 0o666 & ~mask,
-                    "Final exports must honor the caller's sharing policy for both formats")
+                        "Final exports must honor the caller's sharing policy for both formats")
                 #expect(!(try Data(contentsOf: document.destination)).isEmpty)
             }
             #expect(try String(contentsOf: documents[0].destination, encoding: .utf8) == result.text)
@@ -326,16 +326,17 @@ struct ImageToolsRecognitionTests {
             arguments = ["--test-bundle-path", CommandLine.arguments[bundleIndex + 1]]
         }
         arguments += ["--testing-library", "swift-testing", "--filter",
-            "ImageToolsRecognitionTests/exportPermissionsFollowTheCallingProcessUmaskAndKeepStagingPrivate"]
+                      "ImageToolsRecognitionTests/exportPermissionsFollowTheCallingProcessUmaskAndKeepStagingPrivate"]
         for mask in ["022", "027", "077"] {
             var environment = ProcessInfo.processInfo.environment
             environment[maskKey] = mask
             let child = try await AIAgentProcessRunner.run(
                 executableURL: URL(fileURLWithPath: CommandLine.arguments[0]), arguments: arguments,
                 environment: environment, workingDirectoryURL: fixture.root, timeout: 30,
-                maximumOutputBytes: 128 * 1_024, maximumErrorBytes: 128 * 1_024)
+                maximumOutputBytes: 128 * 1_024, maximumErrorBytes: 128 * 1_024
+            )
             #expect(child.status == 0 && !child.didTimeout,
-                "Isolated umask \(mask) regression: \(String(decoding: child.standardOutput, as: UTF8.self)) \(child.standardError)")
+                    "Isolated umask \(mask) regression: \(String(decoding: child.standardOutput, as: UTF8.self)) \(child.standardError)")
             #expect(String(decoding: child.standardOutput, as: UTF8.self).contains("OCR export permissions verified for umask \(mask)"))
         }
     }
@@ -474,16 +475,16 @@ struct ImageToolsRecognitionTests {
         var injected = false
         #expect(throws: CancellationError.self) {
             try ImageToolsRecognitionExporter.write([.init(result: result, format: .text, destination: destination)], stagingParent: fixture.root,
-                checkCancellation: {
-                    if !injected && FileManager.default.fileExists(atPath: destination.path) {
-                        injected = true
-                        let replacement = fixture.root.appendingPathComponent("replacement")
-                        try Data("replacement by another process".utf8).write(to: replacement)
-                        try FileManager.default.removeItem(at: destination)
-                        try FileManager.default.moveItem(at: replacement, to: destination)
-                        throw CancellationError()
-                    }
-                })
+                                                    checkCancellation: {
+                                                        if !injected && FileManager.default.fileExists(atPath: destination.path) {
+                                                            injected = true
+                                                            let replacement = fixture.root.appendingPathComponent("replacement")
+                                                            try Data("replacement by another process".utf8).write(to: replacement)
+                                                            try FileManager.default.removeItem(at: destination)
+                                                            try FileManager.default.moveItem(at: replacement, to: destination)
+                                                            throw CancellationError()
+                                                        }
+                                                    })
         }
         #expect(injected)
         #expect(try String(contentsOf: destination, encoding: .utf8) == "replacement by another process")
@@ -503,14 +504,14 @@ struct ImageToolsRecognitionTests {
         var replaced = false
         let result = Self.result(inputURL: fixture.image)
         _ = try ImageToolsRecognitionExporter.write([.init(result: result, format: .text, destination: destination)], stagingParent: fixture.root,
-            checkCancellation: {
-                let names = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
-                if !replaced && names.contains(where: { $0.hasPrefix("zisla-image-ocr-export-") }) {
-                    replaced = true
-                    try FileManager.default.moveItem(at: parent, to: originalParent)
-                    try FileManager.default.createSymbolicLink(at: parent, withDestinationURL: unwanted)
-                }
-            })
+                                                    checkCancellation: {
+                                                        let names = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
+                                                        if !replaced && names.contains(where: { $0.hasPrefix("zisla-image-ocr-export-") }) {
+                                                            replaced = true
+                                                            try FileManager.default.moveItem(at: parent, to: originalParent)
+                                                            try FileManager.default.createSymbolicLink(at: parent, withDestinationURL: unwanted)
+                                                        }
+                                                    })
         #expect(replaced)
         #expect(try FileManager.default.contentsOfDirectory(atPath: unwanted.path).isEmpty)
         #expect(try String(contentsOf: originalParent.appendingPathComponent("result.txt"), encoding: .utf8) == result.text)
@@ -524,13 +525,13 @@ struct ImageToolsRecognitionTests {
         var reachedPackage = false
         #expect(throws: CancellationError.self) {
             try ImageToolsRecognitionExporter.write([.init(result: Self.result(inputURL: fixture.image), format: .table, destination: destination)],
-                stagingParent: fixture.root, checkCancellation: {
-                    let names = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
-                    if names.contains(where: { $0.hasPrefix("zisla-image-ocr-export-") }) {
-                        reachedPackage = true
-                        throw CancellationError()
-                    }
-                })
+                                                    stagingParent: fixture.root, checkCancellation: {
+                                                        let names = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
+                                                        if names.contains(where: { $0.hasPrefix("zisla-image-ocr-export-") }) {
+                                                            reachedPackage = true
+                                                            throw CancellationError()
+                                                        }
+                                                    })
         }
         #expect(reachedPackage)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == ["source.png"])
@@ -815,7 +816,7 @@ struct ImageToolsRecognitionTests {
         #expect(fcntl(unrelatedDescriptor, F_GETFD) >= 0, "Validation must leave unrelated handles open")
         #expect(!Self.descriptor(unrelatedDescriptor, refersTo: directoryMetadata), "A reused handle for an unrelated file must not count as a directory leak")
         #expect(!Self.descriptor(openedDirectory, refersTo: directoryMetadata),
-            "Successful, cancelled and failed validation must release the destination directory, even if another suite reuses its descriptor number")
+                "Successful, cancelled and failed validation must release the destination directory, even if another suite reuses its descriptor number")
         #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted() == (outcome == "conflict" ? ["result.txt", "source.png"] : ["source.png"]))
     }
@@ -827,7 +828,7 @@ struct ImageToolsRecognitionTests {
         let model = ImageToolsRecognitionModel()
         let image = try makeImage()
         let pendingTask = model.start(urls: [fixture.image, fixture.root.appendingPathComponent("second.png")],
-            service: service, loadImage: { _ in image }, recognizeImage: { _, _ in throw CancellationError() })
+                                      service: service, loadImage: { _ in image }, recognizeImage: { _, _ in throw CancellationError() })
         let task = try #require(pendingTask)
         await task.value
         #expect(model.results.isEmpty && model.failures.isEmpty && model.completed == 0)
@@ -882,7 +883,7 @@ struct ImageToolsRecognitionTests {
         let image = try makeImage()
         let gate = PublicationGate()
         let pending = model.start(urls: [fixture.image], service: service, loadImage: { _ in image }, beforePublish: { _ in await gate.wait() },
-            recognizeImage: { _, _ in Self.fragments("old batch") })
+                                  recognizeImage: { _, _ in Self.fragments("old batch") })
         let task = try #require(pending)
         await gate.waitUntilStarted()
         model.cancel()
@@ -925,8 +926,8 @@ struct ImageToolsRecognitionTests {
     private func makeImage(text: String = "Synthetic") throws -> CGImage {
         let size = CGSize(width: 720, height: 160)
         let context = try #require(CGContext(data: nil, width: Int(size.width), height: Int(size.height),
-            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)

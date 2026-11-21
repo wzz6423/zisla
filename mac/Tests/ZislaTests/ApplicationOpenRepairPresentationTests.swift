@@ -13,7 +13,7 @@ struct ApplicationOpenRepairPresentationTests {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 300, height: 100),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         defer { panel.contentView = nil; panel.close() }
         for assistantEnabled in [false, true] {
@@ -67,7 +67,7 @@ struct ApplicationOpenRepairPresentationTests {
         let content = ClipboardHistoryContent.file(ClipboardFileReference(url: url, displayName: "Example.app", bookmark: Data()))
         let detection = ClipboardAssistantDetection(kind: .appCannotOpen, title: "Example.app", actions: [.repairAndOpenApp(url)])
         let result = AppModel.augmentedClipboardAssistantDetection(detection, content: content,
-            sourceApplication: NSRunningApplication.current, orders: FeatureSettings.default.clipboardAssistantActionOrders)
+                                                                   sourceApplication: NSRunningApplication.current, orders: FeatureSettings.default.clipboardAssistantActionOrders)
         #expect(result.actions == [.repairAndOpenApp(url)])
         #expect(result == detection)
     }
@@ -91,9 +91,10 @@ struct ApplicationOpenRepairPresentationTests {
         #expect(captured.count == 1)
         let content = try #require(captured.first)
         let detection = try #require(await ClipboardAssistantDetector.detectInBackground(
-            content: content, enabledKinds: Set(ClipboardAssistantKind.allCases)))
+            content: content, enabledKinds: Set(ClipboardAssistantKind.allCases)
+        ))
         let result = AppModel.augmentedClipboardAssistantDetection(detection, content: content,
-            sourceApplication: NSRunningApplication.current, orders: FeatureSettings.default.clipboardAssistantActionOrders)
+                                                                   sourceApplication: NSRunningApplication.current, orders: FeatureSettings.default.clipboardAssistantActionOrders)
         #expect(result.actions == [.repairAndOpenApp(fixture.app.standardizedFileURL)])
         #expect(result.kind == .appCannotOpen)
         #expect(getxattr(fixture.app.path, "com.apple.quarantine", nil, 0, 0, 0) > 0)
@@ -109,7 +110,7 @@ struct ApplicationOpenRepairPresentationTests {
         let controller = makeController()
         let availability = PresentationAvailability()
         let presenter = ApplicationOpenRepairPresenter(controller: controller, settings: { .default },
-            canPresent: { availability.canPresent })
+                                                       canPresent: { availability.canPresent })
         #expect(FileShelfPasteboard.writeFileURLs([fixture.app], to: pasteboard))
         var added = 0
         store.receive(TransferPasteboard.readShelfDropItems(from: pasteboard)) { count in
@@ -321,7 +322,7 @@ struct ApplicationOpenRepairPresentationTests {
         let fixture = try Fixture()
         defer { fixture.remove() }
         let unrelated: [[URL]] = [[], [fixture.directory.appendingPathComponent("readme.txt")],
-            [URL(string: "https://example.com/Other.app")!]]
+                                  [URL(string: "https://example.com/Other.app")!]]
         for fromSystemAlert in [false, true] {
             for urls in unrelated {
                 let controller = makeController()
@@ -329,7 +330,7 @@ struct ApplicationOpenRepairPresentationTests {
                 var settings = FeatureSettings.default
                 settings.applicationOpenFailureMonitoringEnabled = true
                 let presenter = ApplicationOpenRepairPresenter(controller: controller, settings: { settings },
-                    canPresent: { availability.canPresent })
+                                                               canPresent: { availability.canPresent })
                 presenter.receive([fixture.app], fromSystemAlert: fromSystemAlert)
                 await presenter.task?.value
                 presenter.receive(urls)
@@ -338,7 +339,7 @@ struct ApplicationOpenRepairPresentationTests {
                 availability.canPresent = true
                 presenter.flush()
                 #expect(controller.presentation.detection?.actions == [.repairAndOpenApp(fixture.app.standardizedFileURL)],
-                    "Unrelated drop \(urls) must preserve the queued repair prompt")
+                        "Unrelated drop \(urls) must preserve the queued repair prompt")
             }
         }
     }
@@ -373,8 +374,8 @@ struct ApplicationOpenRepairPresentationTests {
     func repairHelpAndErrorsTranslateInEveryLanguage() throws {
         let groups = try #require(SettingsView.clipboardAssistantExampleGroups[.appCannotOpen])
         let errors: [ApplicationOpenRepairError] = [.invalidApplication, .protectedApplication, .readOnly,
-            .unsupportedBundle, .inspectionLimit, .readFailed, .applicationChanged, .signatureInvalid,
-            .assessmentRejected, .assessmentUnavailable, .quarantineRemovalFailed, .openFailed]
+                                                    .unsupportedBundle, .inspectionLimit, .readFailed, .applicationChanged, .signatureInvalid,
+                                                    .assessmentRejected, .assessmentUnavailable, .quarantineRemovalFailed, .openFailed]
         let keys = ["应用无法打开", "解决并打开", "系统打不开应用时提醒", "需要辅助功能权限；通过系统窗口事件提醒，不定时扫描"]
             + groups.flatMap { [$0.title] + $0.instructions }
             + errors.map(\.localizationKey)
@@ -394,7 +395,7 @@ struct ApplicationOpenRepairPresentationTests {
             var settings = FeatureSettings.default
             settings.clipboardAssistantEnabled = true
             #expect(SettingsSearchIndex.results(for: AppLocalization.string("应用无法打开", language: language),
-                settings: settings, locale: language.locale).contains { $0.section == .clipboardAssistant })
+                                                settings: settings, locale: language.locale).contains { $0.section == .clipboardAssistant })
         }
         #expect(AppLocalization.string("解决并打开", language: .english) == "Fix and Open")
         #expect(AppLocalization.string("应用无法打开", language: .arabic) == "تعذّر فتح التطبيق")
@@ -415,7 +416,7 @@ struct ApplicationOpenRepairPresentationTests {
         required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) { nil }
         override var fileNames: [String] { [app.lastPathComponent] }
         override func receivePromisedFiles(atDestination destinationDir: URL, options: [AnyHashable: Any] = [:],
-                                          operationQueue: OperationQueue, reader: @escaping (URL, Error?) -> Void) {
+                                           operationQueue: OperationQueue, reader: @escaping (URL, Error?) -> Void) {
             destination = destinationDir
             self.reader = reader
         }

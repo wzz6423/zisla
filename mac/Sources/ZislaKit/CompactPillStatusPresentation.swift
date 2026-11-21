@@ -29,11 +29,11 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     }
     private var accountBalanceHorizontalFont: NSFont {
         NSFont.monospacedDigitSystemFont(ofSize: accountBalanceLines.count > 1 ? 9 : 11,
-            weight: accountBalanceLines.count > 1 ? .medium : .semibold)
+                                         weight: accountBalanceLines.count > 1 ? .medium : .semibold)
     }
 
     public init(priority: CompactStatusPriority?, notice: IslandNotice, text: String,
-         aiCount: Int = 0, aiNotices: [IslandNotice] = [], showsWaveform: Bool = false, showsMediaIdentity: Bool = false) {
+                aiCount: Int = 0, aiNotices: [IslandNotice] = [], showsWaveform: Bool = false, showsMediaIdentity: Bool = false) {
         self.priority = priority
         self.notice = notice
         self.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -46,14 +46,14 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     /// Measures the shared ring and longest summary within existing text-length bounds.
     /// Vertical edges divide the available thickness between quota lines instead of assuming horizontal text.
     public func length(thickness: CGFloat, edge: IslandEdge, text: String? = nil,
-        item: NowPlayingSnapshot? = nil, leadingInset: CGFloat = trailingInset) -> CGFloat {
+                       item: NowPlayingSnapshot? = nil, leadingInset: CGFloat = trailingInset) -> CGFloat {
         let text = (text ?? self.text).trimmingCharacters(in: .whitespacesAndNewlines)
         if isAccountBalance {
             let values = accountBalanceLines
             let lineWidth = edge.isVertical
                 ? max(1, (thickness - 8 - CGFloat(max(0, values.count - 1)) * 2) / CGFloat(max(1, values.count))) : thickness
             let valueLength = values.map { Self.textLength($0, availableWidth: lineWidth, edge: edge,
-                font: accountBalanceHorizontalFont) }.max() ?? 0
+                                                           font: accountBalanceHorizontalFont) }.max() ?? 0
             return leadingInset + Self.trailingInset + max(0, thickness - 8) + 6 + min(Self.maximumTextLength, valueLength)
         }
         let iconSize = max(0, thickness - 8)
@@ -62,7 +62,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
             + (priority == .focusCountdown ? Self.pomodoroControlsLength + 6 : 0)
         let identityLength = mediaIdentityLength(thickness: thickness, edge: edge, text: text, item: item)
         let lyricLength = Self.textLength(text, availableWidth: thickness, edge: edge,
-            font: NSFont.systemFont(ofSize: 11, weight: .medium))
+                                          font: NSFont.systemFont(ofSize: 11, weight: .medium))
         let textLength = identityLength + lyricLength + (identityLength > 0 && !text.isEmpty ? 6 : 0)
         guard textLength > 0 else { return visualLength }
         return visualLength + 6 + min(Self.maximumTextLength, textLength)
@@ -72,7 +72,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     public func accountBalanceSideWidth(thickness: CGFloat) -> CGFloat {
         let valueWidth = accountBalanceLines.map {
             Self.textLength($0, availableWidth: thickness, edge: .top,
-                font: accountBalanceHorizontalFont)
+                            font: accountBalanceHorizontalFont)
         }.max() ?? 0
         return max(max(0, thickness - 8), min(Self.maximumTextLength, valueWidth)) + Self.accountBalanceSideInset * 2
     }
@@ -85,7 +85,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
         let travel = lines.map { line -> CGFloat in
             if edge.isVertical {
                 let full = CGFloat(Self.verticalTextRows(line, availableWidth: verticalWidth,
-                    availableHeight: CGFloat(line.count) * 14).count) * 14 - 1
+                                                         availableHeight: CGFloat(line.count) * 14).count) * 14 - 1
                 return max(0, full)
             }
             return ceil((line as NSString).size(withAttributes: [.font: font]).width)
@@ -94,23 +94,23 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     }
 
     public func mediaIdentityLength(thickness: CGFloat, edge: IslandEdge, text: String,
-        item: NowPlayingSnapshot?) -> CGFloat {
+                                    item: NowPlayingSnapshot?) -> CGFloat {
         guard showsMediaIdentity, let item, !item.isVideo else { return 0 }
         let title = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
         let width = edge.isVertical && !artist.isEmpty ? thickness / 2 : thickness
         let titleLength = Self.textLength(title, availableWidth: width, edge: edge,
-            font: NSFont.systemFont(ofSize: 10.5, weight: .regular))
+                                          font: NSFont.systemFont(ofSize: 10.5, weight: .regular))
         let artistLength = Self.textLength(artist, availableWidth: width, edge: edge,
-            font: NSFont.systemFont(ofSize: 8.5, weight: .regular))
+                                           font: NSFont.systemFont(ofSize: 8.5, weight: .regular))
         return min(Self.maximumTextLength / (text.isEmpty ? 1 : 2), max(titleLength, artistLength))
     }
 
     private static func textLength(_ text: String, availableWidth: CGFloat, edge: IslandEdge,
-        font: NSFont) -> CGFloat {
+                                   font: NSFont) -> CGFloat {
         if edge.isVertical {
             return CGFloat(verticalTextRows(text, availableWidth: availableWidth,
-                availableHeight: maximumTextLength).count) * 14
+                                            availableHeight: maximumTextLength).count) * 14
         }
         return ceil((text as NSString).size(withAttributes: [.font: font]).width)
     }
@@ -124,7 +124,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
         var run = ""
         func append(_ value: String) {
             rows.append(VerticalTextRow(text: value,
-                rotatesClockwise: value.count == 1 && brackets.contains(value)))
+                                        rotatesClockwise: value.count == 1 && brackets.contains(value)))
         }
         func width(_ value: String) -> CGFloat {
             ceil((value as NSString).size(withAttributes: [.font: font]).width)

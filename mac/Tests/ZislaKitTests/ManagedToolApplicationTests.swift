@@ -10,139 +10,139 @@ struct ManagedToolApplicationTests {
     @Test
     func installsAndUpdatesSignedQuietMDWithoutLaunchingIt() async throws {
         #if arch(arm64)
-        let fixture = try Fixture()
-        let service = fixture.service()
-        QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
-        await service.install(.quietMD)
-        #expect(service.states[.quietMD]?.installedVersion == "0.1.7")
-        #expect(service.states[.quietMD]?.location == .external(fixture.executable.path))
-        #expect(service.states[.quietMD]?.phase == .idle)
-        #expect(service.states[.quietMD]?.errorMessage == nil)
-        #expect(FileManager.default.isExecutableFile(atPath: fixture.executable.path))
+            let fixture = try Fixture()
+            let service = fixture.service()
+            QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
+            await service.install(.quietMD)
+            #expect(service.states[.quietMD]?.installedVersion == "0.1.7")
+            #expect(service.states[.quietMD]?.location == .external(fixture.executable.path))
+            #expect(service.states[.quietMD]?.phase == .idle)
+            #expect(service.states[.quietMD]?.errorMessage == nil)
+            #expect(FileManager.default.isExecutableFile(atPath: fixture.executable.path))
 
-        fixture.releaseVersion = "0.1.8"
-        QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8")
-        await service.install(.quietMD)
-        #expect(service.states[.quietMD]?.installedVersion == "0.1.8")
-        #expect(service.states[.quietMD]?.errorMessage == nil)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.applications.path) == ["quiet.md.app"])
-        #expect(!FileManager.default.fileExists(atPath: fixture.executable.path + ".started"))
+            fixture.releaseVersion = "0.1.8"
+            QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8")
+            await service.install(.quietMD)
+            #expect(service.states[.quietMD]?.installedVersion == "0.1.8")
+            #expect(service.states[.quietMD]?.errorMessage == nil)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.applications.path) == ["quiet.md.app"])
+            #expect(!FileManager.default.fileExists(atPath: fixture.executable.path + ".started"))
 
-        let restored = fixture.service()
-        await restored.refreshInstalledVersions()
-        #expect(restored.states[.quietMD]?.installedVersion == "0.1.8")
-        let resolver = ManagedToolService(
-            toolsDirectory: fixture.root.appendingPathComponent("Tools"), applicationsDirectory: fixture.applications,
-            bundleURL: fixture.root, defaults: fixture.defaults
-        )
-        let resolved = try #require(resolver.resolvedExecutable(for: .quietMD))
-        #expect(resolved.url == fixture.executable.resolvingSymlinksInPath())
-        #expect(resolved.location == .external(fixture.executable.path))
+            let restored = fixture.service()
+            await restored.refreshInstalledVersions()
+            #expect(restored.states[.quietMD]?.installedVersion == "0.1.8")
+            let resolver = ManagedToolService(
+                toolsDirectory: fixture.root.appendingPathComponent("Tools"), applicationsDirectory: fixture.applications,
+                bundleURL: fixture.root, defaults: fixture.defaults
+            )
+            let resolved = try #require(resolver.resolvedExecutable(for: .quietMD))
+            #expect(resolved.url == fixture.executable.resolvingSymlinksInPath())
+            #expect(resolved.location == .external(fixture.executable.path))
         #endif
     }
 
     @Test(arguments: ["unsigned", "wrongIdentifier", "missingVersion", "worldWritable", "corrupt", "symlink", "traversal"])
     func rejectedUpdatesPreserveTheExistingApplicationAndRemoveStagingFiles(failure: String) async throws {
         #if arch(arm64)
-        let fixture = try Fixture()
-        let service = fixture.service()
-        QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
-        await service.install(.quietMD)
-        let previous = try Data(contentsOf: fixture.application.appendingPathComponent("Contents/Info.plist"))
-        fixture.releaseVersion = "0.1.8"
+            let fixture = try Fixture()
+            let service = fixture.service()
+            QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
+            await service.install(.quietMD)
+            let previous = try Data(contentsOf: fixture.application.appendingPathComponent("Contents/Info.plist"))
+            fixture.releaseVersion = "0.1.8"
 
-        switch failure {
-        case "unsigned": QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8", signed: false)
-        case "wrongIdentifier": QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8", identifier: "example.other")
-        case "missingVersion": QuietMDDownloadProtocol.payload = try await fixture.archive(version: nil)
-        case "worldWritable": QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8", worldWritable: true)
-        case "corrupt": QuietMDDownloadProtocol.payload = Data("invalid zip".utf8)
-        case "symlink": QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8", symlink: true)
-        default:
-            let script = "import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1], 'w') as z: z.writestr('quiet.md.app/../escaped', 'unsafe')"
-            let archive = fixture.root.appendingPathComponent("traversal.zip")
-            guard case .success = await ManagedToolService.runProcess(
-                URL(fileURLWithPath: "/usr/bin/python3"), arguments: ["-c", script, archive.path], timeout: 30
-            ) else { throw ManagedToolError.notExecutable("fixture archiving failed") }
-            QuietMDDownloadProtocol.payload = try Data(contentsOf: archive)
-        }
-        await service.install(.quietMD)
+            switch failure {
+            case "unsigned": QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8", signed: false)
+            case "wrongIdentifier": QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8", identifier: "example.other")
+            case "missingVersion": QuietMDDownloadProtocol.payload = try await fixture.archive(version: nil)
+            case "worldWritable": QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8", worldWritable: true)
+            case "corrupt": QuietMDDownloadProtocol.payload = Data("invalid zip".utf8)
+            case "symlink": QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.8", symlink: true)
+            default:
+                let script = "import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1], 'w') as z: z.writestr('quiet.md.app/../escaped', 'unsafe')"
+                let archive = fixture.root.appendingPathComponent("traversal.zip")
+                guard case .success = await ManagedToolService.runProcess(
+                    URL(fileURLWithPath: "/usr/bin/python3"), arguments: ["-c", script, archive.path], timeout: 30
+                ) else { throw ManagedToolError.notExecutable("fixture archiving failed") }
+                QuietMDDownloadProtocol.payload = try Data(contentsOf: archive)
+            }
+            await service.install(.quietMD)
 
-        #expect(service.states[.quietMD]?.installedVersion == "0.1.7")
-        #expect(service.states[.quietMD]?.phase == .idle)
-        #expect(service.states[.quietMD]?.errorMessage != nil)
-        #expect(try Data(contentsOf: fixture.application.appendingPathComponent("Contents/Info.plist")) == previous)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.applications.path) == ["quiet.md.app"])
+            #expect(service.states[.quietMD]?.installedVersion == "0.1.7")
+            #expect(service.states[.quietMD]?.phase == .idle)
+            #expect(service.states[.quietMD]?.errorMessage != nil)
+            #expect(try Data(contentsOf: fixture.application.appendingPathComponent("Contents/Info.plist")) == previous)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.applications.path) == ["quiet.md.app"])
         #endif
     }
 
     @Test
     func failedReleaseLookupLeavesQuietMDUninstalledAndCanRecover() async throws {
         #if arch(arm64)
-        let fixture = try Fixture()
-        var unavailable = true
-        let service = fixture.service { _ in
-            if unavailable { throw ManagedToolError.releaseUnavailable("HTTP 503") }
-            return fixture.release
-        }
-        await service.install(.quietMD)
-        #expect(service.states[.quietMD]?.phase == .idle)
-        #expect(service.states[.quietMD]?.location == nil)
-        #expect(service.states[.quietMD]?.errorMessage != nil)
-        #expect(!FileManager.default.fileExists(atPath: fixture.applications.path))
+            let fixture = try Fixture()
+            var unavailable = true
+            let service = fixture.service { _ in
+                if unavailable { throw ManagedToolError.releaseUnavailable("HTTP 503") }
+                return fixture.release
+            }
+            await service.install(.quietMD)
+            #expect(service.states[.quietMD]?.phase == .idle)
+            #expect(service.states[.quietMD]?.location == nil)
+            #expect(service.states[.quietMD]?.errorMessage != nil)
+            #expect(!FileManager.default.fileExists(atPath: fixture.applications.path))
 
-        unavailable = false
-        QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
-        await service.install(.quietMD)
-        #expect(service.states[.quietMD]?.installedVersion == "0.1.7")
-        #expect(service.states[.quietMD]?.errorMessage == nil)
+            unavailable = false
+            QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
+            await service.install(.quietMD)
+            #expect(service.states[.quietMD]?.installedVersion == "0.1.7")
+            #expect(service.states[.quietMD]?.errorMessage == nil)
         #endif
     }
 
     @Test
     func automaticUpdatesIgnoreMissingQuietMDAndRefreshAnInstalledCopy() async throws {
         #if arch(arm64)
-        let fixture = try Fixture()
-        var requests = 0
-        let service = fixture.service { repository in
-            #expect(repository == "s1dashu/quiet-md")
-            requests += 1
-            return fixture.release
-        }
-        await service.updateInstalledTools()
-        #expect(requests == 0)
-        #expect(!FileManager.default.fileExists(atPath: fixture.applications.path))
+            let fixture = try Fixture()
+            var requests = 0
+            let service = fixture.service { repository in
+                #expect(repository == "s1dashu/quiet-md")
+                requests += 1
+                return fixture.release
+            }
+            await service.updateInstalledTools()
+            #expect(requests == 0)
+            #expect(!FileManager.default.fileExists(atPath: fixture.applications.path))
 
-        QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.6")
-        fixture.releaseVersion = "0.1.6"
-        await service.install(.quietMD)
-        fixture.releaseVersion = "0.1.7"
-        QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
-        await service.updateInstalledTools()
-        #expect(service.states[.quietMD]?.installedVersion == "0.1.7")
-        #expect(service.states[.quietMD]?.phase == .idle)
-        #expect(service.states[.quietMD]?.errorMessage == nil)
+            QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.6")
+            fixture.releaseVersion = "0.1.6"
+            await service.install(.quietMD)
+            fixture.releaseVersion = "0.1.7"
+            QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
+            await service.updateInstalledTools()
+            #expect(service.states[.quietMD]?.installedVersion == "0.1.7")
+            #expect(service.states[.quietMD]?.phase == .idle)
+            #expect(service.states[.quietMD]?.errorMessage == nil)
         #endif
     }
 
     @Test
     func uninstallDuringDownloadDoesNotRecreateQuietMD() async throws {
         #if arch(arm64)
-        let fixture = try Fixture()
-        let service = fixture.service()
-        QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.6")
-        await service.install(.quietMD)
-        QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
-        QuietMDDownloadProtocol.beforeLoading = { [application = fixture.application] in
-            try? FileManager.default.removeItem(at: application)
-        }
-        defer { QuietMDDownloadProtocol.beforeLoading = nil }
+            let fixture = try Fixture()
+            let service = fixture.service()
+            QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.6")
+            await service.install(.quietMD)
+            QuietMDDownloadProtocol.payload = try await fixture.archive(version: "0.1.7")
+            QuietMDDownloadProtocol.beforeLoading = { [application = fixture.application] in
+                try? FileManager.default.removeItem(at: application)
+            }
+            defer { QuietMDDownloadProtocol.beforeLoading = nil }
 
-        await service.updateInstalledTools()
+            await service.updateInstalledTools()
 
-        #expect(!FileManager.default.fileExists(atPath: fixture.application.path))
-        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.applications.path).isEmpty)
-        #expect(service.states[.quietMD]?.phase == .idle)
+            #expect(!FileManager.default.fileExists(atPath: fixture.application.path))
+            #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.applications.path).isEmpty)
+            #expect(service.states[.quietMD]?.phase == .idle)
         #endif
     }
 

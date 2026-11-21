@@ -195,7 +195,7 @@ struct OverlayCoordinatorPopoverTests {
             coordinator = OverlayCoordinator(contentView: content, collapseDelay: .zero)
             coordinator.start()
             screen = ScreenSnapshot(displayID: 91, frame: CGRect(x: 20_000, y: 0, width: 1_440, height: 900),
-                                        visibleFrame: CGRect(x: 20_000, y: 0, width: 1_440, height: 876))
+                                    visibleFrame: CGRect(x: 20_000, y: 0, width: 1_440, height: 876))
             coordinator.updateScreens([screen], repositionVisiblePanel: false)
             let layout = try #require(coordinator.layouts.first)
             triggerPoint = CGPoint(x: layout.triggerFrame.midX, y: layout.triggerFrame.midY)
@@ -205,7 +205,7 @@ struct OverlayCoordinatorPopoverTests {
             content.addSubview(anchor)
             anchorFrame = panel.convertToScreen(anchor.convert(anchor.bounds, to: nil))
             popover = PopoverWindowFixture(frame: CGRect(x: anchorFrame.midX - 146,
-                y: layout.expandedFrame.minY - 212, width: 292, height: 200))
+                                                         y: layout.expandedFrame.minY - 212, width: 292, height: 200))
             arrowPoint = CGPoint(x: anchorFrame.midX, y: layout.expandedFrame.minY - 6)
             popoverPoint = CGPoint(x: popover.frame.midX, y: popover.frame.midY)
             outsidePoint = CGPoint(x: screen.frame.minX + 10, y: 100)

@@ -267,8 +267,7 @@ final class TypingStatsModel: ObservableObject {
                 readStatus.markRead(at: loadedSnapshot.generatedAt)
                 let mergedSnapshot = mergeSnapshot(loadedSnapshot, request: request)
                 if publishesUnchangedSnapshot
-                    || snapshot?.hasSameVisibleContent(as: mergedSnapshot) != true
-                {
+                    || snapshot?.hasSameVisibleContent(as: mergedSnapshot) != true {
                     snapshot = mergedSnapshot
                 }
                 if didFlush {

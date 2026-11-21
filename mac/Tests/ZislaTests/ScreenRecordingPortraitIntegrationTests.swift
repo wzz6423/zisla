@@ -12,7 +12,8 @@ struct ScreenRecordingPortraitIntegrationTests {
     private let size = CGSize(width: 384, height: 384)
     private let regions = RecordingPortraitProcessor.Regions(
         faces: [.init(x: 0.3, y: 0.55, width: 0.4, height: 0.3)],
-        bodies: [.init(x: 0.2, y: 0.05, width: 0.6, height: 0.9)])
+        bodies: [.init(x: 0.2, y: 0.05, width: 0.6, height: 0.9)]
+    )
 
     @Test(arguments: ["smoothing", "brightening", "faceSlimming", "bodySlimming"], [false, true])
     func cameraEffectsApplyOnceBeforeMirroringAndLeaveTheScreenUntouched(_ effect: String, mirrored: Bool) throws {
@@ -34,7 +35,7 @@ struct ScreenRecordingPortraitIntegrationTests {
         #expect(try pixels(actual) == pixels(expected), "\(effect) must process the raw camera exactly once before layout and mirroring")
         #expect(try pixels(actual) != pixels(baseline))
         try expectOutsideUnchanged(actual, baseline: baseline,
-            excluding: CGRect(x: 181, y: 9, width: 195, height: 195))
+                                   excluding: CGRect(x: 181, y: 9, width: 195, height: 195))
         let restored = try renderer.render(screen: screen, camera: camera, sourceTime: 0, cameraEffects: .init())
         #expect(try pixels(restored) == pixels(CIImage(cgImage: baseline)), "An explicit reset must override the project effects")
     }
@@ -61,7 +62,7 @@ struct ScreenRecordingPortraitIntegrationTests {
         project.timeline = timeline
         try project.validate()
         let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: size,
-            makePortraitProcessor: { processor() })
+                                                       makePortraitProcessor: { processor() })
         let camera = chart()
         let screen = CIImage(color: .blue).cropped(to: CGRect(origin: .zero, size: size))
         func render(_ clip: RecordingTimelineClip) throws -> CGImage {
@@ -75,7 +76,7 @@ struct ScreenRecordingPortraitIntegrationTests {
         #expect(try pixels(inherited) != pixels(overridden), "A clip override must replace the project effect rather than combine with it")
         for image in [inherited, overridden] {
             try expectOutsideUnchanged(image, baseline: original,
-                excluding: CGRect(x: 181, y: 9, width: 195, height: 195))
+                                       excluding: CGRect(x: 181, y: 9, width: 195, height: 195))
         }
         var expectedProject = project
         expectedProject.timeline = nil
@@ -98,11 +99,11 @@ struct ScreenRecordingPortraitIntegrationTests {
         var timeline = RecordingMultitrackTimeline.migrating(project)
         let recording = try #require(timeline.clips.first)
         let asset = RecordingMediaAsset(name: "Portrait", file: file, kind: video ? .video : .image,
-            duration: 2, width: 192, height: 192)
+                                        duration: 2, width: 192, height: 192)
         let track = RecordingTimelineTrack(id: "portrait", kind: video ? .video : .image)
         let first = RecordingTimelineClip(id: "enhanced", trackID: track.id,
-            content: video ? .video(asset.id) : .image(asset.id), start: 0, sourceEnd: 1,
-            layout: .init(x: 0.5, y: 0.5, width: 0.5, height: 0.5), portraitEffects: effects(effect))
+                                          content: video ? .video(asset.id) : .image(asset.id), start: 0, sourceEnd: 1,
+                                          layout: .init(x: 0.5, y: 0.5, width: 0.5, height: 0.5), portraitEffects: effects(effect))
         var second = first
         second.id = "original"
         second.start = 1
@@ -113,7 +114,7 @@ struct ScreenRecordingPortraitIntegrationTests {
         project.timeline = timeline
         try project.validate()
         let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: size,
-            makePortraitProcessor: { processor() })
+                                                       makePortraitProcessor: { processor() })
         let screen = CIImage(color: .blue).cropped(to: CGRect(origin: .zero, size: size))
         let changed = try renderer.image(frames: [recording.id: screen, first.id: portrait], at: 0)
         let restored = try renderer.image(frames: [recording.id: screen, second.id: portrait], at: 1)
@@ -123,7 +124,7 @@ struct ScreenRecordingPortraitIntegrationTests {
         baselineProject.edits.portraitEffects = .init()
         baselineProject.timeline?.clips[1].portraitEffects = .init()
         let baseline = try RecordingMultitrackRenderer(project: baselineProject, directory: fixture.directory, size: size,
-            makePortraitProcessor: { processor() })
+                                                       makePortraitProcessor: { processor() })
             .image(frames: [recording.id: screen, first.id: portrait], at: 0)
         #expect(try pixels(restored) == pixels(baseline), "Reset must disable imported media effects even when project camera effects are enabled")
     }
@@ -140,22 +141,22 @@ struct ScreenRecordingPortraitIntegrationTests {
         var instances: [WeakProcessor] = []
         do {
             let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: size,
-                makePortraitProcessor: {
-                    let value = processor()
-                    instances.append(WeakProcessor(value))
-                    return value
-                })
+                                                           makePortraitProcessor: {
+                                                               let value = processor()
+                                                               instances.append(WeakProcessor(value))
+                                                               return value
+                                                           })
             let baseCount = instances.count
             for clip in clips.prefix(16) {
                 _ = try renderer.image(frames: [clip.id: portrait], at: clip.start)
             }
             let earlier = Array(instances.dropFirst(baseCount))
             #expect(earlier.count == 16 && earlier.allSatisfy { $0.value != nil },
-                "The active clip cache must retain reusable processors within its budget")
+                    "The active clip cache must retain reusable processors within its budget")
             let last = try #require(clips.last)
             _ = try renderer.image(frames: [last.id: portrait], at: last.start)
             #expect(earlier.contains { $0.value == nil },
-                "Visiting a seventeenth clip must release an earlier clip processor")
+                    "Visiting a seventeenth clip must release an earlier clip processor")
             #expect(instances.dropFirst(baseCount).filter { $0.value != nil }.count <= 16)
             #expect(instances.last?.value != nil, "The current clip must retain its processor for the next frame")
         }
@@ -170,12 +171,12 @@ struct ScreenRecordingPortraitIntegrationTests {
         let project = try importedProject(video: false, file: file, clipDuration: 2)
         var detections = 0
         let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: size,
-            makePortraitProcessor: {
-                RecordingPortraitProcessor { _, _, _ in
-                    detections += 1
-                    return regions
-                }
-            })
+                                                       makePortraitProcessor: {
+                                                           RecordingPortraitProcessor { _, _, _ in
+                                                               detections += 1
+                                                               return regions
+                                                           }
+                                                       })
         let expected = try pixels(renderer.image(frames: [:], at: 0))
         for time in [0.2, 0.75, 1.75] {
             #expect(try pixels(renderer.image(frames: [:], at: time)) == expected)
@@ -198,7 +199,7 @@ struct ScreenRecordingPortraitIntegrationTests {
             project.timeline = .migrating(project)
             let clip = try #require(project.timeline?.clips.first)
             frames = [clip.id: CIImage(color: .blue).cropped(to: CGRect(origin: .zero, size: size)),
-                clip.id + ".camera": portrait]
+                      clip.id + ".camera": portrait]
         } else {
             let video = layer == "video"
             let file = video ? "portrait.mp4" : "portrait.png"
@@ -209,17 +210,17 @@ struct ScreenRecordingPortraitIntegrationTests {
         }
         var detections = 0
         let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: size,
-            makePortraitProcessor: {
-                RecordingPortraitProcessor { _, _, _ in
-                    detections += 1
-                    if detections == 1 { throw Failure.unavailable }
-                    return regions
-                }
-            })
+                                                       makePortraitProcessor: {
+                                                           RecordingPortraitProcessor { _, _, _ in
+                                                               detections += 1
+                                                               if detections == 1 { throw Failure.unavailable }
+                                                               return regions
+                                                           }
+                                                       })
         #expect(throws: Failure.unavailable) { try renderer.image(frames: frames, at: 0) }
         let recovered = try renderer.image(frames: frames, at: 0)
         let expected = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: size,
-            makePortraitProcessor: { processor() }).image(frames: frames, at: 0)
+                                                       makePortraitProcessor: { processor() }).image(frames: frames, at: 0)
         #expect(try pixels(recovered) == pixels(expected), "The \(layer) must render normally after a detection failure")
         #expect(detections == 2, "Failed detection must be retried on the next render")
     }
@@ -243,7 +244,7 @@ struct ScreenRecordingPortraitIntegrationTests {
         if multitrack { project.timeline = .migrating(project) }
         let exporter = ScreenRecordingExporter()
         let image = try await exporter.preview(project: project, directory: fixture.directory, sourceTime: 0,
-            maximumSize: CGSize(width: 64, height: 48))
+                                               maximumSize: CGSize(width: 64, height: 48))
         let pixel = try RecordingMultitrackTestFixture.pixel(image, x: 49, y: 35)
         #expect(pixel[1] > 200 && pixel[0] < 40, "Reset preview must use the green original rather than the red enhanced recording")
         if multitrack {
@@ -253,7 +254,7 @@ struct ScreenRecordingPortraitIntegrationTests {
             #expect(track.segments.contains { $0.sourceURL?.lastPathComponent == "camera-original.mp4" })
         } else {
             let media = try await RecordingExportMedia.prepare(project: project, directory: fixture.directory,
-                timeline: RecordingExportTimeline(project: project))
+                                                               timeline: RecordingExportTimeline(project: project))
             let camera = try #require(media.camera)
             #expect(camera.track.segments.contains { $0.sourceURL?.lastPathComponent == "camera-original.mp4" })
         }
@@ -262,7 +263,7 @@ struct ScreenRecordingPortraitIntegrationTests {
 
     private func project() -> ScreenRecordingProject {
         var project = ScreenRecordingProject(name: "Portrait integration", videoFile: "screen.mp4", duration: 2,
-            width: 384, height: 384)
+                                             width: 384, height: 384)
         project.edits.background = .none
         project.edits.showCursor = false
         project.edits.clickEffects = false
@@ -286,12 +287,12 @@ struct ScreenRecordingPortraitIntegrationTests {
                                  clipDuration: Double = 1) throws -> ScreenRecordingProject {
         var project = project()
         let asset = RecordingMediaAsset(name: "Portrait", file: file, kind: video ? .video : .image,
-            duration: clipDuration, width: 192, height: 192)
+                                        duration: clipDuration, width: 192, height: 192)
         let track = RecordingTimelineTrack(id: "portrait", kind: video ? .video : .image)
         let clips = (0..<clipCount).map { index in
             RecordingTimelineClip(id: "portrait-\(index)", trackID: track.id,
-                content: video ? .video(asset.id) : .image(asset.id), start: Double(index) * clipDuration,
-                sourceEnd: clipDuration, portraitEffects: .init(brightening: 1))
+                                  content: video ? .video(asset.id) : .image(asset.id), start: Double(index) * clipDuration,
+                                  sourceEnd: clipDuration, portraitEffects: .init(brightening: 1))
         }
         project.timeline = .init(assets: [asset], tracks: [track], clips: clips)
         try project.validate()
@@ -327,7 +328,7 @@ struct ScreenRecordingPortraitIntegrationTests {
             }
         }
         return CIImage(bitmapData: Data(bytes), bytesPerRow: 192 * 4, size: CGSize(width: 192, height: 192),
-            format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                       format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
     }
 
     private func pixels(_ image: CGImage) throws -> [UInt8] { try pixels(CIImage(cgImage: image)) }
@@ -338,8 +339,8 @@ struct ScreenRecordingPortraitIntegrationTests {
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         bytes.withUnsafeMutableBytes { pointer in
             CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!]).render(image,
-                toBitmap: pointer.baseAddress!, rowBytes: width * 4, bounds: image.extent, format: .RGBA8,
-                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+                                                                                                    toBitmap: pointer.baseAddress!, rowBytes: width * 4, bounds: image.extent, format: .RGBA8,
+                                                                                                    colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
         }
         return bytes
     }
@@ -350,7 +351,7 @@ struct ScreenRecordingPortraitIntegrationTests {
         var changedOutside = 0
         for y in 0..<image.height {
             for x in 0..<image.width where !region.contains(CGPoint(x: CGFloat(x) + 0.5,
-                y: CGFloat(image.height - y) - 0.5)) {
+                                                                    y: CGFloat(image.height - y) - 0.5)) {
                 let offset = (y * image.width + x) * 4
                 if before[offset..<offset + 4] != after[offset..<offset + 4] { changedOutside += 1 }
             }

@@ -92,7 +92,7 @@ struct SystemMonitorMenuBarIconReferenceTests {
                     let status = Self.status(batteryLevel: 0.5, wifi: wifi, level: 0.5)
                     let actual = try Self.render(status, appearance: appearance, size: 22, scale: scale)
                     let reference = try Self.referenceImage(size: 22, scale: scale, progress: 0.5,
-                        strokeScale: 1.25, style: .dots, level: 0.5, symbol: symbol, wifiScale: wifiScale)
+                                                            strokeScale: 1.25, style: .dots, level: 0.5, symbol: symbol, wifiScale: wifiScale)
                     #expect(try Self.pixels(actual) == Self.pixels(reference), "SF Symbol mismatch: \(symbol.name), \(symbol.value), \(wifiScale)x at \(scale)x")
                 }
             }
@@ -112,9 +112,9 @@ struct SystemMonitorMenuBarIconReferenceTests {
                             showsPercentageWhenConnected: false, usesStatusColors: false, wifiScale: 1
                         )
                         let actual = try Self.render(Self.status(batteryLevel: progress, wifi: .connected(strength: 1), level: level),
-                            appearance: appearance, size: 22, scale: 2)
+                                                     appearance: appearance, size: 22, scale: 2)
                         let reference = try Self.referenceImage(size: 22, scale: 2, progress: progress,
-                            strokeScale: strokeScale, style: style, level: level, symbol: ReferenceSymbol(name: "wifi", value: 1))
+                                                                strokeScale: strokeScale, style: style, level: level, symbol: ReferenceSymbol(name: "wifi", value: 1))
                         #expect(try Self.pixels(actual) == Self.pixels(reference), "SVG raster mismatch: \(strokeStyle), \(style), battery \(progress), indicator \(level)")
                     }
                 }
@@ -149,7 +149,7 @@ struct SystemMonitorMenuBarIconReferenceTests {
             @unknown default: -1
             }
             result.append(PathElement(type: Int(element.pointee.type.rawValue),
-                points: count >= 0 ? Array(UnsafeBufferPointer(start: element.pointee.points, count: count)) : []))
+                                      points: count >= 0 ? Array(UnsafeBufferPointer(start: element.pointee.points, count: count)) : []))
         }
         return result
     }
@@ -166,7 +166,7 @@ struct SystemMonitorMenuBarIconReferenceTests {
         for (lower, upper) in intervals where upper > lower {
             let segment = CGMutablePath()
             segment.addArc(center: CGPoint(x: 59.5, y: 61.48715261785473), radius: 51.5,
-                startAngle: start + sweep * lower, endAngle: start + sweep * upper, clockwise: false)
+                           startAngle: start + sweep * lower, endAngle: start + sweep * upper, clockwise: false)
             path.addPath(segment)
         }
         return path
@@ -178,29 +178,29 @@ struct SystemMonitorMenuBarIconReferenceTests {
         let start: CGFloat = 121.82 * .pi / 180
         let end: CGFloat = 59.12 * .pi / 180
         path.addArc(center: CGPoint(x: 59.5, y: 61.48715261785473), radius: 51.5,
-            startAngle: start, endAngle: start - (start - end) * progress, clockwise: true)
+                    startAngle: start, endAngle: start - (start - end) * progress, clockwise: true)
         return path
     }
 
     private static func status(batteryLevel: Double, wifi: MenuBarWiFiState, level: Double) -> MenuBarIconStatus {
         MenuBarIconStatus(battery: BatterySnapshot(level: batteryLevel, isCharging: false,
-            isPluggedIn: false, isCharged: false, timeRemainingMinutes: nil), wifi: wifi, level: level)
+                                                   isPluggedIn: false, isCharged: false, timeRemainingMinutes: nil), wifi: wifi, level: level)
     }
 
     @MainActor
     private static func render(_ status: MenuBarIconStatus, appearance: SystemMonitorCombinedIconAppearance,
-        size: CGFloat, scale: CGFloat) throws -> CGImage {
+                               size: CGFloat, scale: CGFloat) throws -> CGImage {
         try #require(SystemMonitorMenuBarIconRenderer.render(menuBarStatus: status, size: size, scale: scale,
-            foreground: CGColor(red: 0, green: 0, blue: 0, alpha: 1), options: MenuBarIconBatteryOptions(appearance: appearance),
-            connectionOptions: MenuBarIconConnectionOptions(appearance: appearance), volumeOptions: MenuBarIconVolumeOptions(appearance: appearance)))
+                                                             foreground: CGColor(red: 0, green: 0, blue: 0, alpha: 1), options: MenuBarIconBatteryOptions(appearance: appearance),
+                                                             connectionOptions: MenuBarIconConnectionOptions(appearance: appearance), volumeOptions: MenuBarIconVolumeOptions(appearance: appearance)))
     }
 
     @MainActor
     private static func referenceImage(size: CGFloat, scale: CGFloat, progress: Double, strokeScale: Double,
-        style: SystemMonitorMenuBarIndicatorStyle, level: Double, symbol: ReferenceSymbol, wifiScale: Double = 1) throws -> CGImage {
+                                       style: SystemMonitorMenuBarIndicatorStyle, level: Double, symbol: ReferenceSymbol, wifiScale: Double = 1) throws -> CGImage {
         let dimension = Int((size * scale).rounded(.up))
         let context = try #require(CGContext(data: nil, width: dimension, height: dimension, bitsPerComponent: 8,
-            bytesPerRow: dimension * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bytesPerRow: dimension * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.scaleBy(x: scale, y: scale)
         context.translateBy(x: 0, y: size)
         context.scaleBy(x: size / 120, y: -size / 120)
@@ -220,13 +220,13 @@ struct SystemMonitorMenuBarIconReferenceTests {
         let configuration = NSImage.SymbolConfiguration(pointSize: 38 * wifiScale, weight: .semibold)
             .applying(.init(hierarchicalColor: symbolForeground))
         let image = try #require(NSImage(systemSymbolName: symbol.name, variableValue: symbol.value,
-            accessibilityDescription: nil)?.withSymbolConfiguration(configuration))
+                                         accessibilityDescription: nil)?.withSymbolConfiguration(configuration))
         context.saveGState()
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
         context.scaleBy(x: 1, y: -1)
         image.draw(in: CGRect(x: 59.5 - image.size.width / 2, y: -(64 + image.size.height / 2),
-            width: image.size.width, height: image.size.height))
+                              width: image.size.width, height: image.size.height))
         NSGraphicsContext.restoreGraphicsState()
         context.restoreGState()
         switch style {

@@ -6,7 +6,7 @@ enum ScreenRecordingRegionGeometry {
         guard [start.x, start.y, end.x, end.y, size.width, size.height].allSatisfy(\.isFinite),
               size.width > 0, size.height > 0 else { return nil }
         let rect = CGRect(x: min(start.x, end.x), y: min(start.y, end.y),
-            width: abs(end.x - start.x), height: abs(end.y - start.y))
+                          width: abs(end.x - start.x), height: abs(end.y - start.y))
             .intersection(CGRect(origin: .zero, size: size))
         guard rect.width >= 2, rect.height >= 2 else { return nil }
         return .init(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
@@ -79,10 +79,10 @@ private final class RegionView: NSView {
             border.stroke()
             let dimensions = String(format: "%.0f × %.0f", rect.width, rect.height) as NSString
             let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
-                .foregroundColor: NSColor.white]
+                                                             .foregroundColor: NSColor.white]
             let size = dimensions.size(withAttributes: attributes)
             let badge = CGRect(x: min(rect.minX, bounds.maxX - size.width - 20),
-                y: min(rect.maxY + 8, bounds.maxY - size.height - 16), width: size.width + 16, height: size.height + 8)
+                               y: min(rect.maxY + 8, bounds.maxY - size.height - 16), width: size.width + 16, height: size.height + 8)
             NSColor.black.withAlphaComponent(0.8).setFill()
             NSBezierPath(roundedRect: badge, xRadius: 4, yRadius: 4).fill()
             dimensions.draw(at: CGPoint(x: badge.minX + 8, y: badge.minY + 4), withAttributes: attributes)
@@ -92,7 +92,7 @@ private final class RegionView: NSView {
         }
         let instruction = AppLocalization.text("拖动选择录制区域，按 Esc 取消") as NSString
         instruction.draw(at: CGPoint(x: 24, y: 24), withAttributes: [.foregroundColor: NSColor.white,
-            .font: NSFont.systemFont(ofSize: 16, weight: .medium)])
+                                                                     .font: NSFont.systemFont(ofSize: 16, weight: .medium)])
     }
 
     override func mouseDown(with event: NSEvent) {

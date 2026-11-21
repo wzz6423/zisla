@@ -102,11 +102,11 @@ struct ImageToolsSettingsLifecycleTests {
         defer { started.continuation.finish(); resume.continuation.finish() }
         let image = fixture.image
         let startedTask = input.imageRecognition.start(urls: [fixture.source], service: fixture.service,
-            loadImage: { _ in image }, recognizeImage: { _, _ in
-                started.continuation.yield()
-                for await _ in resume.stream { break }
-                return [ScreenshotRecognizedFragment(text: "Retained text", boundingBox: CGRect(x: 0, y: 0, width: 1, height: 1))]
-            })
+                                                       loadImage: { _ in image }, recognizeImage: { _, _ in
+                                                           started.continuation.yield()
+                                                           for await _ in resume.stream { break }
+                                                           return [ScreenshotRecognizedFragment(text: "Retained text", boundingBox: CGRect(x: 0, y: 0, width: 1, height: 1))]
+                                                       })
         let pending = try #require(startedTask)
         for await _ in started.stream { break }
         await fixture.search("OCR")
@@ -126,7 +126,7 @@ struct ImageToolsSettingsLifecycleTests {
         #expect(input.imageRecognition.results.first?.text == "Retained text")
 
         await input.imageRecognition.start(urls: [fixture.source], service: fixture.service,
-            loadImage: { _ in throw ImageProcessingError.invalidOutput })?.value
+                                           loadImage: { _ in throw ImageProcessingError.invalidOutput })?.value
         let failures = input.imageRecognition.failures
         let message = input.imageRecognition.message
         #expect(failures.count == 1)
@@ -303,7 +303,7 @@ struct ImageToolsSettingsLifecycleTests {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
             source = root.appendingPathComponent("source.png")
             let context = try #require(CGContext(data: nil, width: 40, height: 20, bitsPerComponent: 8, bytesPerRow: 0,
-                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.setFillColor(CGColor(red: 0.2, green: 0.5, blue: 0.8, alpha: 0.5))
             context.fill(CGRect(x: 0, y: 0, width: 40, height: 20))
             image = try #require(context.makeImage())
@@ -317,16 +317,16 @@ struct ImageToolsSettingsLifecycleTests {
                 if location != .download { defaults.set(root.path, forKey: "save-location-\(location.rawValue)-path") }
             }
             let tools = ManagedToolService(toolsDirectory: root.appendingPathComponent("tools"),
-                applicationsDirectory: root.appendingPathComponent("applications"), bundleURL: root, defaults: defaults,
-                releaseLoader: { _ in Data() }, executableResolver: { _ in nil }, homebrewRunner: { _, _ in "" })
+                                           applicationsDirectory: root.appendingPathComponent("applications"), bundleURL: root, defaults: defaults,
+                                           releaseLoader: { _ in Data() }, executableResolver: { _ in nil }, homebrewRunner: { _, _ in "" })
             let saveLocations = SaveLocationStore(defaults: defaults)
             let settingsStore = FeatureSettingsStore(defaults: defaults)
             releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
             window = NSPanel(contentRect: NSRect(x: -100_000, y: -100_000, width: 900, height: 700),
-                styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             let host = NSHostingView(rootView: Host(tools: tools, saveLocations: saveLocations, settingsStore: settingsStore,
-                mounted: { [weak self] input in self?.input = input }))
+                                                    mounted: { [weak self] input in self?.input = input }))
             host.sizingOptions = []
             self.host = host
             window.contentView = host

@@ -27,14 +27,14 @@ public final class SystemAutoCleanupService {
         self.trash = trash
         self.emptyTrash = emptyTrash
         systemCleanup = CleanupSchedule(defaults: defaults, now: now,
-            lastRunKey: "system-cleanup-last-run-v1", timerFactory: timerFactory)
+                                        lastRunKey: "system-cleanup-last-run-v1", timerFactory: timerFactory)
         trashCleanup = CleanupSchedule(defaults: defaults, now: now,
-            lastRunKey: "trash-cleanup-last-run-v1", attemptKey: "trash-cleanup-attempt-v1",
-            reservationFailure: {
-                let error = DesktopOrganizerError.failed(AppLocalization.text("无法保存定时倾倒废纸篓的记录，本次已跳过。"))
-                onTrashReservationFailure(error)
-                return .failure(error)
-            }, timerFactory: timerFactory)
+                                       lastRunKey: "trash-cleanup-last-run-v1", attemptKey: "trash-cleanup-attempt-v1",
+                                       reservationFailure: {
+                                           let error = DesktopOrganizerError.failed(AppLocalization.text("无法保存定时倾倒废纸篓的记录，本次已跳过。"))
+                                           onTrashReservationFailure(error)
+                                           return .failure(error)
+                                       }, timerFactory: timerFactory)
     }
 
     isolated deinit {

@@ -12,58 +12,58 @@ struct ScreenRecordingTimelineView: View {
                 if project.timeline != nil && showsClipInspector {
                     ScreenRecordingMultitrackClipInspector(model: model)
                 } else if project.timeline == nil && showsClipInspector {
-                ViewThatFits(in: .horizontal) {
-                    HStack { splitButton; restoreButton }
-                    VStack(alignment: .trailing, spacing: 6) { splitButton; restoreButton }
-                }.frame(maxWidth: .infinity, alignment: .trailing)
-                Text(AppLocalization.text("输出时长：%@", ScreenRecordingStudioView.clock(project.outputDuration)))
-                    .font(.caption).foregroundStyle(.secondary)
-                if project.edits.segments.isEmpty {
-                    Text(AppLocalization.text("所有片段已删除，请恢复素材后导出"))
+                    ViewThatFits(in: .horizontal) {
+                        HStack { splitButton; restoreButton }
+                        VStack(alignment: .trailing, spacing: 6) { splitButton; restoreButton }
+                    }.frame(maxWidth: .infinity, alignment: .trailing)
+                    Text(AppLocalization.text("输出时长：%@", ScreenRecordingStudioView.clock(project.outputDuration)))
                         .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    ScreenRecordingInspectorSection(AppLocalization.text("片段"), symbol: "scissors") {
-                        Picker(AppLocalization.text("片段"), selection: segmentSelection) {
-                            ForEach(Array(project.edits.segments.enumerated()), id: \.element.id) { index, segment in
-                                Text(AppLocalization.text("片段 %d", index + 1)).tag(Optional(segment.id))
+                    if project.edits.segments.isEmpty {
+                        Text(AppLocalization.text("所有片段已删除，请恢复素材后导出"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        ScreenRecordingInspectorSection(AppLocalization.text("片段"), symbol: "scissors") {
+                            Picker(AppLocalization.text("片段"), selection: segmentSelection) {
+                                ForEach(Array(project.edits.segments.enumerated()), id: \.element.id) { index, segment in
+                                    Text(AppLocalization.text("片段 %d", index + 1)).tag(Optional(segment.id))
+                                }
+                            }.labelsHidden().controlSize(.regular).frame(maxWidth: .infinity)
+                                .accessibilityIdentifier("screenRecording.selectedSegment")
+                            if let index = project.edits.segments.firstIndex(where: {
+                                $0.id == (selectedSegmentID ?? project.edits.segments.first?.id)
+                            }) {
+                                let segment = project.edits.segments[index]
+                                timeField("起点（秒）", value: segmentBinding(segment.id, keyPath: \.start))
+                                timeField("终点（秒）", value: segmentBinding(segment.id, keyPath: \.end))
+                                HStack {
+                                    Text(AppLocalization.text("播放速度")).font(.system(size: 11)).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Picker(AppLocalization.text("播放速度"), selection: segmentBinding(segment.id, keyPath: \.speed)) {
+                                        ForEach([0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4, 8], id: \.self) { speed in
+                                            Text(speed.formatted() + "×").tag(speed)
+                                        }
+                                    }.labelsHidden().controlSize(.regular).frame(width: 100)
+                                }
+                                Divider()
+                                HStack(spacing: 14) {
+                                    Button { model.moveSegment(segment.id, to: index - 1); selectSegment(segment.id) } label: { Image(systemName: "arrow.up") }
+                                        .help(AppLocalization.text("上移")).disabled(index == 0)
+                                    Button { model.moveSegment(segment.id, to: index + 1); selectSegment(segment.id) } label: { Image(systemName: "arrow.down") }
+                                        .help(AppLocalization.text("下移")).disabled(index == project.edits.segments.count - 1)
+                                    Button { duplicate(segment.id) } label: { Image(systemName: "plus.square.on.square") }
+                                        .help(AppLocalization.text("复制片段"))
+                                    Spacer()
+                                    Button(role: .destructive) { remove(segment.id) } label: { Image(systemName: "trash") }
+                                        .help(AppLocalization.text("删除片段"))
+                                }.buttonStyle(.borderless)
+                                Button(AppLocalization.text("预览片段起点")) { selectSegment(segment.id) }
+                                    .font(.caption)
+                                    .accessibilityIdentifier("screenRecording.timelineFormSegment." + segment.id.uuidString)
+                                Button(AppLocalization.text("分离音频")) { model.detachTimelineAudio(segment.id.uuidString) }
+                                    .accessibilityIdentifier("screenRecording.detachAudio")
                             }
-                        }.labelsHidden().controlSize(.regular).frame(maxWidth: .infinity)
-                            .accessibilityIdentifier("screenRecording.selectedSegment")
-                        if let index = project.edits.segments.firstIndex(where: {
-                            $0.id == (selectedSegmentID ?? project.edits.segments.first?.id)
-                        }) {
-                            let segment = project.edits.segments[index]
-                            timeField("起点（秒）", value: segmentBinding(segment.id, keyPath: \.start))
-                            timeField("终点（秒）", value: segmentBinding(segment.id, keyPath: \.end))
-                            HStack {
-                                Text(AppLocalization.text("播放速度")).font(.system(size: 11)).foregroundStyle(.secondary)
-                                Spacer()
-                                Picker(AppLocalization.text("播放速度"), selection: segmentBinding(segment.id, keyPath: \.speed)) {
-                                    ForEach([0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4, 8], id: \.self) { speed in
-                                        Text(speed.formatted() + "×").tag(speed)
-                                    }
-                                }.labelsHidden().controlSize(.regular).frame(width: 100)
-                            }
-                            Divider()
-                            HStack(spacing: 14) {
-                                Button { model.moveSegment(segment.id, to: index - 1); selectSegment(segment.id) } label: { Image(systemName: "arrow.up") }
-                                    .help(AppLocalization.text("上移")).disabled(index == 0)
-                                Button { model.moveSegment(segment.id, to: index + 1); selectSegment(segment.id) } label: { Image(systemName: "arrow.down") }
-                                    .help(AppLocalization.text("下移")).disabled(index == project.edits.segments.count - 1)
-                                Button { duplicate(segment.id) } label: { Image(systemName: "plus.square.on.square") }
-                                    .help(AppLocalization.text("复制片段"))
-                                Spacer()
-                                Button(role: .destructive) { remove(segment.id) } label: { Image(systemName: "trash") }
-                                    .help(AppLocalization.text("删除片段"))
-                            }.buttonStyle(.borderless)
-                            Button(AppLocalization.text("预览片段起点")) { selectSegment(segment.id) }
-                                .font(.caption)
-                                .accessibilityIdentifier("screenRecording.timelineFormSegment." + segment.id.uuidString)
-                            Button(AppLocalization.text("分离音频")) { model.detachTimelineAudio(segment.id.uuidString) }
-                                .accessibilityIdentifier("screenRecording.detachAudio")
                         }
                     }
-                }
                 }
             }
         }.disabled(!model.canEdit)
@@ -95,7 +95,7 @@ struct ScreenRecordingTimelineView: View {
 
     private func timeField(_ title: String, value: Binding<Double>) -> some View {
         ScreenRecordingNumberField(title: AppLocalization.text(title), value: value,
-            identifier: "screenRecording.segmentField." + title)
+                                   identifier: "screenRecording.segmentField." + title)
     }
 
     private func segmentBinding(_ id: UUID, keyPath: WritableKeyPath<RecordingSegment, Double>) -> Binding<Double> {

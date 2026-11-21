@@ -12,10 +12,10 @@ struct ScreenRecordingPortraitCaptureTests {
         defer { fixture.remove() }
         let files = try ScreenRecordingCaptureFiles(directory: fixture.directory)
         let configuration = RecordingCaptureConfiguration(systemAudio: false, microphone: true, camera: true,
-            portraitEffects: .init(brightening: 1), voiceEffects: .init(preset: .broadcast, amount: 0.8))
+                                                          portraitEffects: .init(brightening: 1), voiceEffects: .init(preset: .broadcast, amount: 0.8))
         let writer = ScreenRecordingCaptureWriter(files: files, configuration: configuration, width: 64, height: 48,
-            onFailure: { Issue.record("Native synthetic capture must encode: \($0)") },
-            portraitProcessor: RecordingPortraitProcessor { _, _, _ in .init(faces: [.init(x: 0.1, y: 0.1, width: 0.8, height: 0.8)]) })
+                                                  onFailure: { Issue.record("Native synthetic capture must encode: \($0)") },
+                                                  portraitProcessor: RecordingPortraitProcessor { _, _, _ in .init(faces: [.init(x: 0.1, y: 0.1, width: 0.8, height: 0.8)]) })
         writer.receive(try video(time: 100, kind: .screen))
         for index in 0..<10 {
             writer.receive(try audio(time: 100.125 + Double(index) / 100))
@@ -25,8 +25,8 @@ struct ScreenRecordingPortraitCaptureTests {
         await writer.seal(at: 100.5)
         let duration = try await writer.finish()
         let result = ScreenRecordingResult(videoFile: files.screenName, cameraFile: files.cameraName, microphoneFile: files.microphoneName,
-            duration: duration, width: 64, height: 48, rawCameraFile: files.rawCameraName, rawMicrophoneFile: files.rawMicrophoneName,
-            portraitEffects: configuration.portraitEffects, voiceEffects: configuration.voiceEffects)
+                                           duration: duration, width: 64, height: 48, rawCameraFile: files.rawCameraName, rawMicrophoneFile: files.rawMicrophoneName,
+                                           portraitEffects: configuration.portraitEffects, voiceEffects: configuration.voiceEffects)
         var project = ScreenRecordingProject(result: result, name: "Native portrait capture")
         try files.publish(project.mediaFiles)
         defer { _ = files.discard() }
@@ -45,7 +45,7 @@ struct ScreenRecordingPortraitCaptureTests {
             let track = try #require(try await asset.loadTracks(withMediaType: .audio).first)
             let segments = try await track.load(.segments).filter { !$0.isEmpty }
             let range = CMTimeRange(start: try #require(segments.first?.timeMapping.target.start),
-                end: try #require(segments.last?.timeMapping.target.end))
+                                    end: try #require(segments.last?.timeMapping.target.end))
             #expect(abs(range.start.seconds - 0.125) < 0.001 && range.end.seconds > 0.2)
         }
         project.edits.portraitEffects = .init()
@@ -62,10 +62,10 @@ struct ScreenRecordingPortraitCaptureTests {
         let outputs = Outputs()
         let portrait = RecordingPortraitProcessor { _, _, _ in .init(faces: [.init(x: 0.15, y: 0.15, width: 0.7, height: 0.7)]) }
         let writer = ScreenRecordingCaptureWriter(files: files,
-            configuration: .init(microphone: true, camera: true, portraitEffects: .init(brightening: 1),
-                voiceEffects: .init(preset: .broadcast, amount: 0.8)), width: 64, height: 48,
-            onFailure: { Issue.record("Synthetic capture must not fail: \($0)") }, factory: outputs.make,
-            portraitProcessor: portrait)
+                                                  configuration: .init(microphone: true, camera: true, portraitEffects: .init(brightening: 1),
+                                                                       voiceEffects: .init(preset: .broadcast, amount: 0.8)), width: 64, height: 48,
+                                                  onFailure: { Issue.record("Synthetic capture must not fail: \($0)") }, factory: outputs.make,
+                                                  portraitProcessor: portrait)
         writer.receive(try video(time: 100, kind: .screen))
         writer.receive(try video(time: 100.125, kind: .camera))
         writer.receive(try audio(time: 100.25))
@@ -96,8 +96,8 @@ struct ScreenRecordingPortraitCaptureTests {
         let outputs = Outputs()
         outputs.blockedName = files.rawCameraName
         let writer = ScreenRecordingCaptureWriter(files: files,
-            configuration: .init(camera: true, portraitEffects: .init(smoothing: 0.5)), width: 64, height: 48,
-            onFailure: { Issue.record("Video backpressure must not stop capture: \($0)") }, factory: outputs.make)
+                                                  configuration: .init(camera: true, portraitEffects: .init(smoothing: 0.5)), width: 64, height: 48,
+                                                  onFailure: { Issue.record("Video backpressure must not stop capture: \($0)") }, factory: outputs.make)
         writer.receive(try video(time: 100, kind: .screen))
         writer.receive(try video(time: 100.1, kind: .camera))
         await writer.flush()
@@ -120,9 +120,9 @@ struct ScreenRecordingPortraitCaptureTests {
         let monitor = RecordingVoiceMonitor(makeOutput: { FailingMonitor() })
         let failures = Failures()
         let writer = ScreenRecordingCaptureWriter(files: files,
-            configuration: .init(microphone: true, voiceEffects: .init(preset: .natural, amount: 0.8), monitorMicrophone: true),
-            width: 64, height: 48, onFailure: { Issue.record("A failed optional monitor must not cancel recording: \($0)") },
-            factory: outputs.make, monitor: monitor, onMonitoringFailure: failures.append)
+                                                  configuration: .init(microphone: true, voiceEffects: .init(preset: .natural, amount: 0.8), monitorMicrophone: true),
+                                                  width: 64, height: 48, onFailure: { Issue.record("A failed optional monitor must not cancel recording: \($0)") },
+                                                  factory: outputs.make, monitor: monitor, onMonitoringFailure: failures.append)
         writer.receive(try video(time: 100, kind: .screen))
         writer.receive(try audio(time: 100.1))
         writer.receive(try audio(time: 100.2))
@@ -148,8 +148,8 @@ struct ScreenRecordingPortraitCaptureTests {
         outputs.blockedName = files.rawMicrophoneName
         let failures = Failures()
         let writer = ScreenRecordingCaptureWriter(files: files,
-            configuration: .init(microphone: true, voiceEffects: .init(preset: .warm)), width: 64, height: 48,
-            onFailure: failures.append, factory: outputs.make)
+                                                  configuration: .init(microphone: true, voiceEffects: .init(preset: .warm)), width: 64, height: 48,
+                                                  onFailure: failures.append, factory: outputs.make)
         writer.receive(try video(time: 100, kind: .screen))
         writer.receive(try audio(time: 100.125))
         await writer.flush()
@@ -168,9 +168,9 @@ struct ScreenRecordingPortraitCaptureTests {
         outputs.heldName = files.rawCameraName
         let failures = Failures()
         let writer = ScreenRecordingCaptureWriter(files: files,
-            configuration: .init(camera: true, portraitEffects: .init(brightening: 1)), width: 64, height: 48,
-            onFailure: failures.append, factory: outputs.make,
-            portraitProcessor: RecordingPortraitProcessor { _, _, _ in .init(faces: [.init(x: 0, y: 0, width: 1, height: 1)]) })
+                                                  configuration: .init(camera: true, portraitEffects: .init(brightening: 1)), width: 64, height: 48,
+                                                  onFailure: failures.append, factory: outputs.make,
+                                                  portraitProcessor: RecordingPortraitProcessor { _, _, _ in .init(faces: [.init(x: 0, y: 0, width: 1, height: 1)]) })
         writer.receive(try video(time: 100, kind: .screen))
         writer.receive(try video(time: 100.125, kind: .camera))
         await writer.flush()
@@ -199,16 +199,16 @@ struct ScreenRecordingPortraitCaptureTests {
         let files = try ScreenRecordingCaptureFiles(directory: fixture.directory)
         let outputs = Outputs()
         let writer = ScreenRecordingCaptureWriter(files: files,
-            configuration: .init(camera: true, portraitEffects: .init(brightening: 0.5)), width: 64, height: 48,
-            onFailure: { Issue.record("Resized camera capture must not fail: \($0)") }, factory: outputs.make,
-            portraitProcessor: RecordingPortraitProcessor { _, _, _ in .init(faces: [.init(x: 0, y: 0, width: 1, height: 1)]) })
+                                                  configuration: .init(camera: true, portraitEffects: .init(brightening: 0.5)), width: 64, height: 48,
+                                                  onFailure: { Issue.record("Resized camera capture must not fail: \($0)") }, factory: outputs.make,
+                                                  portraitProcessor: RecordingPortraitProcessor { _, _, _ in .init(faces: [.init(x: 0, y: 0, width: 1, height: 1)]) })
         writer.receive(try video(time: 100, kind: .screen))
         for (index, size) in [CGSize(width: 64, height: 48), CGSize(width: 32, height: 24)].enumerated() {
             let sample = try video(time: 100.125 + Double(index) * 0.125, kind: .camera, size: size)
             let source = try #require(sample.buffer.imageBuffer)
             CVBufferSetAttachment(source, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2, .shouldPropagate)
             CMSetAttachment(sample.buffer, key: kCMSampleBufferAttachmentKey_DisplayEmptyMediaImmediately,
-                value: kCFBooleanTrue, attachmentMode: kCMAttachmentMode_ShouldPropagate)
+                            value: kCFBooleanTrue, attachmentMode: kCMAttachmentMode_ShouldPropagate)
             writer.receive(sample)
             await writer.flush()
             let enhanced = try #require(outputs.items[files.cameraName]?.samples.last)
@@ -229,14 +229,14 @@ struct ScreenRecordingPortraitCaptureTests {
         try #require(CVPixelBufferCreate(nil, Int(size.width), Int(size.height), kCVPixelFormatType_32BGRA, nil, &pixel) == kCVReturnSuccess)
         let buffer = try #require(pixel)
         CIContext().render(CIImage(color: .init(red: 0.3, green: 0.25, blue: 0.2)).cropped(to: CGRect(origin: .zero, size: size)),
-            to: buffer, bounds: CGRect(origin: .zero, size: size), colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                           to: buffer, bounds: CGRect(origin: .zero, size: size), colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
         var format: CMVideoFormatDescription?
         try #require(CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: buffer, formatDescriptionOut: &format) == noErr)
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 30),
-            presentationTimeStamp: .init(seconds: time, preferredTimescale: 1_000_000), decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .init(seconds: time, preferredTimescale: 1_000_000), decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         try #require(CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: buffer, formatDescription: try #require(format),
-            sampleTiming: &timing, sampleBufferOut: &sample) == noErr)
+                                                              sampleTiming: &timing, sampleBufferOut: &sample) == noErr)
         return .init(buffer: try #require(sample), kind: kind, hostTime: time)
     }
 
@@ -246,15 +246,15 @@ struct ScreenRecordingPortraitCaptureTests {
         pcm.frameLength = 480
         for index in 0..<480 { pcm.floatChannelData![0][index] = Float(0.15 * sin(Double(index) * 2 * .pi * 440 / 48_000)) }
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 48_000),
-            presentationTimeStamp: .init(seconds: time, preferredTimescale: 1_000_000), decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .init(seconds: time, preferredTimescale: 1_000_000), decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         var size = 4
         try #require(CMSampleBufferCreateReady(allocator: nil, dataBuffer: nil, formatDescription: format.formatDescription,
-            sampleCount: 480, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 1,
-            sampleSizeArray: &size, sampleBufferOut: &sample) == noErr)
+                                               sampleCount: 480, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 1,
+                                               sampleSizeArray: &size, sampleBufferOut: &sample) == noErr)
         let result = try #require(sample)
         try #require(CMSampleBufferSetDataBufferFromAudioBufferList(result, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil,
-            flags: 0, bufferList: pcm.audioBufferList) == noErr)
+                                                                    flags: 0, bufferList: pcm.audioBufferList) == noErr)
         return .init(buffer: result, kind: .microphone, hostTime: time)
     }
 

@@ -28,7 +28,7 @@ struct FocusCountdownNoticePresentationTests {
         let paused = try #require(queue.left.first)
         #expect(paused.id == running.id && paused.detail == running.detail)
         #expect(try #require(paused.progress) > 0.25,
-            "Pausing must freeze the actual elapsed fraction even when the clock text has not changed")
+                "Pausing must freeze the actual elapsed fraction even when the clock text has not changed")
         #expect(queue.right.first?.progress == paused.progress)
         now += 1_000
         AppModel.refreshFocusCountdownNotices(for: pomodoro, in: queue)
@@ -78,7 +78,7 @@ struct FocusCountdownNoticePresentationTests {
                     mode: mode, phase: phase,
                     isScreenCleaning: screenCleaning, isKeyboardCleaning: keyboardCleaning
                 ) == (phase != .idle && !screenCleaning && !keyboardCleaning),
-                    "Only an active, unobstructed Pomodoro may expose its countdown controls")
+                "Only an active, unobstructed Pomodoro may expose its countdown controls")
             }
         }
     }

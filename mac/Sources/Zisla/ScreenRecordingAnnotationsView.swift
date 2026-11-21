@@ -77,11 +77,12 @@ struct ScreenRecordingAnnotationsView: View {
                     Button { add(kind) } label: { Label(AppLocalization.text(kind.title), systemImage: kind.symbol) }
                 }
             }.disabled(model.project.map { model.overlayTime >= model.overlayDuration
-                || ($0.edits.annotations?.count ?? 0) >= RecordingAnnotation.maximumCount } ?? true)
+                    || ($0.edits.annotations?.count ?? 0) >= RecordingAnnotation.maximumCount
+            } ?? true)
         }.disabled(!model.canEdit)
-        .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
-            if case let .annotation(id) = selection { expandedAnnotationID = id; sectionExpanded = true }
-        }
+            .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
+                if case let .annotation(id) = selection { expandedAnnotationID = id; sectionExpanded = true }
+            }
     }
 
     private func add(_ kind: RecordingAnnotationKind) {
@@ -102,12 +103,12 @@ struct ScreenRecordingAnnotationsView: View {
 
     private func numberField(_ title: String, id: UUID, path: WritableKeyPath<RecordingAnnotation, Double>) -> some View {
         ScreenRecordingNumberField(title: AppLocalization.text(title), value: binding(id, path: path, default: 0),
-            identifier: "screenRecording.annotationField." + id.uuidString + "." + title)
+                                   identifier: "screenRecording.annotationField." + id.uuidString + "." + title)
     }
 
     private func parameter(_ title: String, id: UUID, path: WritableKeyPath<RecordingAnnotation, Double>,
                            in range: ClosedRange<Double>) -> some View {
         ScreenRecordingParameterRow(title: AppLocalization.text(title), value: binding(id, path: path, default: range.lowerBound),
-            range: range, identifier: "screenRecording.annotationField." + id.uuidString + "." + title)
+                                    range: range, identifier: "screenRecording.annotationField." + id.uuidString + "." + title)
     }
 }

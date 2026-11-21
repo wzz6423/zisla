@@ -14,7 +14,7 @@ struct AIUsageHistoryPresentationTests {
     func historyRequestsRaiseOncePerClickAndReopenAfterClose() throws {
         let state = SystemMetricsHistoryPanelPresentationState()
         let panel = OrderingAIHistoryPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 760, height: 640),
-            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+                                           styleMask: [.titled, .closable], backing: .buffered, defer: false)
         let host = SettingsWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         host.isReleasedWhenClosed = false
@@ -24,7 +24,7 @@ struct AIUsageHistoryPresentationTests {
         var coordinator = AIUsageHistoryPanelPresenter.Coordinator(window: panel)
         func update() {
             coordinator.update(requestID: state.requestID, dismiss: state.dismiss,
-                controller: controller, languageStore: languageStore, hostWindow: host)
+                               controller: controller, languageStore: languageStore, hostWindow: host)
         }
         state.present()
         let first = try #require(state.requestID)
@@ -70,7 +70,7 @@ struct AIUsageHistoryPresentationTests {
         let history = AIUsageHistory(usageSamples: [sample])
         let domain = AIUsageHistoryPresentation.domain(history: history, range: range, now: today)
         let weeks = AIUsageHistoryPresentation.heatmap(history: history, domain: domain,
-            year: range == .all ? today : nil, now: today)
+                                                       year: range == .all ? today : nil, now: today)
         let root = UsageHeatmap(weeks: weeks, selectedDate: .constant(today), cellSize: 12)
             .environment(\.layoutDirection, direction)
         let renderer = ImageRenderer(content: root)
@@ -82,7 +82,7 @@ struct AIUsageHistoryPresentationTests {
         let host = NSHostingView(rootView: ScrollView(.horizontal) { root }.frame(width: 584, height: 160))
         host.sizingOptions = []
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 584, height: 160),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -115,7 +115,7 @@ struct AIUsageHistoryPresentationTests {
         let weeks: [[ContributionDay?]] = [[ContributionDay(date: day, tokens: 0)] + Array(repeating: nil, count: 6)]
         let host = NSHostingView(rootView: UsageHeatmap(weeks: weeks, selectedDate: Binding(get: { selected }, set: { selected = $0 }), cellSize: 12))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 160),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -138,7 +138,7 @@ struct AIUsageHistoryPresentationTests {
 
     /// All seven dates remain on one row; details appear only after a user selects a date and survive refreshes.
     @Test(arguments: [CGSize(width: 620, height: 360), CGSize(width: 760, height: 480)],
-        [LayoutDirection.leftToRight, .rightToLeft])
+          [LayoutDirection.leftToRight, .rightToLeft])
     @MainActor
     func historyWindowFitsAndRefreshKeepsTheSelectedDate(size: CGSize, direction: LayoutDirection) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
@@ -148,15 +148,15 @@ struct AIUsageHistoryPresentationTests {
         let older = try #require(Calendar.current.date(byAdding: .day, value: -1, to: today))
         let archiveStart = try #require(Calendar.current.date(byAdding: .year, value: -1, to: today))
         var samples = [AIUsageSample(provider: .codex, timestamp: today, inputTokens: 10, outputTokens: 2, model: "today-model"),
-            AIUsageSample(provider: .claude, timestamp: older, inputTokens: 20, outputTokens: 4, model: "older-model"),
-            AIUsageSample(provider: .gpt, timestamp: archiveStart, inputTokens: 1, outputTokens: 1, model: "archive-model")]
+                       AIUsageSample(provider: .claude, timestamp: older, inputTokens: 20, outputTokens: 4, model: "older-model"),
+                       AIUsageSample(provider: .gpt, timestamp: archiveStart, inputTokens: 1, outputTokens: 1, model: "archive-model")]
         let controller = AIUsageHistoryController(read: { .init(usageSamples: samples, modelUsageSamples: samples) }, clear: {}, write: { _, _ in })
         await controller.load()
         let host = NSHostingView(rootView: AIUsageHistoryContent(controller: controller, now: { today.addingTimeInterval(3600) })
             .environment(\.locale, language.locale).environment(\.layoutDirection, direction))
         host.sizingOptions = []
         let window = SystemMetricsHistoryPanel(contentRect: CGRect(origin: .zero, size: size),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+                                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -180,7 +180,7 @@ struct AIUsageHistoryPresentationTests {
                 ["accessibilityLabel", "accessibilityTitle", "accessibilityValue"].contains { value(object, $0) as? String == title }
             } as? any NSAccessibilityElementProtocol, "Missing history control \(title)")
             #expect(contentBounds.insetBy(dx: -1, dy: -1).contains(control.accessibilityFrame()),
-                "History title and actions must remain within the compact window")
+                    "History title and actions must remain within the compact window")
         }
         let cells = accessibilityObjects(host).filter {
             value($0, "accessibilityRole") as? String == NSAccessibility.Role.button.rawValue
@@ -190,15 +190,15 @@ struct AIUsageHistoryPresentationTests {
         let frames = cells.compactMap { ($0 as? any NSAccessibilityElementProtocol)?.accessibilityFrame() }
         #expect(frames.allSatisfy { $0.height >= 12 && $0.height <= 13.1 })
         #expect((frames.map(\.midY).max() ?? 0) - (frames.map(\.midY).min() ?? 0) < 1,
-            "The seven calendar dates must form one horizontal row")
+                "The seven calendar dates must form one horizontal row")
         #expect(Set(frames.map { Int($0.midX.rounded()) }).count == 7)
         let scroll = try #require(descendants(host).compactMap { $0 as? NSScrollView }.max(by: { $0.frame.height < $1.frame.height }))
         let scrollBounds = window.convertToScreen(scroll.convert(scroll.bounds, to: nil))
         #expect(contentBounds.insetBy(dx: -1, dy: -1).contains(scrollBounds),
-            "The scrolling body must shrink within the compact window")
+                "The scrolling body must shrink within the compact window")
         let weekViewport = window.convertToScreen(scroll.contentView.convert(scroll.contentView.bounds, to: nil))
         #expect(frames.allSatisfy { weekViewport.insetBy(dx: -1, dy: -1).contains($0) },
-            "Scrolling must reveal every date in the seven-day row")
+                "Scrolling must reveal every date in the seven-day row")
         func displayedValues() -> [String] {
             accessibilityObjects(host).compactMap { value($0, "accessibilityValue") as? String }
         }
@@ -214,7 +214,7 @@ struct AIUsageHistoryPresentationTests {
             as? any NSAccessibilityElementProtocol)
         let detailViewport = window.convertToScreen(scroll.contentView.convert(scroll.contentView.bounds, to: nil))
         #expect(detailViewport.insetBy(dx: -1, dy: -1).contains(detail.accessibilityFrame()),
-            "The selected day's model values must be reachable by scrolling")
+                "The selected day's model values must be reachable by scrolling")
         samples[0].inputTokens += 10
         await controller.load()
         try await settle()
@@ -257,7 +257,7 @@ struct AIUsageHistoryPresentationTests {
         }
         try #require(!visibleFrames.isEmpty)
         #expect(visibleFrames.allSatisfy { frame in !tracks.contains { $0.intersects(frame) } },
-            "History scrollbars must not cover chart labels, calendar cells, or model values")
+                "History scrollbars must not cover chart labels, calendar cells, or model values")
         #expect(!window.isVisible && window.level == .normal)
     }
 
@@ -271,9 +271,9 @@ struct AIUsageHistoryPresentationTests {
         let tomorrow = try #require(Calendar.current.date(byAdding: .day, value: 1, to: today))
         let samples = empty ? [] : [
             AIUsageSample(sourceID: AIUsageAnalytics.dailyUsageSummaryPrefix + "fixture", provider: .codex,
-                timestamp: today, inputTokens: 10, outputTokens: 2, model: "today-model"),
+                          timestamp: today, inputTokens: 10, outputTokens: 2, model: "today-model"),
             AIUsageSample(provider: .codex, timestamp: tomorrow.addingTimeInterval(-0.25),
-                inputTokens: 20, outputTokens: 2, model: "late-model"),
+                          inputTokens: 20, outputTokens: 2, model: "late-model"),
             AIUsageSample(provider: .claude, timestamp: yesterday, inputTokens: 20, outputTokens: 4, model: "older-model"),
             AIUsageSample(provider: .gpt, timestamp: tomorrow, inputTokens: 99, outputTokens: 1, model: "future-model"),
         ]
@@ -285,7 +285,7 @@ struct AIUsageHistoryPresentationTests {
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 620, height: 480),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -312,7 +312,7 @@ struct AIUsageHistoryPresentationTests {
         await settle()
         #expect(rangeControl(.day) == nil, "AI history must not expose a 24-hour range in \(language.rawValue)")
         #expect(SystemMetricsHistoryRange.allCases.filter { rangeControl($0) != nil } == [.week, .month, .all],
-            "The range picker must contain exactly 7 days, 30 days, and All")
+                "The range picker must contain exactly 7 days, 30 days, and All")
         let objects = accessibilityObjects(host)
         #expect(objects.contains { value($0, "accessibilityLabel") as? String == AppLocalization.string("AI token 用量热力图", language: language) })
         #expect(objects.contains {
@@ -328,7 +328,7 @@ struct AIUsageHistoryPresentationTests {
             (value($0, "accessibilityLabel") as? String)?.contains(today.formatted(date: .long, time: .omitted)) == true
         })
         #expect((value(todayCell, "accessibilityLabel") as? String)?.contains(empty ? "0 Token" : "34 Token") == true,
-            "The daily total must include midnight and the end of today while excluding tomorrow")
+                "The daily total must include midnight and the end of today while excluding tomorrow")
         try press(todayCell)
         await settle()
         if empty {
@@ -354,17 +354,17 @@ struct AIUsageHistoryPresentationTests {
         let recentDay = try #require(Calendar.current.date(byAdding: .day, value: -1, to: today))
         let archiveDay = try #require(Calendar.current.date(byAdding: .day, value: -8, to: today))
         var samples = [AIUsageSample(provider: .codex, timestamp: firstDay, inputTokens: 10, outputTokens: 2, model: "week-boundary"),
-            AIUsageSample(provider: .claude, timestamp: recentDay, inputTokens: 20, outputTokens: 4, model: "recent-model"),
-            AIUsageSample(provider: .gpt, timestamp: archiveDay, inputTokens: 30, outputTokens: 6, model: "archive-model")]
+                       AIUsageSample(provider: .claude, timestamp: recentDay, inputTokens: 20, outputTokens: 4, model: "recent-model"),
+                       AIUsageSample(provider: .gpt, timestamp: archiveDay, inputTokens: 30, outputTokens: 6, model: "archive-model")]
         var exported: AIUsageHistory?
         let controller = AIUsageHistoryController(read: { .init(usageSamples: samples, modelUsageSamples: samples) },
-            clear: {}, write: { history, _ in exported = history })
+                                                  clear: {}, write: { history, _ in exported = history })
         await controller.load()
         let host = NSHostingView(rootView: AIUsageHistoryContent(controller: controller, now: { now })
             .environment(\.locale, AppLanguage.english.locale))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 620, height: 480),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -424,7 +424,7 @@ struct AIUsageHistoryPresentationTests {
         #expect(contains("after-midnight") && !contains("week-boundary"))
         await controller.export(to: URL(fileURLWithPath: "/fixture.xlsx"))
         #expect(exported == AIUsageHistory(usageSamples: samples, modelUsageSamples: samples),
-            "Selecting a day in the week must not truncate exported history")
+                "Selecting a day in the week must not truncate exported history")
         #expect(!window.isVisible)
     }
 
@@ -433,13 +433,14 @@ struct AIUsageHistoryPresentationTests {
     func allHistoryControlsHaveRuntimeTranslationsAndSearchableAnchors() throws {
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let keys = ["用量历史", "AI 用量历史", "把全部 AI 用量历史导出为 xlsx 表格", "已清空 AI 用量历史", "清空失败：%@",
-            "清空 AI 用量历史？", "删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。",
-            "上一年", "下一年", "AI token 用量热力图", "查看历史记录", "导出", "清空", "取消", "重试", "刷新",
-            "时间范围", "正在读取历史记录", "已保存到 %@", "导出失败：%@", "Token 消耗趋势", "日期"]
+                    "清空 AI 用量历史？", "删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。",
+                    "上一年", "下一年", "AI token 用量热力图", "查看历史记录", "导出", "清空", "取消", "重试", "刷新",
+                    "时间范围", "正在读取历史记录", "已保存到 %@", "导出失败：%@", "Token 消耗趋势", "日期"]
             + [SystemMetricsHistoryRange.week, .month, .all].map(\.titleKey)
         for language in AppLanguage.allCases {
             let table = try #require(NSDictionary(contentsOf: package.appendingPathComponent(
-                "Resources/Localization/\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
+                "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
+            )) as? [String: String])
             for key in keys {
                 let value = try #require(table[key], "Missing \(key) in \(language.rawValue)")
                 #expect(!value.isEmpty && AppLocalization.string(key, language: language) == value)
@@ -458,7 +459,7 @@ struct AIUsageHistoryPresentationTests {
                 let matches = SettingsSearchIndex.results(for: query, settings: .default, locale: language.locale, displayCount: 1)
                     .filter { $0.section == .ai && $0.anchor == .group("用量历史") }
                 #expect(matches.count == 1 && matches.first?.title == "用量历史",
-                    "Current and previous history headings must resolve to the renamed setting in \(language.rawValue)")
+                        "Current and previous history headings must resolve to the renamed setting in \(language.rawValue)")
             }
         }
         #expect(AppLocalization.string("用量历史", language: .english) == "Usage History")
@@ -469,7 +470,7 @@ struct AIUsageHistoryPresentationTests {
         let contentStart = try #require(source.range(of: "struct AIUsageHistoryContent"))
         let settingsSource = String(source[settingsStart.lowerBound..<contentStart.lowerBound])
         #expect(settingsSource.contains(".task { await controller.load() }"),
-            "Settings reentry must refresh an old empty snapshot before export and clear controls are disabled")
+                "Settings reentry must refresh an old empty snapshot before export and clear controls are disabled")
     }
 
     @MainActor

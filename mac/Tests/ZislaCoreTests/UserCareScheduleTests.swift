@@ -146,7 +146,7 @@ struct UserCareScheduleTests {
         }
         _ = schedule.update(at: 100, isActive: true, idleSeconds: 0, localHour: 10)
         #expect(schedule.update(at: 100 + schedule.interval, isActive: true, idleSeconds: 0, localHour: 10,
-            chooseIndex: { $0.lowerBound }) == .water)
+                                chooseIndex: { $0.lowerBound }) == .water)
     }
 
     @Test
@@ -177,8 +177,8 @@ struct UserCareScheduleTests {
         var schedule = UserCareSchedule()
         _ = schedule.update(at: 0, isActive: true, idleSeconds: 0, localHour: 11)
         #expect(schedule.update(at: 2_700, isActive: true, idleSeconds: 0, localHour: 12,
-            chooseIndex: { $0.upperBound - 2 }) == .lunch)
+                                chooseIndex: { $0.upperBound - 2 }) == .lunch)
         #expect(schedule.update(at: 5_400, isActive: true, idleSeconds: 0, localHour: 23,
-            chooseIndex: { $0.upperBound - 1 }) == .tomorrow)
+                                chooseIndex: { $0.upperBound - 1 }) == .tomorrow)
     }
 }

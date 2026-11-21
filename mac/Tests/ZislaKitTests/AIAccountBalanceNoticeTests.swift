@@ -13,7 +13,7 @@ struct AIAccountBalanceNoticeTests {
         settings.islandPlacement.mode = .custom
         controller.update(balances: [balance(0)], settings: settings, language: .english)
         #expect(queue.left.isEmpty && queue.right.isEmpty,
-            "New settings must leave real provider monitoring and display explicitly unselected")
+                "New settings must leave real provider monitoring and display explicitly unselected")
     }
 
     @Test(arguments: AppLanguage.allCases)
@@ -21,7 +21,7 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(capacityPerSide: 4), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.coder], aiAccountBalanceDisplayedProviders: [.coder],
-            aiAccountBalanceQoderRegions: [.global, .china])
+                                       aiAccountBalanceQoderRegions: [.global, .china])
         var global = AIAccountBalanceCatalog.placeholder(for: [.coder], qoderRegion: .global)
         global.status = .available
         global.windows = [.init(id: "credits", kind: .all, remainingPercent: 10)]
@@ -38,15 +38,15 @@ struct AIAccountBalanceNoticeTests {
         global.windows = [.init(id: "credits", kind: .all, remainingPercent: 10)]
         controller.update(balances: [global, china], settings: settings, language: language)
         #expect(queue.left.map(\.id) == [global.noticeID],
-            "Recovering one region must not reissue the dismissed low-quota episode for the other region")
+                "Recovering one region must not reissue the dismissed low-quota episode for the other region")
     }
 
     @Test func pinnedQoderRegionsRotateWithDistinctAccountMetadataAndTitles() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.coder], aiAccountBalanceDisplayedProviders: [.coder],
-            aiAccountBalanceQoderRegions: [.global, .china])
+                                       aiAccountBalanceMonitoredProviders: [.coder], aiAccountBalanceDisplayedProviders: [.coder],
+                                       aiAccountBalanceQoderRegions: [.global, .china])
         settings.islandPlacement.mode = .custom
         let rows = AIAccountBalanceQoderRegion.allCases.map { region in
             var row = AIAccountBalanceCatalog.placeholder(for: [.coder], qoderRegion: region)
@@ -68,9 +68,9 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "shared", providers: providers, status: .available,
-            windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)])
+                                       windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)])
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: !pinned, aiAccountBalancePinnedInCustomIsland: pinned,
-            aiAccountBalanceMonitoredProviders: Set(providers), aiAccountBalanceDisplayedProviders: Set(providers))
+                                       aiAccountBalanceMonitoredProviders: Set(providers), aiAccountBalanceDisplayedProviders: Set(providers))
         settings.islandPlacement.mode = .custom
         controller.update(balances: [reading], settings: settings, language: .english)
         let notice = try #require(queue.left.first)
@@ -84,10 +84,10 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                                                 .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
         controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceCompactStyle: style,
-            aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt]), language: .english)
+                                                                         aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt]), language: .english)
         let notice = try #require(queue.left.first)
         #expect(notice.title == "ChatGPT" && notice.metadata?["quotaProviderID"] == "gpt")
         #expect(notice.metadata?["quotaLine0"] == "5h 10%" && notice.metadata?["quotaLine1"] == "7d 51%")
@@ -102,9 +102,9 @@ struct AIAccountBalanceNoticeTests {
         let weekly = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)
         let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
         let reading = AIAccountBalance(id: "shared", providers: [.gpt], status: .available,
-            windows: weeklyOnly ? [weekly] : [short, weekly])
+                                       windows: weeklyOnly ? [weekly] : [short, weekly])
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt])
+                                       aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [reading], settings: settings, language: language)
         let notice = try #require(queue.left.first)
@@ -112,7 +112,7 @@ struct AIAccountBalanceNoticeTests {
             : ["5h " + short.value(language: language), "7d " + weekly.value(language: language)]
         let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
         #expect(presentation.accountBalanceLines == expected,
-            "Default compact quota must keep the real 5h and 7d rows in \(language.rawValue)")
+                "Default compact quota must keep the real 5h and 7d rows in \(language.rawValue)")
         #expect(notice.metadata?["quotaLineSeverity0"] == (weeklyOnly ? "0" : "2"))
         #expect(notice.metadata?["quotaLineSeverity1"] == (weeklyOnly ? nil : "0"))
         #expect(notice.metadata?["quota5hSeverity"] == (weeklyOnly ? nil : "2"))
@@ -123,42 +123,41 @@ struct AIAccountBalanceNoticeTests {
     func horizontalQuotaMeasurementAndReadingBudgetUseTheRenderedDigitFont(twoLines: Bool) {
         let line = String(repeating: "Review 111% · ", count: 8) + "7d 59%"
         let notice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Codex", style: .status,
-            metadata: twoLines ? ["quotaLine0": "5h 10%", "quotaLine1": line] : ["quotaLine0": line])
+                                  metadata: twoLines ? ["quotaLine0": "5h 10%", "quotaLine1": line] : ["quotaLine0": line])
         let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
         let font = NSFont.monospacedDigitSystemFont(ofSize: twoLines ? 9 : 11, weight: twoLines ? .medium : .semibold)
         let width = ceil((line as NSString).size(withAttributes: [.font: font]).width)
         #expect(presentation.length(thickness: 34, edge: .top) == CGFloat(224))
         #expect(presentation.accountBalanceReadingSeconds(thickness: 34, edge: .top) == Double(width) / 32 + 2.4,
-            "Quota expiry and rotation must give the rendered monospaced digits enough time to reach their tail")
+                "Quota expiry and rotation must give the rendered monospaced digits enough time to reach their tail")
         let shortLines = twoLines ? ["5h 10%", "7d 11%"] : ["7d 11%"]
         let shortNotice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Codex", style: .status,
-            metadata: Dictionary(uniqueKeysWithValues: shortLines.enumerated().map { ("quotaLine\($0.offset)", $0.element) }))
+                                       metadata: Dictionary(uniqueKeysWithValues: shortLines.enumerated().map { ("quotaLine\($0.offset)", $0.element) }))
         let shortPresentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: shortNotice, text: "")
         let shortWidth = shortLines.map { ceil(($0 as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
         #expect(shortPresentation.length(thickness: 34, edge: .top) == 56 + shortWidth,
-            "Natural quota length must reserve the actual monospaced label width")
+                "Natural quota length must reserve the actual monospaced label width")
         #expect(shortPresentation.accountBalanceSideWidth(thickness: 34) == max(26, shortWidth) + 12,
-            "Camera wings must reserve the same measured label and their compact insets")
+                "Camera wings must reserve the same measured label and their compact insets")
     }
-
 
     @Test(arguments: [false, true])
     func additionalAndNamedWindowsNeverReplaceCanonicalRingMetadata(hasCanonical: Bool) throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var windows = [AIAccountQuotaWindow(id: "additional:spark:primary_window", kind: .fiveHours,
-            remainingPercent: 20, durationSeconds: 18_000, name: "Codex Spark"),
-            .init(id: "additional:spark:secondary_window", kind: .weekly, remainingPercent: 70,
-                durationSeconds: 604_800, name: "Codex Spark"),
-            .init(id: "named-weekly", kind: .weekly, remainingPercent: 30, durationSeconds: 604_800, name: "Sonnet"),
-            .init(id: "localized-weekly", kind: .weekly, remainingPercent: 40, nameKey: "模型额度")]
+                                            remainingPercent: 20, durationSeconds: 18_000, name: "Codex Spark"),
+                       .init(id: "additional:spark:secondary_window", kind: .weekly, remainingPercent: 70,
+                             durationSeconds: 604_800, name: "Codex Spark"),
+                       .init(id: "named-weekly", kind: .weekly, remainingPercent: 30, durationSeconds: 604_800, name: "Sonnet"),
+                       .init(id: "localized-weekly", kind: .weekly, remainingPercent: 40, nameKey: "模型额度")]
         if hasCanonical {
             windows += [.init(id: "primary_window", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
-                .init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)]
+                        .init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)]
         }
         controller.update(balances: [.init(id: "shared", providers: [.codex], status: .available, windows: windows)],
-            settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed,
-                aiAccountBalanceMonitoredProviders: [.codex]), language: .simplifiedChinese)
+                          settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed,
+                                                    aiAccountBalanceMonitoredProviders: [.codex]), language: .simplifiedChinese)
         let notice = try #require(queue.left.first)
         #expect(notice.metadata?["quota5hSeverity"] == (hasCanonical ? "2" : nil))
         #expect(notice.metadata?["quota5hFraction"] == (hasCanonical ? "0.1" : nil))
@@ -173,7 +172,7 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let fiveHours = AIAccountBalance(id: "5h-only", providers: [.gpt], status: .available,
-            windows: [.init(id: "primary_window", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)])
+                                         windows: [.init(id: "primary_window", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)])
         let settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalanceMonitoredProviders: [.gpt])
         controller.update(balances: [fiveHours], settings: settings, language: .simplifiedChinese)
         let short = try #require(queue.left.first)
@@ -182,8 +181,8 @@ struct AIAccountBalanceNoticeTests {
         #expect(short.metadata?["quota7dFraction"] == nil && short.metadata?["quota7dSeverity"] == nil)
 
         let weekly = AIAccountBalance(id: "weekly-credits", providers: [.gpt], status: .available,
-            windows: [.init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800),
-                .init(id: "credits", kind: .credits, remaining: 0, unit: .credits)])
+                                      windows: [.init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800),
+                                                .init(id: "credits", kind: .credits, remaining: 0, unit: .credits)])
         controller.update(balances: [weekly], settings: settings, language: .simplifiedChinese)
         let week = try #require(queue.left.first)
         #expect(week.metadata?["quotaLine0"] == "7d 51%" && week.metadata?["quotaLine1"] == "全部 积分余额 0 积分")
@@ -197,14 +196,14 @@ struct AIAccountBalanceNoticeTests {
         defer { queue.removeAll() }
         let windowNames = ["Weekly", "Opus", "Sonnet", "OAuth", "Routines", "Extra"]
         let claude = AIAccountBalance(id: "claude", providers: [.claude], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000)]
-                + windowNames.enumerated().map { .init(id: "window\($0.offset)", kind: .model,
-                    remainingPercent: 70, name: $0.element) })
+                                      windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000)]
+                                          + windowNames.enumerated().map { .init(id: "window\($0.offset)", kind: .model,
+                                                                                 remainingPercent: 70, name: $0.element) })
         let codex = AIAccountBalance(id: "codex", providers: [.codex], status: .available,
-            windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)]
-                + (0..<3).map { .init(id: "additional:\($0)", kind: .model, remainingPercent: 70, name: "Codex additional \($0)") })
+                                     windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)]
+                                         + (0..<3).map { .init(id: "additional:\($0)", kind: .model, remainingPercent: 70, name: "Codex additional \($0)") })
         var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
+                                       aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         controller.update(balances: [claude, codex], settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
         let pinned = try #require(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID })
@@ -218,7 +217,7 @@ struct AIAccountBalanceNoticeTests {
         controller.updatePinned(at: Date(timeIntervalSince1970: exposed))
         controller.updatePinned(at: Date(timeIntervalSince1970: exposed + reading - 0.1))
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "claude",
-            "The long account must retain its entire reading budget after it becomes selected")
+                "The long account must retain its entire reading budget after it becomes selected")
         controller.updatePinned(at: Date(timeIntervalSince1970: exposed + reading + 0.1))
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "codex")
     }
@@ -227,19 +226,19 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
+                                       aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         let rows = [balance(70), balance(10, provider: .codex)]
         controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: queue.left, settings: settings) == .transient)
         controller.updatePinned(at: Date(timeIntervalSince1970: 120))
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Claude",
-            "An invisible pinned account must not rotate while its low reminder is selected")
+                "An invisible pinned account must not rotate while its low reminder is selected")
         queue.removeAll(withIDPrefix: "ai-balance-low-")
         controller.updatePinned(at: Date(timeIntervalSince1970: 121))
         controller.updatePinned(at: Date(timeIntervalSince1970: 125))
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Claude",
-            "The newly exposed account receives its complete five-second reading")
+                "The newly exposed account receives its complete five-second reading")
         controller.updatePinned(at: Date(timeIntervalSince1970: 126))
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Codex")
     }
@@ -250,12 +249,12 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
+                                       aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         controller.update(balances: [balance(70), balance(70, provider: .codex)], settings: settings,
-            language: .english, at: Date(timeIntervalSince1970: 100))
+                          language: .english, at: Date(timeIntervalSince1970: 100))
         queue.enqueue(IslandNotice(id: operationID, title: "Fixture", side: .left,
-            createdAt: Date(timeIntervalSince1970: 101)), expiresAfter: nil)
+                                   createdAt: Date(timeIntervalSince1970: 101)), expiresAfter: nil)
         controller.updatePinned(at: Date(timeIntervalSince1970: 120))
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "claude")
         queue.remove(id: operationID)
@@ -270,11 +269,11 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let windows = [AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
-            .init(id: "weekly", kind: .weekly, remainingPercent: 70)]
+                       .init(id: "weekly", kind: .weekly, remainingPercent: 70)]
         let rows = [AIProvider.claude, .codex].map { AIAccountBalance(id: $0.rawValue, providers: [$0], status: .available, windows: windows) }
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.claude, .codex],
-            aiAccountBalanceDisplayedProviders: [.claude, .codex])
+                                       aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.claude, .codex],
+                                       aiAccountBalanceDisplayedProviders: [.claude, .codex])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
         let first = try #require(queue.left.first)
@@ -291,19 +290,19 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
+                                       aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
         settings.islandPlacement.mode = .custom
         let claude = balance(70), gemini = balance(80, provider: .gemini)
         controller.update(balances: [claude, gemini], settings: settings, language: .english,
-            at: Date(timeIntervalSince1970: 100))
+                          at: Date(timeIntervalSince1970: 100))
         controller.update(balances: [claude, gemini], settings: settings, language: .english,
-            at: Date(timeIntervalSince1970: 104))
+                          at: Date(timeIntervalSince1970: 104))
         #expect(queue.left.first?.title == "Claude")
         controller.update(balances: [claude, balance(10, provider: .gemini)], settings: settings, language: .english,
-            at: Date(timeIntervalSince1970: 105))
+                          at: Date(timeIntervalSince1970: 105))
         #expect(queue.left.first?.title == "Gemini", "The same reading must finish five seconds after its first appearance")
         controller.update(balances: [claude, balance(20, provider: .gemini)], settings: settings, language: .english,
-            at: Date(timeIntervalSince1970: 109))
+                          at: Date(timeIntervalSince1970: 109))
         controller.updatePinned(at: Date(timeIntervalSince1970: 110))
         #expect(queue.left.first?.title == "Gemini", "A changed quota must get a complete new reading before rotation")
     }
@@ -313,10 +312,10 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
-            windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)])
+                                       windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)])
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: !pinned,
-            aiAccountBalancePinnedInCustomIsland: pinned, aiAccountBalanceMonitoredProviders: [provider],
-            aiAccountBalanceDisplayedProviders: [provider])
+                                       aiAccountBalancePinnedInCustomIsland: pinned, aiAccountBalanceMonitoredProviders: [provider],
+                                       aiAccountBalanceDisplayedProviders: [provider])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [reading], settings: settings, language: .simplifiedChinese)
         let notice = try #require(queue.left.first)
@@ -332,10 +331,10 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "debug:gpt", providers: [.gpt], status: .available,
-            windows: [.init(id: "quota", kind: .all, remainingPercent: 0)], isDebug: true)
+                                       windows: [.init(id: "quota", kind: .all, remainingPercent: 0)], isDebug: true)
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: !pinned,
-            aiAccountBalancePinnedInCustomIsland: pinned, aiAccountBalanceMonitoredProviders: [],
-            aiAccountBalanceDisplayedProviders: [])
+                                       aiAccountBalancePinnedInCustomIsland: pinned, aiAccountBalanceMonitoredProviders: [],
+                                       aiAccountBalanceDisplayedProviders: [])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [reading], settings: settings, language: .english)
         let notice = try #require(queue.left.first)
@@ -360,14 +359,14 @@ struct AIAccountBalanceNoticeTests {
         let controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "claude", providers: [.claude], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000)]
-                + (0..<7).map { .init(id: "model\($0)", kind: .model, remainingPercent: 70, name: "claude-opus-long-model-\($0)") }
-                + [.init(id: "extra", kind: .budget, remaining: 0, unit: .usd)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000)]
+                                           + (0..<7).map { .init(id: "model\($0)", kind: .model, remainingPercent: 70, name: "claude-opus-long-model-\($0)") }
+                                           + [.init(id: "extra", kind: .budget, remaining: 0, unit: .usd)])
         var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
+                                       aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         controller.update(balances: [reading, balance(70, provider: .gemini)], settings: settings,
-            language: .english, at: Date(timeIntervalSinceReferenceDate: 119))
+                          language: .english, at: Date(timeIntervalSinceReferenceDate: 119))
         for _ in 0..<400 { if await expiry.duration != nil { break }; await Task.yield() }
         #expect(await expiry.duration ?? .zero > .seconds(20), "The long real summary cannot expire on the default six-second timer")
         queue.removeAll(withIDPrefix: "ai-balance-low-")
@@ -383,13 +382,13 @@ struct AIAccountBalanceNoticeTests {
         var settings = FeatureSettings(islandLayoutStyle: style)
         settings.compactStatusPriority = [.transient]
         let notice = IslandNotice(id: "ai-balance-low-layout", title: "Claude", style: .status,
-            metadata: ["quotaSeverity": "2", "quotaRemainingFraction": "0.1", "quotaLine0": "5h 10%", "quotaLine1": "7d 59%"])
+                                  metadata: ["quotaSeverity": "2", "quotaRemainingFraction": "0.1", "quotaLine0": "5h 10%", "quotaLine1": "7d 59%"])
         let screenFrame = CGRect(x: -1440, y: 0, width: 1440, height: 900)
         let screen = ScreenSnapshot(displayID: 1, frame: screenFrame, visibleFrame: screenFrame,
-            safeAreaInsets: ScreenInsets(top: gap > 0 ? 34 : 0),
-            auxiliaryTopLeftArea: gap > 0 ? CGRect(x: -1440, y: 866, width: 720 - gap / 2, height: 34) : nil,
-            auxiliaryTopRightArea: gap > 0 ? CGRect(x: -720 + gap / 2, y: 866, width: 720 - gap / 2, height: 34) : nil,
-            menuBarHeightFallback: 24)
+                                    safeAreaInsets: ScreenInsets(top: gap > 0 ? 34 : 0),
+                                    auxiliaryTopLeftArea: gap > 0 ? CGRect(x: -1440, y: 866, width: 720 - gap / 2, height: 34) : nil,
+                                    auxiliaryTopRightArea: gap > 0 ? CGRect(x: -720 + gap / 2, y: 866, width: 720 - gap / 2, height: 34) : nil,
+                                    menuBarHeightFallback: 24)
         let engine = SideNoticeLayoutEngine()
         let actual = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
         var configuration = settings.islandScreenConfiguration
@@ -403,7 +402,7 @@ struct AIAccountBalanceNoticeTests {
         if style == .pill || gap > 0 {
             let center = style == .pill ? max(120, gap) : gap
             #expect((76...108).contains(actual.width - center),
-                "Short canonical quota must fit both camera wings without the old 24pt inset per wing; observed \(actual.width - center)pt")
+                    "Short canonical quota must fit both camera wings without the old 24pt inset per wing; observed \(actual.width - center)pt")
             #expect(actual.midX == screen.frame.midX, "Tightening camera wings must keep the physical camera centered")
         } else {
             #expect(actual.width < 150, "A short reading on a simulated notch must use its ring and text's natural width")
@@ -415,10 +414,10 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "fixture", providers: [.claude], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 10)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                                                 .init(id: "weekly", kind: .weekly, remainingPercent: 10)])
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.claude], aiAccountBalanceDisplayedProviders: [.claude])
+                                       aiAccountBalanceMonitoredProviders: [.claude], aiAccountBalanceDisplayedProviders: [.claude])
         settings.islandPlacement.mode = .custom
         for style in MediaCompactStyle.allCases {
             settings.aiAccountBalanceCompactStyle = style
@@ -436,7 +435,7 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.qwen], aiAccountBalanceDisplayedProviders: [.qwen])
+                                       aiAccountBalanceMonitoredProviders: [.qwen], aiAccountBalanceDisplayedProviders: [.qwen])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [balance(0, provider: .qwen)], settings: settings, language: .english)
         #expect(queue.left.isEmpty)
@@ -445,14 +444,14 @@ struct AIAccountBalanceNoticeTests {
     /// Every compact consumer must classify urgent events alike while leaving persistent quota in its own priority.
     @Test func transientClassificationRecognizesAlertsWithoutIncludingPersistentBalance() {
         for notice in [IslandNotice(id: "focus-transition-fixture", title: "Focus"),
-            IslandNotice(id: "headphone-fixture", title: "Audio", style: .headphone),
-            IslandNotice(id: "battery-low", title: "Battery"),
-            IslandNotice(id: "ai-balance-low-fixture", title: "Quota")] {
+                       IslandNotice(id: "headphone-fixture", title: "Audio", style: .headphone),
+                       IslandNotice(id: "battery-low", title: "Battery"),
+                       IslandNotice(id: "ai-balance-low-fixture", title: "Quota")] {
             #expect(SideNoticeLayoutEngine.isTransientCompactNotice(notice))
         }
         for notice in [IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Quota"),
-            IslandNotice(id: "media-active-fixture", title: "Media"),
-            IslandNotice(id: "ordinary-fixture", title: "Ordinary")] {
+                       IslandNotice(id: "media-active-fixture", title: "Media"),
+                       IslandNotice(id: "ordinary-fixture", title: "Ordinary")] {
             #expect(!SideNoticeLayoutEngine.isTransientCompactNotice(notice))
         }
     }
@@ -533,8 +532,8 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var reading = AIAccountBalance(id: "amount-exhausted", providers: [.claude], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                                                 .init(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)])
         let exhausted = AIAccountQuotaWindow(id: "amount", kind: kind, remaining: 0, unit: kind == .credits ? .credits : .usd)
         reading.windows.append(exhausted)
         controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceMonitoredProviders: [.claude]), language: .simplifiedChinese)
@@ -551,7 +550,7 @@ struct AIAccountBalanceNoticeTests {
         defer { queue.removeAll() }
         let rows = [balance(70), balance(50, provider: .gemini), balance(10, provider: .gpt)]
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.claude, .gemini, .gpt], aiAccountBalanceDisplayedProviders: [.claude, .gemini, .gpt])
+                                       aiAccountBalanceMonitoredProviders: [.claude, .gemini, .gpt], aiAccountBalanceDisplayedProviders: [.claude, .gemini, .gpt])
         controller.update(balances: rows, settings: settings, language: .english)
         #expect(queue.left.isEmpty)
         settings.islandPlacement.mode = .custom
@@ -576,7 +575,7 @@ struct AIAccountBalanceNoticeTests {
         var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed)
         settings.compactStatusPriority = [.transient]
         let low = IslandNotice(id: "ai-balance-low-fixture", title: "Claude", createdAt: Date(timeIntervalSince1970: 1),
-            style: .status, metadata: ["quotaProvider": "Claude", "quotaLine0": "5h 10%", "quotaLine1": "Weekly 70%"])
+                               style: .status, metadata: ["quotaProvider": "Claude", "quotaLine0": "5h 10%", "quotaLine1": "Weekly 70%"])
         let battery = IslandNotice(id: "battery-low", title: "Battery", detail: "20%", createdAt: Date(timeIntervalSince1970: 2), style: .status)
         let screen = ScreenSnapshot(displayID: 1, frame: CGRect(x: 0, y: 0, width: 1440, height: 900), visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))
         let engine = SideNoticeLayoutEngine()
@@ -596,7 +595,7 @@ struct AIAccountBalanceNoticeTests {
         queue.enqueue(ordinary, expiresAfter: nil)
         var controller: AIAccountBalanceNoticeController? = AIAccountBalanceNoticeController(queue: queue, sleep: { _ in try await clock.wait() })
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
+                                       aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
         settings.islandPlacement.mode = .custom
         controller?.update(balances: [balance(70), balance(80, provider: .gemini)], settings: settings, language: .english)
         for _ in 0..<400 {
@@ -625,7 +624,7 @@ struct AIAccountBalanceNoticeTests {
 
     private func balance(_ percent: Double, provider: AIProvider = .claude) -> AIAccountBalance {
         .init(id: provider.rawValue, providers: [provider], status: .available,
-            windows: [.init(id: "quota", kind: .all, remainingPercent: percent)])
+              windows: [.init(id: "quota", kind: .all, remainingPercent: percent)])
     }
 }
 

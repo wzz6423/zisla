@@ -27,8 +27,8 @@ struct PetSpriteRenderingTests {
                 let pixels = CGSize(width: viewport.width * scale, height: viewport.height * scale)
                 let width = Int(ceil(pixels.width)), height = Int(ceil(pixels.height))
                 let context = try #require(CGContext(data: nil, width: width, height: height,
-                    bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                     bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
                 context.scaleBy(x: scale, y: scale)
                 layer.render(in: context)
                 try expectAspect(NSBitmapImageRep(cgImage: #require(context.makeImage())), viewport: pixels, sourceSize: sourceSize)
@@ -46,7 +46,7 @@ struct PetSpriteRenderingTests {
             for scale: CGFloat in [1, 2] {
                 renderer.scale = scale
                 try expectAspect(NSBitmapImageRep(cgImage: #require(renderer.cgImage)),
-                    viewport: CGSize(width: viewport.width * scale, height: viewport.height * scale), sourceSize: sourceSize)
+                                 viewport: CGSize(width: viewport.width * scale, height: viewport.height * scale), sourceSize: sourceSize)
             }
         }
     }
@@ -55,17 +55,17 @@ struct PetSpriteRenderingTests {
     func collapsedPetPixelsFollowTheIslandCenterInTheFullPanel(edge: IslandEdge, reduceMotion: Bool) throws {
         let sprite = PetSprite(image: try image(size: CGSize(width: 182, height: 136)))
         let screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
-            visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056))
+                                    frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
+                                    visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056))
         let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: edge),
-            statusIconSize: edge.isVertical ? CGSize(width: 40, height: 120) : CGSize(width: 120, height: 32))).layout(for: screen)
+                                                                                 placement: IslandPlacement(mode: .custom, edge: edge),
+                                                                                 statusIconSize: edge.isVertical ? CGSize(width: 40, height: 120) : CGSize(width: 120, height: 32))).layout(for: screen)
         let bar = layout.collapsedFrame
         let height: CGFloat = 24
         let width = height * 182 / 136
         let container = CollapsedPetLayout.frame(for: layout, petAspectRatio: 182 / 136)
         let content = CollapsedPetView.pillPet(sprite: sprite, behavior: PetBehaviorController(),
-            layout: layout, compactBarFrame: bar, side: .right)
+                                               layout: layout, compactBarFrame: bar, side: .right)
             .frame(width: container.width, height: container.height)
             .environment(\._accessibilityReduceMotion, reduceMotion)
         let bitmap: NSBitmapImageRep
@@ -77,7 +77,7 @@ struct PetSpriteRenderingTests {
             let host = NSHostingView(rootView: content)
             host.sizingOptions = []
             let window = NSWindow(contentRect: CGRect(origin: .zero, size: container.size),
-                styleMask: .borderless, backing: .buffered, defer: false)
+                                  styleMask: .borderless, backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = host
             defer { window.contentView = nil; window.close() }
@@ -87,8 +87,8 @@ struct PetSpriteRenderingTests {
             let frame = host.convert(view.bounds, from: view)
             let pixelsWide = Int(ceil(container.width * 2)), pixelsHigh = Int(ceil(container.height * 2))
             let context = try #require(CGContext(data: nil, width: pixelsWide, height: pixelsHigh,
-                bitsPerComponent: 8, bytesPerRow: pixelsWide * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: pixelsWide * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.translateBy(x: frame.minX * 2, y: (host.isFlipped ? container.height - frame.maxY : frame.minY) * 2)
             context.scaleBy(x: 2, y: 2)
             layer.render(in: context)
@@ -97,7 +97,8 @@ struct PetSpriteRenderingTests {
         let bounds = try visibleBounds(bitmap)
         let expectedCenter = CGPoint(
             x: (edge.isVertical ? bar.midX : bar.maxX + 4 + width / 2) - container.minX,
-            y: container.maxY - (edge.isVertical ? bar.minY - 4 - height / 2 : bar.midY))
+            y: container.maxY - (edge.isVertical ? bar.minY - 4 - height / 2 : bar.midY)
+        )
         #expect(abs(bounds.midX / 2 - expectedCenter.x) <= 0.5)
         #expect(abs(bounds.midY / 2 - expectedCenter.y) <= 0.5,
                 "The pet center must follow the island center instead of its previous top inset")
@@ -107,8 +108,8 @@ struct PetSpriteRenderingTests {
 
     private func image(size: CGSize) throws -> NSImage {
         let context = try #require(CGContext(data: nil, width: Int(size.width), height: Int(size.height),
-            bitsPerComponent: 8, bytesPerRow: Int(size.width) * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bitsPerComponent: 8, bytesPerRow: Int(size.width) * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(NSColor.red.cgColor)
         context.fill(CGRect(origin: .zero, size: size))
         context.clear(CGRect(x: size.width * 0.375, y: size.height * 0.375,
@@ -152,11 +153,11 @@ struct PetSpriteRenderingTests {
                             y: (viewport.height - expectedSize.height) / 2)
         // Each edge rounds independently to physical pixels.
         #expect(abs(bounds.minX - inset.x) <= 1
-                && abs(bounds.maxX - inset.x - expectedSize.width) <= 1,
-                "Pet width must preserve source proportions: rendered \(renderedSize), expected \(expectedSize), viewport \(viewport)px")
+            && abs(bounds.maxX - inset.x - expectedSize.width) <= 1,
+            "Pet width must preserve source proportions: rendered \(renderedSize), expected \(expectedSize), viewport \(viewport)px")
         #expect(abs(bounds.minY - inset.y) <= 1
-                && abs(bounds.maxY - inset.y - expectedSize.height) <= 1,
-                "Pet height must preserve source proportions: rendered \(renderedSize), expected \(expectedSize), viewport \(viewport)px")
+            && abs(bounds.maxY - inset.y - expectedSize.height) <= 1,
+            "Pet height must preserve source proportions: rendered \(renderedSize), expected \(expectedSize), viewport \(viewport)px")
         #expect(abs(bounds.midX * 2 - viewport.width) <= 1 && abs(bounds.midY * 2 - viewport.height) <= 1,
                 "The sprite must remain centered inside its viewport")
         let center = try #require(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2))

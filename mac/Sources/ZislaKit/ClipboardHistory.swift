@@ -225,7 +225,7 @@ public struct ClipboardHistoryItem: Identifiable, Codable, Equatable, Sendable {
         } else if contentType.conforms(to: .sourceCode) || contentType.conforms(to: .script) {
             return .code
         } else if contentType.conforms(to: .text) || contentType.conforms(to: .pdf) ||
-                  contentType.conforms(to: .spreadsheet) || contentType.conforms(to: .presentation) {
+            contentType.conforms(to: .spreadsheet) || contentType.conforms(to: .presentation) {
             return .document
         }
 

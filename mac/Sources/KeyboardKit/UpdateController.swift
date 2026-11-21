@@ -365,22 +365,22 @@ private struct UpdateCache: Codable {
 }
 
 #if DEBUG
-extension UpdateController {
-    static func preview(
-        state: UpdateCheckState,
-        preference: AutomaticUpdateCheckPreference = .enabled,
-        installedVersion: SemanticVersion = SemanticVersion(major: 0, minor: 3, patch: 2)
-    ) -> UpdateController {
-        let suiteName = "SimuBoard.UpdateController.Preview.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        let controller = UpdateController(
-            client: .failing(.invalidResponse),
-            installedVersion: installedVersion,
-            defaults: defaults
-        )
-        controller.automaticCheckPreference = preference
-        controller.state = state
-        return controller
+    extension UpdateController {
+        static func preview(
+            state: UpdateCheckState,
+            preference: AutomaticUpdateCheckPreference = .enabled,
+            installedVersion: SemanticVersion = SemanticVersion(major: 0, minor: 3, patch: 2)
+        ) -> UpdateController {
+            let suiteName = "SimuBoard.UpdateController.Preview.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            let controller = UpdateController(
+                client: .failing(.invalidResponse),
+                installedVersion: installedVersion,
+                defaults: defaults
+            )
+            controller.automaticCheckPreference = preference
+            controller.state = state
+            return controller
+        }
     }
-}
 #endif

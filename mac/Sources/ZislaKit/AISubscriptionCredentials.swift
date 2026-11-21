@@ -70,9 +70,9 @@ struct AISubscriptionCredentials: Sendable {
             password.utf8CString.withUnsafeBytes { passBytes in
                 salt.withUnsafeBytes { saltBytes in
                     CCKeyDerivationPBKDF(CCPBKDFAlgorithm(kCCPBKDF2), passBytes.bindMemory(to: Int8.self).baseAddress,
-                        passBytes.count - 1, saltBytes.bindMemory(to: UInt8.self).baseAddress, salt.count,
-                        CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1), 1003,
-                        keyBytes.bindMemory(to: UInt8.self).baseAddress, keyLength)
+                                         passBytes.count - 1, saltBytes.bindMemory(to: UInt8.self).baseAddress, salt.count,
+                                         CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1), 1003,
+                                         keyBytes.bindMemory(to: UInt8.self).baseAddress, keyLength)
                 }
             }
         }
@@ -87,8 +87,8 @@ struct AISubscriptionCredentials: Sendable {
                 key.withUnsafeBytes { keyBytes in
                     iv.withUnsafeBytes { ivBytes in
                         CCCrypt(CCOperation(kCCDecrypt), CCAlgorithm(kCCAlgorithmAES), CCOptions(kCCOptionPKCS7Padding),
-                            keyBytes.baseAddress, key.count, ivBytes.baseAddress, bytes.baseAddress, payload.count,
-                            out.baseAddress, capacity, &count)
+                                keyBytes.baseAddress, key.count, ivBytes.baseAddress, bytes.baseAddress, payload.count,
+                                out.baseAddress, capacity, &count)
                     }
                 }
             }
@@ -109,7 +109,7 @@ struct AISubscriptionCredentials: Sendable {
         uiFailPolicy: CFString? = keychainUIFailPolicy
     ) -> Data? {
         try? readKeychainCredentialWithoutPrompt(service: service, account: account,
-            copyMatching: copyMatching, allowsRead: allowsRead, uiFailPolicy: uiFailPolicy)?.data
+                                                 copyMatching: copyMatching, allowsRead: allowsRead, uiFailPolicy: uiFailPolicy)?.data
     }
 
     struct KeychainCredential: Sendable {
@@ -209,11 +209,13 @@ struct AISubscriptionCredentials: Sendable {
     // Legacy ACL inspection has no SecItem equivalent. Resolve its C ABI without deprecated imports.
     private typealias KeychainItemTypeID = @convention(c) () -> CFTypeID
     private typealias KeychainItemCopyAccess = @convention(c) (
-        CFTypeRef, UnsafeMutablePointer<Unmanaged<SecAccess>?>) -> OSStatus
+        CFTypeRef, UnsafeMutablePointer<Unmanaged<SecAccess>?>
+    ) -> OSStatus
     private typealias AccessCopyMatchingACLList = @convention(c) (SecAccess, CFTypeRef) -> Unmanaged<CFArray>?
     private typealias ACLCopyContents = @convention(c) (
         SecACL, UnsafeMutablePointer<Unmanaged<CFArray>?>, UnsafeMutablePointer<Unmanaged<CFString>?>,
-        UnsafeMutablePointer<SecKeychainPromptSelector>) -> OSStatus
+        UnsafeMutablePointer<SecKeychainPromptSelector>
+    ) -> OSStatus
     private typealias TrustedApplicationValidator = @convention(c) (SecTrustedApplication, UnsafePointer<CChar>) -> OSStatus
     private nonisolated(unsafe) static let securityFramework = dlopen(
         "/System/Library/Frameworks/Security.framework/Security", RTLD_NOW

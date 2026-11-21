@@ -61,7 +61,7 @@ struct AIResultSweepPresentationTests {
                 status: .succeeded, progress: progress, edge: .top
             ).frame(width: size.width, height: size.height).background(.black)
                 .mask(IslandRevealMask(collapsedSize: collapsedSize, expandedSize: size,
-                                      isCollapsed: true, collapsedCenterOffsetX: 70)))
+                                       isCollapsed: true, collapsedCenterOffsetX: 70)))
             let actual = try resultLightCenter(in: #require(renderer.cgImage), edge: .top)
             let expected = try resultLightCenter(in: #require(reference.cgImage), edge: .top)
             #expect(abs(actual - expected) < 1, "默认刘海扫光必须继续使用展开画布")

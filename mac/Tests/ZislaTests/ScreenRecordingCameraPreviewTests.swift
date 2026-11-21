@@ -387,7 +387,7 @@ struct ScreenRecordingCameraPreviewTests {
     @Test
     func rectangularPreviewKeepsItsLandscapeRatio() {
         let frame = ScreenRecordingCameraPreviewLayout.frame(configuration: .init(cameraRound: false),
-                                                              visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))
+                                                             visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))
         #expect(frame.width > frame.height)
         #expect(frame.height == frame.width * 0.75)
     }
@@ -396,7 +396,7 @@ struct ScreenRecordingCameraPreviewTests {
     func previewUsesTheSelectedCameraAspectRatio(_ ratio: RecordingCameraAspectRatio) {
         let configuration = RecordingEdits(cameraRound: false, cameraAspectRatio: ratio)
         let frame = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration,
-                                                              visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))
+                                                             visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))
         #expect(abs(frame.width / frame.height - ratio.ratio) < 0.000_001)
         #expect(CGRect(x: 0, y: 0, width: 1440, height: 900).contains(frame))
     }
@@ -407,7 +407,7 @@ struct ScreenRecordingCameraPreviewTests {
         let configuration = RecordingEdits(cameraPosition: .topLeft, cameraRound: false, cameraCornerRadius: radius)
         let frame = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration, visibleFrame: visible)
         let baseline = ScreenRecordingCameraPreviewLayout.frame(configuration: .init(cameraPosition: .topLeft, cameraRound: false),
-                                                                 visibleFrame: visible)
+                                                                visibleFrame: visible)
         #expect(frame == baseline)
         #expect(frame.height == frame.width * 0.75)
         #expect(visible.contains(frame))
@@ -481,7 +481,7 @@ struct ScreenRecordingCameraPreviewTests {
         let service = ScreenRecordingService(dependencies: system.dependencies())
         var publishedSize: Double?
         let controller = ScreenRecordingCameraPreviewController(capture: service,
-            changeSize: { publishedSize = $0 }, changeCornerRadius: { _ in })
+                                                                changeSize: { publishedSize = $0 }, changeCornerRadius: { _ in })
         let panel = try #require(app.windows.first {
             !windows.contains(ObjectIdentifier($0)) && $0.contentView is ScreenRecordingCameraPreviewView
         })
@@ -501,26 +501,30 @@ struct ScreenRecordingCameraPreviewTests {
         var configuration = RecordingEdits()
         controller.present(configuration: configuration, screen: screen)
         var cameraFrame = try expectCameraFrame(ScreenRecordingCameraPreviewLayout.frame(
-            configuration: configuration, visibleFrame: screen.visibleFrame))
+            configuration: configuration, visibleFrame: screen.visibleFrame
+        ))
         configuration.cameraPosition = .topLeft
         configuration.cameraSize = 0.2
         configuration.cameraAspectRatio = ratio
         controller.update(configuration: configuration)
         cameraFrame = try expectCameraFrame(ScreenRecordingCameraPreviewLayout.frame(
-            configuration: configuration, visibleFrame: screen.visibleFrame))
+            configuration: configuration, visibleFrame: screen.visibleFrame
+        ))
         configuration.cameraSize = 0.3
         configuration.cameraAspectRatio = .widescreen
         controller.update(configuration: configuration)
         cameraFrame = try expectCameraFrame(ScreenRecordingCameraPreviewLayout.frame(
             configuration: configuration, visibleFrame: screen.visibleFrame,
-            center: CGPoint(x: cameraFrame.midX, y: cameraFrame.midY)))
+            center: CGPoint(x: cameraFrame.midX, y: cameraFrame.midY)
+        ))
         configuration.cameraPosition = .bottomRight
         controller.update(configuration: configuration)
         cameraFrame = try expectCameraFrame(ScreenRecordingCameraPreviewLayout.frame(
-            configuration: configuration, visibleFrame: screen.visibleFrame))
+            configuration: configuration, visibleFrame: screen.visibleFrame
+        ))
         let translation = CGSize(width: -20, height: -20)
         let resized = ScreenRecordingCameraPreviewLayout.resize(frame: cameraFrame, corner: .topLeft,
-            translation: translation, visibleFrame: screen.visibleFrame)
+                                                                translation: translation, visibleFrame: screen.visibleFrame)
         let onResize = try #require(preview.onResize)
         onResize(.topLeft, cameraFrame, translation)
         let actualResized = try expectCameraFrame(resized.frame)
@@ -537,7 +541,7 @@ struct ScreenRecordingCameraPreviewTests {
         let system = CameraPreviewTestSystem()
         let service = ScreenRecordingService(dependencies: system.dependencies())
         let controller = ScreenRecordingCameraPreviewController(capture: service,
-            changeSize: { _ in }, changeCornerRadius: { _ in })
+                                                                changeSize: { _ in }, changeCornerRadius: { _ in })
         let panel = try #require(app.windows.first {
             !windows.contains(ObjectIdentifier($0)) && $0.contentView is ScreenRecordingCameraPreviewView
         })
@@ -545,24 +549,24 @@ struct ScreenRecordingCameraPreviewTests {
         let preview = try #require(panel.contentView as? ScreenRecordingCameraPreviewView)
         let side = min(screen.visibleFrame.width, screen.visibleFrame.height)
         let configuration = RecordingEdits(cameraSize: Double((203 + fraction) / side),
-            cameraRound: false, cameraAspectRatio: .widescreen)
+                                           cameraRound: false, cameraAspectRatio: .widescreen)
         let expected: CGRect
         if operation == "present" {
             let fractionalScreen = FractionalCameraTestScreen()
             fractionalScreen.testVisibleFrame = CGRect(x: fraction, y: fraction, width: 1070, height: 835)
             controller.present(screen: fractionalScreen)
             expected = ScreenRecordingCameraPreviewLayout.frame(configuration: .init(),
-                visibleFrame: fractionalScreen.visibleFrame).insetBy(dx: -10, dy: -10).integral
+                                                                visibleFrame: fractionalScreen.visibleFrame).insetBy(dx: -10, dy: -10).integral
         } else if operation == "update" {
             controller.present(screen: screen)
             let center = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
             controller.update(configuration: configuration)
             expected = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration,
-                visibleFrame: screen.visibleFrame, center: center).insetBy(dx: -10, dy: -10).integral
+                                                                visibleFrame: screen.visibleFrame, center: center).insetBy(dx: -10, dy: -10).integral
         } else {
             controller.present(screen: screen)
             let frame = CGRect(x: screen.visibleFrame.minX + 100 + fraction,
-                y: screen.visibleFrame.minY + 100 + fraction, width: 203.25, height: 114 + fraction)
+                               y: screen.visibleFrame.minY + 100 + fraction, width: 203.25, height: 114 + fraction)
             let resize = try #require(preview.onResize)
             resize(.topRight, frame, .zero)
             expected = frame.insetBy(dx: -10, dy: -10).integral
@@ -570,7 +574,7 @@ struct ScreenRecordingCameraPreviewTests {
         preview.layoutSubtreeIfNeeded()
         let layer = try #require(preview.layer?.sublayers?.first)
         #expect(panel.frame == expected,
-            "The native window must receive the integral frame before AppKit applies platform rounding")
+                "The native window must receive the integral frame before AppKit applies platform rounding")
         #expect(layer.frame == CGRect(x: 10, y: 10, width: expected.width - 20, height: expected.height - 20))
         #expect(!panel.isVisible)
     }
@@ -582,8 +586,8 @@ struct ScreenRecordingCameraPreviewTests {
         let visible = CGRect(x: -1440, y: -200, width: 1440, height: 900)
         let original = CGRect(x: -900, y: 100, width: 200, height: 200 / ratio.ratio)
         let resized = ScreenRecordingCameraPreviewLayout.resize(frame: original, corner: corner,
-            translation: CGSize(width: corner.isLeft ? -30 : 30, height: (corner.isTop ? 30 : -30) / ratio.ratio),
-            visibleFrame: visible)
+                                                                translation: CGSize(width: corner.isLeft ? -30 : 30, height: (corner.isTop ? 30 : -30) / ratio.ratio),
+                                                                visibleFrame: visible)
         #expect(abs(resized.frame.width - 230) < 0.000_001)
         #expect(abs(resized.frame.width / resized.frame.height - ratio.ratio) < 0.000_001)
         #expect(corner.isLeft ? resized.frame.maxX == original.maxX : resized.frame.minX == original.minX)
@@ -599,7 +603,7 @@ struct ScreenRecordingCameraPreviewTests {
         let original = ScreenRecordingCameraPreviewLayout.frame(configuration: .init(), visibleFrame: visible)
         for direction in [-1.0, 1.0] {
             let resized = ScreenRecordingCameraPreviewLayout.resize(frame: original, corner: corner,
-                translation: CGSize(width: direction * 100_000, height: direction * 100_000), visibleFrame: visible)
+                                                                    translation: CGSize(width: direction * 100_000, height: direction * 100_000), visibleFrame: visible)
             #expect(visible.contains(resized.frame))
             #expect(resized.frame.width > 0 && resized.frame.height > 0)
             #expect(resized.frame.width == resized.frame.height)
@@ -613,12 +617,13 @@ struct ScreenRecordingCameraPreviewTests {
         let center = CGPoint(x: -750, y: 300)
         let resized = ScreenRecordingCameraPreviewLayout.frame(
             configuration: .init(cameraSize: 0.3, cameraRound: false, cameraAspectRatio: .widescreen),
-            visibleFrame: visible, center: center)
+            visibleFrame: visible, center: center
+        )
         #expect(resized.midX == center.x)
         #expect(resized.midY == center.y)
         #expect(visible.contains(resized))
         let outside = ScreenRecordingCameraPreviewLayout.frame(configuration: .init(), visibleFrame: visible,
-            center: CGPoint(x: 10_000, y: -10_000))
+                                                               center: CGPoint(x: 10_000, y: -10_000))
         #expect(visible.contains(outside))
     }
 
@@ -670,7 +675,7 @@ struct ScreenRecordingCameraPreviewTests {
     func radiusHandleTracksPointerTranslationAndClampsWithoutResizing(size: CGSize) throws {
         let previewSize = CGSize(width: size.width + 20, height: size.height + 20)
         let window = CameraPreviewTestWindow(contentRect: CGRect(origin: CGPoint(x: 100, y: 100), size: previewSize),
-                              styleMask: [.borderless], backing: .buffered, defer: false)
+                                             styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
         let view = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: previewSize))
@@ -688,7 +693,7 @@ struct ScreenRecordingCameraPreviewTests {
         view.onResize = { _, _, _ in resized = true }
         func event(_ type: NSEvent.EventType, _ location: CGPoint) throws -> NSEvent {
             try #require(NSEvent.mouseEvent(with: type, location: view.convert(location, to: nil), modifierFlags: [],
-                timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+                                            timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
         }
         for start in [0.0, 0.25, 0.5] {
             view.update(session: nil, state: .running, configuration: .init(cameraCornerRadius: start))
@@ -725,7 +730,7 @@ struct ScreenRecordingCameraPreviewTests {
         corner: ScreenRecordingCameraPreviewLayout.Corner, ratio: RecordingCameraAspectRatio
     ) throws {
         let window = CameraPreviewTestWindow(contentRect: CGRect(x: 100, y: 100, width: 220, height: 200 / ratio.ratio + 20),
-                              styleMask: [.borderless], backing: .buffered, defer: false)
+                                             styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
         let view = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: window.frame.size))
@@ -737,7 +742,7 @@ struct ScreenRecordingCameraPreviewTests {
         let point = corner.point(in: view.bounds.insetBy(dx: 6, dy: 6))
         func event(_ type: NSEvent.EventType, _ location: CGPoint) throws -> NSEvent {
             try #require(NSEvent.mouseEvent(with: type, location: view.convert(location, to: nil), modifierFlags: [],
-                timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+                                            timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
         }
         let down = try event(.leftMouseDown, point)
         view.mouseEntered(with: down)
@@ -776,7 +781,7 @@ struct ScreenRecordingCameraPreviewTests {
     @Test
     func circularPreviewRadiusHandlePublishesCustomRoundingAndStopsAfterMouseUp() throws {
         let window = CameraPreviewTestWindow(contentRect: CGRect(x: 100, y: 100, width: 220, height: 220),
-                              styleMask: [.borderless], backing: .buffered, defer: false)
+                                             styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
         let view = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: window.frame.size))
@@ -787,7 +792,7 @@ struct ScreenRecordingCameraPreviewTests {
         let point = ScreenRecordingCameraPreviewLayout.radiusHandle(in: cameraFrame, radius: 0.5)
         func event(_ type: NSEvent.EventType, _ location: CGPoint) throws -> NSEvent {
             try #require(NSEvent.mouseEvent(with: type, location: view.convert(location, to: nil), modifierFlags: [],
-                timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+                                            timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
         }
         var radius: Double?
         view.onCornerRadiusChange = { radius = $0 }
@@ -806,27 +811,27 @@ struct ScreenRecordingCameraPreviewTests {
     func sourceFilterKeepsOtherApplicationWindowsAndExcludesOverlayAndUtilityWindows() {
         let frame = CGRect(x: -1200, y: -300, width: 600, height: 400)
         #expect(ScreenRecordingNativeCapture.includesWindow(frame: frame, layer: 0, processIdentifier: getpid() + 1,
-                                                           isRegularApplication: true, isOnScreen: true, isActive: true, alpha: 1))
+                                                            isRegularApplication: true, isOnScreen: true, isActive: true, alpha: 1))
         #expect(!ScreenRecordingNativeCapture.includesWindow(frame: frame, layer: 0, processIdentifier: getpid(),
-                                                            isRegularApplication: true, isOnScreen: true, isActive: true, alpha: 1))
+                                                             isRegularApplication: true, isOnScreen: true, isActive: true, alpha: 1))
         #expect(!ScreenRecordingNativeCapture.includesWindow(frame: frame, layer: 24, processIdentifier: getpid() + 1,
-                                                            isRegularApplication: true, isOnScreen: true, isActive: true, alpha: 1))
+                                                             isRegularApplication: true, isOnScreen: true, isActive: true, alpha: 1))
         #expect(!ScreenRecordingNativeCapture.includesWindow(frame: CGRect(x: 0, y: 0, width: 1, height: 100),
-                                                            layer: 0, processIdentifier: getpid() + 1, isRegularApplication: true,
-                                                            isOnScreen: true, isActive: true, alpha: 1))
+                                                             layer: 0, processIdentifier: getpid() + 1, isRegularApplication: true,
+                                                             isOnScreen: true, isActive: true, alpha: 1))
     }
 
     @Test
     func regularUntitledDocumentsRemainSelectableButCursorAndAutofillHelpersAreRejected() {
         let documentFrame = CGRect(x: -1200, y: -300, width: 600, height: 400)
         #expect(ScreenRecordingNativeCapture.includesWindow(frame: documentFrame, layer: 0, processIdentifier: getpid() + 1,
-                                                           isRegularApplication: true, isOnScreen: true, isActive: true, alpha: 1),
+                                                            isRegularApplication: true, isOnScreen: true, isActive: true, alpha: 1),
                 "TextEdit 等 regular 应用的未命名或被遮挡文稿仍应可选，过滤不得要求窗口标题")
         #expect(!ScreenRecordingNativeCapture.includesWindow(frame: documentFrame, layer: 0, processIdentifier: getpid() + 2,
-                                                            isRegularApplication: false, isOnScreen: true, isActive: true, alpha: 1),
+                                                             isRegularApplication: false, isOnScreen: true, isActive: true, alpha: 1),
                 "CursorUIViewService 和自动填充等 accessory/prohibited 辅助窗口不可成为录制来源")
         #expect(!ScreenRecordingNativeCapture.includesWindow(frame: documentFrame, layer: 0, processIdentifier: nil,
-                                                            isRegularApplication: false, isOnScreen: true, isActive: true, alpha: 1))
+                                                             isRegularApplication: false, isOnScreen: true, isActive: true, alpha: 1))
     }
 
     @Test(arguments: [(onScreen: true, active: true, selectable: true),
@@ -836,8 +841,8 @@ struct ScreenRecordingCameraPreviewTests {
     func sourceFilterKeepsVisibleAndStageManagerWindows(sample: (onScreen: Bool, active: Bool, selectable: Bool)) {
         let frame = CGRect(x: -1200, y: -300, width: 600, height: 400)
         #expect(ScreenRecordingNativeCapture.includesWindow(frame: frame, layer: 0, processIdentifier: getpid() + 1,
-                                                           isRegularApplication: true, isOnScreen: sample.onScreen,
-                                                           isActive: sample.active, alpha: 1) == sample.selectable)
+                                                            isRegularApplication: true, isOnScreen: sample.onScreen,
+                                                            isActive: sample.active, alpha: 1) == sample.selectable)
     }
 
     @Test(arguments: [(alpha: 0.0, selectable: false), (alpha: 0.01, selectable: false),
@@ -845,16 +850,16 @@ struct ScreenRecordingCameraPreviewTests {
     func sourceFilterRejectsTransparentWindows(sample: (alpha: Double, selectable: Bool)) {
         let frame = CGRect(x: 0, y: 0, width: 600, height: 400)
         #expect(ScreenRecordingNativeCapture.includesWindow(frame: frame, layer: 0, processIdentifier: getpid() + 1,
-                                                           isRegularApplication: true, isOnScreen: true,
-                                                           isActive: true, alpha: sample.alpha) == sample.selectable)
+                                                            isRegularApplication: true, isOnScreen: true,
+                                                            isActive: true, alpha: sample.alpha) == sample.selectable)
     }
 
     @Test(arguments: [(onScreen: true, active: false), (onScreen: false, active: true)])
     func sourceFilterKeepsValidWindowsWhenOpacityMetadataIsUnavailable(sample: (onScreen: Bool, active: Bool)) {
         let frame = CGRect(x: 0, y: 0, width: 600, height: 400)
         #expect(ScreenRecordingNativeCapture.includesWindow(frame: frame, layer: 0, processIdentifier: getpid() + 1,
-                                                           isRegularApplication: true, isOnScreen: sample.onScreen,
-                                                           isActive: sample.active, alpha: nil))
+                                                            isRegularApplication: true, isOnScreen: sample.onScreen,
+                                                            isActive: sample.active, alpha: nil))
     }
 }
 

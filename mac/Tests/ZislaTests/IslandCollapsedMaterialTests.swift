@@ -17,7 +17,7 @@ struct IslandCollapsedMaterialTests {
             .frame(width: 160, height: 32))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 160, height: 32),
-            styleMask: [.borderless], backing: .buffered, defer: false)
+                              styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.close() }

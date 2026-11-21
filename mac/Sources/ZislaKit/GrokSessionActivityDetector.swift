@@ -85,13 +85,13 @@ public final class GrokSessionActivityDetector: AIActivityDetecting {
     private func recentEventFiles() -> [Candidate] {
         guard fileManager.fileExists(atPath: sessionsDirectory.path),
               let enumerator = fileManager.enumerator(
-                at: sessionsDirectory,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
+                  at: sessionsDirectory,
+                  includingPropertiesForKeys: [
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
+                  ],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -100,9 +100,9 @@ public final class GrokSessionActivityDetector: AIActivityDetecting {
         for case let url as URL in enumerator {
             guard url.lastPathComponent == "events.jsonl",
                   let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
                   ]),
                   values.isRegularFile == true else {
                 continue

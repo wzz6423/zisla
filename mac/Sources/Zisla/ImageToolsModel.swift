@@ -65,11 +65,11 @@ final class ImageToolsModel: ObservableObject {
             do {
                 let result = try await service.process(inputs, options: options, rasterTransform: rasterTransform,
                                                        progress: { [weak self] completed, total in
-                    await MainActor.run {
-                        self?.completed = completed
-                        self?.total = total
-                    }
-                })
+                                                           await MainActor.run {
+                                                               self?.completed = completed
+                                                               self?.total = total
+                                                           }
+                                                       })
                 guard let self else {
                     try? FileManager.default.removeItem(at: result.directoryURL)
                     return
@@ -101,7 +101,7 @@ final class ImageToolsModel: ObservableObject {
                 let image = try await loadImage(source)
                 try Task.checkCancellation()
                 self?.editorInput = ImageToolsEditorInput(inputURL: input,
-                    image: NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)))
+                                                          image: NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)))
             } catch {
                 self?.message = error is CancellationError ? AppLocalization.text("已取消") : error.localizedDescription
             }

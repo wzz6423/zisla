@@ -186,8 +186,8 @@ struct OverlayCoordinatorPointerRecoveryTests {
         defer { fixture.coordinator.stop() }
         let panel = try #require(fixture.content.window as? IslandPanel)
         let other = ScreenSnapshot(displayID: 302,
-            frame: CGRect(x: -20_000, y: 20_000, width: 1_920, height: 1_080),
-            visibleFrame: CGRect(x: -20_000, y: 20_000, width: 1_920, height: 1_080))
+                                   frame: CGRect(x: -20_000, y: 20_000, width: 1_920, height: 1_080),
+                                   visibleFrame: CGRect(x: -20_000, y: 20_000, width: 1_920, height: 1_080))
         fixture.coordinator.updateScreens([fixture.screen, other])
         NSWorkspace.shared.notificationCenter.post(
             name: NSWorkspace.activeSpaceDidChangeNotification, object: NSWorkspace.shared

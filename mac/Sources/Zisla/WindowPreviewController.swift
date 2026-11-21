@@ -182,7 +182,7 @@ struct WindowPreviewImageCache {
         if let liveIDs {
             order.removeAll { key in
                 guard key.processIdentifier == processIdentifier && !currentIDs.contains(key.windowID)
-                        && !liveIDs.contains(key.windowID) else { return false }
+                    && !liveIDs.contains(key.windowID) else { return false }
                 cachedSnapshots.removeValue(forKey: key)
                 return true
             }
@@ -366,7 +366,7 @@ struct WindowPreviewWindowMatch {
         let headers = companionFrames.filter { $0.width > $0.height * 6 }.sorted { $0.minY < $1.minY }
         return screenFrames.contains { screen in
             guard abs(screen.minX - frame.minX) <= 8 && abs(screen.maxX - frame.maxX) <= 8
-                    && abs(screen.minY - frame.minY) <= 48 else { return false }
+                && abs(screen.minY - frame.minY) <= 48 else { return false }
             var top = frame.maxY
             for header in headers where abs(screen.minX - header.minX) <= 8 && abs(screen.maxX - header.maxX) <= 8
                 && header.minY <= top + 8 && header.maxY <= screen.maxY + 8 {
@@ -406,10 +406,10 @@ struct WindowPreviewWindowMatch {
         mainScreenTop: CGFloat
     ) -> (title: String, frame: CGRect, companionFrames: [CGRect])? {
         guard let info = windowInfo.first(where: {
-            ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID
-                && ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier
-        }), let bounds = info[kCGWindowBounds as String] as? NSDictionary,
-            let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return nil }
+                  ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID
+                      && ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier
+              }), let bounds = info[kCGWindowBounds as String] as? NSDictionary,
+              let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return nil }
         let companionFrames = windowInfo.compactMap { window -> CGRect? in
             guard (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier,
                   (window[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
@@ -572,8 +572,7 @@ final class WindowPreviewController: ObservableObject {
         var dockSelection: () -> WindowPreviewSelection? = { WindowPreviewController.dockSelectionAtPointer() }
         var dockMenuIsOpen: () -> Bool = {
             WindowPreviewController.dockMenuIsOpen(processIdentifier:
-                NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first?.processIdentifier
-            )
+                NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first?.processIdentifier)
         }
         var switcherSelection: () -> WindowPreviewSelection? = { WindowPreviewController.switcherSelection() }
         var commandPressed: () -> Bool = { CGEventSource.flagsState(.combinedSessionState).contains(.maskCommand) }
@@ -1095,7 +1094,7 @@ final class WindowPreviewController: ObservableObject {
     ) -> Bool {
         guard let processIdentifier,
               let children = attribute(kAXChildrenAttribute, AXUIElementCreateApplication(processIdentifier))
-                as? [AXUIElement] else { return false }
+              as? [AXUIElement] else { return false }
         return children.contains { attribute(kAXRoleAttribute, $0) as? String == kAXMenuRole as String }
     }
 
@@ -1109,9 +1108,9 @@ final class WindowPreviewController: ObservableObject {
         )
         var hit: AXUIElement?
         guard AXUIElementCopyElementAtPosition(
-            AXUIElementCreateApplication(dock.processIdentifier),
-            Float(quartzPoint.x), Float(quartzPoint.y), &hit
-        ) == .success,
+                  AXUIElementCreateApplication(dock.processIdentifier),
+                  Float(quartzPoint.x), Float(quartzPoint.y), &hit
+              ) == .success,
               let item = hit,
               Self.attributeString(kAXSubroleAttribute, from: item) == "AXApplicationDockItem",
               let frame = Self.frame(of: item),

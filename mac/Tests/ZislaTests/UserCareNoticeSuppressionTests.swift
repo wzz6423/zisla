@@ -120,8 +120,8 @@ final class UserCareFeedbackFixture {
     @discardableResult
     func present(_ reminder: UserCareReminder, throttlesNoteUpdates: Bool = false) -> Bool {
         guard let message = feedback.message(for: reminder, settings: settings,
-            presentationAllowed: allowed, currentMessage: self.message, uptime: uptime, language: language,
-            throttlesNoteUpdates: throttlesNoteUpdates) else { return false }
+                                             presentationAllowed: allowed, currentMessage: self.message, uptime: uptime, language: language,
+                                             throttlesNoteUpdates: throttlesNoteUpdates) else { return false }
         self.message = message
         feedback.didPresent(reminder, at: uptime)
         return true

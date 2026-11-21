@@ -35,7 +35,7 @@ struct ImageToolsEditorTests {
         let before = try rgba(pixels(session.model.renderedImage()))
         let selection = CGRect(x: 24, y: 18, width: 48, height: 30)
         session.model.add(ScreenshotAnnotation(kind: .mosaic, rect: selection,
-            obscureEffect: effect, obscureStrength: 8))
+                                               obscureEffect: effect, obscureStrength: 8))
         let output = try #require(session.apply())
         let after = try rgba(output)
         #expect(output.width == 96 * pixelScale && output.height == 80 * pixelScale)
@@ -67,7 +67,7 @@ struct ImageToolsEditorTests {
         let session = ImageToolsEditorSession(image: try image())
         let original = try #require(session.model.pngData())
         session.model.add(ScreenshotAnnotation(kind: .mosaic,
-            rect: CGRect(x: 24, y: 18, width: 48, height: 30), obscureEffect: effect, obscureStrength: 6))
+                                               rect: CGRect(x: 24, y: 18, width: 48, height: 30), obscureEffect: effect, obscureStrength: 6))
         let obscured = try #require(session.model.pngData())
         #expect(obscured != original && session.model.canUndo)
         session.model.undo()
@@ -84,10 +84,10 @@ struct ImageToolsEditorTests {
         let session = ImageToolsEditorSession(image: try image(pixelScale: 2))
         let before = try rgba(pixels(session.model.renderedImage()))
         let annotation = ScreenshotAnnotation(kind: kind,
-            points: [CGPoint(x: 20, y: 24), CGPoint(x: 60, y: 42)],
-            rect: CGRect(x: 20, y: 18, width: 50, height: 30),
-            color: .black, lineWidth: 4, fontSize: 18,
-            obscureEffect: .pixelate, obscureStrength: 6)
+                                              points: [CGPoint(x: 20, y: 24), CGPoint(x: 60, y: 42)],
+                                              rect: CGRect(x: 20, y: 18, width: 50, height: 30),
+                                              color: .black, lineWidth: 4, fontSize: 18,
+                                              obscureEffect: .pixelate, obscureStrength: 6)
         if kind == .text {
             session.model.add(annotation, saveUndo: false)
             session.model.beginTextDraft(id: annotation.id, text: "", isNew: true)
@@ -121,7 +121,7 @@ struct ImageToolsEditorTests {
         let original = try rgba(pixels(source))
         let session = ImageToolsEditorSession(image: source)
         let region = ScreenshotAnnotation(kind: .mosaic,
-            rect: CGRect(x: 24, y: 18, width: 48, height: 30), obscureEffect: effect, obscureStrength: 8)
+                                          rect: CGRect(x: 24, y: 18, width: 48, height: 30), obscureEffect: effect, obscureStrength: 8)
         session.model.add(region)
         let preview = try rgba(pixels(session.model.mosaicPreviewImage))
         #expect(preview != original, "The regression begins with a successfully obscured preview")
@@ -157,9 +157,9 @@ struct ImageToolsEditorTests {
     func everyRequiredObscureFilterAndItsOutputMustSucceed(filterName: String, failOutput: Bool) throws {
         let session = ImageToolsEditorSession(image: try image())
         session.model.add(ScreenshotAnnotation(kind: .mosaic,
-            rect: CGRect(x: 24, y: 18, width: 48, height: 30),
-            obscureEffect: filterName == "CIGaussianBlur" ? .blur : .pixelate,
-            obscureStrength: 8, obscureBlurStrength: 4))
+                                               rect: CGRect(x: 24, y: 18, width: 48, height: 30),
+                                               obscureEffect: filterName == "CIGaussianBlur" ? .blur : .pixelate,
+                                               obscureStrength: 8, obscureBlurStrength: 4))
         var dependencies = ScreenshotEditorModel.RenderingDependencies()
         if failOutput {
             let output = dependencies.filterOutput
@@ -183,12 +183,12 @@ struct ImageToolsEditorTests {
         switch intent {
         case "emptyRectangle": session.model.add(ScreenshotAnnotation(kind: .mosaic, rect: .zero))
         case "outsideRectangle": session.model.add(ScreenshotAnnotation(kind: .mosaic,
-            rect: CGRect(x: 120, y: 120, width: 20, height: 20)))
+                                                                        rect: CGRect(x: 120, y: 120, width: 20, height: 20)))
         case "emptyBrush": session.model.add(ScreenshotAnnotation(kind: .mosaic, obscureShape: .brush))
         case "singlePointBrush": session.model.add(ScreenshotAnnotation(kind: .mosaic,
-            points: [CGPoint(x: 40, y: 40)], obscureShape: .brush))
+                                                                        points: [CGPoint(x: 40, y: 40)], obscureShape: .brush))
         case "outsideBrush": session.model.add(ScreenshotAnnotation(kind: .mosaic,
-            points: [CGPoint(x: 120, y: 120), CGPoint(x: 150, y: 150)], obscureShape: .brush))
+                                                                    points: [CGPoint(x: 120, y: 120), CGPoint(x: 150, y: 150)], obscureShape: .brush))
         default: break
         }
         session.model.renderingDependencies.makeMaskContext = { _, _ in nil }
@@ -207,9 +207,9 @@ struct ImageToolsEditorTests {
     func aLaterObscureFailureCannotExportAnEarlierPartiallyProcessedRegion() throws {
         let session = ImageToolsEditorSession(image: try image())
         session.model.add(ScreenshotAnnotation(kind: .mosaic,
-            rect: CGRect(x: 12, y: 12, width: 24, height: 24), obscureEffect: .pixelate))
+                                               rect: CGRect(x: 12, y: 12, width: 24, height: 24), obscureEffect: .pixelate))
         session.model.add(ScreenshotAnnotation(kind: .mosaic,
-            rect: CGRect(x: 48, y: 30, width: 24, height: 24), obscureEffect: .blur))
+                                               rect: CGRect(x: 48, y: 30, width: 24, height: 24), obscureEffect: .blur))
         let create = session.model.renderingDependencies.makeFilter
         session.model.renderingDependencies.makeFilter = { name in name == "CIGaussianBlur" ? nil : create(name) }
         #expect(session.apply() == nil && !session.isClosed)
@@ -328,8 +328,8 @@ struct ImageToolsEditorTests {
         defer { settings.flushPendingChanges() }
         let model = ScreenshotEditorModel(image: try image())
         let editor = ScreenshotEditorView(model: model, selectionState: ScreenshotAnnotationSelectionState(),
-            settingsStore: settings, toolbarOnly: true, mode: mode, onClose: {}, onCopy: {},
-            onPinToggle: { _ in }, onLongCapture: {})
+                                          settingsStore: settings, toolbarOnly: true, mode: mode, onClose: {}, onCopy: {},
+                                          onPinToggle: { _ in }, onLongCapture: {})
         let fixture = Fixture(editor, size: CGSize(width: 1_600, height: 38))
         defer { fixture.close() }
         await fixture.settle()
@@ -374,8 +374,8 @@ struct ImageToolsEditorTests {
         defer { settings.flushPendingChanges() }
         let model = ScreenshotEditorModel(image: try image())
         let editor = ScreenshotEditorView(model: model, selectionState: ScreenshotAnnotationSelectionState(),
-            settingsStore: settings, toolbarOnly: true, mode: .localImage,
-            onClose: {}, onCopy: {}, onPinToggle: { _ in }, onLongCapture: {})
+                                          settingsStore: settings, toolbarOnly: true, mode: .localImage,
+                                          onClose: {}, onCopy: {}, onPinToggle: { _ in }, onLongCapture: {})
         let fixture = Fixture(editor, size: CGSize(width: 1_600, height: 38))
         defer { fixture.close() }
         let release = AsyncStream<Void>.makeStream()
@@ -414,7 +414,7 @@ struct ImageToolsEditorTests {
         let original = try rgba(pixels(source))
         var applied: CGImage?
         let fixture = Fixture(ImageToolsEditorView(image: source, settingsStore: settings) { applied = $0 },
-            size: CGSize(width: 1_600, height: 480))
+                              size: CGSize(width: 1_600, height: 480))
         defer { fixture.close() }
         await fixture.settle()
         #expect(applied == nil)
@@ -437,7 +437,7 @@ struct ImageToolsEditorTests {
         let settings = isolatedSettings()
         defer { settings.remove() }
         let fixture = Fixture(ImageToolsEditorView(image: try image(), settingsStore: settings.store) { _ in },
-            size: CGSize(width: 1_600, height: 480))
+                              size: CGSize(width: 1_600, height: 480))
         defer { fixture.close() }
         await fixture.settle()
         let keyboard = try #require(fixture.keyboard)
@@ -462,7 +462,7 @@ struct ImageToolsEditorTests {
         let settings = isolatedSettings()
         defer { settings.remove() }
         let fixture = Fixture(ImageToolsEditorView(image: try image(), settingsStore: settings.store) { _ in },
-            size: CGSize(width: 1_600, height: 480))
+                              size: CGSize(width: 1_600, height: 480))
         defer { fixture.close() }
         await fixture.settle()
         let keyboard = try #require(fixture.keyboard)
@@ -471,7 +471,7 @@ struct ImageToolsEditorTests {
         session.model.add(selected)
         session.selectionState.selectedAnnotationID = selected.id
         let other = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 100, height: 100),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                             styleMask: .borderless, backing: .buffered, defer: false)
         other.isReleasedWhenClosed = false
         defer { other.close() }
         var flags: NSEvent.ModifierFlags = []
@@ -498,7 +498,7 @@ struct ImageToolsEditorTests {
         default: break
         }
         let event = try keyEvent(window: context == "otherWindow" ? other : fixture.window,
-            code: context == "ordinaryKey" ? 0 : 51, flags: flags)
+                                 code: context == "ordinaryKey" ? 0 : 51, flags: flags)
         #expect(!keyboard.handle(event))
         #expect(session.model.annotations == [selected])
         if context == "stale" { #expect(session.selectionState.selectedAnnotationID == nil) }
@@ -597,9 +597,9 @@ struct ImageToolsEditorTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let editor = ScreenshotEditorView(model: ScreenshotEditorModel(image: try image()),
-            selectionState: ScreenshotAnnotationSelectionState(), settingsStore: settings,
-            mode: .localImage, tableDirectory: { locations[.imageTools] },
-            onClose: {}, onCopy: {}, onPinToggle: { _ in }, onLongCapture: {})
+                                          selectionState: ScreenshotAnnotationSelectionState(), settingsStore: settings,
+                                          mode: .localImage, tableDirectory: { locations[.imageTools] },
+                                          onClose: {}, onCopy: {}, onPinToggle: { _ in }, onLongCapture: {})
         let panel = TablePanel()
         panel.isReleasedWhenClosed = false
         defer { panel.close() }
@@ -620,15 +620,15 @@ struct ImageToolsEditorTests {
 
     private func image(pixelScale: Int = 1) throws -> NSImage {
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil,
-            pixelsWide: 96 * pixelScale, pixelsHigh: 80 * pixelScale,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                                                   pixelsWide: 96 * pixelScale, pixelsHigh: 80 * pixelScale,
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         bitmap.size = CGSize(width: 96, height: 80)
         for y in 0..<bitmap.pixelsHigh {
             for x in 0..<bitmap.pixelsWide {
                 let dark = ((x / (3 * pixelScale)) + (y / (3 * pixelScale))).isMultiple(of: 2)
                 bitmap.setColor(NSColor(deviceRed: dark ? 0.1 : 0.9, green: dark ? 0.7 : 0.2,
-                    blue: dark ? 0.3 : 0.8, alpha: y < 6 * pixelScale ? 0 : 1), atX: x, y: y)
+                                        blue: dark ? 0.3 : 0.8, alpha: y < 6 * pixelScale ? 0 : 1), atX: x, y: y)
             }
         }
         let image = NSImage(size: bitmap.size)
@@ -642,8 +642,8 @@ struct ImageToolsEditorTests {
 
     private func keyEvent(window: NSWindow, code: UInt16, flags: NSEvent.ModifierFlags = []) throws -> NSEvent {
         try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags,
-            timestamp: 0, windowNumber: window.windowNumber, context: nil,
-            characters: "\u{7f}", charactersIgnoringModifiers: "\u{7f}", isARepeat: false, keyCode: code))
+                                      timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                      characters: "\u{7f}", charactersIgnoringModifiers: "\u{7f}", isARepeat: false, keyCode: code))
     }
 
     private func isolatedSettings() -> (store: FeatureSettingsStore, remove: () -> Void) {
@@ -657,8 +657,8 @@ struct ImageToolsEditorTests {
         var data = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try data.withUnsafeMutableBytes { bytes in
             let context = try #require(CGContext(data: bytes.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         return data

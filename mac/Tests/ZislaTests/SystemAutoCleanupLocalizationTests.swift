@@ -18,8 +18,8 @@ struct SystemAutoCleanupLocalizationTests {
         let controller = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/ImmediateCleanupController.swift"), encoding: .utf8)
         #expect(view.contains("AppLocalization.string(\"立即清理\", locale: locale)"))
         for key in ["立即清理", "正在清理", "清理完成",
-            "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看",
-            "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"] {
+                    "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看",
+                    "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"] {
             #expect(view.contains("\"\(key)\"") || controller.contains("\"\(key)\""))
             let value = try #require(table[key], "Missing \(language.rawValue) translation: \(key)")
             #expect(!value.isEmpty)
@@ -98,11 +98,11 @@ struct SystemAutoCleanupLocalizationTests {
         let settings = FeatureSettings(systemMonitorEnabled: enabled)
         for key in ["自动清理系统垃圾", "清理范围"] {
             let matches = SettingsSearchIndex.results(for: AppLocalization.string(key, locale: language.locale),
-                settings: settings, locale: language.locale)
+                                                      settings: settings, locale: language.locale)
             #expect(matches.contains { $0.section == .scheduledCleanup && $0.title == key && $0.anchor == .row(key) } == enabled)
         }
         let scopeMatches = SettingsSearchIndex.results(for: AppLocalization.string("仅可信", locale: language.locale),
-            settings: settings, locale: language.locale)
+                                                       settings: settings, locale: language.locale)
         #expect(scopeMatches.contains { $0.anchor == .row("清理范围") } == enabled)
     }
 

@@ -40,11 +40,11 @@ public final class ZCodeUsageDetector: AIUsageDetecting {
         // `input_tokens` already includes cached prompt tokens (Anthropic-style cache
         // columns are separate but additive-inclusive), so they must not be added on top.
         let sql = """
-            SELECT id, model_id, started_at, input_tokens, output_tokens
-            FROM model_usage
-            WHERE input_tokens > 0 OR output_tokens > 0
-            ORDER BY started_at ASC, id ASC
-            """
+        SELECT id, model_id, started_at, input_tokens, output_tokens
+        FROM model_usage
+        WHERE input_tokens > 0 OR output_tokens > 0
+        ORDER BY started_at ASC, id ASC
+        """
 
         var statement: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(database, sql, -1, &statement, nil)

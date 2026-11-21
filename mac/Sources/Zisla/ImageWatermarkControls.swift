@@ -38,8 +38,8 @@ struct ImageWatermarkControls: View {
                     text = $0
                     options.content = .text($0)
                 }), axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(1...3)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...3)
                 HStack {
                     AppLocalizedText("文字颜色")
                     TextField("#FFFFFF", text: $options.color).textFieldStyle(.roundedBorder)

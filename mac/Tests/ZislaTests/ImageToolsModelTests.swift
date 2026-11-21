@@ -132,7 +132,7 @@ struct ImageToolsModelTests {
         model.exportZIP([fixture.item], to: destination)
         await finished(model)
         let output = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/unzip"),
-            arguments: ["-p", destination.path, "images/source-png.png"], workingDirectoryURL: fixture.root)
+                                                        arguments: ["-p", destination.path, "images/source-png.png"], workingDirectoryURL: fixture.root)
         #expect(output.status == 0)
         #expect(output.standardOutput == fixture.bytes)
         #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
@@ -198,7 +198,7 @@ struct ImageToolsModelTests {
         var item: ImageProcessedItem {
             let summary = ImageFileSummary(width: 1, height: 1, frameCount: 1, fileSize: Int64(bytes.count), format: .png, hasMetadata: false)
             return ImageProcessedItem(inputURL: image, sourceURL: image, summary: summary,
-                outputs: [ImageProcessedOutput(url: image, format: .png, summary: summary)])
+                                      outputs: [ImageProcessedOutput(url: image, format: .png, summary: summary)])
         }
         init() throws {
             root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-image-model-test-\(UUID())")

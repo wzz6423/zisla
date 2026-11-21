@@ -93,7 +93,7 @@ public enum LegacyAppDataMigration {
         guard currentDefaults.object(forKey: migrationMarker) == nil else { return }
 
         for (key, value) in legacyDefaults.persistentDomain(forName: legacyDomainName) ?? [:]
-        where currentDefaults.object(forKey: key) == nil {
+            where currentDefaults.object(forKey: key) == nil {
             currentDefaults.set(value, forKey: key)
         }
         currentDefaults.set(true, forKey: migrationMarker)

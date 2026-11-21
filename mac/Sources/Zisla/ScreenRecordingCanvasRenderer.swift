@@ -12,7 +12,7 @@ struct RecordingCaptionLayout {
 
 extension RecordingExportRenderer {
     private static let hdrPreviewContext = CIContext(options: [.cacheIntermediates: false,
-        .workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!])
+                                                               .workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!])
 
     static func captionLayout(_ caption: RecordingCaption, canvas: CGRect) -> RecordingCaptionLayout {
         let fontSize = caption.fontSize.map { min(canvas.width, canvas.height) * $0 }
@@ -26,12 +26,12 @@ extension RecordingExportRenderer {
             let setter = CTFramesetterCreateWithAttributedString(captionText(caption.text, fontSize: fontSize))
             let width = canvas.width * 0.88 - padding * 2
             let suggested = CTFramesetterSuggestFrameSizeWithConstraints(setter, CFRange(location: 0, length: 0),
-                nil, CGSize(width: width, height: .infinity), nil)
+                                                                         nil, CGSize(width: width, height: .infinity), nil)
             box = CGRect(x: (canvas.width - width - padding * 2) / 2, y: canvas.height * 0.05,
                          width: width + padding * 2, height: min(suggested.height, canvas.height * 0.3) + padding * 2)
         }
         return RecordingCaptionLayout(box: box, fontSize: fontSize,
-            padding: max(0, min(padding, min(box.width, box.height) / 2 - 0.01)))
+                                      padding: max(0, min(padding, min(box.width, box.height) / 2 - 0.01)))
     }
 
     static func captionImage(_ caption: RecordingCaption, canvas: CGRect, drawsText: Bool = true,

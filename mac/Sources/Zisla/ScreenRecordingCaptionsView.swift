@@ -68,9 +68,9 @@ struct ScreenRecordingCaptionsView: View {
                     .accessibilityIdentifier("screenRecording.addCaption")
             }
         }.disabled(!model.canEdit)
-        .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
-            if case let .caption(id) = selection { expandedCaptionID = id; sectionExpanded = true }
-        }
+            .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
+                if case let .caption(id) = selection { expandedCaptionID = id; sectionExpanded = true }
+            }
     }
 
     private var generateButton: some View {
@@ -93,6 +93,6 @@ struct ScreenRecordingCaptionsView: View {
 
     private func timeField(_ title: String, id: UUID, keyPath: WritableKeyPath<RecordingCaption, Double>) -> some View {
         ScreenRecordingNumberField(title: AppLocalization.text(title), value: captionBinding(id, keyPath: keyPath, default: 0),
-            identifier: "screenRecording.captionField." + id.uuidString + "." + title)
+                                   identifier: "screenRecording.captionField." + id.uuidString + "." + title)
     }
 }

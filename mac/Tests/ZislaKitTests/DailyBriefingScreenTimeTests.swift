@@ -139,13 +139,13 @@ struct DailyBriefingScreenTimeTests {
         #expect(sqlite3_open(path.path, &database) == SQLITE_OK)
         defer { sqlite3_close(database) }
         let sql = """
-            PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;
-            CREATE TABLE ZSOURCE (Z_PK INTEGER, ZDEVICEID TEXT);
-            CREATE TABLE ZOBJECT (ZVALUESTRING TEXT, ZSTARTDATE REAL, ZENDDATE REAL, ZSTREAMNAME TEXT, ZSOURCE INTEGER);
-            INSERT INTO ZSOURCE VALUES (1, NULL), (2, 'remote');
-            INSERT INTO ZOBJECT VALUES ('com.example.editor', \(start.timeIntervalSinceReferenceDate - 30), \(start.timeIntervalSinceReferenceDate + 60), '/app/usage', 1);
-            INSERT INTO ZOBJECT VALUES ('remote.app', \(start.timeIntervalSinceReferenceDate), \(start.timeIntervalSinceReferenceDate + 60), '/app/usage', 2);
-            """
+        PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;
+        CREATE TABLE ZSOURCE (Z_PK INTEGER, ZDEVICEID TEXT);
+        CREATE TABLE ZOBJECT (ZVALUESTRING TEXT, ZSTARTDATE REAL, ZENDDATE REAL, ZSTREAMNAME TEXT, ZSOURCE INTEGER);
+        INSERT INTO ZSOURCE VALUES (1, NULL), (2, 'remote');
+        INSERT INTO ZOBJECT VALUES ('com.example.editor', \(start.timeIntervalSinceReferenceDate - 30), \(start.timeIntervalSinceReferenceDate + 60), '/app/usage', 1);
+        INSERT INTO ZOBJECT VALUES ('remote.app', \(start.timeIntervalSinceReferenceDate), \(start.timeIntervalSinceReferenceDate + 60), '/app/usage', 2);
+        """
         #expect(sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK)
         let wal = URL(fileURLWithPath: path.path + "-wal")
         let beforeDB = try Data(contentsOf: path)
@@ -168,7 +168,7 @@ struct DailyBriefingScreenTimeTests {
         try FileManager.default.createDirectory(at: device, withIntermediateDirectories: true)
         let file = device.appendingPathComponent(String(Int64(start.timeIntervalSinceReferenceDate * 1_000_000)))
         try segment([payload(at: start), payload(at: start.addingTimeInterval(120), gained: false),
-            payload(at: start.addingTimeInterval(180))]).write(to: file)
+                     payload(at: start.addingTimeInterval(180))]).write(to: file)
         let remote = try reader.readRemote(within: range)
         #expect(remote.count == 1)
         #expect(remote.first?.end == start.addingTimeInterval(120))

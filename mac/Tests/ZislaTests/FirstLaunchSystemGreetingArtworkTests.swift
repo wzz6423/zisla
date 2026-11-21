@@ -78,7 +78,7 @@ struct FirstLaunchSystemGreetingArtworkTests {
         let written = dot.trimmedPath(from: 0, to: artwork.strokeProgress(at: 1, index: 1))
         #expect(empty.isEmpty)
         #expect(written.strokedPath(StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)).boundingRect
-                == CGRect(x: -4, y: -4, width: 8, height: 8))
+            == CGRect(x: -4, y: -4, width: 8, height: 8))
     }
 
     @Test

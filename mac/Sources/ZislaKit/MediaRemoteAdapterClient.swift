@@ -268,7 +268,7 @@ private struct MediaRemoteAdapterResources: Sendable {
         if let scriptURL = Bundle.main.resourceURL?
             .appendingPathComponent("MediaRemoteAdapter/mediaremote-adapter.pl"),
            let frameworkURL = Bundle.main.privateFrameworksURL?
-            .appendingPathComponent("MediaRemoteAdapter.framework"),
+               .appendingPathComponent("MediaRemoteAdapter.framework"),
            fileManager.fileExists(atPath: scriptURL.path),
            fileManager.fileExists(atPath: frameworkURL.path) {
             return Self(scriptURL: scriptURL, frameworkURL: frameworkURL)

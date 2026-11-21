@@ -16,12 +16,12 @@ struct DailyBriefingNotificationTests {
         #expect(sqlite3_open(folder.appendingPathComponent("knowledgeC.db").path, &database) == SQLITE_OK)
         defer { sqlite3_close(database) }
         try execute("""
-            PRAGMA journal_mode=WAL;
-            PRAGMA wal_autocheckpoint=0;
-            CREATE TABLE ZSOURCE (Z_PK INTEGER PRIMARY KEY, ZDEVICEID TEXT);
-            CREATE TABLE ZOBJECT (ZVALUESTRING TEXT, ZSTARTDATE REAL, ZENDDATE REAL, ZSTREAMNAME TEXT, ZSOURCE INTEGER);
-            INSERT INTO ZSOURCE VALUES (1, NULL), (2, 'phone');
-            """, in: database)
+        PRAGMA journal_mode=WAL;
+        PRAGMA wal_autocheckpoint=0;
+        CREATE TABLE ZSOURCE (Z_PK INTEGER PRIMARY KEY, ZDEVICEID TEXT);
+        CREATE TABLE ZOBJECT (ZVALUESTRING TEXT, ZSTARTDATE REAL, ZENDDATE REAL, ZSTREAMNAME TEXT, ZSOURCE INTEGER);
+        INSERT INTO ZSOURCE VALUES (1, NULL), (2, 'phone');
+        """, in: database)
         try body(library, database)
     }
 
@@ -34,18 +34,18 @@ struct DailyBriefingNotificationTests {
         try withDatabase { library, database in
             let timestamp = start.timeIntervalSinceReferenceDate
             try execute("""
-                INSERT INTO ZOBJECT VALUES
-                  ('Receive', \(timestamp - 1), NULL, '/notification/usage', 1),
-                  ('Receive', \(timestamp), NULL, '/notification/usage', 1),
-                  ('Receive', \(timestamp + 30), NULL, '/notification/usage', 1),
-                  ('Receive', \(timestamp + 60), NULL, '/notification/usage', 1),
-                  ('Receive', \(timestamp + 120), NULL, '/notification/usage', 1),
-                  ('Receive', \(timestamp + 10), NULL, '/notification/usage', 2),
-                  ('Clear', \(timestamp + 30), NULL, '/notification/usage', 1),
-                  ('Click', \(timestamp + 30), NULL, '/notification/usage', 1),
-                  ('Receive', \(timestamp + 30), NULL, '/some/other/stream', 1),
-                  ('com.example.editor', \(timestamp), \(timestamp + 60), '/app/usage', 1);
-                """, in: database)
+            INSERT INTO ZOBJECT VALUES
+              ('Receive', \(timestamp - 1), NULL, '/notification/usage', 1),
+              ('Receive', \(timestamp), NULL, '/notification/usage', 1),
+              ('Receive', \(timestamp + 30), NULL, '/notification/usage', 1),
+              ('Receive', \(timestamp + 60), NULL, '/notification/usage', 1),
+              ('Receive', \(timestamp + 120), NULL, '/notification/usage', 1),
+              ('Receive', \(timestamp + 10), NULL, '/notification/usage', 2),
+              ('Clear', \(timestamp + 30), NULL, '/notification/usage', 1),
+              ('Click', \(timestamp + 30), NULL, '/notification/usage', 1),
+              ('Receive', \(timestamp + 30), NULL, '/some/other/stream', 1),
+              ('com.example.editor', \(timestamp), \(timestamp + 60), '/app/usage', 1);
+            """, in: database)
             let path = library.appendingPathComponent("Application Support/Knowledge/knowledgeC.db")
             let wal = URL(fileURLWithPath: path.path + "-wal")
             let original = try Data(contentsOf: path)
@@ -86,11 +86,11 @@ struct DailyBriefingNotificationTests {
     func malformedReceiptTimestampsDoNotEstablishCoverage() throws {
         try withDatabase { library, database in
             try execute("""
-                INSERT INTO ZOBJECT VALUES
-                  ('Receive', NULL, NULL, '/notification/usage', 1),
-                  ('Receive', 'unknown', NULL, '/notification/usage', 1),
-                  ('Receive', X'00', NULL, '/notification/usage', 1);
-                """, in: database)
+            INSERT INTO ZOBJECT VALUES
+              ('Receive', NULL, NULL, '/notification/usage', 1),
+              ('Receive', 'unknown', NULL, '/notification/usage', 1),
+              ('Receive', X'00', NULL, '/notification/usage', 1);
+            """, in: database)
             let result = DailyBriefingScreenTimeReader(library: library).read(within: DateInterval(start: start, duration: 3600))
             #expect(result.notificationCount == nil)
         }

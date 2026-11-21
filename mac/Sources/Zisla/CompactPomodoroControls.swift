@@ -13,7 +13,7 @@ struct CompactPomodoroControls: View {
         let row = edge.isVertical ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(spacing: 6))
         row {
             IconButton(symbol: pomodoro.phase == .running ? "pause.fill" : "play.fill",
-                help: toggleTitle, size: .compact, action: pomodoro.toggleStartPause)
+                       help: toggleTitle, size: .compact, action: pomodoro.toggleStartPause)
                 .accessibilityLabel(toggleTitle)
                 .accessibilityIdentifier("pomodoro.toggleStartPause")
             IconButton(symbol: "arrow.counterclockwise", help: resetTitle, size: .compact, action: pomodoro.reset)

@@ -193,7 +193,7 @@ struct BilibiliDirectDownloaderLifecycleTests {
             #expect(components.map(\.kind) == [.video, .audio])
             #expect(components.map(\.formatID) == ["32", "30280"])
             #expect(try components.map { try String(contentsOf: $0.fileURL, encoding: .utf8) }
-                    == ["/video.mp4", "/audio.m4a"])
+                == ["/video.mp4", "/audio.m4a"])
             #expect(await client.activeRequestCount == 0)
             #expect(await client.maximumActiveRequestCount == 2)
             #expect(await client.bytesWritten == 34)
@@ -212,7 +212,7 @@ struct BilibiliDirectDownloaderLifecycleTests {
 
         #expect(components.map(\.kind) == [.video, .audio])
         #expect(try components.map { try String(contentsOf: $0.fileURL, encoding: .utf8) }
-                == ["/video.mp4", "/audio.m4a"])
+            == ["/video.mp4", "/audio.m4a"])
         #expect(await client.requestedMediaURLs.count == 2)
         #expect(await client.activeRequestCount == 0)
     }
@@ -240,7 +240,7 @@ struct BilibiliDirectDownloaderLifecycleTests {
             #expect(try String(contentsOf: result.fileURL, encoding: .utf8) == "/video.mp4|/audio.m4a")
             #expect(requested.count == 3)
             #expect(requested.filter { $0.deletingPathExtension().lastPathComponent == backupTrack.rawValue }
-                    .map(\.host) == ["cdn.example", "backup.cdn.example"])
+                .map(\.host) == ["cdn.example", "backup.cdn.example"])
             #expect(await client.cancelledTracks.isEmpty)
             #expect(await client.activeRequestCount == 0)
             #expect(await client.maximumActiveRequestCount == 2)
@@ -463,8 +463,7 @@ private actor LifecycleBilibiliHTTPClient: BilibiliHTTPClient {
             let suffix = backupTrack == .video ? "mp4" : "m4a"
             let base = "\"baseUrl\":\"https://cdn.example/\(backupTrack.rawValue).\(suffix)\""
             json = json.replacingOccurrences(of: base, with:
-                base + ",\"backupUrl\":[\"https://backup.cdn.example/\(backupTrack.rawValue).\(suffix)\"]"
-            )
+                base + ",\"backupUrl\":[\"https://backup.cdn.example/\(backupTrack.rawValue).\(suffix)\"]")
         }
         return BilibiliHTTPDataResponse(data: Data(json.utf8), statusCode: 200)
     }

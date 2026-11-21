@@ -109,94 +109,94 @@ public final class OpenCodeSessionActivityDetector: AIActivityDetecting {
         sqlite3_busy_timeout(db, 500)
 
         let sql = """
-            SELECT s.id, s.title, s.time_created, s.time_updated,
-                   json_extract(m.data, '$.role') AS role,
-                   json_extract(m.data, '$.time.completed') AS completed,
+        SELECT s.id, s.title, s.time_created, s.time_updated,
+               json_extract(m.data, '$.role') AS role,
+               json_extract(m.data, '$.time.completed') AS completed,
+               (
+                   SELECT MAX(CAST(json_extract(m2.data, '$.time.created') AS INTEGER))
+                   FROM message m2
+                   WHERE m2.session_id = s.id
+                     AND json_extract(m2.data, '$.role') = 'user'
+               ) AS latest_user_created,
+               (
+                   SELECT json_extract(m2.data, '$.time.created')
+                   FROM message m2
+                   WHERE m2.session_id = s.id
+                     AND json_extract(m2.data, '$.role') = 'assistant'
+                   ORDER BY CAST(json_extract(m2.data, '$.time.created') AS INTEGER) DESC,
+                            m2.time_updated DESC,
+                            m2.id DESC
+                   LIMIT 1
+               ) AS latest_assistant_created,
+               (
+                   SELECT json_extract(m2.data, '$.time.completed')
+                   FROM message m2
+                   WHERE m2.session_id = s.id
+                     AND json_extract(m2.data, '$.role') = 'assistant'
+                   ORDER BY CAST(json_extract(m2.data, '$.time.created') AS INTEGER) DESC,
+                            m2.time_updated DESC,
+                            m2.id DESC
+                   LIMIT 1
+               ) AS latest_assistant_completed,
+               (
+                   SELECT json_extract(m2.data, '$.finish')
+                   FROM message m2
+                   WHERE m2.session_id = s.id
+                     AND json_extract(m2.data, '$.role') = 'assistant'
+                   ORDER BY CAST(json_extract(m2.data, '$.time.created') AS INTEGER) DESC,
+                            m2.time_updated DESC,
+                            m2.id DESC
+                   LIMIT 1
+               ) AS latest_assistant_finish,
+               COALESCE(
+                   json_extract(m.data, '$.modelID'),
+                   json_extract(m.data, '$.model.modelID'),
                    (
-                       SELECT MAX(CAST(json_extract(m2.data, '$.time.created') AS INTEGER))
-                       FROM message m2
-                       WHERE m2.session_id = s.id
-                         AND json_extract(m2.data, '$.role') = 'user'
-                   ) AS latest_user_created,
-                   (
-                       SELECT json_extract(m2.data, '$.time.created')
-                       FROM message m2
-                       WHERE m2.session_id = s.id
-                         AND json_extract(m2.data, '$.role') = 'assistant'
-                       ORDER BY CAST(json_extract(m2.data, '$.time.created') AS INTEGER) DESC,
-                                m2.time_updated DESC,
-                                m2.id DESC
-                       LIMIT 1
-                   ) AS latest_assistant_created,
-                   (
-                       SELECT json_extract(m2.data, '$.time.completed')
-                       FROM message m2
-                       WHERE m2.session_id = s.id
-                         AND json_extract(m2.data, '$.role') = 'assistant'
-                       ORDER BY CAST(json_extract(m2.data, '$.time.created') AS INTEGER) DESC,
-                                m2.time_updated DESC,
-                                m2.id DESC
-                       LIMIT 1
-                   ) AS latest_assistant_completed,
-                   (
-                       SELECT json_extract(m2.data, '$.finish')
-                       FROM message m2
-                       WHERE m2.session_id = s.id
-                         AND json_extract(m2.data, '$.role') = 'assistant'
-                       ORDER BY CAST(json_extract(m2.data, '$.time.created') AS INTEGER) DESC,
-                                m2.time_updated DESC,
-                                m2.id DESC
-                       LIMIT 1
-                   ) AS latest_assistant_finish,
-                   COALESCE(
-                       json_extract(m.data, '$.modelID'),
-                       json_extract(m.data, '$.model.modelID'),
-                       (
-                           SELECT COALESCE(
-                               json_extract(m2.data, '$.modelID'),
-                               json_extract(m2.data, '$.model.modelID')
-                           )
-                           FROM message m2
-                           WHERE m2.session_id = s.id
-                             AND (
-                                 json_extract(m2.data, '$.modelID') IS NOT NULL
-                                 OR json_extract(m2.data, '$.model.modelID') IS NOT NULL
-                             )
-                           ORDER BY m2.time_updated DESC, m2.id DESC
-                           LIMIT 1
+                       SELECT COALESCE(
+                           json_extract(m2.data, '$.modelID'),
+                           json_extract(m2.data, '$.model.modelID')
                        )
-                   ) AS model,
-                   COALESCE(
-                       json_extract(m.data, '$.variant'),
-                       json_extract(m.data, '$.model.variant'),
-                       (
-                           SELECT COALESCE(
-                               json_extract(m2.data, '$.variant'),
-                               json_extract(m2.data, '$.model.variant')
-                           )
-                           FROM message m2
-                           WHERE m2.session_id = s.id
-                             AND (
-                                 json_extract(m2.data, '$.variant') IS NOT NULL
-                                 OR json_extract(m2.data, '$.model.variant') IS NOT NULL
-                             )
-                           ORDER BY m2.time_updated DESC, m2.id DESC
-                           LIMIT 1
+                       FROM message m2
+                       WHERE m2.session_id = s.id
+                         AND (
+                             json_extract(m2.data, '$.modelID') IS NOT NULL
+                             OR json_extract(m2.data, '$.model.modelID') IS NOT NULL
+                         )
+                       ORDER BY m2.time_updated DESC, m2.id DESC
+                       LIMIT 1
+                   )
+               ) AS model,
+               COALESCE(
+                   json_extract(m.data, '$.variant'),
+                   json_extract(m.data, '$.model.variant'),
+                   (
+                       SELECT COALESCE(
+                           json_extract(m2.data, '$.variant'),
+                           json_extract(m2.data, '$.model.variant')
                        )
-                   ) AS variant,
-                   json_extract(m.data, '$.finish') AS finish
-            FROM session s
-            LEFT JOIN message m ON m.id = (
-                SELECT m2.id
-                FROM message m2
-                WHERE m2.session_id = s.id
-                ORDER BY m2.time_updated DESC, m2.time_created DESC, m2.id DESC
-                LIMIT 1
-            )
-            WHERE s.time_archived IS NULL
-            ORDER BY s.time_updated DESC
-            LIMIT ?
-            """
+                       FROM message m2
+                       WHERE m2.session_id = s.id
+                         AND (
+                             json_extract(m2.data, '$.variant') IS NOT NULL
+                             OR json_extract(m2.data, '$.model.variant') IS NOT NULL
+                         )
+                       ORDER BY m2.time_updated DESC, m2.id DESC
+                       LIMIT 1
+                   )
+               ) AS variant,
+               json_extract(m.data, '$.finish') AS finish
+        FROM session s
+        LEFT JOIN message m ON m.id = (
+            SELECT m2.id
+            FROM message m2
+            WHERE m2.session_id = s.id
+            ORDER BY m2.time_updated DESC, m2.time_created DESC, m2.id DESC
+            LIMIT 1
+        )
+        WHERE s.time_archived IS NULL
+        ORDER BY s.time_updated DESC
+        LIMIT ?
+        """
 
         var stmt: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(db, sql, -1, &stmt, nil)

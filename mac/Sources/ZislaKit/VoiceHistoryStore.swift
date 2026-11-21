@@ -456,7 +456,7 @@ public final class VoiceHistoryStore: ObservableObject {
         var audioDeletions: [(id: UUID, url: URL)] = []
 
         for index in candidate.indices
-        where candidate[index].createdAt < cutoffDate && candidate[index].audioFileName != nil {
+            where candidate[index].createdAt < cutoffDate && candidate[index].audioFileName != nil {
             guard let audioURL = audioURL(for: candidate[index]) else {
                 candidate[index].audioFileName = nil
                 continue
@@ -580,7 +580,7 @@ public final class VoiceHistoryStore: ObservableObject {
         var seen = Set<URL>()
         let commitRevision = UUID()
         for originalURL in audioURLs.map(\.standardizedFileURL)
-        where seen.insert(originalURL).inserted {
+            where seen.insert(originalURL).inserted {
             pendingAudioRevision = commitRevision
             let stagingURL = originalURL
                 .deletingLastPathComponent()

@@ -170,14 +170,14 @@ private final class CountdownFixture {
     var intervals: [TimeInterval] = []
     var actions: [@Sendable () -> Void] = []
     lazy var calendar = CalendarService(store: store, mutations: .live(store: store),
-        environment: CalendarServiceEnvironment(authorizationStatus: { [self] _ in access }, now: { [self] in date },
-            notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()))
+                                        environment: CalendarServiceEnvironment(authorizationStatus: { [self] _ in access }, now: { [self] in date },
+                                                                                notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()))
     lazy var controller = MeetingCountdownController(calendar: calendar, queue: queue, settings: settings,
-        language: language, now: { [self] in date }, makeTimer: { [self] interval, action in
-            let timer = Timer(timeInterval: interval, repeats: false) { _ in action() }
-            timers.append(timer); intervals.append(interval); actions.append(action)
-            return timer
-        })
+                                                     language: language, now: { [self] in date }, makeTimer: { [self] interval, action in
+                                                         let timer = Timer(timeInterval: interval, repeats: false) { _ in action() }
+                                                         timers.append(timer); intervals.append(interval); actions.append(action)
+                                                         return timer
+                                                     })
 
     init() throws {
         defaults = try #require(UserDefaults(suiteName: suite))
@@ -197,9 +197,9 @@ private final class CountdownFixture {
 
     func event(id: String = "meeting", start: Date) throws -> CountdownEvent {
         let event = try #require(CountdownEvent.perform(NSSelectorFromString("eventWithEventStore:"),
-            with: store)?.takeUnretainedValue() as? CountdownEvent)
+                                                        with: store)?.takeUnretainedValue() as? CountdownEvent)
         let calendar = try #require(CountdownCalendar.perform(NSSelectorFromString("calendarWithEventStore:"),
-            with: store)?.takeUnretainedValue() as? CountdownCalendar)
+                                                              with: store)?.takeUnretainedValue() as? CountdownCalendar)
         calendar.title = "Fixture"
         event.fixtureID = id; event.title = id; event.calendar = calendar
         event.startDate = start; event.endDate = start.addingTimeInterval(3_600)

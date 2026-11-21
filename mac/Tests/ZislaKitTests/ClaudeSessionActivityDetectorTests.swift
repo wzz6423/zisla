@@ -9,7 +9,7 @@ struct ClaudeSessionActivityDetectorTests {
         let root = makeTempRoot("claude-watch-candidates")
         defer { try? FileManager.default.removeItem(at: root) }
         try writeJSONL(under: root, relativePath: "project/old.jsonl", lines: [],
-            modifiedAt: Date(timeIntervalSince1970: 1_900_000_100))
+                       modifiedAt: Date(timeIntervalSince1970: 1_900_000_100))
         try writeJSONL(under: root, relativePath: "project/current.jsonl", lines: [
             claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "current", text: "hi"),
         ], modifiedAt: Date(timeIntervalSince1970: 1_900_000_200))
@@ -38,28 +38,28 @@ struct ClaudeSessionActivityDetectorTests {
         let log = projects.appendingPathComponent("project/current.jsonl")
         let user = claudeUser(timestamp: "2026-07-19T01:00:00.000Z", sessionId: "current", text: "hi")
         let ask = claudeAssistant(timestamp: "2026-07-19T01:00:01.000Z", sessionId: "current",
-            stopReason: "tool_use", model: "claude", toolUses: [("ask-1", "AskUserQuestion")])
+                                  stopReason: "tool_use", model: "claude", toolUses: [("ask-1", "AskUserQuestion")])
         try writeJSONL(under: projects, relativePath: "project/current.jsonl", lines: [user, ask], modifiedAt: .now)
         let detector = ClaudeSessionActivityDetector(projectsDirectory: projects,
-            sessionsDirectory: root.appendingPathComponent("sessions"))
+                                                     sessionsDirectory: root.appendingPathComponent("sessions"))
         let monitor = AIStateMonitor(directoryURL: root.appendingPathComponent("state"),
-            activityDetectors: [detector], activeTaskTTL: .greatestFiniteMagnitude,
-            detectorRefreshInterval: 24 * 60 * 60)
+                                     activityDetectors: [detector], activeTaskTTL: .greatestFiniteMagnitude,
+                                     detectorRefreshInterval: 24 * 60 * 60)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForClaudeMonitor { monitor.state.tasks.first?.status == .blocked })
 
         try appendJSONLLine(claudeUserToolResult(timestamp: "2026-07-19T01:00:02.000Z",
-            sessionId: "current", toolUseId: "ask-1", isError: false), to: log)
+                                                 sessionId: "current", toolUseId: "ask-1", isError: false), to: log)
         #expect(await waitForClaudeMonitor { monitor.state.tasks.first?.status == .running })
 
         let completed = claudeAssistant(timestamp: "2026-07-19T01:00:03.000Z", sessionId: "current",
-            stopReason: "end_turn", model: "claude", toolUses: [])
+                                        stopReason: "end_turn", model: "claude", toolUses: [])
         try Data(([user, completed].joined(separator: "\n") + "\n").utf8).write(to: log, options: .atomic)
         #expect(await waitForClaudeMonitor { monitor.state.tasks.isEmpty })
 
         try appendJSONLLine(claudeUser(timestamp: "2026-07-19T01:00:04.000Z",
-            sessionId: "current", text: "again"), to: log)
+                                       sessionId: "current", text: "again"), to: log)
         #expect(await waitForClaudeMonitor { monitor.state.tasks.first?.status == .running })
 
         try writeJSONL(under: projects, relativePath: "project/new.jsonl", lines: [

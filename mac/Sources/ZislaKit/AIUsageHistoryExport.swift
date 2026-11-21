@@ -11,27 +11,27 @@ public enum AIUsageHistoryExport {
 
     /// Exports daily totals and complete model splits as text-safe OOXML, excluding private source identifiers.
     public static func workbookData(history: AIUsageHistory, timeZone: TimeZone = .current,
-        modificationDate: Date = Date()) throws -> Data {
+                                    modificationDate: Date = Date()) throws -> Data {
         try Task.checkCancellation()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let days = AIUsageAnalytics.dailyModelUsage(history: history,
-            endingAt: (history.usageSamples + history.modelUsageSamples).map(\.timestamp).max() ?? modificationDate,
-            calendar: calendar).reversed()
+                                                    endingAt: (history.usageSamples + history.modelUsageSamples).map(\.timestamp).max() ?? modificationDate,
+                                                    calendar: calendar).reversed()
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         var totalRows = [row(1, [.text("date"), .text("input_tokens"), .text("output_tokens"), .text("total_tokens")])]
         var modelRows = [row(1, [.text("date"), .text("provider"), .text("model"), .text("input_tokens"),
-            .text("output_tokens"), .text("total_tokens")])]
+                                 .text("output_tokens"), .text("total_tokens")])]
         for day in days {
             try Task.checkCancellation()
             let date = formatter.string(from: day.date)
             totalRows.append(row(totalRows.count + 1, [.text(date), .count(day.inputTokens), .count(day.outputTokens), .count(day.totalTokens)]))
             for model in day.models {
                 modelRows.append(row(modelRows.count + 1, [.text(date), .text(model.provider?.rawValue ?? ""),
-                    .text(model.model ?? ""), .count(model.inputTokens), .count(model.outputTokens), .count(model.totalTokens)]))
+                                                           .text(model.model ?? ""), .count(model.inputTokens), .count(model.outputTokens), .count(model.totalTokens)]))
             }
         }
         return StoredZIPArchive.data(entries: [

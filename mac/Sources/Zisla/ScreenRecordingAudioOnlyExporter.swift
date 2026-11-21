@@ -34,11 +34,11 @@ enum ScreenRecordingAudioOnlyExporter {
         try checkpoint(.beforeWrite)
         try Task.checkCancellation()
         try await write(media: media, to: rendered, format: executable == nil ? configuration.format : .wav,
-            checkpoint: checkpoint) { await progress($0 * (executable == nil ? 0.98 : 0.7)) }
+                        checkpoint: checkpoint) { await progress($0 * (executable == nil ? 0.98 : 0.7)) }
         if let executable {
             try await ScreenRecordingFFmpegTranscoder.run(input: rendered, output: temporary,
-                format: configuration.format, duration: media.duration, executable: executable,
-                inputFormat: "wav", checkpoint: checkpoint) { await progress(0.7 + $0 * 0.28) }
+                                                          format: configuration.format, duration: media.duration, executable: executable,
+                                                          inputFormat: "wav", checkpoint: checkpoint) { await progress(0.7 + $0 * 0.28) }
         }
         try checkpoint(.beforeCommit)
         try Task.checkCancellation()
@@ -104,7 +104,7 @@ enum ScreenRecordingAudioOnlyExporter {
                 let count = min(4_096, min(sample.numSamples - offset, Int(total - position)))
                 buffer.frameLength = AVAudioFrameCount(count)
                 guard CMSampleBufferCopyPCMDataIntoAudioBufferList(sample, at: Int32(offset), frameCount: Int32(count),
-                    into: buffer.mutableAudioBufferList) == noErr else { throw ScreenRecordingExportError.unavailableMedia }
+                                                                   into: buffer.mutableAudioBufferList) == noErr else { throw ScreenRecordingExportError.unavailableMedia }
                 // Spectral time stretching can emit a delayed tail into empty composition ranges.
                 var frame = 0
                 while frame < count {

@@ -71,8 +71,7 @@ public struct WeatherLocation: Identifiable, Codable, Equatable, Sendable {
         isoCountryCode = try container.decodeIfPresent(String.self, forKey: .isoCountryCode)
         if container.contains(.latitude), container.contains(.longitude),
            let latitude = try container.decodeIfPresent(Double.self, forKey: .latitude),
-           let longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
-        {
+           let longitude = try container.decodeIfPresent(Double.self, forKey: .longitude) {
             coordinate = GeoCoordinate(latitude: latitude, longitude: longitude)
         } else {
             coordinate = nil
@@ -211,13 +210,11 @@ public final class WeatherLocationStore: ObservableObject {
             guard let coordinate = location.coordinate else { continue }
             if let snapshot = refreshed[location.id],
                snapshot.expiresAt > date,
-               Self.coordinatesApproximatelyEqual(snapshot.coordinate, coordinate)
-            {
+               Self.coordinatesApproximatelyEqual(snapshot.coordinate, coordinate) {
                 result[location.id] = snapshot
             } else if let snapshot = previous[location.id],
                       snapshot.expiresAt > date,
-                      Self.coordinatesApproximatelyEqual(snapshot.coordinate, coordinate)
-            {
+                      Self.coordinatesApproximatelyEqual(snapshot.coordinate, coordinate) {
                 result[location.id] = snapshot
             }
         }

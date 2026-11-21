@@ -100,7 +100,7 @@ struct AIAccountBalanceCredentialsTests {
         var source = makeSource()
         source.websiteCookie = { website in
             #expect(website == (provider == .trae ? .trae : .zed),
-                "The Qoder region must not select another provider's website session")
+                    "The Qoder region must not select another provider's website session")
             return "session=fixture-independent"
         }
         source.fileRead = { _ in Issue.record("Selected website login must not read native credentials"); return nil }
@@ -188,7 +188,7 @@ struct AIAccountBalanceCredentialsTests {
     @Test func zcodeSelectionUsesAuthoritativeRegistryAndNeverStaleEncryptedMirror() throws {
         let config = try JSONSerialization.data(withJSONObject: ["provider": ["builtin:zai-coding-plan": ["options": ["apiKey": "fixture-key"]]]])
         let settings = try JSONSerialization.data(withJSONObject: ["providerFamilyConnectionSelections": ["zai": ["kind": "individual-coding-plan"]],
-            "modelProviderFamilySelectedKeys": ["zai": "preset:builtin:zai"]])
+                                                                   "modelProviderFamilySelectedKeys": ["zai": "preset:builtin:zai"]])
         var source = makeSource()
         source.fileRead = { url in
             switch url.lastPathComponent { case "config.json": config; case "settings.json": settings; default: nil }
@@ -200,7 +200,7 @@ struct AIAccountBalanceCredentialsTests {
         }
         #expect(throws: AIAccountBalanceError.credentialsUnavailable) { try source.load(for: .zcode, at: now) }
         let unknown = try JSONSerialization.data(withJSONObject: ["providerFamilyConnectionSelections": ["zai": ["kind": "unknown"]],
-            "modelProviderFamilySelectedKeys": ["zai": "coding-plan:builtin:zai-coding-plan"]])
+                                                                  "modelProviderFamilySelectedKeys": ["zai": "coding-plan:builtin:zai-coding-plan"]])
         source.fileRead = { $0.lastPathComponent == "config.json" ? config : unknown }
         #expect(throws: AIAccountBalanceError.unsupportedLogin) { try source.load(for: .zcode, at: now) }
     }
@@ -209,7 +209,7 @@ struct AIAccountBalanceCredentialsTests {
     @Test func workbuddyRealmsEncryptedSessionsAndLogoutAreDistinct() throws {
         let path = "/fixture/Library/Application Support/CodeBuddyExtension/Data/Public/auth/workbuddy-desktop-ai.info"
         let data = try JSONSerialization.data(withJSONObject: ["auth": ["accessToken": "fixture", "expiresAt": 2_000_000_000_000,
-            "domain": "www.workbuddy.ai"], "account": ["uid": "fixture-user", "enterpriseId": "fixture-team"]])
+                                                                        "domain": "www.workbuddy.ai"], "account": ["uid": "fixture-user", "enterpriseId": "fixture-team"]])
         var source = makeSource()
         source.fileRead = { $0.path == path ? data : nil }
         let credential = try #require(try source.load(for: .workbuddyAI, at: now))
@@ -247,26 +247,26 @@ struct AIAccountBalanceCredentialsTests {
     @Test func keychainAccountAndPayloadReadKeepNoUIPreflightAndFailureClassification() throws {
         var calls = 0
         let result = try AISubscriptionCredentials.readKeychainCredentialWithoutPrompt(service: "https://zed.dev", internetPassword: true,
-            copyMatching: { query in
-                calls += 1
-                let values = query as NSDictionary
-                #expect(values[kSecClass] as? String == kSecClassInternetPassword as String)
-                #expect(values[kSecAttrServer] as? String == "https://zed.dev")
-                #expect((values[kSecUseAuthenticationContext] as? LAContext)?.interactionNotAllowed == true)
-                #expect(values[kSecUseAuthenticationUI] as? String == "u_AuthUIF")
-                if calls == 1 {
-                    #expect(values[kSecReturnData] == nil)
-                    return (errSecSuccess, [kSecValueRef as String: "fixture-reference", kSecAttrAccount as String: "42"] as CFDictionary)
-                }
-                #expect(values[kSecMatchItemList] as? [String] == ["fixture-reference"])
-                return (errSecSuccess, Data("fixture-secret".utf8) as CFData)
-            }, allowsRead: { _ in true })
+                                                                                       copyMatching: { query in
+                                                                                           calls += 1
+                                                                                           let values = query as NSDictionary
+                                                                                           #expect(values[kSecClass] as? String == kSecClassInternetPassword as String)
+                                                                                           #expect(values[kSecAttrServer] as? String == "https://zed.dev")
+                                                                                           #expect((values[kSecUseAuthenticationContext] as? LAContext)?.interactionNotAllowed == true)
+                                                                                           #expect(values[kSecUseAuthenticationUI] as? String == "u_AuthUIF")
+                                                                                           if calls == 1 {
+                                                                                               #expect(values[kSecReturnData] == nil)
+                                                                                               return (errSecSuccess, [kSecValueRef as String: "fixture-reference", kSecAttrAccount as String: "42"] as CFDictionary)
+                                                                                           }
+                                                                                           #expect(values[kSecMatchItemList] as? [String] == ["fixture-reference"])
+                                                                                           return (errSecSuccess, Data("fixture-secret".utf8) as CFData)
+                                                                                       }, allowsRead: { _ in true })
         #expect(result?.account == "42" && result?.data == Data("fixture-secret".utf8) && calls == 2)
         #expect(try AISubscriptionCredentials.readKeychainCredentialWithoutPrompt(service: "fixture",
-            copyMatching: { _ in (errSecItemNotFound, nil) }) == nil)
+                                                                                  copyMatching: { _ in (errSecItemNotFound, nil) }) == nil)
         #expect(throws: AISubscriptionCredentials.KeychainReadError.self) {
             try AISubscriptionCredentials.readKeychainCredentialWithoutPrompt(service: "fixture",
-                copyMatching: { _ in (errSecInteractionNotAllowed, nil) })
+                                                                              copyMatching: { _ in (errSecInteractionNotAllowed, nil) })
         }
     }
 

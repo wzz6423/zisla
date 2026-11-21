@@ -113,7 +113,7 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
                 return self.registerSideSpecific(hotkey: hotkey, onKeyDown: onKeyDown, onKeyUp: onKeyUp)
             }
             return self.registerCarbon(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers,
-                onKeyDown: onKeyDown, onKeyUp: onKeyUp)
+                                       onKeyDown: onKeyDown, onKeyUp: onKeyUp)
         }
         requestedRegistration = registration
         if hotkey.requiresInputMonitoring, !Self.hasInputMonitoringAccess {
@@ -130,7 +130,7 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         action: @escaping () -> Void
     ) -> GlobalHotkeyRegistrationResult {
         register(hotkey: .init(keyCode: keyCode, carbonModifiers: modifiers, keyDisplayName: ""),
-            onKeyDown: action, onKeyUp: {})
+                 onKeyDown: action, onKeyUp: {})
     }
 
     public func unregister() {
@@ -391,8 +391,8 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
             } else if sideSpecificHotkeyIsPressed,
                       keyCode == sideSpecificHotkey.keyCode,
                       !sideSpecificHotkey.matches(
-                        keyCode: keyCode,
-                        modifierSides: pressedModifierSides
+                          keyCode: keyCode,
+                          modifierSides: pressedModifierSides
                       ) {
                 releaseSideSpecificHotkey()
             }
@@ -522,15 +522,15 @@ private func globalHotkeyEventHandlerCallback(
     let manager = Unmanaged<GlobalHotkeyManager>.fromOpaque(userData).takeUnretainedValue()
     var hotkeyID = EventHotKeyID()
     guard GetEventParameter(
-        event,
-        EventParamName(kEventParamDirectObject),
-        EventParamType(typeEventHotKeyID),
-        nil,
-        MemoryLayout<EventHotKeyID>.size,
-        nil,
-        &hotkeyID
-    ) == noErr,
-        hotkeyID.id == manager.registeredCarbonHotkeyID
+              event,
+              EventParamName(kEventParamDirectObject),
+              EventParamType(typeEventHotKeyID),
+              nil,
+              MemoryLayout<EventHotKeyID>.size,
+              nil,
+              &hotkeyID
+          ) == noErr,
+          hotkeyID.id == manager.registeredCarbonHotkeyID
     else { return OSStatus(eventNotHandledErr) }
     let kind = GetEventKind(event)
     MainActor.assumeIsolated {

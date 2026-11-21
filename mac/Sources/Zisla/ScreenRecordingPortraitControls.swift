@@ -37,7 +37,8 @@ struct ScreenRecordingPortraitControls: View {
                             var effects = voice
                             effects.amount = amount
                             setVoice(effects)
-                        }), range: 0...1, identifier: "screenRecording.voiceAmount")
+                        }
+                    ), range: 0...1, identifier: "screenRecording.voiceAmount")
                 }
                 if case .capture = target {
                     Toggle(AppLocalization.text("监听麦克风"), isOn: $model.configuration.monitorMicrophone)
@@ -108,10 +109,10 @@ struct ScreenRecordingPortraitControls: View {
 
     private func parameter(_ title: String, path: WritableKeyPath<RecordingPortraitEffects, Double>, identifier: String) -> some View {
         ScreenRecordingParameterRow(title: AppLocalization.text(title), value: Binding(get: { portrait[keyPath: path] },
-            set: { value in
-                var effects = portrait
-                effects[keyPath: path] = value
-                setPortrait(effects)
-            }), range: 0...1, identifier: "screenRecording.portrait." + identifier)
+                                                                                       set: { value in
+                                                                                           var effects = portrait
+                                                                                           effects[keyPath: path] = value
+                                                                                           setPortrait(effects)
+                                                                                       }), range: 0...1, identifier: "screenRecording.portrait." + identifier)
     }
 }

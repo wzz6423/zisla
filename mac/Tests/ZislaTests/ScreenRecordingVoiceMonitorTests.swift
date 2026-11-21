@@ -111,12 +111,12 @@ struct ScreenRecordingVoiceMonitorTests {
         monitor.isEnabled = true
         let source = try Self.sample()
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 48_000),
-            presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
         var size = 4
         var missing: CMSampleBuffer?
         try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-            formatDescription: source.formatDescription, sampleCount: 64, sampleTimingEntryCount: 1,
-            sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &missing) == noErr)
+                                               formatDescription: source.formatDescription, sampleCount: 64, sampleTimingEntryCount: 1,
+                                               sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &missing) == noErr)
         for _ in 0..<10 {
             #expect(throws: ScreenRecordingCaptureError.writerUnavailable) { try monitor.append(try #require(missing)) }
         }
@@ -131,8 +131,8 @@ struct ScreenRecordingVoiceMonitorTests {
         let source = try Self.sample()
         var empty: CMSampleBuffer?
         try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-            formatDescription: source.formatDescription, sampleCount: 0, sampleTimingEntryCount: 0,
-            sampleTimingArray: nil, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &empty) == noErr)
+                                               formatDescription: source.formatDescription, sampleCount: 0, sampleTimingEntryCount: 0,
+                                               sampleTimingArray: nil, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &empty) == noErr)
         try monitor.append(try #require(empty))
         #expect(output.starts == 0 && output.buffers.isEmpty)
         for _ in 0..<10 { try monitor.append(source) }
@@ -181,7 +181,7 @@ struct ScreenRecordingVoiceMonitorTests {
     private static func sample(channelCount: UInt32 = 1, interleaved: Bool = true, integer: Bool = false,
                                rate: Double = 48_000) throws -> CMSampleBuffer {
         let format = try #require(AVAudioFormat(commonFormat: integer ? .pcmFormatInt16 : .pcmFormatFloat32,
-            sampleRate: rate, channels: channelCount, interleaved: interleaved))
+                                                sampleRate: rate, channels: channelCount, interleaved: interleaved))
         let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 64))
         buffer.frameLength = 64
         let list = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
@@ -195,18 +195,18 @@ struct ScreenRecordingVoiceMonitorTests {
             }
         }
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: CMTimeScale(rate)),
-            presentationTimeStamp: .init(seconds: 12, preferredTimescale: 48_000), decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .init(seconds: 12, preferredTimescale: 48_000), decodeTimeStamp: .invalid)
         var size = Int(format.streamDescription.pointee.mBytesPerFrame)
         var result: CMSampleBuffer?
         try #require(withUnsafePointer(to: &size) { pointer in
             CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-                formatDescription: format.formatDescription, sampleCount: 64, sampleTimingEntryCount: 1,
-                sampleTimingArray: &timing, sampleSizeEntryCount: interleaved ? 1 : 0,
-                sampleSizeArray: interleaved ? pointer : nil, sampleBufferOut: &result)
+                                      formatDescription: format.formatDescription, sampleCount: 64, sampleTimingEntryCount: 1,
+                                      sampleTimingArray: &timing, sampleSizeEntryCount: interleaved ? 1 : 0,
+                                      sampleSizeArray: interleaved ? pointer : nil, sampleBufferOut: &result)
         } == noErr)
         let sample = try #require(result)
         try #require(CMSampleBufferSetDataBufferFromAudioBufferList(sample, blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: buffer.audioBufferList) == noErr)
+                                                                    blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: buffer.audioBufferList) == noErr)
         return sample
     }
 
