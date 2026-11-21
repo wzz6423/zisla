@@ -3751,3 +3751,10 @@
 "自动更新依赖组件" = "Tự động cập nhật thành phần phụ thuộc";
 "每天更新已安装的依赖组件" = "Cập nhật các thành phần phụ thuộc đã cài đặt mỗi ngày";
 "（默认）" = "(Mặc định)";
+
+"从默认浏览器导入" = "Nhập từ trình duyệt mặc định";
+"正在读取默认浏览器 Cookie" = "Đang đọc cookie từ trình duyệt mặc định";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Không thể xác định trình duyệt mặc định. Hãy dán cookie thủ công.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Chưa hỗ trợ nhập cookie từ trình duyệt mặc định. Hãy dán thủ công.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Không tìm thấy cookie của trang web này. Hãy đăng nhập bằng trình duyệt mặc định hoặc dán cookie thủ công.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Không thể đọc cookie từ trình duyệt mặc định. Hãy dán thủ công hoặc kiểm tra quyền truy cập.";

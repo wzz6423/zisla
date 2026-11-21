@@ -306,7 +306,8 @@ struct AIAccountBalanceViewTests {
         for weeklyOnly in [false, true] {
             let weekly = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)
             let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
-            var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+            var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+                aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
             settings.islandPlacement.mode = .custom
             controller.update(balances: [.init(id: "chatgpt", providers: [.codex], status: .available,
                 windows: weeklyOnly ? [weekly] : [short, weekly])], settings: settings, language: .english)
@@ -368,7 +369,8 @@ struct AIAccountBalanceViewTests {
         defer { queue.removeAll() }
         let weekly = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)
         let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
-        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [.init(id: "quota", providers: [.codex], status: .available,
             windows: weeklyOnly ? [weekly] : [short, weekly])], settings: settings, language: .english)
@@ -408,7 +410,8 @@ struct AIAccountBalanceViewTests {
         let model = AIAccountQuotaWindow(id: "model", kind: .model, remainingPercent: 59,
             name: language == .arabic ? "خُطَّة مُمَيَّزَة" : "Édition Ångström")
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true)
+            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.codex],
+            aiAccountBalanceDisplayedProviders: [.codex])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [.init(id: "quota", providers: [.codex], status: .available,
             windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000), model])],
@@ -738,7 +741,7 @@ struct AIAccountBalanceViewTests {
 
     private struct StatusDetector: AIAccountBalanceDetecting {
         let status: AIAccountBalanceStatus
-        func accountBalances(for providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion) async throws -> [AIAccountBalance] {
+        func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>) async throws -> [AIAccountBalance] {
             [.init(id: "status", providers: [.claude], status: status,
                 windows: status == .available ? [.init(id: "quota", kind: .all, remainingPercent: 70)] : [])]
         }

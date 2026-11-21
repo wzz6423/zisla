@@ -6,13 +6,71 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceNoticeTests {
+    @Test func defaultProviderSelectionCannotCreateLowOrPinnedBalanceNotices() {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement.mode = .custom
+        controller.update(balances: [balance(0)], settings: settings, language: .english)
+        #expect(queue.left.isEmpty && queue.right.isEmpty,
+            "New settings must leave real provider monitoring and display explicitly unselected")
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func qoderRegionAlertsStayIndependentAndRecoveryDoesNotRearmTheOtherRegion(language: AppLanguage) throws {
+        let queue = SideNoticeQueue(capacityPerSide: 4), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.coder], aiAccountBalanceDisplayedProviders: [.coder],
+            aiAccountBalanceQoderRegions: [.global, .china])
+        var global = AIAccountBalanceCatalog.placeholder(for: [.coder], qoderRegion: .global)
+        global.status = .available
+        global.windows = [.init(id: "credits", kind: .all, remainingPercent: 10)]
+        var china = AIAccountBalanceCatalog.placeholder(for: [.coder], qoderRegion: .china)
+        china.status = .available
+        china.windows = [.init(id: "credits", kind: .all, remainingPercent: 0)]
+        controller.update(balances: [global, china], settings: settings, language: language)
+        #expect(Set(queue.left.map(\.id)) == [global.noticeID, china.noticeID])
+        #expect(queue.left.first { $0.id == global.noticeID }?.title == global.providerTitle(language: language))
+        #expect(queue.left.first { $0.id == china.noticeID }?.title == china.providerTitle(language: language))
+        queue.removeAll()
+        global.windows = [.init(id: "credits", kind: .all, remainingPercent: 70)]
+        controller.update(balances: [global, china], settings: settings, language: language)
+        global.windows = [.init(id: "credits", kind: .all, remainingPercent: 10)]
+        controller.update(balances: [global, china], settings: settings, language: language)
+        #expect(queue.left.map(\.id) == [global.noticeID],
+            "Recovering one region must not reissue the dismissed low-quota episode for the other region")
+    }
+
+    @Test func pinnedQoderRegionsRotateWithDistinctAccountMetadataAndTitles() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.coder], aiAccountBalanceDisplayedProviders: [.coder],
+            aiAccountBalanceQoderRegions: [.global, .china])
+        settings.islandPlacement.mode = .custom
+        let rows = AIAccountBalanceQoderRegion.allCases.map { region in
+            var row = AIAccountBalanceCatalog.placeholder(for: [.coder], qoderRegion: region)
+            row.status = .available
+            row.windows = [.init(id: "credits", kind: .all, remainingPercent: 70)]
+            return row
+        }
+        controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
+        let first = try #require(queue.left.first)
+        controller.updatePinned(at: Date(timeIntervalSince1970: 1_000))
+        let second = try #require(queue.left.first)
+        #expect(Set([first.metadata?["quotaAccountID"], second.metadata?["quotaAccountID"]]) == Set(rows.map { Optional($0.id) }))
+        #expect(Set([first.title, second.title]) == ["Qoder · Global", "Qoder · China"])
+        #expect(queue.left.count == 1, "Region rotation must reuse the one persistent balance slot")
+    }
+
     @Test(arguments: [[AIProvider.codex, .gpt], [.gpt, .codex]], [false, true])
     func sharedAccountNoticesUseOneNameMatchingTheirIcon(providers: [AIProvider], pinned: Bool) throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "shared", providers: providers, status: .available,
             windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)])
-        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: !pinned, aiAccountBalancePinnedInCustomIsland: pinned)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: !pinned, aiAccountBalancePinnedInCustomIsland: pinned,
+            aiAccountBalanceMonitoredProviders: Set(providers), aiAccountBalanceDisplayedProviders: Set(providers))
         settings.islandPlacement.mode = .custom
         controller.update(balances: [reading], settings: settings, language: .english)
         let notice = try #require(queue.left.first)
@@ -45,7 +103,8 @@ struct AIAccountBalanceNoticeTests {
         let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
         let reading = AIAccountBalance(id: "shared", providers: [.gpt], status: .available,
             windows: weeklyOnly ? [weekly] : [short, weekly])
-        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [reading], settings: settings, language: language)
         let notice = try #require(queue.left.first)
@@ -98,7 +157,8 @@ struct AIAccountBalanceNoticeTests {
                 .init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)]
         }
         controller.update(balances: [.init(id: "shared", providers: [.codex], status: .available, windows: windows)],
-            settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed), language: .simplifiedChinese)
+            settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed,
+                aiAccountBalanceMonitoredProviders: [.codex]), language: .simplifiedChinese)
         let notice = try #require(queue.left.first)
         #expect(notice.metadata?["quota5hSeverity"] == (hasCanonical ? "2" : nil))
         #expect(notice.metadata?["quota5hFraction"] == (hasCanonical ? "0.1" : nil))
@@ -114,7 +174,7 @@ struct AIAccountBalanceNoticeTests {
         defer { queue.removeAll() }
         let fiveHours = AIAccountBalance(id: "5h-only", providers: [.gpt], status: .available,
             windows: [.init(id: "primary_window", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)])
-        let settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed)
+        let settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalanceMonitoredProviders: [.gpt])
         controller.update(balances: [fiveHours], settings: settings, language: .simplifiedChinese)
         let short = try #require(queue.left.first)
         #expect(short.metadata?["quotaLine0"] == "5h 10%" && short.metadata?["quotaLine1"] == nil)
@@ -166,7 +226,8 @@ struct AIAccountBalanceNoticeTests {
     @Test func lowReminderCoverageCannotConsumeThePinnedAccountReading() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
-        var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         let rows = [balance(70), balance(10, provider: .codex)]
         controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
@@ -229,7 +290,8 @@ struct AIAccountBalanceNoticeTests {
     @Test func repeatedPollAndUnrelatedAccountChangesCannotRestartOrSkipThePinnedReading() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
-        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
         settings.islandPlacement.mode = .custom
         let claude = balance(70), gemini = balance(80, provider: .gemini)
         controller.update(balances: [claude, gemini], settings: settings, language: .english,
@@ -301,7 +363,8 @@ struct AIAccountBalanceNoticeTests {
             windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000)]
                 + (0..<7).map { .init(id: "model\($0)", kind: .model, remainingPercent: 70, name: "claude-opus-long-model-\($0)") }
                 + [.init(id: "extra", kind: .budget, remaining: 0, unit: .usd)])
-        var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         controller.update(balances: [reading, balance(70, provider: .gemini)], settings: settings,
             language: .english, at: Date(timeIntervalSinceReferenceDate: 119))
@@ -354,7 +417,8 @@ struct AIAccountBalanceNoticeTests {
         let reading = AIAccountBalance(id: "fixture", providers: [.claude], status: .available,
             windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
                 .init(id: "weekly", kind: .weekly, remainingPercent: 10)])
-        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.claude], aiAccountBalanceDisplayedProviders: [.claude])
         settings.islandPlacement.mode = .custom
         for style in MediaCompactStyle.allCases {
             settings.aiAccountBalanceCompactStyle = style
@@ -371,7 +435,8 @@ struct AIAccountBalanceNoticeTests {
     @Test func unsupportedAvailableFixtureCannotCreateCardsPinOrLowAlert() {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
-        var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.qwen], aiAccountBalanceDisplayedProviders: [.qwen])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [balance(0, provider: .qwen)], settings: settings, language: .english)
         #expect(queue.left.isEmpty)
@@ -397,7 +462,7 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue()
         let notices = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
-        let settings = FeatureSettings()
+        let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.claude])
         for (index, percent) in [21.0, 20, 19, 10, 0].enumerated() {
             notices.update(balances: [balance(percent)], settings: settings, language: .english, at: Date(timeIntervalSince1970: Double(index)))
             if percent > 20 { #expect(queue.left.isEmpty) }
@@ -418,7 +483,7 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue()
         let notices = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
-        var settings = FeatureSettings(aiAccountBalanceDisplayedProviders: [])
+        var settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [provider], aiAccountBalanceDisplayedProviders: [])
         notices.update(balances: [balance(10, provider: provider)], settings: settings, language: .english)
         #expect(queue.left.count == 1)
         settings.aiAccountBalanceMonitoredProviders = []
@@ -445,12 +510,12 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var reading = balance(10)
-        controller.update(balances: [reading], settings: FeatureSettings(), language: .english)
+        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceMonitoredProviders: [.claude]), language: .english)
         reading.status = .unavailable
-        controller.update(balances: [reading], settings: FeatureSettings(), language: .english)
+        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceMonitoredProviders: [.claude]), language: .english)
         #expect(queue.left.isEmpty)
         reading.status = .available
-        controller.update(balances: [reading], settings: FeatureSettings(), language: .english)
+        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceMonitoredProviders: [.claude]), language: .english)
         #expect(queue.left.isEmpty)
         reading.id = "shared-codex"; reading.providers = [.codex, .gpt]
         var settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt])
@@ -472,7 +537,7 @@ struct AIAccountBalanceNoticeTests {
                 .init(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)])
         let exhausted = AIAccountQuotaWindow(id: "amount", kind: kind, remaining: 0, unit: kind == .credits ? .credits : .usd)
         reading.windows.append(exhausted)
-        controller.update(balances: [reading], settings: FeatureSettings(), language: .simplifiedChinese)
+        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceMonitoredProviders: [.claude]), language: .simplifiedChinese)
         #expect(queue.left.first?.metadata?["quotaSeverity"] == String(AIAccountQuotaSeverity.exhausted.rawValue))
         #expect(queue.left.first?.metadata?["quotaLine0"] == exhausted.label(language: .simplifiedChinese) + " "
             + exhausted.value(language: .simplifiedChinese))
@@ -485,7 +550,8 @@ struct AIAccountBalanceNoticeTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let rows = [balance(70), balance(50, provider: .gemini), balance(10, provider: .gpt)]
-        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.claude, .gemini, .gpt], aiAccountBalanceDisplayedProviders: [.claude, .gemini, .gpt])
         controller.update(balances: rows, settings: settings, language: .english)
         #expect(queue.left.isEmpty)
         settings.islandPlacement.mode = .custom
@@ -529,7 +595,8 @@ struct AIAccountBalanceNoticeTests {
         let ordinary = IslandNotice(id: "ordinary", title: "Fixture", side: .left)
         queue.enqueue(ordinary, expiresAfter: nil)
         var controller: AIAccountBalanceNoticeController? = AIAccountBalanceNoticeController(queue: queue, sleep: { _ in try await clock.wait() })
-        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.claude, .gemini], aiAccountBalanceDisplayedProviders: [.claude, .gemini])
         settings.islandPlacement.mode = .custom
         controller?.update(balances: [balance(70), balance(80, provider: .gemini)], settings: settings, language: .english)
         for _ in 0..<400 {

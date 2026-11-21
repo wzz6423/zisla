@@ -3751,3 +3751,10 @@
 "自动更新依赖组件" = "Bağımlılıkları Otomatik Güncelle";
 "每天更新已安装的依赖组件" = "Yüklü bağımlılıkları her gün güncelle";
 "（默认）" = "(Varsayılan)";
+
+"从默认浏览器导入" = "Varsayılan tarayıcıdan içe aktar";
+"正在读取默认浏览器 Cookie" = "Varsayılan tarayıcı çerezleri okunuyor";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Varsayılan tarayıcı belirlenemedi. Çerezleri elle yapıştırın.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Varsayılan tarayıcıdan çerez içe aktarma desteklenmiyor. Elle yapıştırın.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Bu site için çerez bulunamadı. Varsayılan tarayıcıda oturum açın veya çerezleri elle yapıştırın.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Varsayılan tarayıcı çerezleri okunamadı. Elle yapıştırın veya erişim izinlerini kontrol edin.";

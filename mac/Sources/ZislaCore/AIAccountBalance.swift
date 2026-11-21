@@ -155,18 +155,21 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
     public var windows: [AIAccountQuotaWindow]
     public var updatedAt: Date?
     public var accountName: String?
+    public var qoderRegion: AIAccountBalanceQoderRegion?
     public var detailKey: String?
     public var isDebug: Bool
 
     public init(id: String, providers: [AIProvider], status: AIAccountBalanceStatus,
                 windows: [AIAccountQuotaWindow] = [], updatedAt: Date? = nil,
-                accountName: String? = nil, detailKey: String? = nil, isDebug: Bool = false) {
+                accountName: String? = nil, qoderRegion: AIAccountBalanceQoderRegion? = nil,
+                detailKey: String? = nil, isDebug: Bool = false) {
         self.id = id
         self.providers = providers
         self.status = status
         self.windows = windows
         self.updatedAt = updatedAt
         self.accountName = accountName
+        self.qoderRegion = qoderRegion
         self.detailKey = detailKey
         self.isDebug = isDebug
     }
@@ -200,7 +203,8 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
 
     public func providerTitle(language: AppLanguage) -> String {
         let brands = providers.allSatisfy { $0 == .codex || $0 == .gpt } ? Array(providers.prefix(1)) : providers
-        return brands.map { $0 == .gpt ? "ChatGPT" : AIAccountBalanceCatalog.providerName($0) }.joined(separator: " / ")
+        let title = brands.map { $0 == .gpt ? "ChatGPT" : AIAccountBalanceCatalog.providerName($0) }.joined(separator: " / ")
+        return qoderRegion.map { title + " · " + AppLocalization.string($0.title, language: language) } ?? title
     }
 
     /// Reserves the first of at most two lines for a canonical 5h or rolling window.
@@ -297,9 +301,23 @@ public enum AIAccountBalanceCatalog {
         }
     }
 
+    /// Qoder regions are independent accounts; other selected shared accounts retain one query group.
+    public static func queryGroups(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>)
+        -> [(providers: [AIProvider], qoderRegion: AIAccountBalanceQoderRegion?)] {
+        groups.flatMap { group -> [(providers: [AIProvider], qoderRegion: AIAccountBalanceQoderRegion?)] in
+            let selected = group.filter { providers.contains($0) }
+            guard !selected.isEmpty else { return [] }
+            if group[0] == .coder {
+                return AIAccountBalanceQoderRegion.allCases.filter { qoderRegions.contains($0) }.map { (group, $0) }
+            }
+            return [(group, nil)]
+        }
+    }
+
     /// Classifies a nonempty account group without claiming a balance or requiring unsupported login access.
-    public static func placeholder(for providers: [AIProvider]) -> AIAccountBalance {
+    public static func placeholder(for providers: [AIProvider], qoderRegion: AIAccountBalanceQoderRegion? = nil) -> AIAccountBalance {
         let provider = providers[0]
+        let region = provider == .coder ? qoderRegion : nil
         let status: AIAccountBalanceStatus = switch provider {
         case .pi, .harness, .orca: .connectedAccount
         case .qwen, .doubao, .delta: .queryUnsupported
@@ -311,8 +329,9 @@ public enum AIAccountBalanceCatalog {
         case .qwen, .doubao, .delta: "供应商未提供已验证的本地额度查询接口"
         default: nil
         }
-        return .init(id: provider.rawValue, providers: providers, status: status, detailKey: detail)
+        let id = provider.rawValue + (region.map { ":" + $0.rawValue } ?? "")
+        return .init(id: id, providers: providers, status: status, qoderRegion: region, detailKey: detail)
     }
 
-    public static var placeholders: [AIAccountBalance] { groups.map(placeholder(for:)) }
+    public static var placeholders: [AIAccountBalance] { groups.map { placeholder(for: $0) } }
 }

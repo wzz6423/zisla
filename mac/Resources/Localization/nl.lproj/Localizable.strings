@@ -3751,3 +3751,10 @@
 "自动更新依赖组件" = "Afhankelijkheden automatisch bijwerken";
 "每天更新已安装的依赖组件" = "Geïnstalleerde afhankelijkheden dagelijks bijwerken";
 "（默认）" = "(Standaard)";
+
+"从默认浏览器导入" = "Importeren uit standaardbrowser";
+"正在读取默认浏览器 Cookie" = "Cookies van de standaardbrowser lezen";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "De standaardbrowser kan niet worden vastgesteld. Plak de cookies handmatig.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Cookies importeren uit de standaardbrowser wordt niet ondersteund. Plak ze handmatig.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Geen cookies voor deze website gevonden. Meld u aan in de standaardbrowser of plak de cookies handmatig.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "De cookies van de standaardbrowser kunnen niet worden gelezen. Plak ze handmatig of controleer de toegangsrechten.";

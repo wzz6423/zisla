@@ -152,20 +152,85 @@ struct AIAccountBalanceTests {
         #expect(AIAccountQuotaWindow(id: "unlimited", kind: .all, unlimited: true).severity == .normal)
     }
 
-    /// Legacy defaults, forward provider IDs, explicit empty display selection, and region choice have distinct meanings.
+    /// Defaults avoid account reads; unknown IDs are ignored without reviving an explicit empty selection.
     @Test func settingsDefaultsUnknownProvidersAndChosenRegionRoundTrip() throws {
         let old = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
-        #expect(old.aiAccountBalanceMonitoredProviders == Set(AIProvider.allCases))
-        #expect(old.aiAccountBalanceDisplayedProviders == Set(AIProvider.allCases))
+        #expect(old.aiAccountBalanceMonitoredProviders.isEmpty)
+        #expect(old.aiAccountBalanceDisplayedProviders.isEmpty)
+        #expect(FeatureSettings.default.aiAccountBalanceMonitoredProviders.isEmpty)
+        #expect(FeatureSettings.default.aiAccountBalanceDisplayedProviders.isEmpty)
         #expect(old.aiAccountBalanceNoticeEnabled && !old.aiAccountBalancePinnedInCustomIsland)
-        #expect(old.aiAccountBalanceQoderRegion == .global)
+        #expect(old.aiAccountBalanceQoderRegions == [.global])
         let future = try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"aiAccountBalanceMonitoredProviders":["claude","future"],"aiAccountBalanceDisplayedProviders":[],"aiAccountBalanceQoderRegion":"future"}"#.utf8))
         #expect(future.aiAccountBalanceMonitoredProviders == [.claude] && future.aiAccountBalanceDisplayedProviders.isEmpty)
-        #expect(future.aiAccountBalanceQoderRegion == .global)
+        #expect(future.aiAccountBalanceQoderRegions.isEmpty)
         let settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
             aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
-            aiAccountBalanceDisplayedProviders: [.codex], aiAccountBalanceQoderRegion: .china)
+            aiAccountBalanceDisplayedProviders: [.codex], aiAccountBalanceQoderRegions: [.china])
         #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings)) == settings)
+    }
+
+    @Test(arguments: [Set<AIAccountBalanceQoderRegion>(), [.global], [.china], [.global, .china]])
+    func qoderRegionSelectionsRoundTripWithoutChangingOtherProviders(regions: Set<AIAccountBalanceQoderRegion>) throws {
+        let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.coder, .trae, .zed],
+            aiAccountBalanceDisplayedProviders: [.coder, .zed], aiAccountBalanceQoderRegions: regions)
+        let data = try JSONEncoder().encode(settings)
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: data) == settings)
+        let payload = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(Set(try #require(payload["aiAccountBalanceQoderRegions"] as? [String])) == Set(regions.map(\.rawValue)))
+        #expect(payload["aiAccountBalanceQoderRegion"] == nil, "New settings must persist the independent region selection")
+    }
+
+    @Test(arguments: AIAccountBalanceQoderRegion.allCases)
+    func legacySingleQoderRegionMigratesAndPreservesExplicitProviders(region: AIAccountBalanceQoderRegion) throws {
+        let data = try JSONSerialization.data(withJSONObject: ["aiAccountBalanceMonitoredProviders": ["coder", "trae", "zed"],
+            "aiAccountBalanceDisplayedProviders": ["coder"], "aiAccountBalanceQoderRegion": region.rawValue])
+        let settings = try JSONDecoder().decode(FeatureSettings.self, from: data)
+        #expect(settings.aiAccountBalanceQoderRegions == [region])
+        #expect(settings.aiAccountBalanceMonitoredProviders == [.coder, .trae, .zed])
+        #expect(settings.aiAccountBalanceDisplayedProviders == [.coder])
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings)) == settings)
+    }
+
+    @Test(arguments: ["future", "GLOBAL", "cn", ""])
+    func invalidLegacyQoderRegionDoesNotSelectAnotherRegion(raw: String) throws {
+        let data = try JSONSerialization.data(withJSONObject: ["aiAccountBalanceQoderRegion": raw])
+        let settings = try JSONDecoder().decode(FeatureSettings.self, from: data)
+        #expect(settings.aiAccountBalanceQoderRegions.isEmpty, "An unknown saved region must not access a different account")
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings)) == settings)
+    }
+
+    @Test(arguments: [([String](), Set<AIAccountBalanceQoderRegion>()), (["future"], Set<AIAccountBalanceQoderRegion>()),
+        (["china", "future", "china"], Set<AIAccountBalanceQoderRegion>([.china])),
+        (["global", "china", "future"], Set<AIAccountBalanceQoderRegion>([.global, .china]))])
+    func currentQoderRegionsSupersedeLegacyValueAndIgnoreUnknownRegions(selection: ([String], Set<AIAccountBalanceQoderRegion>)) throws {
+        let data = try JSONSerialization.data(withJSONObject: ["aiAccountBalanceQoderRegions": selection.0,
+            "aiAccountBalanceQoderRegion": "global"])
+        let settings = try JSONDecoder().decode(FeatureSettings.self, from: data)
+        #expect(settings.aiAccountBalanceQoderRegions == selection.1,
+            "A new empty or unknown selection must not fall back to the old region")
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func qoderRegionsKeepDistinctTitlesAndNoticeIdentities(language: AppLanguage) throws {
+        let rows = AIAccountBalanceQoderRegion.allCases.map { AIAccountBalanceCatalog.placeholder(for: [.coder], qoderRegion: $0) }
+        #expect(Set(rows.map(\.id)).count == 2)
+        #expect(Set(rows.map(\.noticeID)).count == 2)
+        #expect(Set(rows.map { $0.providerTitle(language: language) }).count == 2)
+        for row in rows {
+            let region = try #require(row.qoderRegion)
+            #expect(row.providerTitle(language: language) == "Qoder · " + AppLocalization.string(region.title, language: language))
+            #expect(try JSONDecoder().decode(AIAccountBalance.self, from: JSONEncoder().encode(row)) == row)
+        }
+        #expect(AIAccountBalanceCatalog.placeholder(for: [.trae], qoderRegion: .china).providerTitle(language: language) == "TRAE")
+        #expect(AIAccountBalanceCatalog.placeholder(for: [.zed], qoderRegion: .china).qoderRegion == nil)
+    }
+
+    @Test func legacyBalanceWithoutRegionStillDecodes() throws {
+        let row = AIAccountBalance(id: "legacy", providers: [.coder], status: .notSignedIn)
+        let payload = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any])
+        #expect(payload["qoderRegion"] == nil)
+        #expect(try JSONDecoder().decode(AIAccountBalance.self, from: JSONSerialization.data(withJSONObject: payload)) == row)
     }
 }
 

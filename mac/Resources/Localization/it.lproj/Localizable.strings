@@ -3751,3 +3751,10 @@
 "自动更新依赖组件" = "Aggiorna automaticamente le dipendenze";
 "每天更新已安装的依赖组件" = "Aggiorna ogni giorno le dipendenze installate";
 "（默认）" = "(Predefinito)";
+
+"从默认浏览器导入" = "Importa dal browser predefinito";
+"正在读取默认浏览器 Cookie" = "Lettura dei cookie del browser predefinito";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Impossibile identificare il browser predefinito. Incolla i cookie manualmente.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "L’importazione dei cookie dal browser predefinito non è disponibile. Incollali manualmente.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Nessun cookie trovato per questo sito. Accedi dal browser predefinito o incolla i cookie manualmente.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Impossibile leggere i cookie del browser predefinito. Incollali manualmente o verifica i permessi di accesso.";

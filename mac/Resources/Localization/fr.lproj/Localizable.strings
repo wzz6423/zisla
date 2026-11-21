@@ -3747,3 +3747,10 @@
 "自动更新依赖组件" = "Mettre à jour automatiquement les dépendances";
 "每天更新已安装的依赖组件" = "Mettre à jour chaque jour les dépendances installées";
 "（默认）" = "(Par défaut)";
+
+"从默认浏览器导入" = "Importer depuis le navigateur par défaut";
+"正在读取默认浏览器 Cookie" = "Lecture des cookies du navigateur par défaut";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Impossible d’identifier le navigateur par défaut. Collez les cookies manuellement.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "L’importation des cookies n’est pas disponible pour le navigateur par défaut. Collez-les manuellement.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Aucun cookie trouvé pour ce site. Connectez-vous dans le navigateur par défaut ou collez les cookies manuellement.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Impossible de lire les cookies du navigateur par défaut. Collez-les manuellement ou vérifiez les autorisations d’accès.";

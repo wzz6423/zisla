@@ -2,7 +2,7 @@ import Foundation
 import ZislaCore
 
 public protocol AIAccountBalanceDetecting: Sendable {
-    func accountBalances(for providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion) async throws -> [AIAccountBalance]
+    func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>) async throws -> [AIAccountBalance]
 }
 
 public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecked Sendable {
@@ -61,25 +61,27 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
 
     /// Queries each selected shared account once with at most three groups in flight and stable result ordering.
     /// Unselected groups never read credentials; provider failures become rows while cancellation propagates.
-    public func accountBalances(for providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion = .global) async throws -> [AIAccountBalance] {
+    public func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion> = [.global]) async throws -> [AIAccountBalance] {
         try Task.checkCancellation()
         if let fixtures = debugBalances() {
             return fixtures
         }
-        let groups = AIAccountBalanceCatalog.groups.filter { !$0.allSatisfy { !providers.contains($0) } }
+        let groups = AIAccountBalanceCatalog.queryGroups(for: providers, qoderRegions: qoderRegions)
         return try await withThrowingTaskGroup(of: (Int, AIAccountBalance).self) { group in
             var next = 0, results: [Int: AIAccountBalance] = [:]
             for _ in 0..<min(3, groups.count) {
                 let index = next
                 next += 1
-                group.addTask { (index, try await self.refresh(groups[index], selected: providers, qoderRegion: qoderRegion)) }
+                group.addTask { (index, try await self.refresh(groups[index].providers, selected: providers,
+                    qoderRegion: groups[index].qoderRegion)) }
             }
             while let (index, balance) = try await group.next() {
                 results[index] = balance
                 if next < groups.count {
                     let index = next
                     next += 1
-                    group.addTask { (index, try await self.refresh(groups[index], selected: providers, qoderRegion: qoderRegion)) }
+                    group.addTask { (index, try await self.refresh(groups[index].providers, selected: providers,
+                        qoderRegion: groups[index].qoderRegion)) }
                 }
             }
             try Task.checkCancellation()
@@ -89,9 +91,9 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
 
     /// Publishes a complete validated reading or a sanitized status, never partial windows or raw error text.
     /// A cancelled query must escape the provider failure path instead of appearing as an unavailable balance.
-    private func refresh(_ group: [AIProvider], selected: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion) async throws -> AIAccountBalance {
+    private func refresh(_ group: [AIProvider], selected: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion?) async throws -> AIAccountBalance {
         let provider = group[0]
-        var row = AIAccountBalanceCatalog.placeholder(for: group.filter { selected.contains($0) })
+        var row = AIAccountBalanceCatalog.placeholder(for: group.filter { selected.contains($0) }, qoderRegion: qoderRegion)
         if provider == .codex, row.providers.count > 1, preferredOpenAIProvider() == .gpt {
             row.providers = [.gpt, .codex]
         }
@@ -103,7 +105,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
                 guard let data = try await museUsage() else { return row }
                 row.windows = try AIAccountBalanceParser.parse(data, provider: provider, now: time)
             } else {
-                guard let credential = try credentials(provider, time, qoderRegion) else { return row }
+                guard let credential = try credentials(provider, time, qoderRegion ?? .global) else { return row }
                 row.id = provider.rawValue + ":" + credential.identity(provider: provider)
                 row.accountName = credential.accountName
                 row.windows = try await fetch(provider, credential: credential, now: time)

@@ -4,6 +4,20 @@ import Testing
 @testable import ZislaKit
 
 struct AIAccountBalanceCookieStoreTests {
+    @Test(arguments: [Set<AIAccountBalanceQoderRegion>(), [.global], [.china], [.global, .china]])
+    func selectedWebsitesFollowEachProviderAndOnlyQoderUsesRegionSelection(regions: Set<AIAccountBalanceQoderRegion>) {
+        #expect(AIAccountBalanceWebsite.selected(for: [], qoderRegions: regions).isEmpty)
+        #expect(AIAccountBalanceWebsite.selected(for: [.claude], qoderRegions: regions).isEmpty)
+        let qoder = AIAccountBalanceWebsite.selected(for: [.coder], qoderRegions: regions)
+        let expected: [AIAccountBalanceWebsite] = [.qoder, .qoderChina].filter {
+            regions.contains($0 == .qoder ? .global : .china)
+        }
+        #expect(qoder == expected)
+        #expect(AIAccountBalanceWebsite.selected(for: [.trae], qoderRegions: regions) == [.trae])
+        #expect(AIAccountBalanceWebsite.selected(for: [.zed], qoderRegions: regions) == [.zed])
+        #expect(AIAccountBalanceWebsite.selected(for: [.coder, .trae, .zed], qoderRegions: regions) == expected + [.trae, .zed])
+    }
+
     /// Region isolation and private database permissions must survive deleting one website credential.
     @Test func storesRegionsSeparatelyInPrivateDatabaseAndClearsOnlyChosenCookie() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-balance-cookie-\(UUID())")

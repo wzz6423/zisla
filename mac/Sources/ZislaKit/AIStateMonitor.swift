@@ -84,8 +84,8 @@ public final class AIStateMonitor: ObservableObject {
     private let accountBalanceDetector: (any AIAccountBalanceDetecting)?
     private let accountBalanceNotificationCenter: NotificationCenter
     private var accountBalanceObservers: [NSObjectProtocol] = []
-    private var accountBalanceProviders = Set(AIProvider.allCases)
-    private var accountBalanceQoderRegion = AIAccountBalanceQoderRegion.global
+    private var accountBalanceProviders: Set<AIProvider> = []
+    private var accountBalanceQoderRegions: Set<AIAccountBalanceQoderRegion> = [.global]
     private var accountBalanceTask: Task<Void, Never>?
     private var accountBalanceGeneration: UInt64 = 0
     private var lastAccountBalanceRefreshAt = Date.distantPast
@@ -525,18 +525,22 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     /// Invalidates old provider/region work and removes stale selection immediately, before the next query completes.
-    public func configureAccountBalanceProviders(_ providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion = .global) {
+    public func configureAccountBalanceProviders(_ providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion> = [.global]) {
         #if DEBUG
-        let providers = AIAccountBalanceDebug.balances(environment: debugEnvironment, now: now())
-            .map { Set($0.flatMap(\.providers)) } ?? providers
+        let fixtures = AIAccountBalanceDebug.balances(environment: debugEnvironment, now: now())
+        let providers = fixtures.map { Set($0.flatMap(\.providers)) } ?? providers
+        let qoderRegions: Set<AIAccountBalanceQoderRegion> = fixtures == nil ? qoderRegions : [.global]
         #endif
-        guard accountBalanceProviders != providers || accountBalanceQoderRegion != qoderRegion else { return }
-        let regionChanged = accountBalanceQoderRegion != qoderRegion
+        let providersChanged = accountBalanceProviders != providers
+        guard providersChanged || accountBalanceQoderRegions != qoderRegions else { return }
         accountBalanceProviders = providers
-        accountBalanceQoderRegion = qoderRegion
+        accountBalanceQoderRegions = qoderRegions
+        guard providersChanged || providers.contains(.coder) else { return }
         cancelAccountBalanceRefresh()
         accountBalances = accountBalances.compactMap { balance in
-            if regionChanged && balance.providers.contains(.coder) { return nil }
+            if balance.providers.contains(.coder) {
+                guard let region = balance.qoderRegion, qoderRegions.contains(region) else { return nil }
+            }
             var row = balance
             row.providers = row.providers.filter { providers.contains($0) }
             return row.providers.isEmpty ? nil : row
@@ -582,17 +586,17 @@ public final class AIStateMonitor: ObservableObject {
     /// Queries only while running, awake, selected, and past the throttle, with one quota task in flight.
     /// Cancellation reaches detached work; only the captured configuration generation may publish ephemeral balances.
     private func scheduleAccountBalanceRefresh() {
-        guard source != nil, !accountBalanceSuspended, !accountBalanceProviders.isEmpty,
+        let providers = accountBalanceQoderRegions.isEmpty ? accountBalanceProviders.subtracting([.coder]) : accountBalanceProviders
+        guard source != nil, !accountBalanceSuspended, !providers.isEmpty,
               let detector = accountBalanceDetector, accountBalanceTask == nil,
               now().timeIntervalSince(lastAccountBalanceRefreshAt) >= usageRefreshInterval else { return }
         lastAccountBalanceRefreshAt = now()
         let generation = accountBalanceGeneration
-        let providers = accountBalanceProviders
-        let qoderRegion = accountBalanceQoderRegion
+        let qoderRegions = accountBalanceQoderRegions
         isRefreshingAccountBalances = true
         accountBalanceTask = Task { [weak self] in
             guard !Task.isCancelled else { return }
-            let work = Task.detached(priority: .utility) { try await detector.accountBalances(for: providers, qoderRegion: qoderRegion) }
+            let work = Task.detached(priority: .utility) { try await detector.accountBalances(for: providers, qoderRegions: qoderRegions) }
             let result = await withTaskCancellationHandler { await work.result } onCancel: { work.cancel() }
             guard !Task.isCancelled, let self, self.accountBalanceGeneration == generation else { return }
             self.accountBalanceTask = nil
@@ -600,10 +604,9 @@ public final class AIStateMonitor: ObservableObject {
             switch result {
             case let .success(balances): self.accountBalances = balances
             case .failure:
-                self.accountBalances = AIAccountBalanceCatalog.groups.compactMap { group in
-                    let selected = group.filter { providers.contains($0) }
-                    guard !selected.isEmpty else { return nil }
-                    var balance = AIAccountBalanceCatalog.placeholder(for: selected)
+                self.accountBalances = AIAccountBalanceCatalog.queryGroups(for: providers, qoderRegions: qoderRegions).map { group in
+                    let selected = group.providers.filter { providers.contains($0) }
+                    var balance = AIAccountBalanceCatalog.placeholder(for: selected, qoderRegion: group.qoderRegion)
                     if balance.status == .notSignedIn || balance.status == .additionalCredentialsRequired { balance.status = .unavailable }
                     return balance
                 }

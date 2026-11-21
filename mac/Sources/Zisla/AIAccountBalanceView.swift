@@ -174,15 +174,22 @@ struct AIAccountBalanceProviderStatus: View {
     @ObservedObject var monitor: AIStateMonitor
     let provider: AIProvider
     let language: AppLanguage
+    var qoderRegion: AIAccountBalanceQoderRegion?
+
+    var title: String {
+        qoderRegion.map { AppLocalization.string($0.title, language: language) }
+            ?? AIAccountBalanceCatalog.providerName(provider)
+    }
 
     var status: AIAccountBalanceStatus {
-        monitor.accountBalances.first { $0.providers.contains(provider) }?.status
-            ?? AIAccountBalanceCatalog.placeholder(for: [provider]).status
+        monitor.accountBalances.first {
+            $0.providers.contains(provider) && (qoderRegion == nil || $0.qoderRegion == qoderRegion)
+        }?.status ?? AIAccountBalanceCatalog.placeholder(for: [provider], qoderRegion: qoderRegion).status
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(AIAccountBalanceCatalog.providerName(provider))
+            Text(title)
             Text(AppLocalization.string(status.title, language: language))
                 .font(.system(size: 10)).foregroundStyle(.secondary)
         }

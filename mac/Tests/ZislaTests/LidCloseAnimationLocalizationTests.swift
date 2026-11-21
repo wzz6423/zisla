@@ -56,7 +56,7 @@ struct LidCloseAnimationLocalizationTests {
             pattern: #"featureToggle\(\s*"([^"]*)"\s*,\s*detail:\s*"([^"]*)"\s*,\s*symbol:\s*"[^"]*"\s*,\s*keyPath:\s*\\\.lidCloseAnimationEnabled\s*\)"#
         )
         let previewRow = try NSRegularExpression(
-            pattern: #"lidClosePreviewRow\(\) -> some View \{\s*settingRow\(symbol:\s*"[^"]*",\s*title:\s*"([^"]*)",\s*detail:\s*"([^"]*)"\)"#
+            pattern: #"lidClosePreviewRow\(\) -> some View \{\s*settingRow\(\s*(?:symbol:\s*"[^"]*",\s*)?title:\s*"([^"]*)",\s*detail:\s*"([^"]*)""#
         )
         var keys: [String] = []
         for regex in [toggle, previewRow] {

@@ -95,6 +95,21 @@ struct AIAccountBalanceCredentialsTests {
         #expect(throws: AIAccountBalanceError.invalidCredentials) { try source.load(for: .zed, at: now) }
     }
 
+    @Test(arguments: AIAccountBalanceQoderRegion.allCases, [AIProvider.trae, .zed])
+    func qoderRegionChoiceDoesNotChangeTRAEOrZedCredentialSource(region: AIAccountBalanceQoderRegion, provider: AIProvider) throws {
+        var source = makeSource()
+        source.websiteCookie = { website in
+            #expect(website == (provider == .trae ? .trae : .zed),
+                "The Qoder region must not select another provider's website session")
+            return "session=fixture-independent"
+        }
+        source.fileRead = { _ in Issue.record("Selected website login must not read native credentials"); return nil }
+        source.keychainRead = { _, _ in Issue.record("Selected website login must not read native Keychain"); return nil }
+        let credential = try #require(try source.load(for: provider, at: now, qoderRegion: region))
+        #expect(credential.isWebsiteCookie)
+        #expect(credential.region == (provider == .trae ? "cn" : nil))
+    }
+
     /// Commented settings remain readable while host overrides and invalid inline auth cannot escape their source boundary.
     @Test func zedJSONCSettingsKeepTrustedHostAndInlineOpenCodeAuthNeverFallsBack() throws {
         var source = makeSource()

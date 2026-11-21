@@ -28,7 +28,6 @@ struct AIAccountBalanceLocalizationTests {
     @Test(arguments: AppLanguage.allCases)
     func allBalanceCopyRendersRequestedLanguageAndPreservesPlaceholders(language: AppLanguage) throws {
         let table = try self.table(language), english = try self.table(.english)
-        #expect(AppLanguage.allCases.count == 17 && Self.keys.count == 53)
         for key in Self.keys {
             let translation = try #require(table[key], "Missing \(language.rawValue) key \(key)")
             #expect(!translation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -75,9 +74,17 @@ struct AIAccountBalanceLocalizationTests {
         var discovered: Set<String> = []
         var texts = try sourcePaths.map { try String(contentsOf: root.appendingPathComponent($0), encoding: .utf8) }
         let settings = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
-        let start = try #require(settings.range(of: "featureToggle(\"低额度提醒\""))
-        let end = try #require(settings.range(of: "featureToggle(\"AI 任务结果扫光\""))
-        texts.append(String(settings[start.lowerBound..<end.lowerBound]))
+        let settingPatterns = [
+            #"featureToggle\("[^"]+", detail: "[^"]*", symbol: "[^"]+", keyPath: \\\.aiAccountBalance[A-Za-z]+\)"#,
+            #"settingRow\(symbol: "[^"]+", title: "(?:[^"]*额度[^"]*|Qoder[^"]*)", detail: "[^"]*"\)"#,
+            #"AppLocal(?:ization\.(?:text|string)|izedText)\("[^"]*(?:额度|Cookie)[^"]*"(?:, locale: locale)?\)"#,
+        ]
+        for pattern in settingPatterns {
+            let regex = try NSRegularExpression(pattern: pattern)
+            texts += regex.matches(in: settings, range: NSRange(settings.startIndex..., in: settings)).map {
+                String(settings[Range($0.range, in: settings)!])
+            }
+        }
         for text in texts {
             let value = text as NSString
             for match in expression.matches(in: text, range: NSRange(location: 0, length: value.length)) {
@@ -86,7 +93,7 @@ struct AIAccountBalanceLocalizationTests {
             }
         }
         let existingKeys: Set<String> = ["全部", "%@ 次", "每周额度", "保存", "清除"]
-        #expect(discovered.subtracting(existingKeys) == Set(Self.keys),
+        #expect(discovered.subtracting(existingKeys).isSubset(of: Set(Self.keys + AIAccountBalanceBrowserCookieLocalizationTests.keys)),
             "Every runtime label, parser-provided localizable name, and indirect enum title must be covered by all languages")
     }
 

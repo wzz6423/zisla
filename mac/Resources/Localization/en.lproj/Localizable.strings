@@ -3750,3 +3750,10 @@
 "自动更新依赖组件" = "Automatically Update Dependencies";
 "每天更新已安装的依赖组件" = "Update installed dependencies daily";
 "（默认）" = "(Default)";
+
+"从默认浏览器导入" = "Import from default browser";
+"正在读取默认浏览器 Cookie" = "Reading default browser cookies";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Cannot identify the default browser. Paste cookies manually.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Cookie import is unavailable for the default browser. Paste cookies manually.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "No cookies found for this website. Sign in using the default browser or paste cookies manually.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Cannot read default browser cookies. Paste cookies manually or check access permissions.";
