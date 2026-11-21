@@ -269,7 +269,7 @@ final class DailyBriefingController: ObservableObject {
                 let name = bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
                     ?? bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String ?? interval.bundleID
                 application = DailyBriefingApplication(name: name,
-                    category: DailyBriefingCategory(applicationCategory: bundle?.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String))
+                                                       category: DailyBriefingCategory(applicationCategory: bundle?.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String))
             }
             application!.seconds += interval.end.timeIntervalSince(interval.start)
             report.day.applications[interval.bundleID] = application

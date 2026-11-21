@@ -447,15 +447,15 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
         if capacity == nil {
             // Separate aggregates let SQLite count index pages and seek the two endpoints.
             sql = """
-                SELECT (SELECT COUNT(*) FROM metrics),
-                       (SELECT MIN(timestamp) FROM metrics),
-                       (SELECT MAX(timestamp) FROM metrics)
-                """
+            SELECT (SELECT COUNT(*) FROM metrics),
+                   (SELECT MIN(timestamp) FROM metrics),
+                   (SELECT MAX(timestamp) FROM metrics)
+            """
         } else {
             sql = """
-                SELECT COUNT(*), MIN(timestamp), MAX(timestamp)
-                FROM (SELECT timestamp FROM metrics ORDER BY timestamp DESC LIMIT ?)
-                """
+            SELECT COUNT(*), MIN(timestamp), MAX(timestamp)
+            FROM (SELECT timestamp FROM metrics ORDER BY timestamp DESC LIMIT ?)
+            """
         }
         let statement = try prepare(sql, on: database)
         defer { sqlite3_finalize(statement) }

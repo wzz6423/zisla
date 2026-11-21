@@ -312,14 +312,14 @@ struct ScreenRecordingCaptureTests {
     @Test
     func regionAndPointerCoordinatesStayLocalOnDisplaysWithNegativeOrigins() throws {
         let frame = try ScreenRecordingCaptureGeometry.region(.init(x: 120, y: 80, width: 640, height: 360),
-                                                               in: CGRect(x: -1920, y: -200, width: 1920, height: 1080))
+                                                              in: CGRect(x: -1920, y: -200, width: 1920, height: 1080))
         #expect(frame == CGRect(x: -1800, y: -120, width: 640, height: 360))
         #expect(ScreenRecordingCaptureGeometry.normalizedPointer(CGPoint(x: -1480, y: 60), in: frame) == CGPoint(x: 0.5, y: 0.5))
         #expect(ScreenRecordingCaptureGeometry.normalizedPointer(CGPoint(x: -1800, y: -120), in: frame) == .zero)
         #expect(ScreenRecordingCaptureGeometry.normalizedPointer(CGPoint(x: 0, y: 0), in: frame) == nil)
         #expect(throws: ScreenRecordingCaptureError.invalidRegion) {
             try ScreenRecordingCaptureGeometry.region(.init(x: 1800, y: 0, width: 400, height: 300),
-                                                       in: CGRect(x: -1920, y: 0, width: 1920, height: 1080))
+                                                      in: CGRect(x: -1920, y: 0, width: 1920, height: 1080))
         }
     }
 
@@ -537,8 +537,8 @@ struct ScreenRecordingCaptureTests {
         let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, microphone: true),
                                                   width: 16, height: 16, finishTimeout: 0, onFailure: failures.append,
                                                   factory: { _, kind, _ in
-            CaptureTestAssetWriter(assets: kind == .microphone ? microphone : screen)
-        })
+                                                      CaptureTestAssetWriter(assets: kind == .microphone ? microphone : screen)
+                                                  })
         writer.receive(try syntheticVideo(time: 100, kind: .screen))
         writer.receive(try syntheticAudio(time: 100, kind: .microphone))
         await writer.seal(at: 101)
@@ -995,8 +995,8 @@ struct ScreenRecordingCaptureTests {
         var block: CMBlockBuffer?
         let length = ScreenRecordingCaptureAudioBacklog.byteLimit
         #expect(CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: length,
-                                                  blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
-                                                  offsetToData: 0, dataLength: length, flags: 0, blockBufferOut: &block) == noErr)
+                                                   blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
+                                                   offsetToData: 0, dataLength: length, flags: 0, blockBufferOut: &block) == noErr)
         var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 48_000),
                                         presentationTimeStamp: CMTime(value: 100, timescale: 1), decodeTimeStamp: .invalid)
         var size = 2
@@ -1080,9 +1080,9 @@ struct ScreenRecordingCaptureTests {
         #expect(readiness.marked == [.screen, .systemAudio])
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [AVFormatIDKey: kAudioFormatLinearPCM,
-                                                                           AVLinearPCMIsFloatKey: true,
-                                                                           AVLinearPCMBitDepthKey: 32,
-                                                                           AVLinearPCMIsNonInterleaved: false])
+                                                                             AVLinearPCMIsFloatKey: true,
+                                                                             AVLinearPCMBitDepthKey: 32,
+                                                                             AVLinearPCMIsNonInterleaved: false])
         reader.add(output)
         #expect(reader.startReading())
         var frames = 0
@@ -1292,13 +1292,13 @@ struct ScreenRecordingCaptureTests {
         CVPixelBufferUnlockBaseAddress(buffer, [])
         var format: CMVideoFormatDescription?
         #expect(CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
-                                                            formatDescriptionOut: &format) == noErr)
+                                                             formatDescriptionOut: &format) == noErr)
         var timing = CMSampleTimingInfo(duration: duration,
                                         presentationTimeStamp: CMTime(seconds: time, preferredTimescale: 1_000_000), decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         #expect(CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
-                                                        formatDescription: try #require(format), sampleTiming: &timing,
-                                                        sampleBufferOut: &sample) == noErr)
+                                                         formatDescription: try #require(format), sampleTiming: &timing,
+                                                         sampleBufferOut: &sample) == noErr)
         return ScreenRecordingCaptureSample(buffer: try #require(sample), kind: kind, hostTime: time)
     }
 
@@ -1309,8 +1309,8 @@ struct ScreenRecordingCaptureTests {
                                                       mChannelsPerFrame: 1, mBitsPerChannel: 16, mReserved: 0)
         var format: CMAudioFormatDescription?
         #expect(CMAudioFormatDescriptionCreate(allocator: kCFAllocatorDefault, asbd: &description, layoutSize: 0,
-                                              layout: nil, magicCookieSize: 0, magicCookie: nil,
-                                              extensions: nil, formatDescriptionOut: &format) == noErr)
+                                               layout: nil, magicCookieSize: 0, magicCookie: nil,
+                                               extensions: nil, formatDescriptionOut: &format) == noErr)
         var block: CMBlockBuffer?
         #expect(CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: 960,
                                                    blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
@@ -1554,10 +1554,10 @@ private final class CaptureTestNativeReadiness: @unchecked Sendable {
             queue.async {
                 do {
                     let native = try ScreenRecordingNativeAssetWriter(url: files.url(for: files.screenName), kind: .screen,
-                                                                       firstSample: firstSample.buffer, width: 16, height: 16,
-                                                                       systemAudio: true, frameRate: 30, finishQueue: self.queue,
-                                                                       finishTimeout: timeout, onFailure: { self.failure.resolve(.failure($0)) },
-                                                                       ready: self.ready, markFinished: self.markFinished)
+                                                                      firstSample: firstSample.buffer, width: 16, height: 16,
+                                                                      systemAudio: true, frameRate: 30, finishQueue: self.queue,
+                                                                      finishTimeout: timeout, onFailure: { self.failure.resolve(.failure($0)) },
+                                                                      ready: self.ready, markFinished: self.markFinished)
                     continuation.resume(returning: native)
                 } catch { continuation.resume(throwing: error) }
             }

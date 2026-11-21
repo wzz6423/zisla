@@ -12,7 +12,8 @@ struct ScreenRecordingTimelineMagnificationTests {
         let harness = Harness()
         defer { harness.view.detach() }
         let original = try #require(ScreenRecordingTimelineStripGeometry(
-            segments: [.init(start: 0, end: 80)], viewportWidth: 784, zoom: harness.zoom))
+            segments: [.init(start: 0, end: 80)], viewportWidth: 784, zoom: harness.zoom
+        ))
         harness.view.magnify(by: 0, phase: .began, location: 208)
         harness.view.magnify(by: 0.5, phase: .changed, location: 208)
         #expect(harness.zoom == 1.5)
@@ -20,7 +21,8 @@ struct ScreenRecordingTimelineMagnificationTests {
         #expect(harness.zoom == 2)
         harness.view.magnify(by: 1, phase: .ended, location: 208)
         let enlarged = try #require(ScreenRecordingTimelineStripGeometry(
-            segments: [.init(start: 0, end: 80)], viewportWidth: 784, zoom: harness.zoom))
+            segments: [.init(start: 0, end: 80)], viewportWidth: 784, zoom: harness.zoom
+        ))
         #expect(enlarged.pointsPerSecond == original.pointsPerSecond * 2)
         #expect(enlarged.ticks.count > original.ticks.count)
         #expect(enlarged.duration == original.duration)

@@ -20,11 +20,11 @@ struct ScreenRecordingMediaGroupingViewTests {
         let now = Date(timeIntervalSince1970: 1_783_000_000)
         let assets = [
             RecordingMediaAsset(name: "Audio", file: "sound.wav", kind: .audio, duration: 2,
-                importedAt: now, capturedAt: now),
+                                importedAt: now, capturedAt: now),
             RecordingMediaAsset(name: "Image", file: "image.png", kind: .image, duration: 2, width: 64, height: 48,
-                importedAt: now.addingTimeInterval(-7_200)),
+                                importedAt: now.addingTimeInterval(-7_200)),
             RecordingMediaAsset(name: "Video", file: "video.mp4", kind: .video, duration: 2, width: 64, height: 48,
-                importedAt: now.addingTimeInterval(-40 * 86_400), capturedAt: now.addingTimeInterval(-400 * 86_400)),
+                                importedAt: now.addingTimeInterval(-40 * 86_400), capturedAt: now.addingTimeInterval(-400 * 86_400)),
         ]
         var project = fixture.project()
         project.videoFile = ""
@@ -38,7 +38,7 @@ struct ScreenRecordingMediaGroupingViewTests {
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         view.sizingOptions = []
         let window = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 260, height: 900),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = view
         window.orderFrontRegardless()
@@ -50,15 +50,15 @@ struct ScreenRecordingMediaGroupingViewTests {
         #expect(groupTitles(in: view).isEmpty)
         for asset in assets { #expect(element("screenRecording.mediaAsset." + asset.id.uuidString, in: view) != nil) }
         try choose(AppLocalization.text("按类型"), id: "screenRecording.mediaGrouping", in: view,
-            options: RecordingMediaGrouping.allCases.map { AppLocalization.text($0.title) })
+                   options: RecordingMediaGrouping.allCases.map { AppLocalization.text($0.title) })
         #expect(groupTitles(in: view) == ["视频", "图片", "音频"].map { AppLocalization.text($0) })
         #expect(element("screenRecording.mediaTimeGranularity", in: view) == nil)
         for grouping in [RecordingMediaGrouping.importedAt, .capturedAt] {
             try choose(AppLocalization.text(grouping.title), id: "screenRecording.mediaGrouping", in: view,
-                options: RecordingMediaGrouping.allCases.map { AppLocalization.text($0.title) })
+                       options: RecordingMediaGrouping.allCases.map { AppLocalization.text($0.title) })
             for unit in RecordingMediaTimeGranularity.allCases {
                 try choose(AppLocalization.text(unit.title), id: "screenRecording.mediaTimeGranularity", in: view,
-                    options: RecordingMediaTimeGranularity.allCases.map { AppLocalization.text($0.title) })
+                           options: RecordingMediaTimeGranularity.allCases.map { AppLocalization.text($0.title) })
                 let expected = RecordingMediaLibraryGrouping.groups(assets: assets, grouping: grouping, granularity: unit)
                 let expectedTitles = expected.map { group in
                     if let date = group.date { return dateTitle(date, unit: unit, locale: language.locale) }
@@ -73,7 +73,7 @@ struct ScreenRecordingMediaGroupingViewTests {
             }
         }
         try choose(AppLocalization.text("不分组"), id: "screenRecording.mediaGrouping", in: view,
-            options: RecordingMediaGrouping.allCases.map { AppLocalization.text($0.title) })
+                   options: RecordingMediaGrouping.allCases.map { AppLocalization.text($0.title) })
         #expect(groupTitles(in: view).isEmpty && element("screenRecording.mediaTimeGranularity", in: view) == nil)
         #expect(model.mediaAssets == assets && model.project == project && !model.isDirty && !model.canUndo)
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) } && !window.isKeyWindow)
@@ -83,7 +83,7 @@ struct ScreenRecordingMediaGroupingViewTests {
     func missingMenuStopsWaitingAndItsObserverIsRemoved() {
         let selection = MenuSelection(title: "Missing menu fixture")
         NotificationCenter.default.addObserver(selection, selector: #selector(MenuSelection.began(_:)),
-            name: NSMenu.didBeginTrackingNotification, object: nil)
+                                               name: NSMenu.didBeginTrackingNotification, object: nil)
         defer { NotificationCenter.default.removeObserver(selection) }
         let clock = ContinuousClock()
         let started = clock.now
@@ -100,7 +100,7 @@ struct ScreenRecordingMediaGroupingViewTests {
         let picker = try #require(element(id, in: view))
         let selection = MenuSelection(title: title)
         NotificationCenter.default.addObserver(selection, selector: #selector(MenuSelection.began(_:)),
-            name: NSMenu.didBeginTrackingNotification, object: nil)
+                                               name: NSMenu.didBeginTrackingNotification, object: nil)
         defer { NotificationCenter.default.removeObserver(selection) }
         let action = NSSelectorFromString("accessibilityPerformPress")
         try #require(picker.responds(to: action))

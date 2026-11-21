@@ -370,21 +370,21 @@ struct ScreenRecordingCaptureTimingTests {
     private func video(at time: Double) throws -> ScreenRecordingCaptureSample {
         var pixel: CVPixelBuffer?
         #expect(CVPixelBufferCreate(kCFAllocatorDefault, 16, 16, kCVPixelFormatType_32BGRA,
-                                   [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pixel) == kCVReturnSuccess)
+                                    [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pixel) == kCVReturnSuccess)
         let image = try #require(pixel)
         CVPixelBufferLockBaseAddress(image, [])
         if let base = CVPixelBufferGetBaseAddress(image) { memset(base, 127, CVPixelBufferGetBytesPerRow(image) * 16) }
         CVPixelBufferUnlockBaseAddress(image, [])
         var format: CMVideoFormatDescription?
         #expect(CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: image,
-                                                            formatDescriptionOut: &format) == noErr)
+                                                             formatDescriptionOut: &format) == noErr)
         var timing = CMSampleTimingInfo(duration: .invalid,
                                         presentationTimeStamp: CMTime(seconds: time, preferredTimescale: 1_000_000_000),
                                         decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         #expect(CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: image,
-                                                        formatDescription: try #require(format), sampleTiming: &timing,
-                                                        sampleBufferOut: &sample) == noErr)
+                                                         formatDescription: try #require(format), sampleTiming: &timing,
+                                                         sampleBufferOut: &sample) == noErr)
         return ScreenRecordingCaptureSample(buffer: try #require(sample), kind: .screen, hostTime: time)
     }
 
@@ -411,8 +411,8 @@ struct ScreenRecordingCaptureTimingTests {
         } == noErr)
         var block: CMBlockBuffer?
         #expect(CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: length,
-                                                  blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
-                                                  offsetToData: 0, dataLength: length, flags: 0, blockBufferOut: &block) == noErr)
+                                                   blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
+                                                   offsetToData: 0, dataLength: length, flags: 0, blockBufferOut: &block) == noErr)
         let data = try #require(block)
         #expect(CMBlockBufferFillDataBytes(with: 0, blockBuffer: data, offsetIntoDestination: 0, dataLength: length) == noErr)
         var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: Int32(sampleRate)),

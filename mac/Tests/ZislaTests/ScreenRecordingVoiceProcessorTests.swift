@@ -18,8 +18,8 @@ struct ScreenRecordingVoiceProcessorTests {
         let valid = try Self.sample([Self.tone(440, frames: 512)])
         var empty: CMSampleBuffer?
         try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-            formatDescription: valid.formatDescription, sampleCount: 0, sampleTimingEntryCount: 0,
-            sampleTimingArray: nil, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &empty) == noErr)
+                                               formatDescription: valid.formatDescription, sampleCount: 0, sampleTimingEntryCount: 0,
+                                               sampleTimingArray: nil, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &empty) == noErr)
         let packet = try #require(empty)
         let effects = RecordingVoiceEffects(preset: .natural, amount: 1)
         let processor = RecordingVoiceProcessor()
@@ -68,7 +68,7 @@ struct ScreenRecordingVoiceProcessorTests {
     @Test(arguments: [AVAudioCommonFormat.pcmFormatFloat32, .pcmFormatFloat64, .pcmFormatInt16, .pcmFormatInt32], [true, false])
     func PCMFormatsPreserveChannelsLayoutAndTiming(_ commonFormat: AVAudioCommonFormat, _ interleaved: Bool) throws {
         let source = try Self.sample([Self.tone(180, frames: 2_048), Self.tone(2_000, frames: 2_048),
-                                     [Float](repeating: 0, count: 2_048)], commonFormat: commonFormat, interleaved: interleaved)
+                                      [Float](repeating: 0, count: 2_048)], commonFormat: commonFormat, interleaved: interleaved)
         CMSetAttachment(source, key: "voice-fixture" as CFString, value: "preserved" as CFString, attachmentMode: kCMAttachmentMode_ShouldPropagate)
         let original = try Self.samples(source)
         let presentationTime = CMTime(seconds: 24, preferredTimescale: 48_000)
@@ -145,17 +145,17 @@ struct ScreenRecordingVoiceProcessorTests {
             var maximum = maximum
             try #require(withUnsafeBytes(of: &maximum) {
                 CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0,
-                    dataLength: $0.count)
+                                              dataLength: $0.count)
             } == noErr)
             let processor = RecordingVoiceProcessor()
             let effects = RecordingVoiceEffects(preset: .broadcast, amount: 1)
             _ = try processor.process(Self.sample([[Float](repeating: -1, count: 24_000)], commonFormat: format,
-                interleaved: true), effects: effects)
+                                                  interleaved: true), effects: effects)
             let output = try processor.process(source, effects: effects)
             var actual = T.zero
             try #require(withUnsafeMutableBytes(of: &actual) {
                 CMBlockBufferCopyDataBytes(try #require(output.dataBuffer), atOffset: 0, dataLength: $0.count,
-                    destination: $0.baseAddress!)
+                                           destination: $0.baseAddress!)
             } == noErr)
             #expect(actual == maximum, "Positive full-scale PCM must saturate instead of overflowing after rounding")
             try #require(withUnsafeMutableBytes(of: &actual) {
@@ -176,13 +176,13 @@ struct ScreenRecordingVoiceProcessorTests {
         for index in 0..<32 { data[index] = index % 2 == 0 ? Double.greatestFiniteMagnitude : -Double.greatestFiniteMagnitude }
         var replacement: CMSampleBuffer?
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 48_000),
-            presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
         try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-            formatDescription: extreme.formatDescription, sampleCount: 32, sampleTimingEntryCount: 1,
-            sampleTimingArray: &timing, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &replacement) == noErr)
+                                               formatDescription: extreme.formatDescription, sampleCount: 32, sampleTimingEntryCount: 1,
+                                               sampleTimingArray: &timing, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &replacement) == noErr)
         let sample = try #require(replacement)
         try #require(CMSampleBufferSetDataBufferFromAudioBufferList(sample, blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: buffer.audioBufferList) == noErr)
+                                                                    blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: buffer.audioBufferList) == noErr)
         let processor = RecordingVoiceProcessor()
         let effects = RecordingVoiceEffects(preset: .broadcast, amount: 1)
         #expect(try Self.samples(processor.process(sample, effects: effects))[0].allSatisfy { $0.isFinite && abs($0) <= 1 })
@@ -191,18 +191,18 @@ struct ScreenRecordingVoiceProcessorTests {
         let speech = try Self.sample([Self.tone(440, frames: 24_000)], commonFormat: .pcmFormatFloat64)
         let recovered = try Self.samples(processor.process(speech, effects: effects))[0]
         #expect((0.08...0.3).contains(Self.rms(recovered)),
-            "Oversized source samples must not leave the next speech packet permanently compressed or clipped")
+                "Oversized source samples must not leave the next speech packet permanently compressed or clipped")
     }
 
     @Test func missingPCMStorageFailsWithoutPublishingAnOutput() throws {
         let source = try Self.sample([Self.tone(440, frames: 32)])
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 48_000),
-            presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
         var size = 4
         var missing: CMSampleBuffer?
         try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-            formatDescription: source.formatDescription, sampleCount: 32, sampleTimingEntryCount: 1,
-            sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &missing) == noErr)
+                                               formatDescription: source.formatDescription, sampleCount: 32, sampleTimingEntryCount: 1,
+                                               sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &missing) == noErr)
         let packet = try #require(missing)
         #expect(throws: ScreenRecordingCaptureError.writerUnavailable) {
             try RecordingVoiceProcessor().process(packet, effects: .init(preset: .natural, amount: 1))
@@ -212,12 +212,12 @@ struct ScreenRecordingVoiceProcessorTests {
 
     @Test func formatlessPacketIsRejectedBeforePCMAllocation() throws {
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 48_000),
-            presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
         var size = 4
         var missing: CMSampleBuffer?
         try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-            formatDescription: nil, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
-            sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &missing) == noErr)
+                                               formatDescription: nil, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                               sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &missing) == noErr)
         #expect(throws: ScreenRecordingCaptureError.writerUnavailable) {
             try RecordingVoiceProcessor().process(try #require(missing), effects: .init(preset: .natural, amount: 1))
         }
@@ -225,19 +225,19 @@ struct ScreenRecordingVoiceProcessorTests {
 
     @Test func compressedPacketIsRejectedBeforePCMAllocation() throws {
         var description = AudioStreamBasicDescription(mSampleRate: 48_000, mFormatID: kAudioFormatMPEG4AAC,
-            mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 1_024, mBytesPerFrame: 0,
-            mChannelsPerFrame: 2, mBitsPerChannel: 0, mReserved: 0)
+                                                      mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 1_024, mBytesPerFrame: 0,
+                                                      mChannelsPerFrame: 2, mBitsPerChannel: 0, mReserved: 0)
         var format: CMAudioFormatDescription?
         try #require(CMAudioFormatDescriptionCreate(allocator: kCFAllocatorDefault, asbd: &description,
-            layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil, extensions: nil,
-            formatDescriptionOut: &format) == noErr)
+                                                    layoutSize: 0, layout: nil, magicCookieSize: 0, magicCookie: nil, extensions: nil,
+                                                    formatDescriptionOut: &format) == noErr)
         var timing = CMSampleTimingInfo(duration: .init(value: 1_024, timescale: 48_000),
-            presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
         var size = 4
         var result: CMSampleBuffer?
         try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-            formatDescription: format, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
-            sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &result) == noErr)
+                                               formatDescription: format, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                               sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &result) == noErr)
         #expect(throws: ScreenRecordingCaptureError.writerUnavailable) {
             try RecordingVoiceProcessor().process(try #require(result), effects: .init(preset: .natural, amount: 1))
         }
@@ -246,12 +246,12 @@ struct ScreenRecordingVoiceProcessorTests {
     @Test func oversizedPacketIsRejectedBeforePCMAllocation() throws {
         let source = try Self.sample([Self.tone(440, frames: 32)])
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 48_000),
-            presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
         var size = 4
         var result: CMSampleBuffer?
         try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-            formatDescription: source.formatDescription, sampleCount: Int(Int32.max) + 1, sampleTimingEntryCount: 1,
-            sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &result) == noErr)
+                                               formatDescription: source.formatDescription, sampleCount: Int(Int32.max) + 1, sampleTimingEntryCount: 1,
+                                               sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &result) == noErr)
         #expect(throws: ScreenRecordingCaptureError.writerUnavailable) {
             try RecordingVoiceProcessor().process(try #require(result), effects: .init(preset: .natural, amount: 1))
         }
@@ -319,17 +319,17 @@ struct ScreenRecordingVoiceProcessorTests {
             }
         }
         var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: CMTimeScale(rate)),
-            presentationTimeStamp: CMTime(seconds: time, preferredTimescale: 48_000), decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: CMTime(seconds: time, preferredTimescale: 48_000), decodeTimeStamp: .invalid)
         var size = Int(format.streamDescription.pointee.mBytesPerFrame)
         var result: CMSampleBuffer?
         try #require(withUnsafePointer(to: &size) { pointer in
             CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil, formatDescription: format.formatDescription,
-                sampleCount: count, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
-                sampleSizeEntryCount: interleaved ? 1 : 0, sampleSizeArray: interleaved ? pointer : nil, sampleBufferOut: &result)
+                                      sampleCount: count, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                      sampleSizeEntryCount: interleaved ? 1 : 0, sampleSizeArray: interleaved ? pointer : nil, sampleBufferOut: &result)
         } == noErr)
         let sample = try #require(result)
         try #require(CMSampleBufferSetDataBufferFromAudioBufferList(sample, blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: buffer.audioBufferList) == noErr)
+                                                                    blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: buffer.audioBufferList) == noErr)
         return sample
     }
 
@@ -338,7 +338,7 @@ struct ScreenRecordingVoiceProcessorTests {
         let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(sample.numSamples)))
         buffer.frameLength = buffer.frameCapacity
         try #require(CMSampleBufferCopyPCMDataIntoAudioBufferList(sample, at: 0, frameCount: Int32(sample.numSamples),
-            into: buffer.mutableAudioBufferList) == noErr)
+                                                                  into: buffer.mutableAudioBufferList) == noErr)
         let list = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
         return try (0..<Int(format.channelCount)).map { channel in
             let data = try #require(list[format.isInterleaved ? 0 : channel].mData)

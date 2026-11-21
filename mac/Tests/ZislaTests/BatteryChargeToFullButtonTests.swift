@@ -12,11 +12,11 @@ struct BatteryChargeToFullButtonTests {
         var messages: [String] = []
         let monitor = BatteryMonitor()
         let view = SystemMonitorView(service: SystemMonitorService(), batteryMonitor: monitor,
-            networkMonitor: NetworkBatteryMonitor(), showsSystemMonitor: false, showsBatteryMonitor: true,
-            onCleanupRequested: {}, onTransientMessage: { messages.append($0) })
+                                     networkMonitor: NetworkBatteryMonitor(), showsSystemMonitor: false, showsBatteryMonitor: true,
+                                     onCleanupRequested: {}, onTransientMessage: { messages.append($0) })
         let detail: BatteryDetailView = try #require(value(in: view.body))
         let battery = BatterySnapshot(level: 0.8, isCharging: false, isPluggedIn: true,
-            isCharged: false, timeRemainingMinutes: nil)
+                                      isCharged: false, timeRemainingMinutes: nil)
         let action: BatteryChargeToFullButton = try #require(value(in: detail.localBatterySection(battery)))
         let message = BatteryLocalization.string("无法立即充至100%，请重试。", locale: Locale(identifier: "en"))
         action.onTransientMessage(message)
@@ -36,9 +36,9 @@ struct BatteryChargeToFullButtonTests {
         let defaults = try #require(UserDefaults(suiteName: domain))
         defer { defaults.removePersistentDomain(forName: domain) }
         let battery: BatterySnapshot? = scenario == "missing" ? nil : BatterySnapshot(level: 0.8,
-            isCharging: false, isPluggedIn: true, isCharged: false, timeRemainingMinutes: nil)
+                                                                                      isCharging: false, isPluggedIn: true, isCharged: false, timeRemainingMinutes: nil)
         let monitor = BatteryMonitor(defaults: defaults, notificationCenter: NotificationCenter(),
-            snapshotProvider: { battery }, runLoopSourceFactory: { _ in nil })
+                                     snapshotProvider: { battery }, runLoopSourceFactory: { _ in nil })
         monitor.refresh()
         let completions = AsyncStream<Bool>.makeStream()
         let observation = controller.$isRequesting.dropFirst().filter { !$0 }
@@ -48,13 +48,13 @@ struct BatteryChargeToFullButtonTests {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let window = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 280, height: 48),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let host = NSHostingView(rootView: BatteryChargeToFullButton(batteryMonitor: monitor,
-            onTransientMessage: { messages.append($0) },
-            environment: ["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL": "1"], isDebugBuild: true, controller: controller)
-            .environment(\.locale, language.locale)
-            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+                                                                     onTransientMessage: { messages.append($0) },
+                                                                     environment: ["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL": "1"], isDebugBuild: true, controller: controller)
+                .environment(\.locale, language.locale)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         window.contentView = host
         defer { window.contentView = nil; window.close() }
         host.layoutSubtreeIfNeeded()
@@ -89,7 +89,7 @@ struct BatteryChargeToFullButtonTests {
         let environment = value.map { ["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL": $0] } ?? [:]
         let monitor = BatteryMonitor()
         let view = BatteryChargeToFullButton(batteryMonitor: monitor, onTransientMessage: { _ in },
-            environment: environment, isDebugBuild: isDebugBuild)
+                                             environment: environment, isDebugBuild: isDebugBuild)
         let image = try render(view.frame(width: 280, height: 48), language: .english)
         var hasVisibleAction = false
         for y in 0..<image.pixelsHigh {
@@ -116,9 +116,9 @@ struct BatteryChargeToFullButtonTests {
     @Test(arguments: AppLanguage.allCases, [false, true]) @MainActor
     func buttonFitsTheExistingCompactHeaderInEveryLanguage(language: AppLanguage, isRequesting: Bool) throws {
         let battery = BatterySnapshot(level: 0.8, isCharging: false, isPluggedIn: true,
-            isCharged: false, timeRemainingMinutes: nil, isLowPowerMode: true)
+                                      isCharged: false, timeRemainingMinutes: nil, isLowPowerMode: true)
         let view = BatteryDetailView(batteryMonitor: BatteryMonitor(), networkMonitor: NetworkBatteryMonitor(),
-            onTransientMessage: { _ in })
+                                     onTransientMessage: { _ in })
         let presentation = BatteryPowerModePresentation(
             currentMode: .lowPower, powerSource: .powerAdapter,
             supportedModes: BatteryPowerMode.allCases, isChanging: false, error: nil

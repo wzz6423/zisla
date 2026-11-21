@@ -188,7 +188,7 @@ public enum ClipboardAssistantDetector {
         if enabledKinds.contains(.conversion),
            let conversion = parseCurrencyConversion(text, preferredCurrencyCode: preferredCurrencyCode, locale: locale),
            conversion.sourceCurrencyCode
-              != (conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)) {
+           != (conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)) {
             let target = conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)
             return ClipboardAssistantDetection(
                 kind: .conversion,
@@ -260,7 +260,7 @@ public enum ClipboardAssistantDetector {
         // application is a far stronger signal than a language guess.
         if enabledKinds.contains(.app),
            let application = InstalledApplicationCatalog.application(
-            named: text, in: installedApplications
+               named: text, in: installedApplications
            ) {
             return ClipboardAssistantDetection(
                 kind: .app,
@@ -899,8 +899,8 @@ public enum ClipboardAssistantDetector {
         guard let (detectedLanguage, confidence) = recognizer
             .languageHypotheses(withMaximum: 1)
             .max(by: { $0.value < $1.value }),
-              confidence >= 0.5,
-              let detectedLanguageCode = primaryLanguageCode(from: detectedLanguage.rawValue) else {
+            confidence >= 0.5,
+            let detectedLanguageCode = primaryLanguageCode(from: detectedLanguage.rawValue) else {
             return false
         }
         return detectedLanguageCode != appLanguageCode

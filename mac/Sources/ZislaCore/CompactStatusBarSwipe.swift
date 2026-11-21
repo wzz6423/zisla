@@ -9,8 +9,8 @@ public enum CompactStatusBarSwipeRecognizer {
         containerWidth: CGFloat
     ) -> Bool {
         guard containerWidth > 0,
-            abs(translation.width) >= minimumDistance,
-            abs(translation.width) > abs(translation.height)
+              abs(translation.width) >= minimumDistance,
+              abs(translation.width) > abs(translation.height)
         else {
             return false
         }

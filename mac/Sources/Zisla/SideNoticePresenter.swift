@@ -252,7 +252,7 @@ final class SideNoticePresenter {
                 ? (screenLayout.placementMode == .camera
                     ? max(ScreenLayoutConfiguration.cameraPillCenterWidth, screenLayout.centerOcclusionWidth)
                     : screenLayout.centerOcclusionWidth) : screenLayout.topology.hasPhysicalNotch
-                    ? screenLayout.collapsedFrame.width : 0)
+                ? screenLayout.collapsedFrame.width : 0)
             let compactBarFrame = compactFrame(for: snapshot, notices: compactNotices, at: date,
                                                statusHidden: displayState.compactStatusHidden)
                 ?? (screenLayout.style == .pill ? screenLayout.collapsedFrame : layoutEngine.compactBarFrame(for: snapshot))
@@ -329,9 +329,9 @@ final class SideNoticePresenter {
             return configuration
         }
         if let information = FloatingIslandInformationLayout(
-            notices: statusHidden ? [] : notices, icons: availableStatusIcons,
-            settings: settingsStore.settings, item: media.snapshot, at: date
-        ), !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
+               notices: statusHidden ? [] : notices, icons: availableStatusIcons,
+               settings: settingsStore.settings, item: media.snapshot, at: date
+           ), !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
            resultSweep.current == nil {
             configuration.statusIconSize = information.size
             return configuration
@@ -485,7 +485,8 @@ final class SideNoticePresenter {
             settings: settingsStore.settings, item: media.snapshot, at: date
         )
         panel.ignoresMouseEvents = Self.compactPanelIgnoresMouseEvents(
-            statusIcons: displayState.statusIcons, information: information)
+            statusIcons: displayState.statusIcons, information: information
+        )
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         if settingsStore.settings.islandLayoutStyle == .pill && !settingsStore.settings.islandCollapsedOnTop {
             panel.level = IslandPanel.onBottomLevel

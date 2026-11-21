@@ -852,7 +852,7 @@ struct WindowPreviewLifecycleTests {
         let frame = scenario.browser ? CGRect(x: 0, y: 0, width: 1512, height: 868)
             : CGRect(x: 0, y: 33, width: 1512, height: 949)
         let headers = scenario.browser ? [CGRect(x: 0, y: 949, width: 1512, height: 33),
-                                         CGRect(x: 0, y: 868, width: 1512, height: 81)] : []
+                                          CGRect(x: 0, y: 868, width: 1512, height: 81)] : []
         let selection = PreviewSystem.selection(1, source: source)
         var dependencies = system.dependencies()
         dependencies.dockSelection = { selection }
@@ -2095,7 +2095,7 @@ private final class PreviewSystem {
         let height = Int(size.height)
         var pixel: CVPixelBuffer?
         #expect(CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA,
-                                   [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pixel) == kCVReturnSuccess)
+                                    [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pixel) == kCVReturnSuccess)
         let buffer = try #require(pixel)
         CVPixelBufferLockBaseAddress(buffer, [])
         defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
@@ -2129,7 +2129,7 @@ private final class PreviewSystem {
         }
         var destination: CVPixelBuffer?
         #expect(CVPixelBufferCreate(kCFAllocatorDefault, configuration.width, configuration.height, configuration.pixelFormat,
-                                   [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &destination) == kCVReturnSuccess)
+                                    [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &destination) == kCVReturnSuccess)
         let buffer = try #require(destination)
         var transfer: VTPixelTransferSession?
         #expect(VTPixelTransferSessionCreate(allocator: kCFAllocatorDefault, pixelTransferSessionOut: &transfer) == noErr)
@@ -2142,12 +2142,12 @@ private final class PreviewSystem {
     private static func videoSampleBuffer(from buffer: CVPixelBuffer) throws -> CMSampleBuffer {
         var format: CMVideoFormatDescription?
         #expect(CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
-                                                            formatDescriptionOut: &format) == noErr)
+                                                             formatDescriptionOut: &format) == noErr)
         var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         #expect(CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
-                                                        formatDescription: try #require(format), sampleTiming: &timing,
-                                                        sampleBufferOut: &sample) == noErr)
+                                                         formatDescription: try #require(format), sampleTiming: &timing,
+                                                         sampleBufferOut: &sample) == noErr)
         return try #require(sample)
     }
 

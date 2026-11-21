@@ -64,7 +64,7 @@ struct DailyBriefingPowerChart: View {
                 $0.date >= interval.start && $0.date < interval.end
                     && $0.averageWatts.isFinite && $0.averageWatts >= 0 && $0.sampleCount > 0
             }
-                .sorted { $0.date < $1.date }
+            .sorted { $0.date < $1.date }
             var previousDate: Date?
             var segment = 0
             return selected.map { sample in
@@ -91,7 +91,7 @@ struct DailyBriefingPowerChart: View {
     func timeLabel(_ hour: Double) -> String {
         dayInterval.start.addingTimeInterval(hour * 3600).formatted(
             Date.FormatStyle(date: .omitted, time: .shortened, locale: language.locale,
-                calendar: calendar, timeZone: calendar.timeZone)
+                             calendar: calendar, timeZone: calendar.timeZone)
         )
     }
 
@@ -156,7 +156,7 @@ private struct DailyBriefingTimelinePlot: View {
                         AxisValueLabel {
                             if let number = value.as(Double.self) {
                                 Text(number.formatted(.number.notation(.compactName)
-                                    .precision(.fractionLength(0...1)).locale(language.locale)) + unitSuffix)
+                                        .precision(.fractionLength(0...1)).locale(language.locale)) + unitSuffix)
                                     .font(.system(size: 12)).foregroundStyle(ink.opacity(0.55))
                             }
                         }

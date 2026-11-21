@@ -119,7 +119,7 @@ struct AIAccountBalanceBrowserCookieReader: Sendable {
                 if firefox ? value : !value { expires = nil }
             }
             var cookie = AIAccountBalanceBrowserCookie(domain: try text(statement, index(hostColumn)),
-                name: try text(statement, index("name")), value: "", path: try text(statement, index("path")), expires: expires)
+                                                       name: try text(statement, index("name")), value: "", path: try text(statement, index("path")), expires: expires)
             guard cookie.applies(to: website, now: time) else { continue }
             let encryptedIndex = firefox ? nil : index("encrypted_value")
             if let encryptedIndex, sqlite3_column_bytes(statement, encryptedIndex) > 0 {
@@ -317,8 +317,8 @@ struct AIAccountBalanceBrowserCookieReader: Sendable {
                 guard cookies.count < Self.maximumCookies else { throw AIAccountBalanceBrowserCookieError.invalidData }
                 let expiration = Double(bitPattern: try integer(start + 40, count: 8))
                 cookies.append(AIAccountBalanceBrowserCookie(domain: domain, name: try string(20), value: try string(28),
-                    path: try string(24),
-                    expires: expiration + Date.timeIntervalBetween1970AndReferenceDate))
+                                                             path: try string(24),
+                                                             expires: expiration + Date.timeIntervalBetween1970AndReferenceDate))
             }
             pageOffset += size
         }

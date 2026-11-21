@@ -433,12 +433,12 @@ public final class BatteryMonitor: ObservableObject {
 
         var unmanaged: Unmanaged<CFMutableDictionary>?
         guard IORegistryEntryCreateCFProperties(
-            service,
-            &unmanaged,
-            kCFAllocatorDefault,
-            0
-        ) == kIOReturnSuccess,
-            let properties = unmanaged?.takeRetainedValue() as? [String: Any]
+                  service,
+                  &unmanaged,
+                  kCFAllocatorDefault,
+                  0
+              ) == kIOReturnSuccess,
+              let properties = unmanaged?.takeRetainedValue() as? [String: Any]
         else {
             return nil
         }

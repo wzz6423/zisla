@@ -35,78 +35,78 @@ struct AIAccountBalanceServiceTests {
     }
 
     #if DEBUG
-    @Test(arguments: [Set<AIProvider>(), [.codex]])
-    func explicitFixtureOverridesSelectionAndNeverReadsAccounts(providers: Set<AIProvider>) async throws {
-        BalanceURLProtocol.configure([:])
-        let environment = ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"]
-        let service = makeService(credentials: { _, _, _ in
-            Issue.record("An explicit fixture must never read account credentials")
-            return nil
-        }, debug: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
-        let rows = try await service.accountBalances(for: providers)
-        #expect(rows.map(\.providers) == [[.claude], [.gpt], [.cursor]],
-            "The requested fixture must replace real monitor selections and preserve its explicit aliases")
-        #expect(rows.map { $0.windows.map(\.remainingPercent) } == [[10, 70], [0], [20]])
-        #expect(rows.allSatisfy { $0.isDebug && $0.updatedAt == now && $0.severity != nil })
-        #expect(BalanceURLProtocol.requests.isEmpty)
-    }
+        @Test(arguments: [Set<AIProvider>(), [.codex]])
+        func explicitFixtureOverridesSelectionAndNeverReadsAccounts(providers: Set<AIProvider>) async throws {
+            BalanceURLProtocol.configure([:])
+            let environment = ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"]
+            let service = makeService(credentials: { _, _, _ in
+                Issue.record("An explicit fixture must never read account credentials")
+                return nil
+            }, debug: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
+            let rows = try await service.accountBalances(for: providers)
+            #expect(rows.map(\.providers) == [[.claude], [.gpt], [.cursor]],
+                    "The requested fixture must replace real monitor selections and preserve its explicit aliases")
+            #expect(rows.map { $0.windows.map(\.remainingPercent) } == [[10, 70], [0], [20]])
+            #expect(rows.allSatisfy { $0.isDebug && $0.updatedAt == now && $0.severity != nil })
+            #expect(BalanceURLProtocol.requests.isEmpty)
+        }
 
-    @Test func environmentFixtureUsesTheDefaultServiceInitializer() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-balance-environment-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let service = AIAccountBalanceService(home: root,
-            environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"], now: { now })
-        let rows = try await service.accountBalances(for: [.codex])
-        #expect(rows.map(\.providers) == [[.claude], [.gpt], [.cursor]])
-        #expect(rows.map { $0.windows.map(\.remainingPercent) } == [[10, 70], [0], [20]])
-        #expect(rows.allSatisfy { $0.isDebug })
-        #expect(!FileManager.default.fileExists(atPath: root.path), "Debug fixtures must not create account files")
-    }
-
-    @Test func emptyOrRemovedFixtureRestoresTheSelectedAccountPath() async throws {
-        BalanceURLProtocol.configure([:])
-        for environment in [[:], ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": ""]] {
-            let service = makeService(credentials: { _, _, _ in nil },
-                debug: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
+        @Test func environmentFixtureUsesTheDefaultServiceInitializer() async throws {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-balance-environment-\(UUID())")
+            defer { try? FileManager.default.removeItem(at: root) }
+            let service = AIAccountBalanceService(home: root,
+                                                  environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"], now: { now })
             let rows = try await service.accountBalances(for: [.codex])
-            #expect(rows.map(\.providers) == [[.codex]] && rows.map(\.status) == [.notSignedIn])
-            #expect(rows.allSatisfy { !$0.isDebug }, "Clearing a fixture must restore the regular selected-account path")
+            #expect(rows.map(\.providers) == [[.claude], [.gpt], [.cursor]])
+            #expect(rows.map { $0.windows.map(\.remainingPercent) } == [[10, 70], [0], [20]])
+            #expect(rows.allSatisfy { $0.isDebug })
+            #expect(!FileManager.default.fileExists(atPath: root.path), "Debug fixtures must not create account files")
         }
-        #expect(BalanceURLProtocol.requests.isEmpty)
-    }
 
-    @Test(arguments: [" ", "claude:nan", "codex:101", "claude:10,claude:20", "cursor:20,"])
-    func malformedFixtureCannotFallBackToCredentialedSources(raw: String) async throws {
-        BalanceURLProtocol.configure([:])
-        let service = makeService(credentials: { _, _, _ in
-            Issue.record("A malformed explicit fixture must not fall back to an account")
-            return nil
-        }, debug: { AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now) })
-        #expect(try await service.accountBalances(for: [.claude, .codex, .cursor]).isEmpty)
-        #expect(BalanceURLProtocol.requests.isEmpty)
-    }
-
-    @Test func seededFixtureAliasesKeepExactPercentagesAndRejectTruncation() throws {
-        var seed: UInt64 = 0x283_2026
-        let aliases: [AIProvider] = [.codex, .gpt, .cursor, .grokBot]
-        for index in 0..<128 {
-            seed = seed &* 6_364_136_223_846_793_005 &+ 1
-            let percent = Double(seed % 101), provider = aliases[index % aliases.count]
-            let raw = "\(provider.rawValue):\(percent):\(100 - percent)"
-            let rows = try #require(AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now))
-            #expect(rows.map(\.providers) == [[provider]], "Seed 0x2832026 sample \(index) must preserve its selected alias")
-            #expect(rows.first?.windows.map(\.remainingPercent) == [percent, 100 - percent])
-            #expect(rows.allSatisfy { $0.isDebug && $0.windows.allSatisfy { $0.isValid } })
-            #expect(AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw + ","], now: now) == [],
-                "Seed 0x2832026 sample \(index) must reject an incomplete fixture without live fallback")
+        @Test func emptyOrRemovedFixtureRestoresTheSelectedAccountPath() async throws {
+            BalanceURLProtocol.configure([:])
+            for environment in [[:], ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": ""]] {
+                let service = makeService(credentials: { _, _, _ in nil },
+                                          debug: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
+                let rows = try await service.accountBalances(for: [.codex])
+                #expect(rows.map(\.providers) == [[.codex]] && rows.map(\.status) == [.notSignedIn])
+                #expect(rows.allSatisfy { !$0.isDebug }, "Clearing a fixture must restore the regular selected-account path")
+            }
+            #expect(BalanceURLProtocol.requests.isEmpty)
         }
-    }
+
+        @Test(arguments: [" ", "claude:nan", "codex:101", "claude:10,claude:20", "cursor:20,"])
+        func malformedFixtureCannotFallBackToCredentialedSources(raw: String) async throws {
+            BalanceURLProtocol.configure([:])
+            let service = makeService(credentials: { _, _, _ in
+                Issue.record("A malformed explicit fixture must not fall back to an account")
+                return nil
+            }, debug: { AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now) })
+            #expect(try await service.accountBalances(for: [.claude, .codex, .cursor]).isEmpty)
+            #expect(BalanceURLProtocol.requests.isEmpty)
+        }
+
+        @Test func seededFixtureAliasesKeepExactPercentagesAndRejectTruncation() throws {
+            var seed: UInt64 = 0x283_2026
+            let aliases: [AIProvider] = [.codex, .gpt, .cursor, .grokBot]
+            for index in 0..<128 {
+                seed = seed &* 6_364_136_223_846_793_005 &+ 1
+                let percent = Double(seed % 101), provider = aliases[index % aliases.count]
+                let raw = "\(provider.rawValue):\(percent):\(100 - percent)"
+                let rows = try #require(AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now))
+                #expect(rows.map(\.providers) == [[provider]], "Seed 0x2832026 sample \(index) must preserve its selected alias")
+                #expect(rows.first?.windows.map(\.remainingPercent) == [percent, 100 - percent])
+                #expect(rows.allSatisfy { $0.isDebug && $0.windows.allSatisfy { $0.isValid } })
+                #expect(AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw + ","], now: now) == [],
+                        "Seed 0x2832026 sample \(index) must reject an incomplete fixture without live fallback")
+            }
+        }
     #endif
 
     /// Recorded requests prove shared-account deduplication, selected alias output, and secret-free public rows.
     @Test func sharedAliasesFetchOnceAndPublishOnlySelectedNamesWithoutSecrets() async throws {
         BalanceURLProtocol.configure(["/backend-api/wham/usage": [.json(#"{"rate_limit":{"primary_window":{"used_percent":90,"limit_window_seconds":18000}}}"#)],
-            "/api/usage-summary": [.json(#"{"individualUsage":{"plan":{"used":900,"limit":1000}}}"#)]])
+                                      "/api/usage-summary": [.json(#"{"individualUsage":{"plan":{"used":900,"limit":1000}}}"#)]])
         let service = makeService()
         let rows = try await service.accountBalances(for: [.gpt, .grokBot])
         #expect(rows.map(\.providers) == [[.gpt], [.grokBot]])
@@ -128,13 +128,13 @@ struct AIAccountBalanceServiceTests {
         #expect(unsupported.count == 6 && unsupported.allSatisfy { $0.status == .queryUnsupported || $0.status == .connectedAccount })
         #expect(BalanceURLProtocol.requests.isEmpty)
         #if DEBUG
-        for raw in ["claude:0:70,gpt:10", "claude:nan", "codex:101", "claude:10,claude:20", "codex:10,gpt:20"] {
-            let service = makeService(credentials: { _, _, _ in Issue.record("Debug fixtures must not read credentials"); return nil },
-                debug: { AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now) })
-            let result = try await service.accountBalances(for: Set(AIProvider.allCases))
-            #expect(result.allSatisfy { $0.isDebug })
-            #expect(BalanceURLProtocol.requests.isEmpty)
-        }
+            for raw in ["claude:0:70,gpt:10", "claude:nan", "codex:101", "claude:10,claude:20", "codex:10,gpt:20"] {
+                let service = makeService(credentials: { _, _, _ in Issue.record("Debug fixtures must not read credentials"); return nil },
+                                          debug: { AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now) })
+                let result = try await service.accountBalances(for: Set(AIProvider.allCases))
+                #expect(result.allSatisfy { $0.isDebug })
+                #expect(BalanceURLProtocol.requests.isEmpty)
+            }
         #endif
         let missing = try await makeService(credentials: { _, _, _ in nil }).accountBalances(for: [.claude, .coder])
         #expect(missing.map(\.status) == [.notSignedIn, .additionalCredentialsRequired])
@@ -145,7 +145,7 @@ struct AIAccountBalanceServiceTests {
     @Test(arguments: [(401, AIAccountBalanceStatus.credentialsExpired), (403, .credentialsExpired), (429, .rateLimited), (503, .unavailable)])
     func failuresStayIsolatedSanitizedAndRecover(scenario: (status: Int, expected: AIAccountBalanceStatus)) async throws {
         BalanceURLProtocol.configure(["/api/oauth/usage": [.init(status: scenario.status, data: Data("private-body".utf8))],
-            "/backend-api/wham/usage": [.json(#"{"credits":{"has_credits":true,"balance":"10"}}"#)]])
+                                      "/backend-api/wham/usage": [.json(#"{"credits":{"has_credits":true,"balance":"10"}}"#)]])
         let service = makeService()
         let result = try await service.accountBalances(for: [.claude, .codex])
         #expect(result.first?.status == scenario.expected && result.first?.windows.isEmpty == true)
@@ -158,9 +158,9 @@ struct AIAccountBalanceServiceTests {
     /// Body and declared size, unexpected URL, timeout, and redirect-like responses must all invalidate quota.
     @Test func responseSizeURLAndNetworkFailuresCannotPublishPartialQuota() async throws {
         for response in [BalanceURLProtocol.Response(data: Data(repeating: 32, count: 1_024 * 1_024 + 1)),
-            .init(data: Data("{}".utf8), contentLength: 1_024 * 1_024 + 1),
-            .init(data: Data(#"{"five_hour":{"utilization":0}}"#.utf8), url: "https://untrusted.example/"),
-            .init(error: .timedOut), .init(status: 302)] {
+                         .init(data: Data("{}".utf8), contentLength: 1_024 * 1_024 + 1),
+                         .init(data: Data(#"{"five_hour":{"utilization":0}}"#.utf8), url: "https://untrusted.example/"),
+                         .init(error: .timedOut), .init(status: 302)] {
             BalanceURLProtocol.configure(["/api/oauth/usage": [response]])
             let result = try await makeService().accountBalances(for: [.claude])
             #expect(result.first?.severity == nil && result.first?.windows.isEmpty == true)
@@ -172,9 +172,9 @@ struct AIAccountBalanceServiceTests {
     @Test func websiteRegionsAndCookieAuthenticationUseOnlyFixedHostsAndNeverFallback() async throws {
         let qoder = #"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":90}}}}"#
         BalanceURLProtocol.configure(["/api/v2/me/usages/big_model_credits": [.json(qoder), .json(qoder)],
-            "/cloudide/api/v3/common/GetUserToken": [.json(#"{"Result":{"Token":"fixture-exchanged-token"}}"#)],
-            "/trae/api/v2/pay/user_current_entitlement_list": [.json(#"{"is_credits_billing":true,"usage_summary":{"total_amount":100,"consumed_amount":90}}"#)],
-            "/frontend/billing/usage": [.init(status: 401)]])
+                                      "/cloudide/api/v3/common/GetUserToken": [.json(#"{"Result":{"Token":"fixture-exchanged-token"}}"#)],
+                                      "/trae/api/v2/pay/user_current_entitlement_list": [.json(#"{"is_credits_billing":true,"usage_summary":{"total_amount":100,"consumed_amount":90}}"#)],
+                                      "/frontend/billing/usage": [.init(status: 401)]])
         let service = makeService(credentials: { provider, _, region in
             var credential = AIAccountBalanceCredential(token: "session=fixture-secret", region: region == .china ? "cn" : "global")
             credential.isWebsiteCookie = [.coder, .trae, .zed].contains(provider)
@@ -200,12 +200,12 @@ struct AIAccountBalanceServiceTests {
         let china = #"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":30}}}}"#
         let path = "/api/v2/me/usages/big_model_credits"
         BalanceURLProtocol.configure(["https://qoder.com" + path: [.json(global)],
-            "https://qoder.com.cn" + path: [.json(china)]], held: true, event: { continuation.yield($0) })
+                                      "https://qoder.com.cn" + path: [.json(china)]], held: true, event: { continuation.yield($0) })
         defer { BalanceURLProtocol.release(); continuation.finish() }
         let service = makeService(credentials: { provider, _, region in
             #expect(provider == .coder)
             var credential = AIAccountBalanceCredential(token: "session=fixture-" + region.rawValue,
-                region: region == .china ? "cn" : "global")
+                                                        region: region == .china ? "cn" : "global")
             credential.isWebsiteCookie = true
             return credential
         })
@@ -237,7 +237,7 @@ struct AIAccountBalanceServiceTests {
         let path = "/api/v2/me/usages/big_model_credits"
         let quota = #"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":90}}}}"#
         BalanceURLProtocol.configure(["https://qoder.com" + path: [.init(status: 401)],
-            "https://qoder.com.cn" + path: [.json(quota)]])
+                                      "https://qoder.com.cn" + path: [.json(quota)]])
         let service = makeService(credentials: { _, _, region in
             AIAccountBalanceCredential(token: "session=fixture-secret", region: region == .china ? "cn" : "global")
         })
@@ -246,7 +246,7 @@ struct AIAccountBalanceServiceTests {
         #expect(failed.map(\.status) == [.credentialsExpired, .available])
         #expect(failed[0].windows.isEmpty && failed[1].windows.first?.remainingPercent == 10)
         BalanceURLProtocol.configure(["https://qoder.com" + path: [.json(quota)],
-            "https://qoder.com.cn" + path: [.json(quota)]])
+                                      "https://qoder.com.cn" + path: [.json(quota)]])
         let recovered = try await service.accountBalances(for: [.coder], qoderRegions: [.global, .china])
         #expect(recovered.map(\.id) == failed.map(\.id))
         #expect(recovered.allSatisfy { $0.status == .available })
@@ -283,10 +283,10 @@ struct AIAccountBalanceServiceTests {
     /// Unified Cursor must use current endpoints; WorkBuddy's version fallback must not retry authentication failure.
     @Test func cursorUnifiedRequestsUseCurrentWindowsAndWorkBuddyFallbackRequires404() async throws {
         BalanceURLProtocol.configure(["/api/usage-summary": [.json(#"{"membershipType":"unified_pro","limitType":"user","individualUsage":{"plan":{"used":0,"limit":1000}}}"#)],
-            "/api/dashboard/get-sand-usage-status": [.json(#"{"usagePercent":90,"hasNonZeroIncludedLimit":true}"#)],
-            "/api/dashboard/v2/usage-status": [.json(#"{"availability":"available","monthlyUsage":{"usedCents":800,"limitCents":1000,"periodStart":"2030-01-01T00:00:00Z","resetsAt":"2031-01-01T00:00:00Z"}}"#)],
-            "/billing/meter/get-user-resource": [.init(status: 404)],
-            "/v2/billing/meter/get-user-resource": [.json(#"{"data":{"Accounts":[{"Status":0,"CycleCapacitySizePrecise":100,"CycleCapacityRemainPrecise":20}]}}"#)]])
+                                      "/api/dashboard/get-sand-usage-status": [.json(#"{"usagePercent":90,"hasNonZeroIncludedLimit":true}"#)],
+                                      "/api/dashboard/v2/usage-status": [.json(#"{"availability":"available","monthlyUsage":{"usedCents":800,"limitCents":1000,"periodStart":"2030-01-01T00:00:00Z","resetsAt":"2031-01-01T00:00:00Z"}}"#)],
+                                      "/billing/meter/get-user-resource": [.init(status: 404)],
+                                      "/v2/billing/meter/get-user-resource": [.json(#"{"data":{"Accounts":[{"Status":0,"CycleCapacitySizePrecise":100,"CycleCapacityRemainPrecise":20}]}}"#)]])
         let rows = try await makeService().accountBalances(for: [.cursor, .workbuddyAI])
         #expect(rows.allSatisfy { $0.status == .available })
         #expect(rows.first { $0.providers == [.cursor] }?.windows.map(\.remainingPercent) == [10, 20])
@@ -300,11 +300,11 @@ struct AIAccountBalanceServiceTests {
     @Test func groupedParallelRequestsAreBoundedAndCancellationPropagates() async throws {
         let (events, continuation) = AsyncStream<Int>.makeStream()
         BalanceURLProtocol.configure(["/api/oauth/usage": [.json(#"{"five_hour":{"utilization":0}}"#)],
-            "/backend-api/wham/usage": [.json(#"{"credits":{"has_credits":true,"balance":10}}"#)],
-            "/copilot_internal/user": [.json(#"{"quota_snapshots":{"chat":{"percent_remaining":50}}}"#)],
-            "/coding/v1/usages": [.json(#"{"usages":{"limit_5h":{"used_ratio":0.1}}}"#)],
-            "/zen/go/v1/usage": [.json(#"{"usage":{"rolling":{"percent":10},"weekly":{"percent":20}}}"#)]],
-            held: true, event: { continuation.yield($0) })
+                                      "/backend-api/wham/usage": [.json(#"{"credits":{"has_credits":true,"balance":10}}"#)],
+                                      "/copilot_internal/user": [.json(#"{"quota_snapshots":{"chat":{"percent_remaining":50}}}"#)],
+                                      "/coding/v1/usages": [.json(#"{"usages":{"limit_5h":{"used_ratio":0.1}}}"#)],
+                                      "/zen/go/v1/usage": [.json(#"{"usage":{"rolling":{"percent":10},"weekly":{"percent":20}}}"#)]],
+                                     held: true, event: { continuation.yield($0) })
         defer { BalanceURLProtocol.release(); continuation.finish() }
         let service = makeService()
         let task = Task { try await service.accountBalances(for: [.claude, .codex, .copilot, .kimi, .opencode]) }
@@ -342,12 +342,12 @@ struct AIAccountBalanceServiceTests {
     private func makeService(credentials: @escaping @Sendable (AIProvider, Date, AIAccountBalanceQoderRegion) throws -> AIAccountBalanceCredential? = { _, _, _ in
         AIAccountBalanceCredential(token: "fixture-secret", accountID: "fixture-account")
     }, debug: @escaping @Sendable () -> [AIAccountBalance]? = { nil },
-        muse: @escaping @Sendable () async throws -> Data? = { nil },
-        openAIProvider: @escaping @Sendable () -> AIProvider? = { nil }) -> AIAccountBalanceService {
+    muse: @escaping @Sendable () async throws -> Data? = { nil },
+    openAIProvider: @escaping @Sendable () -> AIProvider? = { nil }) -> AIAccountBalanceService {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BalanceURLProtocol.self]
         return .init(credentials: credentials, configuration: configuration, now: { now }, museUsage: muse,
-            debugBalances: debug, preferredOpenAIProvider: openAIProvider)
+                     debugBalances: debug, preferredOpenAIProvider: openAIProvider)
     }
 }
 

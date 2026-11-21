@@ -439,7 +439,8 @@ struct ScreenRecordingOperationTests {
         #expect(SideNoticeLayoutEngine.screenRecordingOperationNotice(for: [browser, operation], settings: settings) == operation)
         for id in ["voice-processing-left", "focus-transition-test"] {
             #expect(SideNoticeLayoutEngine.screenRecordingOperationNotice(
-                for: [operation, IslandNotice(id: id, title: id)], settings: settings) == nil)
+                for: [operation, IslandNotice(id: id, title: id)], settings: settings
+            ) == nil)
         }
         settings.sideNoticesEnabled = false
         #expect(SideNoticeLayoutEngine.screenRecordingOperationNotice(for: [operation], settings: settings) == nil)
@@ -465,7 +466,7 @@ struct ScreenRecordingOperationTests {
         notices.enqueue(notice, expiresAfter: nil)
         notices.enqueue(IslandNotice(id: "voice-processing-left", title: "Voice"), expiresAfter: nil)
         let view = CompactStatusBarView(queue: notices, displayState: display, media: media,
-            browserDownloads: downloads, settingsStore: settings, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
+                                        browserDownloads: downloads, settingsStore: settings, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         #expect(view.recordingOperationNotice == nil)
         display.hidesVoiceProcessingIndicator = true
         #expect(view.recordingOperationNotice == notice,
@@ -542,11 +543,11 @@ struct ScreenRecordingOperationTests {
             let project = ScreenRecordingProject(name: "Output", videoFile: "screen.mp4", duration: 1, width: 16, height: 16)
             try store.save(project, in: directory)
             let context = try #require(CGContext(data: nil, width: 16, height: 16, bitsPerComponent: 8, bytesPerRow: 64,
-                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             let preview = try #require(context.makeImage())
             model = ScreenRecordingStudioModel(exporter: exporter, projectStore: store,
-                renderPreview: { _, _, _ in preview }, presentExportPanel: panel.present,
-                notices: notices, writeProjectFiles: write ?? ScreenRecordingOperationTests.write)
+                                               renderPreview: { _, _, _ in preview }, presentExportPanel: panel.present,
+                                               notices: notices, writeProjectFiles: write ?? ScreenRecordingOperationTests.write)
             model.hideWindow = { [weak self] in self?.hideCount += 1 }
             model.install(project, directory: directory)
         }

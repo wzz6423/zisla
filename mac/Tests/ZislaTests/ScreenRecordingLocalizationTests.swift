@@ -70,9 +70,9 @@ struct ScreenRecordingLocalizationTests {
         #expect(AppLocalization.format("轨道 %ld", locale: Locale(identifier: "en"), [3]) == "Track 3")
         #expect(AppLocalization.string("素材已从素材库移除", locale: Locale(identifier: "en")) == "Media removed from library")
         #expect(AppLocalization.string(RecordingClipAnimationKind.typewriter.entranceTitle,
-            locale: Locale(identifier: "en")) == "Typewriter")
+                                       locale: Locale(identifier: "en")) == "Typewriter")
         #expect(AppLocalization.string(RecordingClipTransitionKind.dissolve.title,
-            locale: Locale(identifier: "ar")) == "تداخل تدريجي")
+                                       locale: Locale(identifier: "ar")) == "تداخل تدريجي")
         #expect(AppLocalization.format("文件路径：%@", locale: Locale(identifier: "ar"), ["/tmp/clip.mp4"])
             == "مسار الملف: \u{2068}/tmp/clip.mp4\u{2069}")
         #expect(AppLanguage.allCases.filter(\.isRightToLeft) == [.arabic])
@@ -127,7 +127,7 @@ struct ScreenRecordingLocalizationTests {
         AppLocalization.text("片段 %d", source.id + "source.")
         """#
         #expect(try Self.localizedKeys(source) == ["继续录制", "录屏已取消", "暂停录制",
-            "录屏正在导出，请等待或取消", "导出录屏", "录屏失败：%@", "取消", "片段 %d"])
+                                                   "录屏正在导出，请等待或取消", "导出录屏", "录屏失败：%@", "取消", "片段 %d"])
     }
 
     private static let permissionKeys = [
@@ -160,10 +160,12 @@ struct ScreenRecordingLocalizationTests {
         keys.formUnion(RecordingMediaTimeGranularity.allCases.map(\.title))
         keys.formUnion(RecordingMediaLibraryGrouping.groups(
             assets: [.init(name: "Unknown", file: "unknown.png", kind: .image, duration: 1, width: 1, height: 1)],
-            grouping: .importedAt, granularity: .day).compactMap(\.title))
+            grouping: .importedAt, granularity: .day
+        ).compactMap(\.title))
         keys.formUnion(RecordingMediaLibraryGrouping.groups(
             assets: [.init(name: "Unknown", file: "unknown.png", kind: .image, duration: 1, width: 1, height: 1)],
-            grouping: .capturedAt, granularity: .day).compactMap(\.title))
+            grouping: .capturedAt, granularity: .day
+        ).compactMap(\.title))
         keys.formUnion([SettingsSection.recording.title, SettingsSection.recording.subtitle])
 
         for path in paths {
@@ -186,7 +188,7 @@ struct ScreenRecordingLocalizationTests {
         keys.formUnion(try captures(#"(?:title|detail): "([^"\\]+)""#, in: group))
         let conflictStart = try #require(settings.range(of: "private var currentRecordingHotkeyConflict:"))
         let conflictEnd = try #require(settings.range(of: "private func updateScreenshotHotkey(",
-                                                     range: conflictStart.upperBound..<settings.endIndex))
+                                                      range: conflictStart.upperBound..<settings.endIndex))
         keys.formUnion(try localizedKeys(String(settings[conflictStart.lowerBound..<conflictEnd.lowerBound])))
 
         var enabled = FeatureSettings.default
@@ -245,7 +247,8 @@ struct ScreenRecordingLocalizationTests {
 
     private static func table(language: AppLanguage, name: String = "Localizable") throws -> [String: String] {
         try #require(NSDictionary(contentsOf: packageURL.appendingPathComponent(
-            "Resources/Localization/\(language.rawValue).lproj/\(name).strings")) as? [String: String])
+            "Resources/Localization/\(language.rawValue).lproj/\(name).strings"
+        )) as? [String: String])
     }
 
     private static func source(_ path: String) throws -> String {

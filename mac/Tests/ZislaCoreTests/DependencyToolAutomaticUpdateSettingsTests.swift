@@ -44,7 +44,7 @@ struct DependencyToolAutomaticUpdateSettingsTests {
     func dependencyUpdatesRejectInvalidTypes(value: String) {
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(FeatureSettings.self,
-                from: Data("{\"dependencyToolsAutomaticUpdatesEnabled\":\(value)}".utf8))
+                                     from: Data("{\"dependencyToolsAutomaticUpdatesEnabled\":\(value)}".utf8))
         }
     }
 }

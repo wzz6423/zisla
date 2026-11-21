@@ -84,7 +84,7 @@ struct DailyBriefingTests {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
         var day = DailyBriefingDay(date: start, calendar: calendar)
         var observation = DailyBriefingObservation(date: start, applicationID: "editor", applicationName: "Editor",
-            category: .work, isActive: true, isListening: true)
+                                                   category: .work, isActive: true, isListening: true)
         day.record(from: start, to: start.addingTimeInterval(30), observation: observation, calendar: calendar)
         observation.isActive = false
         day.record(from: start.addingTimeInterval(30), to: start.addingTimeInterval(60), observation: observation, calendar: calendar)

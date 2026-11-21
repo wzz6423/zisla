@@ -56,14 +56,14 @@ struct SystemMonitorHeadphoneOptionsSettingsTests {
             #expect(settings.systemMonitorMenuBarHeadphoneOptions == SystemMonitorHeadphoneOptions())
         }
         let partial = try JSONDecoder().decode(SystemMonitorHeadphoneOptions.self,
-            from: Data(#"{"replacesNetworkIcon":true,"symbolScale":null}"#.utf8))
+                                               from: Data(#"{"replacesNetworkIcon":true,"symbolScale":null}"#.utf8))
         #expect(partial == SystemMonitorHeadphoneOptions(replacesNetworkIcon: true))
     }
 
     @Test
     func removedBatteryPreferenceIsIgnoredWithoutChangingSavedSize() throws {
         let options = try JSONDecoder().decode(SystemMonitorHeadphoneOptions.self,
-            from: Data(#"{"showsBatteryLevels":true,"symbolScale":1.4,"replacesNetworkIcon":true}"#.utf8))
+                                               from: Data(#"{"showsBatteryLevels":true,"symbolScale":1.4,"replacesNetworkIcon":true}"#.utf8))
         #expect(options.symbolScale == 1.4)
         #expect(options.replacesNetworkIcon)
         #expect(try Self.object(options)["showsBatteryLevels"] == nil)

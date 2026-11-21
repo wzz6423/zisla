@@ -49,10 +49,10 @@ public final class DeltaSessionActivityDetector: AIActivityDetecting, AIUsageDet
         let cutoff = now().addingTimeInterval(-recencyThreshold)
         let tasks = databaseURLs.flatMap { database in
             DesktopAIStorage.rows(at: database, sql: """
-                SELECT id, name, status, created_at, last_prompted_at
-                FROM app_threads WHERE archived = 0 AND status = 'streaming'
-                ORDER BY last_prompted_at DESC LIMIT \(maxThreads)
-                """, limit: maxThreads).compactMap { row -> AIProgressTask? in
+            SELECT id, name, status, created_at, last_prompted_at
+            FROM app_threads WHERE archived = 0 AND status = 'streaming'
+            ORDER BY last_prompted_at DESC LIMIT \(maxThreads)
+            """, limit: maxThreads).compactMap { row -> AIProgressTask? in
                 guard let id = row["id"] as? String, !id.isEmpty,
                       let promptedAt = DesktopAIStorage.milliseconds(row["last_prompted_at"]), promptedAt >= cutoff else { return nil }
                 let title = (row["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -75,10 +75,10 @@ public final class DeltaSessionActivityDetector: AIActivityDetecting, AIUsageDet
             // This numeric daily ledger is available in newer Delta builds. Older schemas report
             // no usage rather than attempting to deserialize the replicated conversation tree.
             DesktopAIStorage.rows(at: database, sql: """
-                SELECT day, access_provider, model_provider, model, pricing_tier,
-                       input_tokens, output_tokens, cache_write_tokens, cache_read_tokens
-                FROM app_model_usage_daily ORDER BY day ASC
-                """).compactMap { row -> AIUsageSample? in
+            SELECT day, access_provider, model_provider, model, pricing_tier,
+                   input_tokens, output_tokens, cache_write_tokens, cache_read_tokens
+            FROM app_model_usage_daily ORDER BY day ASC
+            """).compactMap { row -> AIUsageSample? in
                 guard let day = row["day"] as? NSNumber else { return nil }
                 let rawDay = day.doubleValue
                 // Delta's decode_usage_bucket multiplies day by 86,400,000 to produce Unix

@@ -54,7 +54,7 @@ struct ImageWatermarkTests {
         let options = ImageWatermarkOptions(content: .text(text), opacity: 0.6, scale: 0.4, color: "#FF0000")
         #expect(options.isValid)
         let overlay = try ImageWatermarkRenderer(options: options, content: .text(text)).render(width: 360, height: 120,
-            to: fixture.root.appendingPathComponent("overlay.png"))
+                                                                                                to: fixture.root.appendingPathComponent("overlay.png"))
         let image = try Pixels.load(overlay.url)
         #expect(image.width <= 144 && image.height <= 120)
         #expect(overlay.x >= 0 && overlay.y >= 0 && overlay.x + image.width <= 360 && overlay.y + image.height <= 120)
@@ -73,7 +73,7 @@ struct ImageWatermarkTests {
         let options = ImageWatermarkOptions(content: .text(text), opacity: 0.6, scale: 0.4, color: "#FF0000")
         #expect(options.isValid)
         let overlay = try ImageWatermarkRenderer(options: options, content: .text(text)).render(width: 360, height: 120,
-            to: fixture.root.appendingPathComponent("overlay.png"))
+                                                                                                to: fixture.root.appendingPathComponent("overlay.png"))
         let bytes = try ImageTransformTests.Pixels.bytes(Pixels.load(overlay.url))
         #expect(stride(from: 3, to: bytes.count, by: 4).contains { bytes[$0] > 0 })
         #expect(stride(from: 3, to: bytes.count, by: 4).allSatisfy { bytes[$0] <= 154 })
@@ -119,7 +119,7 @@ struct ImageWatermarkTests {
         let image = try Pixels.solid(width: 20, height: 10, red: 255, alpha: 128)
         let options = ImageWatermarkOptions(content: .image(fixture.root.appendingPathComponent("mark.png")), opacity: 0.5, scale: 0.25, position: position)
         let overlay = try ImageWatermarkRenderer(options: options, content: .image(image)).render(width: 100, height: 60,
-            to: fixture.root.appendingPathComponent("overlay.png"))
+                                                                                                  to: fixture.root.appendingPathComponent("overlay.png"))
         let rendered = try Pixels.load(overlay.url)
         #expect(rendered.width == 25 && rendered.height == 13)
         let origin: (Int, Int)
@@ -142,7 +142,7 @@ struct ImageWatermarkTests {
         let image = try Pixels.solid(width: 2, height: 100, red: 255)
         let options = ImageWatermarkOptions(content: .image(fixture.root.appendingPathComponent("mark.png")), opacity: 1, scale: 1, position: .bottomRight)
         let overlay = try ImageWatermarkRenderer(options: options, content: .image(image)).render(width: dimensions.0, height: dimensions.1,
-            to: fixture.root.appendingPathComponent("overlay.png"))
+                                                                                                  to: fixture.root.appendingPathComponent("overlay.png"))
         let rendered = try Pixels.load(overlay.url)
         #expect(overlay.x >= 0 && overlay.y >= 0)
         #expect(rendered.width + overlay.x <= dimensions.0 && rendered.height + overlay.y <= dimensions.1)
@@ -185,7 +185,7 @@ struct ImageWatermarkTests {
         let source = try fixture.png()
         do {
             let batch = try await ImageProcessingService(executableURL: nil).process([source], options: .init(watermark: .init(content: .text("Zisla"))),
-                rasterTransform: { image, _ in image })
+                                                                                     rasterTransform: { image, _ in image })
             defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
             Issue.record("Watermarked raster edits require the composition engine")
         } catch {
@@ -256,7 +256,7 @@ struct ImageWatermarkTests {
         static func solid(width: Int, height: Int, red: UInt8 = 0, green: UInt8 = 0, blue: UInt8 = 0, alpha: UInt8 = 255) throws -> CGImage {
             let bytes = [red, green, blue].map { UInt8(Int($0) * Int(alpha) / 255) } + [alpha]
             return try ImageTransformTests.Pixels.make(width: width, height: height,
-                bytes: Array(repeating: bytes, count: width * height).flatMap { $0 })
+                                                       bytes: Array(repeating: bytes, count: width * height).flatMap { $0 })
         }
 
         static func load(_ url: URL, index: Int = 0) throws -> CGImage {

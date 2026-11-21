@@ -66,58 +66,58 @@ public final class CursorSessionActivityDetector: AIActivityDetecting {
                 return "\(filter) OR (hex(json_extract(c.value, '$.composerId')) = '\(identity)' AND unfinished = \(run.unfinished))"
             }
             let fields = """
-                json_extract(c.value, '$.composerId') AS id,
-                json_extract(c.value, '$.name') AS name,
-                json_extract(c.value, '$.unfinishedRunAt') AS unfinished,
-                json_extract(c.value, '$.hasBlockingPendingActions') AS blocked,
-                COALESCE(NULLIF(json_extract(c.value, '$.lastUpdatedAt'), 0),
-                         NULLIF(json_extract(c.value, '$.unfinishedRunAt'), 0)) AS updated,
-                json_extract(c.value, '$.createdAt') AS created,
-                json_extract(c.value, '$.modelConfig.modelName') AS model
-                """
+            json_extract(c.value, '$.composerId') AS id,
+            json_extract(c.value, '$.name') AS name,
+            json_extract(c.value, '$.unfinishedRunAt') AS unfinished,
+            json_extract(c.value, '$.hasBlockingPendingActions') AS blocked,
+            COALESCE(NULLIF(json_extract(c.value, '$.lastUpdatedAt'), 0),
+                     NULLIF(json_extract(c.value, '$.unfinishedRunAt'), 0)) AS updated,
+            json_extract(c.value, '$.createdAt') AS created,
+            json_extract(c.value, '$.modelConfig.modelName') AS model
+            """
             let global = DesktopAIStorage.rows(at: database, sql: """
-                SELECT \(fields) FROM cursorDiskKV c
-                WHERE key LIKE 'composerData:%' AND json_valid(c.value)
-                AND json_extract(c.value, '$.status') = 'generating'
-                AND COALESCE(json_extract(c.value, '$.composerId'), '') != ''
-                AND COALESCE(json_extract(c.value, '$.isArchived'), 0) = 0
-                AND COALESCE(json_extract(c.value, '$.isDraft'), 0) = 0
-                AND updated >= \(cutoff.timeIntervalSince1970 * 1_000)
-                AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
-                ORDER BY updated DESC LIMIT \(maxSessions)
-                """, limit: maxSessions)
+            SELECT \(fields) FROM cursorDiskKV c
+            WHERE key LIKE 'composerData:%' AND json_valid(c.value)
+            AND json_extract(c.value, '$.status') = 'generating'
+            AND COALESCE(json_extract(c.value, '$.composerId'), '') != ''
+            AND COALESCE(json_extract(c.value, '$.isArchived'), 0) = 0
+            AND COALESCE(json_extract(c.value, '$.isDraft'), 0) = 0
+            AND updated >= \(cutoff.timeIntervalSince1970 * 1_000)
+            AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
+            ORDER BY updated DESC LIMIT \(maxSessions)
+            """, limit: maxSessions)
             let headers = DesktopAIStorage.rows(at: database, sql: """
-                SELECT \(fields), 1 AS header FROM composerHeaders c
-                WHERE json_valid(c.value) AND json_extract(c.value, '$.type') = 'head'
-                AND COALESCE(json_extract(c.value, '$.composerId'), '') != ''
-                AND (json_extract(c.value, '$.status') IS NULL
-                     OR json_extract(c.value, '$.status') = 'generating')
-                AND json_type(c.value, '$.unfinishedRunAt') IN ('integer', 'real')
-                AND unfinished > 0
-                AND (unfinished >= \(cutoff.timeIntervalSince1970 * 1_000) OR (\(retainedHeaders)))
-                AND json_extract(c.value, '$.unfinishedRunAt') <= \(currentTime.timeIntervalSince1970 * 1_000)
-                AND COALESCE(json_extract(c.value, '$.isArchived'), 0) = 0
-                AND COALESCE(json_extract(c.value, '$.isDraft'), 0) = 0
-                AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
-                ORDER BY updated DESC LIMIT \(maxSessions)
-                """, limit: maxSessions)
+            SELECT \(fields), 1 AS header FROM composerHeaders c
+            WHERE json_valid(c.value) AND json_extract(c.value, '$.type') = 'head'
+            AND COALESCE(json_extract(c.value, '$.composerId'), '') != ''
+            AND (json_extract(c.value, '$.status') IS NULL
+                 OR json_extract(c.value, '$.status') = 'generating')
+            AND json_type(c.value, '$.unfinishedRunAt') IN ('integer', 'real')
+            AND unfinished > 0
+            AND (unfinished >= \(cutoff.timeIntervalSince1970 * 1_000) OR (\(retainedHeaders)))
+            AND json_extract(c.value, '$.unfinishedRunAt') <= \(currentTime.timeIntervalSince1970 * 1_000)
+            AND COALESCE(json_extract(c.value, '$.isArchived'), 0) = 0
+            AND COALESCE(json_extract(c.value, '$.isDraft'), 0) = 0
+            AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
+            ORDER BY updated DESC LIMIT \(maxSessions)
+            """, limit: maxSessions)
             let legacy = DesktopAIStorage.rows(at: database, sql: """
-                SELECT \(fields) FROM ItemTable i,
-                json_each(CASE WHEN NOT json_valid(i.value) THEN '[]'
-                               WHEN json_type(i.value) = 'array' THEN i.value
-                               ELSE json_extract(i.value, '$.allComposers') END) c
-                WHERE i.key IN ('composer.composerData', 'allComposers') AND json_valid(i.value)
-                AND json_valid(c.value)
-                AND COALESCE(json_extract(c.value, '$.composerId'), '') != ''
-                AND (json_extract(c.value, '$.status') = 'generating'
-                     OR (json_extract(c.value, '$.status') IS NULL
-                         AND json_extract(c.value, '$.unfinishedRunAt') > 0))
-                AND COALESCE(json_extract(c.value, '$.isArchived'), 0) = 0
-                AND COALESCE(json_extract(c.value, '$.isDraft'), 0) = 0
-                AND updated >= \(cutoff.timeIntervalSince1970 * 1_000)
-                AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
-                ORDER BY updated DESC LIMIT \(maxSessions)
-                """, limit: maxSessions)
+            SELECT \(fields) FROM ItemTable i,
+            json_each(CASE WHEN NOT json_valid(i.value) THEN '[]'
+                           WHEN json_type(i.value) = 'array' THEN i.value
+                           ELSE json_extract(i.value, '$.allComposers') END) c
+            WHERE i.key IN ('composer.composerData', 'allComposers') AND json_valid(i.value)
+            AND json_valid(c.value)
+            AND COALESCE(json_extract(c.value, '$.composerId'), '') != ''
+            AND (json_extract(c.value, '$.status') = 'generating'
+                 OR (json_extract(c.value, '$.status') IS NULL
+                     AND json_extract(c.value, '$.unfinishedRunAt') > 0))
+            AND COALESCE(json_extract(c.value, '$.isArchived'), 0) = 0
+            AND COALESCE(json_extract(c.value, '$.isDraft'), 0) = 0
+            AND updated >= \(cutoff.timeIntervalSince1970 * 1_000)
+            AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
+            ORDER BY updated DESC LIMIT \(maxSessions)
+            """, limit: maxSessions)
             for row in headers + global + legacy {
                 guard let id = row["id"] as? String, !id.isEmpty,
                       let updated = DesktopAIStorage.milliseconds(row["updated"]) else { continue }

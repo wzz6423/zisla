@@ -15,7 +15,7 @@ struct ScreenRecordingHDRTests {
     func captureDefaultsToSDRAndHDRRequestsKeepGeometryAndAudio(includeHDR: Bool) {
         #expect(!RecordingCaptureConfiguration().preservesHDR)
         let config = ScreenRecordingNativeCapture.streamConfiguration(width: 640, height: 480, frameRate: 60,
-            includeHDR: includeHDR)
+                                                                      includeHDR: includeHDR)
         #expect(config.width == 640 && config.height == 480 && config.minimumFrameInterval == .init(value: 1, timescale: 60))
         #expect(!config.showsCursor && config.sampleRate == 48_000 && config.channelCount == 2 && config.excludesCurrentProcessAudio)
         if #available(macOS 15.0, *), includeHDR && ScreenshotCaptureService.supportsHDRCapture {
@@ -38,7 +38,7 @@ struct ScreenRecordingHDRTests {
         #expect(Self.highlight(preview) > 3.8, "HDR highlights must survive the recording renderer")
         if #available(macOS 26.0, *) { #expect(preview.contentHeadroom > 3.8 && preview.contentAverageLightLevel > 0) }
         let composed = try RecordingExportRenderer.composedPreview(base: source, project: project, sourceTime: 0,
-            context: CIContext())
+                                                                   context: CIContext())
         #expect(ScreenshotImageRendering.isHDR(composed))
         #expect(Self.highlight(composed) > 3.8, "Editable overlays must not flatten the HDR background")
     }
@@ -51,7 +51,7 @@ struct ScreenRecordingHDRTests {
         project.timeline = .migrating(project)
         let clip = try #require(project.timeline?.clips.first { $0.content.trackKind == .video })
         let scene = RecordingMultitrackPreviewScene(project: project, directory: fixture.directory, time: 0,
-            size: .init(width: 64, height: 48), frames: [clip.id: try Self.image()], preservesHDR: true)
+                                                    size: .init(width: 64, height: 48), frames: [clip.id: try Self.image()], preservesHDR: true)
         let preview = try scene.image(project: project)
         #expect(ScreenshotImageRendering.isHDR(preview))
         #expect(Self.highlight(preview) > 3.8, "Flattening a timeline layer must preserve HDR highlights")
@@ -66,7 +66,7 @@ struct ScreenRecordingHDRTests {
         let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
         let format = try #require(try await track.load(.formatDescriptions).first)
         #expect(CMFormatDescriptionGetMediaSubType(format) == kCMVideoCodecType_HEVC,
-            "HDR capture requires HEVC Main 10 even below 4K")
+                "HDR capture requires HEVC Main 10 even below 4K")
         try Self.requireMain10(format)
         #expect(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_TransferFunction) as? String
             == kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String)
@@ -91,14 +91,14 @@ struct ScreenRecordingHDRTests {
         let files = try fixture.files()
         let exporter = ScreenRecordingExporter()
         let preview = try await exporter.preview(project: project, directory: fixture.directory, sourceTime: 0,
-            maximumSize: .init(width: 64, height: 48))
+                                                 maximumSize: .init(width: 64, height: 48))
         #expect(ScreenshotImageRendering.isHDR(preview) && Self.highlight(preview) > 3.7)
         let item = try await exporter.playbackItem(project: project, directory: fixture.directory)
         let composition = try #require(item.videoComposition)
         #expect(composition.colorTransferFunction == AVVideoTransferFunction_SMPTE_ST_2084_PQ)
         let pixels = try await Self.decode(item.asset, composition: composition)
         #expect(!pixels.isEmpty && pixels.allSatisfy { abs($0 - 4) < 0.1 },
-            "Playback must preserve source luminance without a second transfer function")
+                "Playback must preserve source luminance without a second transfer function")
         let color = try await Self.decode(item.asset, composition: composition, point: .init(x: 8, y: 8))
         #expect(color.allSatisfy { abs($0 - 3) < 0.1 }, "Playback must preserve saturated HDR colors")
         #expect(try fixture.files() == files)
@@ -114,7 +114,7 @@ struct ScreenRecordingHDRTests {
         let destination = fixture.root.appendingPathComponent("output." + format.fileExtension)
         let exporter = ScreenRecordingExporter()
         try await exporter.export(project: project, directory: fixture.directory, to: destination,
-            configuration: .init(format: format, resolution: .source, frameRate: 8))
+                                  configuration: .init(format: format, resolution: .source, frameRate: 8))
         let asset = AVURLAsset(url: destination)
         let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
         let formats = try await track.load(.formatDescriptions)
@@ -143,7 +143,7 @@ struct ScreenRecordingHDRTests {
         })
         await #expect(throws: CancellationError.self) {
             try await exporter.export(project: project, directory: fixture.directory, to: destination,
-                configuration: .init(resolution: .source, frameRate: 8))
+                                      configuration: .init(resolution: .source, frameRate: 8))
         }
         #expect(try Data(contentsOf: destination) == Data([7, 8]) && !exporter.isExporting)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted()
@@ -173,7 +173,7 @@ struct ScreenRecordingHDRTests {
         defer { fixture.remove() }
         var project = fixture.project()
         let annotation = RecordingAnnotation(kind: .text, start: 0, end: 2, x: 0.1, y: 0.1,
-            endX: 0.5, endY: 0.3, text: "Edit")
+                                             endX: 0.5, endY: 0.3, text: "Edit")
         project.edits.annotations = [annotation]
         let canvas = RecordingCanvasEditorView(frame: .init(x: 0, y: 0, width: 640, height: 480))
         let window = NSWindow(contentRect: canvas.bounds, styleMask: .borderless, backing: .buffered, defer: false)
@@ -184,7 +184,7 @@ struct ScreenRecordingHDRTests {
         canvas.configure(project: project, sourceTime: 0, baseImage: base, selection: .annotation(annotation.id), editable: true)
         canvas.layoutSubtreeIfNeeded()
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 640, pixelsHigh: 480,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         let graphics = try #require(NSGraphicsContext(bitmapImageRep: bitmap))
         func draw() {
             NSGraphicsContext.saveGraphicsState()
@@ -198,13 +198,13 @@ struct ScreenRecordingHDRTests {
         let handles = try #require(shapes.first { $0.fillColor != nil })
         let imageBounds = RecordingCanvasElement.annotation(annotation).bounds(canvas: canvas.canvasSize)
         let expected = CGRect(x: imageBounds.minX * 10, y: (48 - imageBounds.maxY) * 10,
-            width: imageBounds.width * 10, height: imageBounds.height * 10)
+                              width: imageBounds.width * 10, height: imageBounds.height * 10)
         #expect(outline.path?.boundingBoxOfPath == expected && handles.path?.isEmpty == false,
-            "The upper-left selection must remain above the HDR image in the correct flipped coordinates")
+                "The upper-left selection must remain above the HDR image in the correct flipped coordinates")
         let point = CGPoint(x: imageBounds.midX * 10, y: imageBounds.midY * 10)
         let event = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: canvas.convert(point, to: nil),
-            modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
-            eventNumber: 0, clickCount: 2, pressure: 1))
+                                                    modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                                    eventNumber: 0, clickCount: 2, pressure: 1))
         canvas.mouseDown(with: event)
         let editor = try #require(canvas.textEditor)
         let hitPoint = canvas.convert(point, to: canvas.superview)
@@ -219,7 +219,7 @@ struct ScreenRecordingHDRTests {
         #expect(replacement?.text == "Changed" && canvas.textEditor == nil)
         #expect(canvas.hitTest(hitPoint) === canvas && !window.isVisible)
         canvas.configure(project: project, sourceTime: 0, baseImage: try #require(ScreenshotImageRendering.sdrImage(from: base)),
-            selection: .annotation(annotation.id), editable: true)
+                         selection: .annotation(annotation.id), editable: true)
         #expect(canvas.backingImageView.isHidden, "SDR media must use the existing canvas drawing above its selection")
     }
 
@@ -232,13 +232,13 @@ struct ScreenRecordingHDRTests {
         defer { defaults.removePersistentDomain(forName: defaultsName) }
         var dependencies = ScreenRecordingCaptureDependencies.live
         dependencies.loadSources = { [.init(id: 1, name: "Display", mode: .display,
-            frame: .init(x: 0, y: 0, width: 640, height: 480))] }
+                                            frame: .init(x: 0, y: 0, width: 640, height: 480))] }
         dependencies.loadDevices = { .init() }
         let model = ScreenRecordingStudioModel(capture: .init(dependencies: dependencies))
         defer { model.shutdown() }
         await model.loadSources()
         let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(defaults: defaults),
-            selectRegion: {}, start: {}, openStudio: {}, cancel: {})
+                                                             selectRegion: {}, start: {}, openStudio: {}, cancel: {})
         defer { controller.shutdown() }
         let window = try #require(controller.hostingView.window)
         window.appearance = NSAppearance(named: darkMode ? .darkAqua : .aqua)
@@ -277,7 +277,7 @@ struct ScreenRecordingHDRTests {
                 }
                 let contrast = try #require(contrasts.max())
                 #expect(contrast > 0.2,
-                    "The HDR label must draw visible foreground pixels while the control is \(model.configuration.preservesHDR ? "on" : "off")")
+                        "The HDR label must draw visible foreground pixels while the control is \(model.configuration.preservesHDR ? "on" : "off")")
             }
             try expectVisibleLabel()
             Self.press(button)
@@ -307,7 +307,7 @@ struct ScreenRecordingHDRTests {
         if multitrack { project.timeline = .migrating(project) }
         let destination = fixture.root.appendingPathComponent("output.gif")
         try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: destination,
-            configuration: .init(format: .gif, resolution: .source, frameRate: 8))
+                                                   configuration: .init(format: .gif, resolution: .source, frameRate: 8))
         let source = try #require(CGImageSourceCreateWithURL(destination as CFURL, nil))
         let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
         #expect(image.width == 64 && image.height == 48 && !ScreenshotImageRendering.isHDR(image))
@@ -315,7 +315,7 @@ struct ScreenRecordingHDRTests {
     }
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_FFMPEG_EXPORT_TESTS"] == "1"),
-        arguments: [RecordingExportFormat.mkv, .webm, .ts], [false, true])
+          arguments: [RecordingExportFormat.mkv, .webm, .ts], [false, true])
     func externalVideoExportsKeepTenBitPQAndSourceHighlights(format: RecordingExportFormat, multitrack: Bool) async throws {
         let fixture = try RecordingMultitrackTestFixture()
         defer { fixture.remove() }
@@ -329,10 +329,10 @@ struct ScreenRecordingHDRTests {
         try #require(YTDLPResolver.isTrustedExecutable(probe))
         let demuxer = format == .ts ? ["-f", "mpegts"] : []
         try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: destination,
-            configuration: .init(format: format, resolution: .source, frameRate: 8))
+                                                   configuration: .init(format: format, resolution: .source, frameRate: 8))
         let result = try await AIAgentProcessRunner.run(executableURL: probe,
-            arguments: ["-v", "error", "-protocol_whitelist", "file"] + demuxer + ["-show_streams", "-of", "json", destination.path],
-            timeout: 15, maximumOutputBytes: 32_768, maximumErrorBytes: 8_192)
+                                                        arguments: ["-v", "error", "-protocol_whitelist", "file"] + demuxer + ["-show_streams", "-of", "json", destination.path],
+                                                        timeout: 15, maximumOutputBytes: 32_768, maximumErrorBytes: 8_192)
         #expect(result.status == 0 && !result.didTimeout, Comment(rawValue: result.standardError))
         let json = try #require(JSONSerialization.jsonObject(with: result.standardOutput) as? [String: Any])
         let streams = try #require(json["streams"] as? [[String: Any]])
@@ -343,10 +343,10 @@ struct ScreenRecordingHDRTests {
         var luma: [UInt16] = []
         for url in [source, destination] {
             let decoded = try await AIAgentProcessRunner.run(executableURL: executable,
-                arguments: ["-v", "error", "-protocol_whitelist", "file,pipe"] + (url == destination ? demuxer : [])
-                    + ["-i", url.path, "-map", "0:v:0",
-                    "-frames:v", "1", "-pix_fmt", "yuv420p10le", "-f", "rawvideo", "pipe:1"],
-                timeout: 15, maximumOutputBytes: 64 * 48 * 3 + 1, maximumErrorBytes: 8_192)
+                                                             arguments: ["-v", "error", "-protocol_whitelist", "file,pipe"] + (url == destination ? demuxer : [])
+                                                                 + ["-i", url.path, "-map", "0:v:0",
+                                                                    "-frames:v", "1", "-pix_fmt", "yuv420p10le", "-f", "rawvideo", "pipe:1"],
+                                                             timeout: 15, maximumOutputBytes: 64 * 48 * 3 + 1, maximumErrorBytes: 8_192)
             #expect(decoded.status == 0 && !decoded.didTimeout)
             let bytes = decoded.standardOutput
             try #require(bytes.count == 64 * 48 * 3)
@@ -354,7 +354,7 @@ struct ScreenRecordingHDRTests {
             luma.append(UInt16(bytes[offset]) | UInt16(bytes[offset + 1]) << 8)
         }
         #expect(luma[0] > 512 && abs(Int(luma[0]) - Int(luma[1])) < 16,
-            "Transcoding must preserve the source's PQ highlight code values")
+                "Transcoding must preserve the source's PQ highlight code values")
         #expect(try Data(contentsOf: source) == original)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted()
             == [fixture.directory.lastPathComponent, destination.lastPathComponent].sorted())
@@ -369,14 +369,14 @@ struct ScreenRecordingHDRTests {
         let base = try Self.image()
         let context = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
         let paused = try RecordingExportRenderer.composedPreview(base: base, project: project, sourceTime: 0,
-            context: context, editingText: .caption(project.captions[0].id))
+                                                                 context: context, editingText: .caption(project.captions[0].id))
         let linear = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!])
         let image = try RecordingExportRenderer.overlays(project: project, sourceTime: 0,
-            canvas: .init(x: 0, y: 0, width: 64, height: 48), editingText: .caption(project.captions[0].id))
+                                                         canvas: .init(x: 0, y: 0, width: 64, height: 48), editingText: .caption(project.captions[0].id))
             .composited(over: CIImage(cgImage: base))
         let exported = try RecordingHDR.image(image, in: image.extent, context: linear, preservesHDR: true)
         #expect(abs(Self.highlight(paused) - Self.highlight(exported)) < 0.01,
-            "Paused editing must use the same linear light compositing as HDR playback and export")
+                "Paused editing must use the same linear light compositing as HDR playback and export")
     }
 
     @Test(arguments: [false, true])
@@ -389,17 +389,17 @@ struct ScreenRecordingHDRTests {
         if multitrack { project.timeline = .migrating(project) }
         let exporter = ScreenRecordingExporter()
         let preview = try await exporter.preview(project: project, directory: fixture.directory, sourceTime: 0,
-            maximumSize: .init(width: 64, height: 48))
+                                                 maximumSize: .init(width: 64, height: 48))
         let item = try await exporter.playbackItem(project: project, directory: fixture.directory)
         let played = try await Self.decode(item.asset, composition: try #require(item.videoComposition))
         let destination = fixture.root.appendingPathComponent("caption.mp4")
         try await exporter.export(project: project, directory: fixture.directory, to: destination,
-            configuration: .init(resolution: .source, frameRate: 8))
+                                  configuration: .init(resolution: .source, frameRate: 8))
         let exported = try await Self.decode(AVURLAsset(url: destination))
         #expect(abs(Self.highlight(preview) - 0.88) < 0.05)
         #expect(!played.isEmpty && played.allSatisfy { abs($0 - 0.88) < 0.05 }, Comment(rawValue: "Decoded playback: \(played)"))
         #expect(!exported.isEmpty && exported.allSatisfy { abs($0 - 0.88) < 0.05 },
-            "The 78% black caption background must blend in linear light throughout the HDR pipeline")
+                "The 78% black caption background must blend in linear light throughout the HDR pipeline")
     }
 
     @Test(arguments: [false, true])
@@ -411,11 +411,11 @@ struct ScreenRecordingHDRTests {
         if multitrack { project.timeline = .migrating(project) }
         let item = try await ScreenRecordingExporter().playbackItem(project: project, directory: fixture.directory)
         let played = try await Self.decode(item.asset, composition: try #require(item.videoComposition),
-            point: .init(x: 0, y: 40), width: 64)
+                                           point: .init(x: 0, y: 40), width: 64)
         let steps = zip(played, played.dropFirst()).enumerated().filter { ($0.offset + 1) % 64 != 0 }
             .map { abs($0.element.0 - $0.element.1) }
         #expect(played.count >= 64 && steps.allSatisfy { $0 < 0.09 },
-            Comment(rawValue: "Smooth HDR highlights must not become visible quantization steps; largest step: \(steps.max() ?? 0)"))
+                Comment(rawValue: "Smooth HDR highlights must not become visible quantization steps; largest step: \(steps.max() ?? 0)"))
     }
 
     @Test(arguments: [false, true])
@@ -442,38 +442,38 @@ struct ScreenRecordingHDRTests {
         project.timeline = timeline
         let exporter = ScreenRecordingExporter()
         let scene = try await exporter.multitrackPreview(project: project, directory: fixture.directory, time: 0,
-            maximumSize: .init(width: 64, height: 48))
+                                                         maximumSize: .init(width: 64, height: 48))
         let selection = RecordingCanvasSelection.caption(project.captions[0].id)
         let paused = try scene.image(project: project, editingText: selection)
         let media = try await RecordingMultitrackMedia.prepare(project: project, directory: fixture.directory)
         #expect(scene.preservesHDR && media.preservesHDR, "HDR compositing must be independent of clip storage order")
         let renderer = try RecordingMultitrackRenderer(project: project, directory: fixture.directory, size: scene.size,
-            preservesHDR: media.preservesHDR)
+                                                       preservesHDR: media.preservesHDR)
         let played = try renderer.image(frames: scene.frames.mapValues(CIImage.init(cgImage:)), at: 0, editingText: selection)
         #expect(abs(Self.highlight(paused) - Self.highlight(played)) < 0.01,
-            "SDR sections must use the timeline's HDR compositing space, including translucent overlays")
+                "SDR sections must use the timeline's HDR compositing space, including translucent overlays")
     }
 
     @Test
     func HLGSourceFramesSelectHDRWhileSDRAndMissingTagsDoNot() throws {
         for (transfer, expected) in [(kCVImageBufferTransferFunction_ITU_R_2100_HLG, true),
-                                    (kCVImageBufferTransferFunction_ITU_R_709_2, false)] {
+                                     (kCVImageBufferTransferFunction_ITU_R_709_2, false)] {
             var format: CMVideoFormatDescription?
             try #require(CMVideoFormatDescriptionCreate(allocator: nil, codecType: kCMVideoCodecType_HEVC, width: 64, height: 48,
-                extensions: [kCMFormatDescriptionExtension_TransferFunction: transfer] as CFDictionary,
-                formatDescriptionOut: &format) == noErr)
+                                                        extensions: [kCMFormatDescriptionExtension_TransferFunction: transfer] as CFDictionary,
+                                                        formatDescriptionOut: &format) == noErr)
             #expect(RecordingHDR.isHDR(try #require(format)) == expected)
         }
         var untagged: CMVideoFormatDescription?
         try #require(CMVideoFormatDescriptionCreate(allocator: nil, codecType: kCMVideoCodecType_HEVC, width: 64, height: 48,
-            extensions: nil, formatDescriptionOut: &untagged) == noErr)
+                                                    extensions: nil, formatDescriptionOut: &untagged) == noErr)
         #expect(!RecordingHDR.isHDR(try #require(untagged)))
     }
 
     private static func record(in fixture: RecordingMultitrackTestFixture, localDisplay: Bool = false) async throws -> URL {
         let files = try ScreenRecordingCaptureFiles(directory: fixture.directory)
         let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, preservesHDR: true),
-            width: 64, height: 48, onFailure: { _ in })
+                                                  width: 64, height: 48, onFailure: { _ in })
         writer.receive(try Self.sample(time: 100, localDisplay: localDisplay))
         await writer.flush()
         _ = try await writer.waitForFirstFrame()
@@ -498,11 +498,11 @@ struct ScreenRecordingHDRTests {
 
     private static func requireMain10(_ format: CMFormatDescription) throws {
         let atoms = try #require(CMFormatDescriptionGetExtension(format,
-            extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms) as? [String: Data])
+                                                                 extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms) as? [String: Data])
         let configuration = try #require(atoms["hvcC"])
         try #require(configuration.count >= 19)
         #expect(configuration[1] & 31 == 2 && configuration[17] & 7 == 2 && configuration[18] & 7 == 2,
-            "The HEVC configuration must declare Main 10 with ten-bit luma and chroma")
+                "The HEVC configuration must declare Main 10 with ten-bit luma and chroma")
     }
 
     private static func image() throws -> CGImage {
@@ -525,21 +525,21 @@ struct ScreenRecordingHDRTests {
         var pixel = [Float](repeating: 0, count: 4)
         pixel.withUnsafeMutableBytes {
             CIContext().render(CIImage(cgImage: image), toBitmap: $0.baseAddress!, rowBytes: 16,
-                bounds: .init(x: 32, y: 24, width: 1, height: 1), format: .RGBAf,
-                colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
+                               bounds: .init(x: 32, y: 24, width: 1, height: 1), format: .RGBAf,
+                               colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
         }
         return pixel[0]
     }
 
     nonisolated private static func decode(_ asset: AVAsset, composition: AVVideoComposition? = nil,
-        point: CGPoint = .init(x: 32, y: 24), width: Int = 1) async throws -> [Float] {
+                                           point: CGPoint = .init(x: 32, y: 24), width: Int = 1) async throws -> [Float] {
         let tracks = try await asset.loadTracks(withMediaType: .video)
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue(label: "zisla-hdr-test-decode").async(execute: DispatchWorkItem {
                 do {
                     let reader = try AVAssetReader(asset: asset)
                     let settings: [String: Any] = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_64RGBAHalf,
-                        AVVideoAllowWideColorKey: true]
+                                                   AVVideoAllowWideColorKey: true]
                     let output: AVAssetReaderOutput
                     if let composition {
                         let composed = AVAssetReaderVideoCompositionOutput(videoTracks: tracks, videoSettings: settings)
@@ -556,8 +556,8 @@ struct ScreenRecordingHDRTests {
                         var pixel = [Float](repeating: 0, count: width * 4)
                         pixel.withUnsafeMutableBytes {
                             context.render(image, toBitmap: $0.baseAddress!, rowBytes: width * 16,
-                                bounds: .init(x: point.x, y: point.y, width: CGFloat(width), height: 1), format: .RGBAf,
-                                colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
+                                           bounds: .init(x: point.x, y: point.y, width: CGFloat(width), height: 1), format: .RGBAf,
+                                           colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
                         }
                         for x in 0..<width { pixels.append(pixel[x * 4]) }
                     }
@@ -571,24 +571,24 @@ struct ScreenRecordingHDRTests {
     private static func sample(time: Double, localDisplay: Bool) throws -> ScreenRecordingCaptureSample {
         var buffer: CVPixelBuffer?
         try #require(CVPixelBufferCreate(nil, 64, 48,
-            localDisplay ? kCVPixelFormatType_444YpCbCr10BiPlanarFullRange : kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
-            [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &buffer) == kCVReturnSuccess)
+                                         localDisplay ? kCVPixelFormatType_444YpCbCr10BiPlanarFullRange : kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
+                                         [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &buffer) == kCVReturnSuccess)
         let pixels = try #require(buffer)
         CVBufferSetAttachment(pixels, kCVImageBufferColorPrimariesKey,
-            localDisplay ? kCVImageBufferColorPrimaries_P3_D65 : kCVImageBufferColorPrimaries_ITU_R_2020, .shouldPropagate)
+                              localDisplay ? kCVImageBufferColorPrimaries_P3_D65 : kCVImageBufferColorPrimaries_ITU_R_2020, .shouldPropagate)
         CVBufferSetAttachment(pixels, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ, .shouldPropagate)
         CVBufferSetAttachment(pixels, kCVImageBufferYCbCrMatrixKey,
-            localDisplay ? kCVImageBufferYCbCrMatrix_ITU_R_709_2 : kCVImageBufferYCbCrMatrix_ITU_R_2020, .shouldPropagate)
+                              localDisplay ? kCVImageBufferYCbCrMatrix_ITU_R_709_2 : kCVImageBufferYCbCrMatrix_ITU_R_2020, .shouldPropagate)
         CIContext().render(CIImage(cgImage: try image()), to: pixels, bounds: .init(x: 0, y: 0, width: 64, height: 48),
-            colorSpace: CGColorSpace(name: localDisplay ? CGColorSpace.displayP3_PQ : CGColorSpace.itur_2100_PQ))
+                           colorSpace: CGColorSpace(name: localDisplay ? CGColorSpace.displayP3_PQ : CGColorSpace.itur_2100_PQ))
         var format: CMVideoFormatDescription?
         try #require(CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: pixels,
-            formatDescriptionOut: &format) == noErr)
+                                                                  formatDescriptionOut: &format) == noErr)
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 30),
-            presentationTimeStamp: .init(seconds: time, preferredTimescale: 60_000), decodeTimeStamp: .invalid)
+                                        presentationTimeStamp: .init(seconds: time, preferredTimescale: 60_000), decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         try #require(CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: pixels,
-            formatDescription: try #require(format), sampleTiming: &timing, sampleBufferOut: &sample) == noErr)
+                                                              formatDescription: try #require(format), sampleTiming: &timing, sampleBufferOut: &sample) == noErr)
         return .init(buffer: try #require(sample), kind: .screen, hostTime: time)
     }
 }

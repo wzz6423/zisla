@@ -328,7 +328,7 @@ public final class CalendarService: ObservableObject {
             }
         }
         let predicate = store.predicateForEvents(withStart: snapshot.startDate.addingTimeInterval(-1),
-            end: snapshot.endDate.addingTimeInterval(1), calendars: nil)
+                                                 end: snapshot.endDate.addingTimeInterval(1), calendars: nil)
         return MeetingWorkflow.meetings(in: store.events(matching: predicate).map(Self.makeEventSnapshot), at: date)
             .first { $0.eventIdentity == identity }
     }
@@ -621,7 +621,7 @@ public final class CalendarService: ObservableObject {
             ).map { occurrenceDate in
                 let endDate = due.isAllDay
                     ? recurrenceCalendar.date(byAdding: .day, value: 1, to: occurrenceDate)
-                        ?? occurrenceDate
+                    ?? occurrenceDate
                     : occurrenceDate
                 return CalendarEventSnapshot(
                     id: "reminder:\(reminder.calendarItemIdentifier):\(occurrenceDate.timeIntervalSince1970)",

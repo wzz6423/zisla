@@ -43,9 +43,9 @@ struct ScreenRecordingStudioTests {
         let project = ScreenRecordingProject(name: "Demo", videoFile: "screen.mp4", duration: 10, width: 64, height: 48)
         try store.save(project, in: directory)
         let model = ScreenRecordingStudioModel(capture: capture, projectStore: store, outputDirectoryStore: outputDirectoryStore,
-            saveLocations: saveLocations,
-            renderPreview: preview ?? { _, _, _ in throw ScreenRecordingExportError.cannotRender },
-            aiCompletion: aiCompletion, onError: onError)
+                                               saveLocations: saveLocations,
+                                               renderPreview: preview ?? { _, _, _ in throw ScreenRecordingExportError.cannotRender },
+                                               aiCompletion: aiCompletion, onError: onError)
         model.install(project, directory: directory)
         return (model, root, project)
     }
@@ -60,14 +60,15 @@ struct ScreenRecordingStudioTests {
                 return session
             },
             makeCameraPreview: { _, _ in fatalError("Camera preview is disabled in these tests") },
-            now: { 10 }, scheduleTick: { _ in {} }))
+            now: { 10 }, scheduleTick: { _ in {} }
+        ))
     }
 
     @Test func timelineSeekingUsesOutputTimeAcrossReorderedRepeatedAndRetimedSegments() throws {
         let (model, root, original) = try fixture()
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         model.update { $0.edits.segments = [.init(start: 4, end: 6, speed: 2),
-            .init(start: 1, end: 2, speed: 0.5), .init(start: 4, end: 6, speed: 2)] }
+                                            .init(start: 1, end: 2, speed: 0.5), .init(start: 4, end: 6, speed: 2)] }
         let edited = try #require(model.project)
 
         model.seekTimeline(to: 3.25)
@@ -163,7 +164,7 @@ struct ScreenRecordingStudioTests {
     @Test func losingTheSelectedDisplayClearsItsRegionBeforeChoosingAnotherDisplay() async throws {
         let session = RecordingStudioTestSession()
         let source = RecordingCaptureSource(id: 2, name: "Second Display", mode: .display,
-            frame: .init(x: 0, y: 0, width: 800, height: 600))
+                                            frame: .init(x: 0, y: 0, width: 800, height: 600))
         let (model, root, _) = try fixture(capture: captureService(session, sources: { [source] }))
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         model.configuration = .init(mode: .region, sourceID: 1, region: .init(x: 10, y: 20, width: 100, height: 80))
@@ -181,7 +182,7 @@ struct ScreenRecordingStudioTests {
         await model.previewTask?.value
         let previousError = try #require(model.errorMessage)
         let configuration = RecordingCaptureConfiguration(mode: .region, sourceID: 1,
-            region: .init(x: 10, y: 20, width: 100, height: 80))
+                                                          region: .init(x: 10, y: 20, width: 100, height: 80))
         model.configuration = configuration
 
         await model.loadSources()
@@ -204,7 +205,7 @@ struct ScreenRecordingStudioTests {
         #expect(model.capture.phase == .recording)
 
         gate.resolve([.init(id: 2, name: "Second Display", mode: .display,
-            frame: .init(x: 0, y: 0, width: 800, height: 600))])
+                            frame: .init(x: 0, y: 0, width: 800, height: 600))])
         await refresh.value
 
         #expect(model.configuration == configuration)
@@ -238,7 +239,7 @@ struct ScreenRecordingStudioTests {
         let preview = try image(red: 1, blue: 0, width: 3)
         var notices: [String] = []
         let (model, root, original) = try fixture(capture: captureService(session),
-            preview: { _, _, _ in preview }, onError: { notices.append($0) })
+                                                  preview: { _, _, _ in preview }, onError: { notices.append($0) })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let previousDirectory = try #require(model.directory)
         var project = original
@@ -297,7 +298,7 @@ struct ScreenRecordingStudioTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-first-recording-\(UUID())")
         let preview = try image(red: 1, blue: 0, width: 3)
         let model = ScreenRecordingStudioModel(capture: captureService(session), projectStore: .init(root: root),
-            renderPreview: { _, _, _ in preview })
+                                               renderPreview: { _, _, _ in preview })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
 
         model.start()
@@ -340,7 +341,7 @@ struct ScreenRecordingStudioTests {
         let preview = try image(red: 1, blue: 0, width: 3)
         var notices: [String] = []
         let (model, root, original) = try fixture(capture: captureService(session),
-            preview: { _, _, _ in preview }, onError: { notices.append($0) })
+                                                  preview: { _, _, _ in preview }, onError: { notices.append($0) })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let directory = try #require(model.directory)
         await model.previewTask?.value
@@ -423,8 +424,8 @@ struct ScreenRecordingStudioTests {
         let preview = try image(red: 1, blue: 0, width: 3)
         var notices: [String] = []
         let (model, root, original) = try fixture(capture: captureService(session),
-            aiCompletion: { _, _, _ in #"{"version":1,"operations":[{"type":"cut","start":2,"end":4}]}"# },
-            preview: { _, _, _ in try await gate.wait() }, onError: { notices.append($0) })
+                                                  aiCompletion: { _, _, _ in #"{"version":1,"operations":[{"type":"cut","start":2,"end":4}]}"# },
+                                                  preview: { _, _, _ in try await gate.wait() }, onError: { notices.append($0) })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         await gate.waitUntilEntered()
         let previousPreview = model.previewTask
@@ -491,7 +492,7 @@ struct ScreenRecordingStudioTests {
         let preview = try image(red: 1, blue: 0, width: 3)
         var notices: [String] = []
         let (model, root, original) = try fixture(capture: captureService(session),
-            preview: { _, _, _ in preview }, onError: { notices.append($0) })
+                                                  preview: { _, _, _ in preview }, onError: { notices.append($0) })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         await model.previewTask?.value
         var showsWindow = false
@@ -583,7 +584,8 @@ struct ScreenRecordingStudioTests {
         let session = RecordingStudioTestSession()
         session.beforeStop = { directory in
             try FileManager.default.createDirectory(
-                at: directory.appendingPathComponent(ScreenRecordingProjectStore.manifestName), withIntermediateDirectories: false)
+                at: directory.appendingPathComponent(ScreenRecordingProjectStore.manifestName), withIntermediateDirectories: false
+            )
         }
         let gate = Gate<CGImage>()
         let initialPreview = try image(red: 1, blue: 0, width: 3)
@@ -686,9 +688,9 @@ struct ScreenRecordingStudioTests {
         try locations.setDirectory(downloads, for: .recording)
         var panelDirectory: URL?
         let model = ScreenRecordingStudioModel(outputDirectoryStore: outputStore,
-            saveLocations: locations,
-            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
-            presentExportPanel: { panel, completion in panelDirectory = panel.directoryURL; completion(nil) })
+                                               saveLocations: locations,
+                                               renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
+                                               presentExportPanel: { panel, completion in panelDirectory = panel.directoryURL; completion(nil) })
         defer { model.shutdown() }
         #expect(model.recordingOutputDirectory.path == downloads.path,
                 "The central recording directory must take priority over a legacy recording preference")
@@ -725,7 +727,7 @@ struct ScreenRecordingStudioTests {
         let session = RecordingStudioTestSession()
         let locations = SaveLocationStore(defaults: defaults)
         let (model, root, original) = try fixture(capture: captureService(session), outputDirectoryStore: outputStore,
-            saveLocations: locations)
+                                                  saveLocations: locations)
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let originalDirectory = try #require(model.directory)
         let first = root.appendingPathComponent("first", isDirectory: true)
@@ -768,7 +770,7 @@ struct ScreenRecordingStudioTests {
         let locations = SaveLocationStore(defaults: defaults)
         let legacy = ScreenRecordingOutputDirectoryStore(defaults: defaults)
         let (model, root, original) = try fixture(outputDirectoryStore: legacy,
-            saveLocations: locations)
+                                                  saveLocations: locations)
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let originalDirectory = try #require(model.directory)
         let custom = root.appendingPathComponent("Custom recording directory", isDirectory: true)
@@ -826,7 +828,7 @@ struct ScreenRecordingStudioTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let session = RecordingStudioTestSession()
         let (model, root, original) = try fixture(capture: captureService(session),
-            outputDirectoryStore: ScreenRecordingOutputDirectoryStore(defaults: defaults))
+                                                  outputDirectoryStore: ScreenRecordingOutputDirectoryStore(defaults: defaults))
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let originalDirectory = try #require(model.directory)
         let custom = root.appendingPathComponent("custom", isDirectory: true)
@@ -857,7 +859,7 @@ struct ScreenRecordingStudioTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let session = RecordingStudioTestSession()
         let (model, root, _) = try fixture(capture: captureService(session),
-            outputDirectoryStore: ScreenRecordingOutputDirectoryStore(defaults: defaults))
+                                           outputDirectoryStore: ScreenRecordingOutputDirectoryStore(defaults: defaults))
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let custom = root.appendingPathComponent("custom", isDirectory: true)
         try FileManager.default.createDirectory(at: custom, withIntermediateDirectories: false)
@@ -905,7 +907,7 @@ struct ScreenRecordingStudioTests {
     @Test func captionsFollowRepeatedReorderedAndSlowSegments() throws {
         var project = ScreenRecordingProject(name: "Demo", videoFile: "screen.mp4", duration: 10, width: 64, height: 48)
         project.edits.segments = [.init(start: 6, end: 8, speed: 0.5), .init(start: 0, end: 4, speed: 2),
-                                 .init(start: 6, end: 8)]
+                                  .init(start: 6, end: 8)]
         project.captions = [.init(start: 1, end: 3, text: "first"), .init(start: 5, end: 7, text: "second")]
         let captions = ScreenRecordingStudioModel.outputCaptions(project)
         #expect(captions.map(\.text) == ["second", "first", "second"])
@@ -1058,7 +1060,7 @@ struct ScreenRecordingStudioTests {
 
     private func image(red: CGFloat, blue: CGFloat, width: Int) throws -> CGImage {
         let context = try #require(CGContext(data: nil, width: width, height: 2, bitsPerComponent: 8, bytesPerRow: width * 4,
-            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(red: red, green: 0, blue: blue, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: 2))
         return try #require(context.makeImage())

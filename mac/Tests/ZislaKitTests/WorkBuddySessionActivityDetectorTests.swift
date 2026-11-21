@@ -72,11 +72,11 @@ struct WorkBuddySessionActivityDetectorTests {
         let aiURL = try makeWorkBuddyDatabase()
         defer { removeWorkBuddyDatabase(at: aiURL) }
         try insertWorkBuddySession(at: workBuddyURL, id: Self.conversationID,
-            title: "WorkBuddy task", status: "working", createdAt: Self.milliseconds(Self.now),
-            updatedAt: Self.milliseconds(Self.now))
+                                   title: "WorkBuddy task", status: "working", createdAt: Self.milliseconds(Self.now),
+                                   updatedAt: Self.milliseconds(Self.now))
         try insertWorkBuddySession(at: aiURL, id: Self.conversationID,
-            title: "WorkBuddy AI task", status: "blocked", createdAt: Self.milliseconds(Self.now),
-            updatedAt: Self.milliseconds(Self.now))
+                                   title: "WorkBuddy AI task", status: "blocked", createdAt: Self.milliseconds(Self.now),
+                                   updatedAt: Self.milliseconds(Self.now))
         let workBuddyDetector = WorkBuddySessionActivityDetector(databaseURL: workBuddyURL, now: { Self.now })
         let aiDetector = WorkBuddyAISessionActivityDetector(databaseURL: aiURL, now: { Self.now })
         let workBuddy = try #require(workBuddyDetector.activeTasks().first)
@@ -93,7 +93,7 @@ struct WorkBuddySessionActivityDetectorTests {
         #expect(!workBuddyDetector.activityFileURLs.contains(aiURL))
         #expect(!aiDetector.activityFileURLs.contains(workBuddyURL))
         let historical = try #require(WorkBuddySessionActivityDetector(databaseURL: workBuddyURL,
-            now: { Self.now }, provider: .harness).activeTasks().first)
+                                                                       now: { Self.now }, provider: .harness).activeTasks().first)
         #expect(historical.id == workBuddy.id)
         #expect(historical.provider == .harness)
     }
@@ -370,21 +370,21 @@ private func makeWorkBuddyDatabase(createSessionTable: Bool = true) throws -> UR
 
     // Columns mirror the production `sessions` table for every field the detector reads.
     let sessionSQL = """
-        CREATE TABLE sessions (
-            id TEXT PRIMARY KEY,
-            cwd TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            title TEXT,
-            custom_title TEXT,
-            status TEXT NOT NULL DEFAULT 'Pending',
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL,
-            deleted_at INTEGER,
-            mode TEXT,
-            model TEXT,
-            last_activity_at INTEGER
-        )
-        """
+    CREATE TABLE sessions (
+        id TEXT PRIMARY KEY,
+        cwd TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        title TEXT,
+        custom_title TEXT,
+        status TEXT NOT NULL DEFAULT 'Pending',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        mode TEXT,
+        model TEXT,
+        last_activity_at INTEGER
+    )
+    """
     var error: UnsafeMutablePointer<CChar>?
     guard sqlite3_exec(database, sessionSQL, nil, nil, &error) == SQLITE_OK else {
         sqlite3_free(error)
@@ -428,10 +428,10 @@ private func insertWorkBuddySession(
     defer { sqlite3_close(database) }
 
     let sql = """
-        INSERT INTO sessions (id, cwd, user_id, title, custom_title, status,
-            created_at, updated_at, last_activity_at, model, deleted_at)
-        VALUES (?, '/tmp', 'user', ?, ?, ?, ?, ?, ?, ?, ?)
-        """
+    INSERT INTO sessions (id, cwd, user_id, title, custom_title, status,
+        created_at, updated_at, last_activity_at, model, deleted_at)
+    VALUES (?, '/tmp', 'user', ?, ?, ?, ?, ?, ?, ?, ?)
+    """
     var statement: OpaquePointer?
     guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
         sqlite3_finalize(statement)

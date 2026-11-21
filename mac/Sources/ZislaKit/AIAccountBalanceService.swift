@@ -25,15 +25,15 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
             var processEnvironment = environment
             processEnvironment["MUSE_NO_AUTO_UPDATE"] = "1"
             let output = try await AIAgentProcessRunner.run(executableURL: executable, arguments: ["usage", "--json"],
-                environment: processEnvironment, workingDirectoryURL: FileManager.default.temporaryDirectory,
-                timeout: 15, maximumOutputBytes: 256 * 1_024, maximumErrorBytes: 16 * 1_024)
+                                                            environment: processEnvironment, workingDirectoryURL: FileManager.default.temporaryDirectory,
+                                                            timeout: 15, maximumOutputBytes: 256 * 1_024, maximumErrorBytes: 16 * 1_024)
             guard !output.didTimeout, output.status == 0 else { throw AIAccountBalanceError.noQuota }
             return output.standardOutput
         }, debugBalances: {
             #if DEBUG
-            return AIAccountBalanceDebug.balances(environment: environment, now: now())
+                return AIAccountBalanceDebug.balances(environment: environment, now: now())
             #else
-            nil
+                nil
             #endif
         })
     }
@@ -73,7 +73,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
                 let index = next
                 next += 1
                 group.addTask { (index, try await self.refresh(groups[index].providers, selected: providers,
-                    qoderRegion: groups[index].qoderRegion)) }
+                                                               qoderRegion: groups[index].qoderRegion)) }
             }
             while let (index, balance) = try await group.next() {
                 results[index] = balance
@@ -81,7 +81,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
                     let index = next
                     next += 1
                     group.addTask { (index, try await self.refresh(groups[index].providers, selected: providers,
-                        qoderRegion: groups[index].qoderRegion)) }
+                                                                   qoderRegion: groups[index].qoderRegion)) }
                 }
             }
             try Task.checkCancellation()
@@ -132,40 +132,40 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         switch provider {
         case .copilot:
             data = try await request("https://api.github.com/copilot_internal/user", credential: credential,
-                headers: ["Authorization": "token " + credential.token, "Editor-Version": "vscode/1.96.2",
-                          "Editor-Plugin-Version": "copilot-chat/0.26.7", "Copilot-Integration-Id": "vscode-chat"])
+                                     headers: ["Authorization": "token " + credential.token, "Editor-Version": "vscode/1.96.2",
+                                               "Editor-Plugin-Version": "copilot-chat/0.26.7", "Copilot-Integration-Id": "vscode-chat"])
         case .coder:
             let base = credential.region == "cn" ? "https://qoder.com.cn" : "https://qoder.com"
             data = try await request(base + "/api/v2/me/usages/big_model_credits", credential: credential, cookie: true,
-                headers: ["Origin": base, "Referer": base + "/account/usage", "X-Requested-With": "XMLHttpRequest", "Bx-V": "2.5.35"])
+                                     headers: ["Origin": base, "Referer": base + "/account/usage", "X-Requested-With": "XMLHttpRequest", "Bx-V": "2.5.35"])
         case .trae:
             let headers = ["Origin": "https://www.trae.cn", "Referer": "https://www.trae.cn/"]
             let exchange = try await request("https://api.trae.cn/cloudide/api/v3/common/GetUserToken", credential: credential,
-                cookie: true, headers: headers, body: [:])
+                                             cookie: true, headers: headers, body: [:])
             let root = try AIAccountBalanceCredentials.object(exchange)
             guard AIAccountBalanceCredentials.number(root["code"]) != 1001,
                   let token = (root["Result"] as? [String: Any])?["Token"] as? String else { throw AIAccountBalanceError.credentialsExpired }
             data = try await request("https://api.trae.cn/trae/api/v2/pay/user_current_entitlement_list", credential: credential,
-                cookie: true, headers: headers.merging(["Authorization": "Cloud-IDE-JWT " + (try AIAccountBalanceCredentials.header(token))],
-                    uniquingKeysWith: { _, new in new }), body: ["require_usage": true, "full_data": true])
+                                     cookie: true, headers: headers.merging(["Authorization": "Cloud-IDE-JWT " + (try AIAccountBalanceCredentials.header(token))],
+                                                                            uniquingKeysWith: { _, new in new }), body: ["require_usage": true, "full_data": true])
         case .claude:
             data = try await request("https://api.anthropic.com/api/oauth/usage", credential: credential,
-                headers: ["anthropic-beta": "oauth-2025-04-20"])
+                                     headers: ["anthropic-beta": "oauth-2025-04-20"])
         case .codex, .gpt:
             var headers: [String: String] = [:]
             if let accountID = credential.accountID { headers["ChatGPT-Account-Id"] = accountID }
             data = try await request("https://chatgpt.com/backend-api/wham/usage", credential: credential, headers: headers)
         case .gemini:
             let setup = try await request("https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", credential: credential,
-                body: ["metadata": ["ideType": "GEMINI_CLI", "pluginType": "GEMINI"]])
+                                          body: ["metadata": ["ideType": "GEMINI_CLI", "pluginType": "GEMINI"]])
             let root = try AIAccountBalanceCredentials.object(setup)
             let project = root["cloudaicompanionProject"] as? String ?? (root["cloudaicompanionProject"] as? [String: Any])?["id"] as? String
             let body: [String: Any] = project.map { ["project": $0] } ?? [:]
             data = try await request("https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota", credential: credential, body: body)
         case .grok:
             data = try await request("https://grok.com/grok_api_v2.GrokBuildBilling/GetGrokCreditsConfig", credential: credential,
-                headers: ["Content-Type": "application/grpc-web+proto", "Accept": "application/grpc-web+proto",
-                          "Origin": "https://grok.com", "x-grpc-web": "1"], rawBody: Data([0, 0, 0, 0, 2, 8, 0]))
+                                     headers: ["Content-Type": "application/grpc-web+proto", "Accept": "application/grpc-web+proto",
+                                               "Origin": "https://grok.com", "x-grpc-web": "1"], rawBody: Data([0, 0, 0, 0, 2, 8, 0]))
         case .kimi:
             data = try await request("https://api.kimi.com/coding/v1/usages", credential: credential)
         case .cursor, .grokBot:
@@ -177,7 +177,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
                 let sand = try await request("https://cursor.com/api/dashboard/get-sand-usage-status", credential: credential, cookie: true, body: [:])
                 let monthly = try await request("https://cursor.com/api/dashboard/v2/usage-status", credential: credential, cookie: true)
                 let windows = try AIAccountBalanceParser.cursor(root, now: now,
-                    sand: AIAccountBalanceCredentials.object(sand), unified: AIAccountBalanceCredentials.object(monthly))
+                                                                sand: AIAccountBalanceCredentials.object(sand), unified: AIAccountBalanceCredentials.object(monthly))
                 guard !windows.isEmpty, windows.allSatisfy(\.isValid) else { throw AIAccountBalanceError.noQuota }
                 return windows
             }
@@ -188,12 +188,12 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         case .zed:
             if credential.isWebsiteCookie {
                 data = try await request("https://cloud.zed.dev/frontend/billing/usage", credential: credential,
-                    cookie: true, headers: ["Origin": "https://dashboard.zed.dev", "Referer": "https://dashboard.zed.dev/"])
+                                         cookie: true, headers: ["Origin": "https://dashboard.zed.dev", "Referer": "https://dashboard.zed.dev/"])
                 break
             }
             guard let accountID = credential.accountID else { throw AIAccountBalanceError.invalidCredentials }
             data = try await request("https://cloud.zed.dev/client/users/me", credential: credential,
-                headers: ["Authorization": accountID + " " + credential.token])
+                                     headers: ["Authorization": accountID + " " + credential.token])
         case .workbuddy, .workbuddyAI:
             let base = provider == .workbuddyAI ? "https://www.workbuddy.ai" : "https://copilot.tencent.com"
             let enterprise = credential.headers["X-Enterprise-Id"] != nil
@@ -202,8 +202,8 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
             let body: [String: Any] = enterprise ? [:] : ["PageNumber": 1, "PageSize": 100, "ProductCode": "p_tcaca", "Status": [0, 3],
-                "PackageEndTimeRangeBegin": formatter.string(from: now),
-                "PackageEndTimeRangeEnd": formatter.string(from: now.addingTimeInterval(101 * 365 * 86_400))]
+                                                          "PackageEndTimeRangeBegin": formatter.string(from: now),
+                                                          "PackageEndTimeRangeEnd": formatter.string(from: now.addingTimeInterval(101 * 365 * 86_400))]
             do { data = try await request(base + (provider == .workbuddyAI ? "" : "/v2") + path, credential: credential, body: body) }
             catch AIAccountBalanceError.httpStatus(404) where provider == .workbuddyAI {
                 data = try await request(base + "/v2" + path, credential: credential, body: body)

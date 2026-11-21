@@ -14,7 +14,7 @@ struct ClipboardAssistantPlacementTests {
         let controller = makeController(edge: edge)
         defer { controller.dismiss(animated: false) }
         let detection = ClipboardAssistantDetection(kind: .text, title: String(repeating: "长", count: 1000),
-            actions: [.copyText("fixture")])
+                                                    actions: [.copyText("fixture")])
         var firstLength: CGFloat?
         for expandedWidth: CGFloat in [240, 1600] {
             controller.screenLayoutConfiguration.expandedSize.width = expandedWidth
@@ -28,7 +28,7 @@ struct ClipboardAssistantPlacementTests {
         }
         controller.screenLayoutConfiguration = ScreenLayoutConfiguration()
         let notch = controller.rowLayout(for: ClipboardAssistantDetection(kind: .text, title: "fixture"),
-            on: screen, locale: chinese)
+                                         on: screen, locale: chinese)
         #expect(notch.collapsedFrame.width == 480)
     }
 
@@ -65,7 +65,7 @@ struct ClipboardAssistantPlacementTests {
         var capped: ClipboardAssistantController.RowLayout?
         for count in [100, 10_000] {
             let detection = ClipboardAssistantDetection(kind: .text, title: "短",
-                detail: .path(String(repeating: "路径", count: count)))
+                                                        detail: .path(String(repeating: "路径", count: count)))
             let layout = controller.rowLayout(for: detection, on: screen, locale: chinese)
             #expect(layout.frame.width == ScreenLayoutConfiguration.quickActionRowWidth)
             #expect(layout.frame == layout.collapsedFrame && screen.frame.contains(layout.frame))
@@ -74,14 +74,14 @@ struct ClipboardAssistantPlacementTests {
             else { capped = layout }
         }
         let narrow = ScreenSnapshot(displayID: 2,
-            frame: CGRect(x: -300, y: -400, width: 300, height: 600),
-            visibleFrame: CGRect(x: -300, y: -400, width: 300, height: 576))
+                                    frame: CGRect(x: -300, y: -400, width: 300, height: 600),
+                                    visibleFrame: CGRect(x: -300, y: -400, width: 300, height: 576))
         let huge = ClipboardAssistantDetection(kind: .text, title: "短",
-            detail: .path(String(repeating: "路径", count: 10_000)))
+                                               detail: .path(String(repeating: "路径", count: 10_000)))
         let constrained = controller.rowLayout(for: huge, on: narrow, locale: chinese)
         #expect(constrained.frame.width <= ScreenLayoutConfiguration.quickActionRowWidth)
         #expect(narrow.frame.contains(constrained.frame),
-            "The existing row cap must also respect a display narrower than that cap")
+                "The existing row cap must also respect a display narrower than that cap")
     }
 
     @Test
@@ -451,7 +451,7 @@ struct ClipboardAssistantPlacementTests {
         defer { panel.close() }
         var finishFold: (@MainActor () -> Void)?
         let controller = ClipboardAssistantController(window: panel, windowPresenter: { _, _ in },
-            animateDismissal: { _, _, completion in finishFold = completion })
+                                                      animateDismissal: { _, _, completion in finishFold = completion })
         defer { controller.dismiss(animated: false) }
         controller.displayDuration = .never
         controller.screenLayoutConfiguration = ScreenLayoutConfiguration(
@@ -499,7 +499,7 @@ struct ClipboardAssistantPlacementTests {
         defer { panel.close() }
         var finishFold: (@MainActor () -> Void)?
         let controller = ClipboardAssistantController(window: panel, windowPresenter: { _, _ in },
-            animateDismissal: { _, _, completion in finishFold = completion })
+                                                      animateDismissal: { _, _, completion in finishFold = completion })
         defer { controller.dismiss(animated: false) }
         controller.displayDuration = .never
         controller.screenLayoutConfiguration = ScreenLayoutConfiguration(

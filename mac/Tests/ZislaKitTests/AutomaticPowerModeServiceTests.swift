@@ -12,7 +12,7 @@ struct AutomaticPowerModeServiceTests {
         let service = fixture.service()
         defer { service.stop() }
         let settings = FeatureSettings(automaticPowerModeEnabled: true,
-            powerAdapterDefaultMode: adapter, batteryDefaultMode: battery, lowBatteryPowerModeEnabled: false)
+                                       powerAdapterDefaultMode: adapter, batteryDefaultMode: battery, lowBatteryPowerModeEnabled: false)
         service.apply(settings: settings, snapshot: fixture.snapshot())
         await fixture.drain(service)
         #expect(fixture.adapterMode == adapter)
@@ -87,7 +87,7 @@ struct AutomaticPowerModeServiceTests {
         let service = fixture.service()
         defer { service.stop() }
         let settings = FeatureSettings(automaticPowerModeEnabled: true,
-            powerAdapterDefaultMode: .highPower, batteryDefaultMode: .highPower)
+                                       powerAdapterDefaultMode: .highPower, batteryDefaultMode: .highPower)
         service.apply(settings: settings, snapshot: fixture.snapshot(level: level))
         await fixture.drain(service)
         #expect(fixture.currentMode == (level <= 0.20 ? .lowPower : .highPower))
@@ -104,7 +104,7 @@ struct AutomaticPowerModeServiceTests {
         let service = fixture.service()
         defer { service.stop() }
         let settings = FeatureSettings(systemMonitorEnabled: systemEnabled,
-            automaticPowerModeEnabled: automaticEnabled, powerAdapterDefaultMode: .highPower)
+                                       automaticPowerModeEnabled: automaticEnabled, powerAdapterDefaultMode: .highPower)
         service.apply(settings: settings, snapshot: fixture.snapshot())
         await fixture.drain(service)
         #expect(fixture.requests.isEmpty == !(systemEnabled && automaticEnabled))
@@ -317,7 +317,7 @@ struct AutomaticPowerModeServiceTests {
         }
         let settings = FeatureSettings(automaticPowerModeEnabled: true, powerAdapterDefaultMode: .highPower)
         let snapshot = BatterySnapshot(level: 0.7, isCharging: false, isPluggedIn: true,
-            isCharged: false, timeRemainingMinutes: nil)
+                                       isCharged: false, timeRemainingMinutes: nil)
         service.apply(settings: settings, snapshot: snapshot)
         await fixture.drain(service)
         #expect(fixture.changes.isEmpty)
@@ -461,7 +461,7 @@ struct AutomaticPowerModeServiceTests {
             #expect(!service.manualPaused)
             #expect(fixture.currentMode == .lowPower)
             #expect(fixture.changes.last == (action == "source"
-                ? ["-b", "powermode", "1"] : ["-c", "powermode", "1"]))
+                    ? ["-b", "powermode", "1"] : ["-c", "powermode", "1"]))
         }
     }
 
@@ -634,14 +634,14 @@ private final class PowerFixture {
 
     func service() -> AutomaticPowerModeService {
         AutomaticPowerModeService(controller: BatteryPowerModeController(runCommand: run,
-            notificationCenter: notifications, prepareAuthorization: { try await self.prepareAuthorization() }),
-            defaults: defaults, notificationCenter: notifications,
-            onFailure: { self.failures.append($0) })
+                                                                         notificationCenter: notifications, prepareAuthorization: { try await self.prepareAuthorization() }),
+                                  defaults: defaults, notificationCenter: notifications,
+                                  onFailure: { self.failures.append($0) })
     }
 
     func snapshot(level: Double = 0.7) -> BatterySnapshot {
         BatterySnapshot(level: level, isCharging: source == .powerAdapter,
-            isPluggedIn: source == .powerAdapter, isCharged: false, timeRemainingMinutes: nil)
+                        isPluggedIn: source == .powerAdapter, isCharged: false, timeRemainingMinutes: nil)
     }
 
     func drain(_ service: AutomaticPowerModeService) async {

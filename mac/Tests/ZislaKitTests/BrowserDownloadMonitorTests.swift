@@ -564,7 +564,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         let identities = staleEventFirst ? [staleIdentity, identity] : [identity, staleIdentity]
         for eventIdentity in identities {
             monitor.handleFileEvent(at: temporary, fileID: eventIdentity.inode, renamed: true,
-                runningBundleIdentifiers: ["com.google.Chrome"])
+                                    runningBundleIdentifiers: ["com.google.Chrome"])
         }
         #expect(monitor.snapshots.map(\.progressText) == ["20%"])
         #expect(monitor.snapshots.map(\.fileName) == ["未确认 119006"])
@@ -608,7 +608,7 @@ struct BrowserDownloadMonitorLifecycleTests {
             try Data("partial".utf8).write(to: url)
             let identity = try #require(BrowserDownloadFileIdentity(url: url))
             monitor.handleFileEvent(at: url, fileID: identity.inode, renamed: false,
-                runningBundleIdentifiers: ["com.google.Chrome"])
+                                    runningBundleIdentifiers: ["com.google.Chrome"])
         }
         progress.fileURL = temporary
         progress.completedUnitCount = 27
@@ -856,7 +856,8 @@ struct BrowserDownloadFileNameMonitorTests {
             let database = try BrowserDownloadMetadataFixture()
             metadata = database
             try database.write([.init(value: BrowserDownloadMetadataFixture.download(
-                current: fixture.temporaryURL.path, target: completed.path))])
+                current: fixture.temporaryURL.path, target: completed.path
+            ))])
             home = database.history.home
         } else {
             try fixture.insertDownload(targetPath: completed.path)

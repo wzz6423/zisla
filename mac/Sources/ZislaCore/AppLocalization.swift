@@ -104,13 +104,13 @@ public enum AppLocalization {
     private static let localizationBundles: [String: Bundle] = {
         var result: [String: Bundle] = [:]
         #if SWIFT_PACKAGE && !SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE
-        let containers = [Bundle.module, Bundle.main]
+            let containers = [Bundle.module, Bundle.main]
         #else
-        let containers = [Bundle.main]
+            let containers = [Bundle.main]
         #endif
         for language in AppLanguage.allCases {
             for identifier in localeIdentifiers(for: language.locale)
-            where result[identifier] == nil {
+                where result[identifier] == nil {
                 if let bundle = containers.lazy.compactMap({ localizationBundle(in: $0, identifier: identifier) }).first {
                     result[identifier] = bundle
                 }

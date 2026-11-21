@@ -21,7 +21,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         try FileManager.default.copyItem(at: image, to: copy)
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: image)
         let result = try await RecordingMediaImporter.prepare(urls: [image, image, copy, link],
-            project: nil, directory: nil, store: fixture.store)
+                                                              project: nil, directory: nil, store: fixture.store)
         defer { result.discard() }
         let asset = try #require(result.project.timeline?.assets.first)
         #expect(result.project.timeline?.assets.count == 1 && result.addedFiles == [asset.file])
@@ -41,7 +41,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         let copy = fixture.directory.appendingPathComponent("renamed.png")
         try FileManager.default.copyItem(at: image, to: copy)
         let repeated = try await RecordingMediaImporter.prepare(urls: [copy], project: first.project,
-            directory: first.directory, store: fixture.store)
+                                                                directory: first.directory, store: fixture.store)
         defer { repeated.discard() }
         #expect(repeated.project == first.project && repeated.addedFiles.isEmpty && !repeated.createdDirectory)
         #expect(repeated.duplicateCount == 1 && repeated.restoredAssetIDs.isEmpty)
@@ -197,7 +197,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         var hidden = result.project
         hidden.timeline?.assets[0].isHiddenFromLibrary = true
         let restored = try await RecordingMediaImporter.prepare(urls: [dated], project: hidden,
-            directory: result.directory, store: fixture.store)
+                                                                directory: result.directory, store: fixture.store)
         #expect(restored.project == result.project && restored.project.timeline?.assets.first == asset)
         #expect(restored.restoredAssetIDs == [asset.id] && restored.duplicateCount == 0 && restored.addedFiles.isEmpty)
     }
@@ -234,7 +234,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         var hidden = result.project
         hidden.timeline?.assets[0].isHiddenFromLibrary = true
         let restored = try await RecordingMediaImporter.prepare(urls: [dated], project: hidden,
-            directory: result.directory, store: fixture.store)
+                                                                directory: result.directory, store: fixture.store)
         #expect(restored.project == result.project && restored.project.timeline?.assets.first == asset)
         #expect(restored.restoredAssetIDs == [asset.id] && restored.addedFiles.isEmpty)
     }
@@ -280,7 +280,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         let files = try FileManager.default.contentsOfDirectory(atPath: first.directory.path).sorted()
         let manifest = try Data(contentsOf: first.directory.appendingPathComponent("project.json"))
         let result = try await RecordingMediaImporter.prepare(urls: [visible, removed, removed, new, new],
-            project: original, directory: first.directory, store: fixture.store)
+                                                              project: original, directory: first.directory, store: fixture.store)
         let assets = try #require(result.project.timeline?.assets)
         var restored = try #require(original.timeline?.assets[1])
         restored.isHiddenFromLibrary = nil
@@ -314,13 +314,13 @@ struct ScreenRecordingMediaDuplicatesTests {
         if cancel {
             await #expect(throws: CancellationError.self) {
                 _ = try await RecordingMediaImporter.prepare(urls: [removed, new], project: original,
-                    directory: first.directory, store: fixture.store, checkCancellation: { try cancellation.check() })
+                                                             directory: first.directory, store: fixture.store, checkCancellation: { try cancellation.check() })
             }
             #expect(try cancellation.copiedFiles.count == 1 && cancellation.copiedBytes == Data(contentsOf: new))
         } else {
             await #expect(throws: Error.self) {
                 _ = try await RecordingMediaImporter.prepare(urls: [removed, new, invalid], project: original,
-                    directory: first.directory, store: fixture.store)
+                                                             directory: first.directory, store: fixture.store)
             }
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: first.directory.path).sorted() == files)
@@ -336,25 +336,25 @@ struct ScreenRecordingMediaDuplicatesTests {
         let old = try fixture.createImage()
         let new = try fixture.createImage("new.png", color: .init(red: 1, green: 0, blue: 0))
         var project = ScreenRecordingProject(name: "Limit", videoFile: "", duration: 5, width: 64, height: 48,
-            edits: .init(segments: []), timeline: .init(assets: (0..<1_999).map {
-                .init(name: "Old \($0)", file: old.lastPathComponent, kind: .image, duration: 5, width: 64, height: 48)
-            }))
+                                             edits: .init(segments: []), timeline: .init(assets: (0..<1_999).map {
+                                                 .init(name: "Old \($0)", file: old.lastPathComponent, kind: .image, duration: 5, width: 64, height: 48)
+                                             }))
         try fixture.store.save(project, in: fixture.directory)
         let result = try await RecordingMediaImporter.prepare(urls: Array(repeating: new, count: 2_001),
-            project: project, directory: fixture.directory, store: fixture.store)
+                                                              project: project, directory: fixture.directory, store: fixture.store)
         defer { result.discard() }
         #expect(result.project.timeline?.assets.count == 2_000 && result.addedFiles.count == 1 && result.duplicateCount == 2_000)
         project = result.project
         let files = try fixture.files()
         let duplicate = try await RecordingMediaImporter.prepare(urls: Array(repeating: old, count: 2_001),
-            project: project, directory: fixture.directory, store: fixture.store)
+                                                                 project: project, directory: fixture.directory, store: fixture.store)
         #expect(duplicate.project == project && duplicate.addedFiles.isEmpty && duplicate.duplicateCount == 2_001)
         #expect(try fixture.files() == files)
         let overflow = try fixture.createImage("overflow.png", color: .init(red: 0, green: 0, blue: 1))
         let beforeOverflow = try fixture.files()
         await #expect(throws: ScreenRecordingProjectError.invalidProject) {
             _ = try await RecordingMediaImporter.prepare(urls: [overflow], project: project,
-                directory: fixture.directory, store: fixture.store)
+                                                         directory: fixture.directory, store: fixture.store)
         }
         #expect(try fixture.files() == beforeOverflow)
     }
@@ -365,18 +365,18 @@ struct ScreenRecordingMediaDuplicatesTests {
         let hidden = try fixture.createImage()
         let other = try fixture.createImage("other.png", color: .init(red: 1, green: 0, blue: 0))
         let asset = RecordingMediaAsset(name: "Removed", file: hidden.lastPathComponent, kind: .image,
-            duration: 5, width: 64, height: 48, isHiddenFromLibrary: true,
-            importedAt: Date(timeIntervalSince1970: 1_600_000_000), capturedAt: Date(timeIntervalSince1970: 1_500_000_000))
+                                        duration: 5, width: 64, height: 48, isHiddenFromLibrary: true,
+                                        importedAt: Date(timeIntervalSince1970: 1_600_000_000), capturedAt: Date(timeIntervalSince1970: 1_500_000_000))
         var project = ScreenRecordingProject(name: "Limit", videoFile: "", duration: 5, width: 64, height: 48,
-            edits: .init(segments: []), timeline: .init(assets: [asset] + (0..<1_999).map {
-                .init(name: "Other \($0)", file: other.lastPathComponent, kind: .image, duration: 5, width: 64, height: 48)
-            }))
+                                             edits: .init(segments: []), timeline: .init(assets: [asset] + (0..<1_999).map {
+                                                 .init(name: "Other \($0)", file: other.lastPathComponent, kind: .image, duration: 5, width: 64, height: 48)
+                                             }))
         let clip = project.timeline?.addAssetClip(asset.id, at: 0)
         _ = try #require(clip)
         try fixture.store.save(project, in: fixture.directory)
         let files = try fixture.files()
         let result = try await RecordingMediaImporter.prepare(urls: [hidden, hidden], project: project,
-            directory: fixture.directory, store: fixture.store)
+                                                              directory: fixture.directory, store: fixture.store)
         var restored = asset
         restored.isHiddenFromLibrary = nil
         #expect(result.project.timeline?.assets.count == 2_000 && result.project.timeline?.assets.first == restored)
@@ -402,7 +402,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         let files = try FileManager.default.contentsOfDirectory(atPath: first.directory.path).sorted()
         await #expect(throws: ScreenRecordingProjectError.unsafeMediaPath) {
             _ = try await RecordingMediaImporter.prepare(urls: [image], project: hidden,
-                directory: first.directory, store: fixture.store)
+                                                         directory: first.directory, store: fixture.store)
         }
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: target.path) == image.path)
         #expect(try Data(contentsOf: image) == bytes && Data(contentsOf: first.directory.appendingPathComponent("project.json")) == manifest)
@@ -414,13 +414,13 @@ struct ScreenRecordingMediaDuplicatesTests {
         defer { fixture.remove() }
         let source = try fixture.createImage()
         let hidden = RecordingMediaAsset(name: "Removed", file: source.lastPathComponent, kind: .image, duration: 5,
-            width: 64, height: 48, isHiddenFromLibrary: true)
+                                         width: 64, height: 48, isHiddenFromLibrary: true)
         let visible = RecordingMediaAsset(name: "Visible", file: source.lastPathComponent, kind: .image, duration: 5,
-            width: 64, height: 48)
+                                          width: 64, height: 48)
         let project = ScreenRecordingProject(name: "Legacy duplicates", videoFile: "", duration: 5, width: 64, height: 48,
-            edits: .init(segments: []), timeline: .init(assets: [hidden, visible]))
+                                             edits: .init(segments: []), timeline: .init(assets: [hidden, visible]))
         let result = try await RecordingMediaImporter.prepare(urls: [source], project: project,
-            directory: fixture.directory, store: fixture.store)
+                                                              directory: fixture.directory, store: fixture.store)
         #expect(result.project == project && result.duplicateCount == 1 && result.restoredAssetIDs.isEmpty && result.addedFiles.isEmpty)
     }
 
@@ -436,7 +436,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         try Data(contentsOf: replacement).write(to: first.directory.appendingPathComponent(asset.file))
         let incoming = sameAsReplacement ? replacement : originalSource
         let result = try await RecordingMediaImporter.prepare(urls: [incoming], project: first.project,
-            directory: first.directory, store: fixture.store)
+                                                              directory: first.directory, store: fixture.store)
         defer { result.discard() }
         if sameAsReplacement {
             #expect(result.project == first.project && result.duplicateCount == 1 && result.addedFiles.isEmpty)
@@ -453,20 +453,20 @@ struct ScreenRecordingMediaDuplicatesTests {
         defer { fixture.remove() }
         let incoming = try fixture.createImage()
         let existing = try fixture.createImage("existing.png", size: .init(width: 127, height: 95),
-            color: .init(red: 1, green: 0, blue: 0))
+                                               color: .init(red: 1, green: 0, blue: 0))
         let bytes = try Data(contentsOf: existing)
         let incomingBytes = try Data(contentsOf: incoming)
         try #require(bytes.count != incomingBytes.count)
         let original = ScreenRecordingProject(name: "Temporarily unreadable candidate", videoFile: "", duration: 5,
-            width: 64, height: 48, edits: .init(segments: []), timeline: .init(assets: [
-                .init(name: "Existing", file: existing.lastPathComponent, kind: .image, duration: 5, width: 127, height: 95),
-            ]))
+                                              width: 64, height: 48, edits: .init(segments: []), timeline: .init(assets: [
+                                                  .init(name: "Existing", file: existing.lastPathComponent, kind: .image, duration: 5, width: 127, height: 95),
+                                              ]))
         try fixture.store.save(original, in: fixture.directory)
         try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: existing.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: existing.path) }
         #expect(throws: Error.self) { try FileHandle(forReadingFrom: existing) }
         let result = try await RecordingMediaImporter.prepare(urls: [incoming], project: original,
-            directory: fixture.directory, store: fixture.store)
+                                                              directory: fixture.directory, store: fixture.store)
         defer { result.discard() }
         #expect(result.project.timeline?.assets.count == 2 && result.addedFiles.count == 1 && result.duplicateCount == 0)
         #expect(result.project.timeline?.assets.first == original.timeline?.assets.first)
@@ -486,7 +486,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         let directories = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted()
         await #expect(throws: ScreenRecordingExportError.unavailableMedia) {
             _ = try await RecordingMediaImporter.prepare(urls: [source], project: nil, directory: nil,
-                store: fixture.store, checkCancellation: { try mutation.check() })
+                                                         store: fixture.store, checkCancellation: { try mutation.check() })
         }
         #expect(mutation.didMutate && mutation.copiedFiles.isEmpty)
         #expect(try Data(contentsOf: source) == bytes)
@@ -504,7 +504,7 @@ struct ScreenRecordingMediaDuplicatesTests {
         let replacementDigest = try RecordingMediaIdentity.digest(of: replacement)
         let mutation = try RecordingImportSourceMutation(source: source, replacement: bytes, root: fixture.root)
         let result = try await RecordingMediaImporter.prepare(urls: [source, source], project: nil, directory: nil,
-            store: fixture.store, checkCancellation: { try mutation.check() })
+                                                              store: fixture.store, checkCancellation: { try mutation.check() })
         defer { result.discard() }
         let assets = try #require(result.project.timeline?.assets)
         #expect(mutation.didMutate && assets.count == 2 && result.addedFiles.count == 2 && result.duplicateCount == 0)

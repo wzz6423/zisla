@@ -327,8 +327,8 @@ struct AIStateMonitorActivityDetectorTests {
         let unchanged = MutableActivityDetector(tasks: [claude])
         let usage = CountingUsageDetector()
         let monitor = AIStateMonitor(directoryURL: directory.appendingPathComponent("state"),
-            activityDetectors: [changed, unchanged], usageDetectors: [usage],
-            detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     activityDetectors: [changed, unchanged], usageDetectors: [usage],
+                                     detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState(timeout: 10) { monitor.state.tasks.count == 2 })
@@ -337,7 +337,7 @@ struct AIStateMonitorActivityDetectorTests {
         try Data("finished\n".utf8).write(to: log)
         #expect(await waitForMonitorState(timeout: 10) { monitor.state.tasks == [claude] })
         #expect(unchanged.callCount == unchangedCalls,
-            "One log event must not launch filesystem scans or processes for unrelated providers")
+                "One log event must not launch filesystem scans or processes for unrelated providers")
         #expect(usage.callCount == 0)
         #expect(changed.lastChangedURLs == [log.standardizedFileURL],
                 "The detector needs the changed path to avoid rescanning its whole log directory")
@@ -351,7 +351,7 @@ struct AIStateMonitorActivityDetectorTests {
         let persisted = AIProgressTask(id: "persisted", provider: .claude, title: "Claude", progress: nil, updatedAt: .now)
         let detector = MutableActivityDetector(tasks: [automatic])
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [detector],
-            detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState(timeout: 10) { monitor.state.tasks == [automatic] })
@@ -376,7 +376,7 @@ struct AIStateMonitorActivityDetectorTests {
         let detectors = tasks.map { MutableActivityDetector(tasks: [$0]) }
         let usage = CountingUsageDetector()
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: detectors,
-            usageDetectors: [usage], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     usageDetectors: [usage], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { monitor.state.tasks == tasks })
@@ -393,7 +393,7 @@ struct AIStateMonitorActivityDetectorTests {
             expected[index].title = "updated"
             #expect(await waitForMonitorState { monitor.state.tasks == expected })
             #expect(detectors.enumerated().allSatisfy { $0.element.callCount == ($0.offset <= index ? 2 : 1) },
-                "Each timer slot may scan only its source while retaining the other snapshots")
+                    "Each timer slot may scan only its source while retaining the other snapshots")
         }
         #expect(usage.callCount == 0)
     }
@@ -405,11 +405,11 @@ struct AIStateMonitorActivityDetectorTests {
         let now = Date(timeIntervalSince1970: 1_910_000_000)
         let usage = CountingUsageDetector(samples: [
             AIUsageSample(sourceID: "usage-only", provider: .claude, timestamp: now,
-                inputTokens: 10, outputTokens: 5),
+                          inputTokens: 10, outputTokens: 5),
         ])
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [],
-            usageDetectors: [usage], detectorRefreshInterval: Self.testPeriodicRefreshInterval,
-            now: { now })
+                                     usageDetectors: [usage], detectorRefreshInterval: Self.testPeriodicRefreshInterval,
+                                     now: { now })
         defer { monitor.stop() }
         monitor.start()
         #expect(monitor.activityTimer == nil)
@@ -432,16 +432,16 @@ struct AIStateMonitorActivityDetectorTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         var now = Date(timeIntervalSince1970: 1_910_000_000)
         let active = AIProgressTask(id: "active", provider: .codex, title: "Active", progress: nil,
-            status: .running, updatedAt: now)
+                                    status: .running, updatedAt: now)
         let finished = AIProgressTask(id: "finished", provider: .claude, title: "Finished", progress: 1,
-            status: .succeeded, updatedAt: now.addingTimeInterval(-60))
+                                      status: .succeeded, updatedAt: now.addingTimeInterval(-60))
         let repository = AIStateRepository(directoryURL: directory)
         let database = try AIStateDatabase(url: repository.databaseURL, maximumUsageSamples: 10)
         try database.upsertTask(active)
         try database.upsertTask(finished)
         let usage = CountingUsageDetector()
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [],
-            usageDetectors: hasUsageCollector ? [usage] : [], activeTaskTTL: 30, now: { now })
+                                     usageDetectors: hasUsageCollector ? [usage] : [], activeTaskTTL: 30, now: { now })
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { Set(monitor.state.tasks.map(\.id)) == [active.id, finished.id] })
@@ -460,10 +460,10 @@ struct AIStateMonitorActivityDetectorTests {
         now = now.addingTimeInterval(1)
         monitor.usageTimer?.fire()
         #expect(await waitForMonitorState { monitor.state.tasks == [finished] },
-            "Elapsed time alone must expire persisted activity even without collectors or another usage scan")
+                "Elapsed time alone must expire persisted activity even without collectors or another usage scan")
         #expect(usage.callCount == (hasUsageCollector ? 1 : 0))
         #expect(Set(try repository.load().tasks.map(\.id)) == [active.id, finished.id],
-            "Expiry only changes the visible snapshot, not persisted task records")
+                "Expiry only changes the visible snapshot, not persisted task records")
         #expect(monitor.state.usageSamples.isEmpty && monitor.usageHistoryState == .idle)
         monitor.usageTimer?.fire()
         await Task { @MainActor in }.value
@@ -478,12 +478,12 @@ struct AIStateMonitorActivityDetectorTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         var now = Date(timeIntervalSince1970: 1_910_000_000)
         let task = AIProgressTask(id: "active", provider: .codex, title: "Active", progress: nil,
-            status: .running, updatedAt: now)
+                                  status: .running, updatedAt: now)
         let repository = AIStateRepository(directoryURL: directory)
         let database = try AIStateDatabase(url: repository.databaseURL, maximumUsageSamples: 10)
         try database.upsertTask(task)
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [],
-            activeTaskTTL: 30, now: { now })
+                                     activeTaskTTL: 30, now: { now })
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { monitor.state.tasks == [task] })
@@ -497,7 +497,7 @@ struct AIStateMonitorActivityDetectorTests {
 
         monitor.start()
         #expect(await waitForMonitorState { monitor.state.tasks.isEmpty },
-            "Restart must reconcile expiry even when the persisted state is unchanged")
+                "Restart must reconcile expiry even when the persisted state is unchanged")
         withExtendedLifetime(database) {}
     }
 
@@ -508,12 +508,12 @@ struct AIStateMonitorActivityDetectorTests {
         var now = Date(timeIntervalSince1970: 1_910_000_000)
         let usage = CountingUsageDetector()
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [],
-            usageDetectors: [usage], now: { now })
+                                     usageDetectors: [usage], now: { now })
         defer { monitor.stop() }
         monitor.start()
         let timer = try #require(monitor.usageTimer)
         #expect(timer.timeInterval == 60,
-            "A delayed scan must not make an early timer tick postpone the next scan by five more minutes")
+                "A delayed scan must not make an early timer tick postpone the next scan by five more minutes")
         timer.fire()
         await Task { @MainActor in }.value
         _ = try await monitor.readUsageHistory()
@@ -538,10 +538,10 @@ struct AIStateMonitorActivityDetectorTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         var now = Date(timeIntervalSince1970: 1_910_000_000)
         var task = AIProgressTask(id: "waiting", provider: .claude, title: "Waiting", progress: nil,
-            status: .blocked, updatedAt: now)
+                                  status: .blocked, updatedAt: now)
         let detector = MutableActivityDetector(tasks: [task])
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [detector],
-            activeTaskTTL: 30, now: { now })
+                                     activeTaskTTL: 30, now: { now })
         monitor.reload(includeUsageSamples: false)
         #expect(monitor.state.tasks == [task])
 
@@ -568,7 +568,7 @@ struct AIStateMonitorActivityDetectorTests {
         let task = AIProgressTask(id: "before-stop", provider: .codex, title: "Codex", progress: nil, updatedAt: .now)
         let detector = MutableActivityDetector(tasks: [task])
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [detector],
-            detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { monitor.state.tasks == [task] })
@@ -588,7 +588,7 @@ struct AIStateMonitorActivityDetectorTests {
         let detector = MutableActivityDetector(tasks: [task])
         let usage = CountingUsageDetector()
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [detector],
-            usageDetectors: [usage], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     usageDetectors: [usage], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { monitor.state.tasks == [task] })
@@ -614,7 +614,7 @@ struct AIStateMonitorActivityDetectorTests {
         let gate = detector.suspendNextCall()
         defer { gate.signal() }
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [detector],
-            detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         var observedIDs: [String] = []
         let observation = monitor.$state.sink { observedIDs.append(contentsOf: $0.tasks.map(\.id)) }
@@ -643,7 +643,7 @@ struct AIStateMonitorActivityDetectorTests {
             MutableActivityDetector(tasks: [$0.element], activityFileURLs: $0.offset < logs.count ? [logs[$0.offset]] : [])
         }
         let monitor = AIStateMonitor(directoryURL: directory.appendingPathComponent("state"),
-            activityDetectors: detectors, detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     activityDetectors: detectors, detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { monitor.state.tasks == tasks })
@@ -666,7 +666,7 @@ struct AIStateMonitorActivityDetectorTests {
         let detectors = tasks.map { MutableActivityDetector(tasks: [$0]) }
         let usage = CountingUsageDetector()
         let monitor = AIStateMonitor(directoryURL: directory, activityDetectors: detectors,
-            usageDetectors: [usage], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     usageDetectors: [usage], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { monitor.state.tasks == tasks })
@@ -688,7 +688,7 @@ struct AIStateMonitorActivityDetectorTests {
         gate.signal()
         #expect(await waitForMonitorState { monitor.state.tasks == expected && usage.callCount == 1 })
         #expect(detectors.allSatisfy { $0.callCount == 2 },
-            "Pending slots must merge without re-scanning the source already in flight")
+                "Pending slots must merge without re-scanning the source already in flight")
     }
 
     @Test @MainActor
@@ -701,7 +701,7 @@ struct AIStateMonitorActivityDetectorTests {
         let task = AIProgressTask(id: "pending", provider: .codex, title: "Initial", progress: nil, updatedAt: .now)
         let detector = MutableActivityDetector(tasks: [task], activityFileURLs: logs)
         let monitor = AIStateMonitor(directoryURL: directory.appendingPathComponent("state"),
-            activityDetectors: [detector], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     activityDetectors: [detector], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { detector.callCount == 1 })
@@ -736,7 +736,7 @@ struct AIStateMonitorActivityDetectorTests {
         var task = AIProgressTask(id: "streaming", provider: .claude, title: "Claude", progress: nil, updatedAt: .now)
         let detector = MutableActivityDetector(tasks: [task], activityFileURLs: [log])
         let monitor = AIStateMonitor(directoryURL: directory.appendingPathComponent("state"),
-            activityDetectors: [detector], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
+                                     activityDetectors: [detector], detectorRefreshInterval: Self.testPeriodicRefreshInterval)
         defer { monitor.stop() }
         monitor.start()
         #expect(await waitForMonitorState { monitor.state.tasks == [task] })
@@ -753,7 +753,7 @@ struct AIStateMonitorActivityDetectorTests {
         }
         defer { writer.cancel() }
         #expect(await waitForMonitorState { monitor.state.tasks == [task] },
-            "A growing log must publish updates while writes continue")
+                "A growing log must publish updates while writes continue")
         writer.cancel()
         _ = await writer.result
     }

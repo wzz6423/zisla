@@ -105,22 +105,22 @@ public struct VoiceInputHotkeyPreset: Codable, Equatable, Sendable {
 
     /// ⌥ Space
     public static let optionSpace = VoiceInputHotkeyPreset(
-        keyCode: 49,              // kVK_Space
-        carbonModifiers: 0x0800,  // optionKey
+        keyCode: 49, // kVK_Space
+        carbonModifiers: 0x0800, // optionKey
         keyDisplayName: "Space"
     )
 
     /// ⌃ Space
     public static let controlSpace = VoiceInputHotkeyPreset(
-        keyCode: 49,              // kVK_Space
-        carbonModifiers: 0x1000,  // controlKey
+        keyCode: 49, // kVK_Space
+        carbonModifiers: 0x1000, // controlKey
         keyDisplayName: "Space"
     )
 
     /// ⌘⇧ V
     public static let commandShiftV = VoiceInputHotkeyPreset(
-        keyCode: 9,                         // kVK_ANSI_V
-        carbonModifiers: 0x0100 | 0x0200,   // cmdKey | shiftKey
+        keyCode: 9, // kVK_ANSI_V
+        carbonModifiers: 0x0100 | 0x0200, // cmdKey | shiftKey
         keyDisplayName: "V"
     )
 
@@ -171,10 +171,10 @@ public struct VoiceInputHotkeyPreset: Codable, Equatable, Sendable {
     /// macOS-style modifier symbol string (⌃⌥⇧⌘).
     public static func modifierSymbols(carbonModifiers: UInt32) -> String {
         var symbols = ""
-        if carbonModifiers & 0x1000 != 0 { symbols += "⌃" }  // controlKey
-        if carbonModifiers & 0x0800 != 0 { symbols += "⌥" }  // optionKey
-        if carbonModifiers & 0x0100 != 0 { symbols += "⌘" }  // cmdKey
-        if carbonModifiers & 0x0200 != 0 { symbols += "⇧" }  // shiftKey
+        if carbonModifiers & 0x1000 != 0 { symbols += "⌃" } // controlKey
+        if carbonModifiers & 0x0800 != 0 { symbols += "⌥" } // optionKey
+        if carbonModifiers & 0x0100 != 0 { symbols += "⌘" } // cmdKey
+        if carbonModifiers & 0x0200 != 0 { symbols += "⇧" } // shiftKey
         return symbols
     }
 
@@ -228,8 +228,6 @@ public struct VoiceInputHotkeyPreset: Codable, Equatable, Sendable {
         try container.encodeIfPresent(modifierSides, forKey: .modifierSides)
     }
 }
-
-
 
 /// Model discovery state, used by the settings page to display connection test progress and results.
 public enum VoiceModelDiscoveryState: Equatable, Sendable {

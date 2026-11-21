@@ -301,9 +301,9 @@ public struct ImageProcessingService: Sendable {
             let rotated = (5...8).contains(orientation)
             let hasMetadata = CGImageSourceCopyMetadataAtIndex(source, 0, nil) != nil
                 || [kCGImagePropertyExifDictionary, kCGImagePropertyGPSDictionary, kCGImagePropertyIPTCDictionary, kCGImagePropertyTIFFDictionary]
-                    .contains { (properties[$0] as? [AnyHashable: Any])?.isEmpty == false }
+                .contains { (properties[$0] as? [AnyHashable: Any])?.isEmpty == false }
             summary = ImageFileSummary(width: rotated ? height : width, height: rotated ? width : height,
-                frameCount: frameCount, fileSize: Int64(size), format: format, hasMetadata: hasMetadata)
+                                       frameCount: frameCount, fileSize: Int64(size), format: format, hasMetadata: hasMetadata)
         } else {
             let fields = try await header(url)
             guard let width = fields["width"].flatMap(Int.init), let height = fields["height"].flatMap(Int.init) else {
@@ -313,9 +313,9 @@ public struct ImageProcessingService: Sendable {
             let pageHeight = fields["page-height"].flatMap(Int.init) ?? height
             let rotated = (5...8).contains(orientation)
             summary = ImageFileSummary(width: rotated ? pageHeight : width, height: rotated ? width : pageHeight,
-                frameCount: fields["n-pages"].flatMap(Int.init) ?? 1, fileSize: Int64(size),
-                format: Self.loaderFormat(fields["vips-loader"]),
-                hasMetadata: url.pathExtension.lowercased() == "svg" || ["exif-data", "xmp-data", "iptc-data"].contains { fields[$0] != nil })
+                                       frameCount: fields["n-pages"].flatMap(Int.init) ?? 1, fileSize: Int64(size),
+                                       format: Self.loaderFormat(fields["vips-loader"]),
+                                       hasMetadata: url.pathExtension.lowercased() == "svg" || ["exif-data", "xmp-data", "iptc-data"].contains { fields[$0] != nil })
         }
         guard summary.width > 0, summary.height > 0, summary.width <= 150_000, summary.height <= 150_000,
               summary.frameCount > 0, summary.frameCount <= 1_000,
@@ -534,13 +534,13 @@ public struct ImageProcessingService: Sendable {
                 _ = try await run(["flatten", colour.path, prepared.path, "--background=\(options.backgroundChannels!)"], in: work)
             } else { prepared = colour }
             _ = try await run(["gravity", prepared.path, image.path, "centre", String(resize.width!), String(resize.height!),
-                              "--extend=background", "--background=\(options.backgroundChannels!)"], in: work)
+                               "--extend=background", "--background=\(options.backgroundChannels!)"], in: work)
             prepared = image
         }
         if let overlay {
             let watermarked = work.appendingPathComponent("watermarked.v")
             _ = try await run(["composite2", prepared.path, overlay.url.path, watermarked.path, "over",
-                              "--x=\(overlay.x)", "--y=\(overlay.y)", "--compositing-space=srgb"], in: work)
+                               "--x=\(overlay.x)", "--y=\(overlay.y)", "--compositing-space=srgb"], in: work)
             prepared = watermarked
         }
         _ = try await run(Self.saveArguments(prepared, output: output, format: format, options: options), in: work)

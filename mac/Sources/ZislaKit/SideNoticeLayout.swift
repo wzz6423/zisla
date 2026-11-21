@@ -229,8 +229,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let priorities = CompactStatusPriority.normalized(settings.compactStatusPriority)
         return priorities.first {
             compactStatusIsAvailable($0, notices: notices,
-                systemMonitorAvailable: systemMonitorAvailable && settings.systemMonitorEnabled
-                    && settings.effectiveStatusIconDestination == .island)
+                                     systemMonitorAvailable: systemMonitorAvailable && settings.systemMonitorEnabled
+                                         && settings.effectiveStatusIconDestination == .island)
         }
     }
 
@@ -510,7 +510,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 placementMode: layout.placementMode,
                 screenFrame: layout.screenFrame,
                 inwardDistance: ScreenLayoutEngine.edgeDistance(
-                    of: layout.collapsedFrame, in: layout.screenFrame, edge: layout.edge),
+                    of: layout.collapsedFrame, in: layout.screenFrame, edge: layout.edge
+                ),
                 expandsForDetailedStatus: expandsForDetailedMedia
             )
         }
@@ -520,8 +521,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             let visibleWingWidth = expandsForDetailedMedia
                 ? Layout.compactBarMediaDetailSideWidth - Layout.compactOverlap
                 : compactWingWidth
-                    + max(0, sideExtension)
-                    - Layout.compactOverlap
+                + max(0, sideExtension)
+                - Layout.compactOverlap
             baseWidth = anchor.width + visibleWingWidth * 2
         } else {
             baseWidth = expandsForDetailedMedia
@@ -536,7 +537,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         } else if let compactPresentation, compactPresentation.isAccountBalance {
             let height = layout.topology.hasPhysicalNotch
                 ? compactBarHeight(topBarHeight: layout.topBarHeight, anchor: anchor,
-                    screenHeight: layout.screenFrame.height, progressGlowEnabled: progressGlowEnabled)
+                                   screenHeight: layout.screenFrame.height, progressGlowEnabled: progressGlowEnabled)
                 : max(anchor.height, minimumSimulatedHeight)
             contentWidth = layout.topology.hasPhysicalNotch
                 ? anchor.width + compactPresentation.accountBalanceSideWidth(thickness: height) * 2
@@ -632,7 +633,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             : CGFloat(settings.islandPillHeight)
         if let notice = notices.first(where: { $0.id.hasPrefix("voice-processing-") }) {
             let presentation = CompactPillStatusPresentation(priority: nil, notice: notice,
-                text: notice.detail ?? "")
+                                                             text: notice.detail ?? "")
             return (0, false, false, Layout.compactWingWidth, 0,
                     presentation.length(thickness: thickness, edge: settings.islandPlacement.edge), nil, presentation)
         }
@@ -703,11 +704,11 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
             settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
                 ? selectedPriority == .focusCountdown
-                    ? Layout.compactWingWidth + sideExtension
-                    : presentation?.isAccountBalance == true
-                        ? presentation?.accountBalanceSideWidth(thickness: ScreenLayoutConfiguration.cameraPillHeight)
-                        : displaysHeadphone
-                            ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil
+                ? Layout.compactWingWidth + sideExtension
+                : presentation?.isAccountBalance == true
+                ? presentation?.accountBalanceSideWidth(thickness: ScreenLayoutConfiguration.cameraPillHeight)
+                : displaysHeadphone
+                ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil
                 : nil,
             presentation
         )
@@ -776,11 +777,11 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         return selectedNotice.map {
             CompactPillStatusPresentation(priority: selectedPriority, notice: $0, text: text,
-                aiCount: aiCount, aiNotices: aiNotices,
-                showsWaveform: selectedPriority == .media && $0.id.hasPrefix("media-active-")
-                    && settings.mediaVisualizationStyle == .waveform,
-                showsMediaIdentity: selectedPriority == .media && $0.id.hasPrefix("media-active-")
-                    && settings.mediaCompactStyle == .detailed && settings.mediaShowLyricsAndInfo)
+                                          aiCount: aiCount, aiNotices: aiNotices,
+                                          showsWaveform: selectedPriority == .media && $0.id.hasPrefix("media-active-")
+                                              && settings.mediaVisualizationStyle == .waveform,
+                                          showsMediaIdentity: selectedPriority == .media && $0.id.hasPrefix("media-active-")
+                                              && settings.mediaCompactStyle == .detailed && settings.mediaShowLyricsAndInfo)
         }
     }
 

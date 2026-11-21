@@ -4,32 +4,32 @@ import Testing
 
 @MainActor
 struct PetBehaviorControllerTests {
-  @Test
-  func tapDoesNotOverrideAnExternalActivity() {
-    let behavior = PetBehaviorController(tapFeedbackDuration: .milliseconds(1))
-    behavior.setActivity(.working)
+    @Test
+    func tapDoesNotOverrideAnExternalActivity() {
+        let behavior = PetBehaviorController(tapFeedbackDuration: .milliseconds(1))
+        behavior.setActivity(.working)
 
-    behavior.handleTap()
+        behavior.handleTap()
 
-    #expect(behavior.activity == .working)
-  }
+        #expect(behavior.activity == .working)
+    }
 
-  @Test
-  func externalActivitySupersedesPendingTapFeedback() {
-    let behavior = PetBehaviorController(tapFeedbackDuration: .milliseconds(10))
-    behavior.handleTap()
-    #expect(behavior.activity == .succeeded)
+    @Test
+    func externalActivitySupersedesPendingTapFeedback() {
+        let behavior = PetBehaviorController(tapFeedbackDuration: .milliseconds(10))
+        behavior.handleTap()
+        #expect(behavior.activity == .succeeded)
 
-    behavior.setActivity(.working)
+        behavior.setActivity(.working)
 
-    #expect(behavior.activity == .working)
-  }
+        #expect(behavior.activity == .working)
+    }
 
-  @Test
-  func tapEntersTemporarySuccessStateWhenNoExternalActivityExists() {
-    let behavior = PetBehaviorController(tapFeedbackDuration: .milliseconds(10))
-    behavior.handleTap()
+    @Test
+    func tapEntersTemporarySuccessStateWhenNoExternalActivityExists() {
+        let behavior = PetBehaviorController(tapFeedbackDuration: .milliseconds(10))
+        behavior.handleTap()
 
-    #expect(behavior.activity == .succeeded)
-  }
+        #expect(behavior.activity == .succeeded)
+    }
 }

@@ -12,7 +12,7 @@ struct ScreenRecordingImageCanvasTests {
     func imageCornersPreserveThePixelAspectRatioAndOppositeAnchorInsideTheCanvas(_ handle: RecordingCanvasHandle) {
         let canvas = CGSize(width: 800, height: 600)
         let clip = RecordingTimelineClip(trackID: "image", content: .image(UUID()), start: 0, sourceEnd: 2,
-            layout: .init(x: 0.2, y: 0.3, width: 0.3, height: 0.2))
+                                         layout: .init(x: 0.2, y: 0.3, width: 0.3, height: 0.2))
         let element = RecordingCanvasElement.image(clip)
         let original = element.bounds(canvas: canvas)
         let left = handle == .topLeft || handle == .bottomLeft
@@ -34,7 +34,7 @@ struct ScreenRecordingImageCanvasTests {
     func imageMovesClampTheWholeObjectAndRejectInvalidEvents() {
         let canvas = CGSize(width: 800, height: 600)
         let element = RecordingCanvasElement.image(.init(trackID: "image", content: .image(UUID()), start: 0, sourceEnd: 2,
-            layout: .init(x: 0.2, y: 0.3, width: 0.3, height: 0.2)))
+                                                         layout: .init(x: 0.2, y: 0.3, width: 0.3, height: 0.2)))
         let moved = RecordingCanvasGeometry.transformed(element, by: CGSize(width: 5_000, height: -5_000), handle: nil, canvas: canvas)
         let box = moved.bounds(canvas: canvas)
         #expect(box.maxX == canvas.width && box.minY == 0)
@@ -42,7 +42,7 @@ struct ScreenRecordingImageCanvasTests {
         #expect(RecordingCanvasGeometry.transformed(element, by: .zero, handle: nil, canvas: canvas) == element)
         #expect(RecordingCanvasGeometry.transformed(element, by: CGSize(width: CGFloat.nan, height: 1), handle: .topLeft, canvas: canvas) == element)
         #expect(RecordingCanvasGeometry.transformed(element, by: CGSize(width: 1, height: 1), handle: nil,
-            canvas: CGSize(width: CGFloat.infinity, height: 600)) == element)
+                                                    canvas: CGSize(width: CGFloat.infinity, height: 600)) == element)
         #expect(element.text == nil && element.replacingText("Ignored") == element)
     }
 
@@ -70,14 +70,14 @@ struct ScreenRecordingImageCanvasTests {
     func updatingAnImageClipNeverChangesAnotherUseOfItsAssetOrOverwritesANewerEdit() {
         let assetID = UUID()
         let first = RecordingTimelineClip(id: "first", trackID: "image", content: .image(assetID), start: 0, sourceEnd: 2,
-            layout: .init(x: 0.1, y: 0.1, width: 0.3, height: 0.2))
+                                          layout: .init(x: 0.1, y: 0.1, width: 0.3, height: 0.2))
         var second = first
         second.id = "second"
         let original = RecordingCanvasElement.image(first)
         var project = ScreenRecordingProject(name: "Images", videoFile: "screen.mp4", duration: 3, width: 800, height: 600,
-            timeline: .init(clips: [first, second]))
+                                             timeline: .init(clips: [first, second]))
         let moved = RecordingCanvasGeometry.transformed(original, by: CGSize(width: 100, height: 90), handle: nil,
-                                                       canvas: CGSize(width: 800, height: 600))
+                                                        canvas: CGSize(width: 800, height: 600))
         moved.write(to: &project, replacing: original)
         #expect(project.timeline?.clips[0] != first && project.timeline?.clips[1] == second)
         let updated = project
@@ -188,7 +188,7 @@ struct ScreenRecordingImageCanvasTests {
         fixture.view.mouseDown(with: try fixture.mouse(.leftMouseDown, x: 0.25, y: 0.2))
         fixture.view.mouseDragged(with: try fixture.mouse(.leftMouseDragged, x: 0.3, y: 0.3))
         fixture.view.configure(project: fixture.model.project, sourceTime: 0.5, baseImage: fixture.base,
-            selection: fixture.selection, editable: true, multitrackScene: fixture.scene)
+                               selection: fixture.selection, editable: true, multitrackScene: fixture.scene)
         #expect(fixture.view.draft == nil && fixture.view.renderedImage == nil && fixture.commits == 0)
         #expect(fixture.view.hitTest(CGPoint(x: 100, y: 100)) == nil)
         await fixture.ready()
@@ -197,9 +197,9 @@ struct ScreenRecordingImageCanvasTests {
         var project = try #require(fixture.model.project)
         project.timeline?.clips.removeFirst()
         let scene = RecordingMultitrackPreviewScene(project: project, directory: fixture.media.directory,
-            time: 0, size: fixture.view.canvasSize, frames: [:])
+                                                    time: 0, size: fixture.view.canvasSize, frames: [:])
         fixture.view.configure(project: project, sourceTime: 0, baseImage: fixture.base,
-            selection: fixture.selection, editable: true, multitrackScene: scene)
+                               selection: fixture.selection, editable: true, multitrackScene: scene)
         #expect(fixture.view.draft == nil && fixture.commits == 0)
         #expect(try RecordingImageFixture.pixels(#require(fixture.view.renderedImage)).bytes
             == RecordingImageFixture.pixels(scene.image(project: project)).bytes)
@@ -213,7 +213,7 @@ struct ScreenRecordingImageCanvasTests {
         let asset = try #require(fixture.media.project.timeline?.assets.first)
         try FileManager.default.removeItem(at: fixture.media.url(asset))
         fixture.view.configure(project: fixture.model.project, sourceTime: 0, baseImage: fixture.base,
-            selection: fixture.selection, editable: true, multitrackScene: fixture.scene)
+                               selection: fixture.selection, editable: true, multitrackScene: fixture.scene)
         #expect(fixture.view.renderedImage == nil && fixture.errors.count == 1)
         #expect(!fixture.model.canUndo && fixture.commits == 0)
     }
@@ -230,7 +230,7 @@ struct ScreenRecordingImageCanvasTests {
         let point: CGPoint
         if text {
             let annotation = RecordingAnnotation(kind: .text, start: 0, end: 2, x: 0.15, y: 0.15,
-                endX: 0.4, endY: 0.3, text: "Overlay")
+                                                 endX: 0.4, endY: 0.3, text: "Overlay")
             project.edits.annotations = [annotation]
             project.timeline?.clips[1].content = .annotation(annotation.id)
             selection = .annotation(annotation.id)
@@ -245,9 +245,9 @@ struct ScreenRecordingImageCanvasTests {
             point = CGPoint(x: 0.25, y: 0.2)
         }
         let scene = RecordingMultitrackPreviewScene(project: project, directory: fixture.media.directory,
-            time: 0, size: fixture.view.canvasSize, frames: fixture.scene.frames)
+                                                    time: 0, size: fixture.view.canvasSize, frames: fixture.scene.frames)
         fixture.view.configure(project: project, sourceTime: 0, baseImage: fixture.base,
-            selection: .video(video.id), editable: true, multitrackScene: scene)
+                               selection: .video(video.id), editable: true, multitrackScene: scene)
         fixture.view.mouseDown(with: try fixture.mouse(.leftMouseDown, x: point.x, y: point.y))
         #expect(fixture.selection == selection && fixture.view.draft?.selection == selection)
         #expect(fixture.commits == 0 && fixture.view.textEditor == nil)
@@ -257,11 +257,11 @@ struct ScreenRecordingImageCanvasTests {
     func videoCornersUseTheSameAspectAndAnchorConstraintsAndNeverOverwriteANewerClipEdit(_ handle: RecordingCanvasHandle) {
         let canvas = CGSize(width: 800, height: 600)
         let clip = RecordingTimelineClip(id: "video", trackID: "video", content: .video(UUID()), start: 2,
-            sourceStart: 0.5, sourceEnd: 2, speed: 2, layout: .init(x: 0.2, y: 0.3, width: 0.3, height: 0.2))
+                                         sourceStart: 0.5, sourceEnd: 2, speed: 2, layout: .init(x: 0.2, y: 0.3, width: 0.3, height: 0.2))
         let original = RecordingCanvasElement.video(clip)
         let before = original.bounds(canvas: canvas)
         let moved = RecordingCanvasGeometry.transformed(original, by: CGSize(width: 30, height: 20),
-            handle: handle, canvas: canvas)
+                                                        handle: handle, canvas: canvas)
         guard case let .video(replacement) = moved else { Issue.record("Expected video clip"); return }
         let after = moved.bounds(canvas: canvas)
         #expect(after != before, "Dragging a video corner must change its layout")
@@ -273,7 +273,7 @@ struct ScreenRecordingImageCanvasTests {
         #expect(replacement.layout.isNormalized && replacement.sourceStart == clip.sourceStart && replacement.speed == clip.speed)
         #expect(original.text == nil && original.replacingText("Ignored") == original)
         var project = ScreenRecordingProject(name: "Video", videoFile: "screen.mp4", duration: 3, width: 800, height: 600,
-            timeline: .init(clips: [clip]))
+                                             timeline: .init(clips: [clip]))
         moved.write(to: &project, replacing: original)
         #expect(project.timeline?.clips.first == replacement)
         let updated = project
@@ -301,14 +301,14 @@ struct ScreenRecordingImageCanvasTests {
             let first = RecordingTimelineClip(id: "first", trackID: bottom.id, content: .image(asset.id), start: 0,
                                               sourceEnd: 2, layout: layout)
             let second = RecordingTimelineClip(id: "second", trackID: top.id, content: .image(asset.id), start: 0,
-                sourceEnd: 2, layout: overlapping ? layout : .init(x: 0.65, y: 0.7, width: 0.3, height: 0.2))
+                                               sourceEnd: 2, layout: overlapping ? layout : .init(x: 0.65, y: 0.7, width: 0.3, height: 0.2))
             media.project.timeline?.tracks = [bottom, top]
             media.project.timeline?.clips = [first, second]
             var frames: [String: CGImage] = [:]
             if video {
                 let image = try #require(NSImage(contentsOf: media.url(asset))?.cgImage(forProposedRect: nil, context: nil, hints: nil))
                 let source = RecordingMediaAsset(name: "Video", file: "screen.mp4", kind: .video,
-                    duration: 2, width: 60, height: 30)
+                                                 duration: 2, width: 60, height: 30)
                 media.project.timeline?.assets.append(source)
                 media.project.timeline?.clips[0].content = .video(source.id)
                 media.project.timeline?.clips[1].content = .video(source.id)
@@ -316,7 +316,7 @@ struct ScreenRecordingImageCanvasTests {
             }
             selection = video ? .video(first.id) : .image(first.id)
             scene = RecordingMultitrackPreviewScene(project: media.project, directory: media.directory,
-                time: 0, size: CGSize(width: 400, height: 300), frames: frames)
+                                                    time: 0, size: CGSize(width: 400, height: 300), frames: frames)
             base = try scene.image(project: media.project)
             let base = self.base
             model = ScreenRecordingStudioModel(projectStore: .init(root: media.root), renderPreview: { _, _, _ in base })
@@ -352,13 +352,13 @@ struct ScreenRecordingImageCanvasTests {
         func mouse(_ type: NSEvent.EventType, x: Double, y: Double, clicks: Int = 1) throws -> NSEvent {
             let point = view.convert(CGPoint(x: x * view.bounds.width, y: y * view.bounds.height), to: nil)
             return try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
-                windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1))
+                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1))
         }
 
         func escape() throws -> NSEvent {
             try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
-                windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "",
-                isARepeat: false, keyCode: 53))
+                                          windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "",
+                                          isARepeat: false, keyCode: 53))
         }
     }
 }

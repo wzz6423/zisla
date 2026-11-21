@@ -41,8 +41,8 @@ struct QuickNoteExpandedView: View {
                     wordCount: draftPlainText.count,
                     showsWordCount: false
                 )
-                    .frame(height: 30)
-                    .padding(.horizontal, 12)
+                .frame(height: 30)
+                .padding(.horizontal, 12)
             }
 
             if let error = service.errorMessage {

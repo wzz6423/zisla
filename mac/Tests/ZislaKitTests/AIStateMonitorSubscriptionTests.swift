@@ -23,7 +23,7 @@ struct AIStateMonitorSubscriptionTests {
         let task = AIProgressTask(id: "fixture-active", provider: .cursor, title: "fixture", progress: nil, updatedAt: currentTime)
         let activity = SubscriptionActivityFixture(task: task)
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [activity],
-            subscriptionUsageDetector: subscription, usageRefreshInterval: 180, now: { currentTime })
+                                     subscriptionUsageDetector: subscription, usageRefreshInterval: 180, now: { currentTime })
         defer { monitor.stop() }
         monitor.refresh()
         #expect(await waitFor { monitor.state.tasks.map(\.id) == [task.id] })
@@ -56,7 +56,7 @@ struct AIStateMonitorSubscriptionTests {
             "schema_version": 1, "record_type": "event", "payload_type": "runtime.session",
             "payload_schema_version": 1, "recorded_at": Int64(now.timeIntervalSince1970 * 1_000_000),
             "id": "fixture-muse", "payload": ["event": ["kind": "model_completed",
-                "usage": ["input_tokens": 100, "output_tokens": 20, "cache_read_tokens": 30]]],
+                                                        "usage": ["input_tokens": 100, "output_tokens": 20, "cache_read_tokens": 30]]],
         ]
         try (JSONSerialization.data(withJSONObject: event) + Data([10]))
             .write(to: sessions.appendingPathComponent("session.jsonl"))
@@ -67,7 +67,7 @@ struct AIStateMonitorSubscriptionTests {
             AIUsageSample(sourceID: "fixture-cursor", provider: .cursor, timestamp: now, inputTokens: 10, outputTokens: 5),
         ]))
         let monitor = AIStateMonitor(directoryURL: repository.directoryURL, activityDetectors: [],
-            usageDetectors: [localUsage], subscriptionUsageDetector: subscription, now: { now })
+                                     usageDetectors: [localUsage], subscriptionUsageDetector: subscription, now: { now })
         defer { monitor.stop() }
 
         monitor.reload(includeUsageSamples: false)
@@ -77,7 +77,7 @@ struct AIStateMonitorSubscriptionTests {
         await subscription.release()
         #expect(await waitFor { (try? repository.load().usageSamples.map(\.totalTokens)) == [140] })
         #expect(monitor.usageHistoryState == .idle && monitor.state.usageSamples.isEmpty,
-            "Background collection must persist consumption without loading panel history")
+                "Background collection must persist consumption without loading panel history")
         let stored = try repository.load().usageSamples
         #expect(stored.count == 1, "All providers must contribute to one daily total")
         let daily = try #require(stored.first)
@@ -89,12 +89,12 @@ struct AIStateMonitorSubscriptionTests {
         monitor.loadUsageHistory()
         #expect(await waitFor { monitor.usageHistoryState == .loaded && monitor.state.usageSamples == stored })
         let trend = AIUsageAnalytics.dailyUsageSeries(samples: monitor.state.usageSamples,
-            endingAt: now, days: 1, calendar: calendar)
+                                                      endingAt: now, days: 1, calendar: calendar)
         #expect(trend.map(\.totalTokens) == [140])
         let today = AIUsageAnalytics.contributionCalendar(samples: monitor.state.usageSamples,
-            endingAt: now, weeks: 1, calendar: calendar).flatMap { $0 }.compactMap { $0 }.first {
-                calendar.isDate($0.date, inSameDayAs: now)
-            }
+                                                          endingAt: now, weeks: 1, calendar: calendar).flatMap { $0 }.compactMap { $0 }.first {
+            calendar.isDate($0.date, inSameDayAs: now)
+        }
         #expect(today?.tokens == 140)
         monitor.unloadUsageHistory()
         #expect(monitor.state.usageSamples.isEmpty)
@@ -106,7 +106,8 @@ struct AIStateMonitorSubscriptionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let now = Date(timeIntervalSince1970: 1_910_000_000)
         let subscription = SubscriptionGate(result: .init(usageSamples: [
-            AIUsageSample(sourceID: "late", provider: .cursor, timestamp: now, inputTokens: 10, outputTokens: 1)],
+                AIUsageSample(sourceID: "late", provider: .cursor, timestamp: now, inputTokens: 10, outputTokens: 1)
+            ],
             failedUsageProviders: [.cursor]))
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], subscriptionUsageDetector: subscription)
         monitor.refresh()
@@ -134,8 +135,8 @@ struct AIStateMonitorSubscriptionTests {
         let events = AsyncStream<SubscriptionCredentialProbe.Event>.makeStream()
         do {
             let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [],
-                subscriptionUsageDetector: SubscriptionCredentialProbe(events: events.continuation),
-                accountBalanceNotificationCenter: NotificationCenter(), environment: [:])
+                                         subscriptionUsageDetector: SubscriptionCredentialProbe(events: events.continuation),
+                                         accountBalanceNotificationCenter: NotificationCenter(), environment: [:])
             if startWatcher { monitor.start() } else { monitor.refresh() }
             monitor.stop()
             #expect(monitor.failedUsageProviders.isEmpty)

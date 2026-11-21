@@ -45,7 +45,7 @@ extension RecordingExportRenderer {
         }
         for index in hidden {
             partial.addAttribute(NSAttributedString.Key(kCTForegroundColorAttributeName as String),
-                value: CGColor(gray: 0, alpha: 0), range: clusters[index].range)
+                                 value: CGColor(gray: 0, alpha: 0), range: clusters[index].range)
         }
         // Keep complete glyph clusters and the full layout; direct run drawing changes color-emoji rasterization.
         let setter = CTFramesetterCreateWithAttributedString(partial)
@@ -65,7 +65,7 @@ extension RecordingExportRenderer {
         for y in 0..<context.height {
             for x in 0..<context.width where pixels[y * context.bytesPerRow + x * 4 + 3] != 0 {
                 bounds = bounds.union(CGRect(x: box.minX + CGFloat(x), y: box.minY + CGFloat(context.height - 1 - y),
-                    width: 1, height: 1))
+                                             width: 1, height: 1))
             }
         }
         return bounds

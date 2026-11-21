@@ -328,6 +328,7 @@ class CiSkipDirectivesTest < Minitest::Test
 
     {
       'mac/Sources/App.swift' => 'Swift Tests',
+      '.swiftformat' => 'Swift Tests',
       'web/src/main.ts' => 'Web CI',
       # The site directory was renamed from Web/ to web/, and either spelling
       # must keep its own workflow relevant.

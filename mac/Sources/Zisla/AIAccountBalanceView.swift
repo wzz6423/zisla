@@ -16,7 +16,7 @@ struct AIAccountBalanceSection: View {
 
     var displayedBalances: [AIAccountBalance] {
         AIAccountBalanceCatalog.displayedBalances(balances, monitoredProviders: monitoredProviders,
-            displayedProviders: displayedProviders)
+                                                  displayedProviders: displayedProviders)
     }
 
     var body: some View {
@@ -48,7 +48,7 @@ struct AIAccountBalanceCardLayout: Layout {
         for (index, subview) in subviews.enumerated() {
             if index % count == 0 { heights.append(0) }
             heights[index / count] = max(heights[index / count],
-                subview.sizeThatFits(ProposedViewSize(width: cardWidth, height: nil)).height)
+                                         subview.sizeThatFits(ProposedViewSize(width: cardWidth, height: nil)).height)
         }
         return heights
     }
@@ -69,7 +69,7 @@ struct AIAccountBalanceCardLayout: Layout {
             if column == 0, index > 0 { y += heights[index / count - 1] + spacing }
             let x = CGFloat(column) * (width + spacing)
             subview.place(at: CGPoint(x: bounds.minX + (direction == .rightToLeft ? bounds.width - x - width : x), y: y),
-                anchor: .topLeading, proposal: ProposedViewSize(width: width, height: heights[index / count]))
+                          anchor: .topLeading, proposal: ProposedViewSize(width: width, height: heights[index / count]))
         }
     }
 }
@@ -80,7 +80,8 @@ struct AIAccountBalanceCard: View {
 
     var body: some View {
         let shape = IslandSurfaceGeometry.moduleContentShape(
-            cornerRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius)
+            cornerRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+        )
         VStack(alignment: .leading, spacing: 10) {
             Text(balance.providerTitle(language: language))
                 .font(.system(size: 11, weight: .semibold))
@@ -88,10 +89,10 @@ struct AIAccountBalanceCard: View {
             if balance.fiveHourWindow != nil || balance.weeklyWindow != nil {
                 HStack(alignment: .center, spacing: 8) {
                     AIAccountQuotaRing(provider: balance.displayProvider,
-                        fraction: balance.weeklyWindow?.remainingFraction,
-                        severity: balance.weeklyWindow?.severity, diameter: 52,
-                        innerFraction: balance.fiveHourWindow?.remainingFraction,
-                        innerSeverity: balance.fiveHourWindow?.severity)
+                                       fraction: balance.weeklyWindow?.remainingFraction,
+                                       severity: balance.weeklyWindow?.severity, diameter: 52,
+                                       innerFraction: balance.fiveHourWindow?.remainingFraction,
+                                       innerSeverity: balance.fiveHourWindow?.severity)
                     VStack(alignment: .leading, spacing: 8) {
                         if let window = balance.fiveHourWindow { quotaDetails(window, label: "5h") }
                         if let window = balance.weeklyWindow { quotaDetails(window, label: "7d") }
@@ -102,7 +103,7 @@ struct AIAccountBalanceCard: View {
             ForEach(balance.windows.filter { $0.id != balance.fiveHourWindow?.id && $0.id != balance.weeklyWindow?.id }) { window in
                 HStack(alignment: .center, spacing: 8) {
                     AIAccountQuotaRing(provider: balance.displayProvider, fraction: window.remainingFraction,
-                        severity: window.severity, diameter: 42)
+                                       severity: window.severity, diameter: 42)
                     quotaDetails(window, label: window.label(language: language))
                 }
             }
@@ -123,7 +124,7 @@ struct AIAccountBalanceCard: View {
         var details = Text("\(title) \(value)")
         if let reset = window.resetsAt {
             let resetText = Text(AppLocalization.format("%@ 重置", locale: language.locale,
-                [reset.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour().minute().locale(language.locale))]))
+                                                        [reset.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour().minute().locale(language.locale))]))
                 .font(.system(size: 9)).foregroundStyle(.secondary)
             details = Text("\(details) · \(resetText)")
         }
@@ -216,10 +217,10 @@ struct CompactAIAccountBalanceBar: View {
     private var ring: some View {
         let hasCanonical = notice.metadata?["quota5hSeverity"] != nil || notice.metadata?["quota7dSeverity"] != nil
         return AIAccountQuotaRing(provider: provider,
-            fraction: hasCanonical ? notice.metadata?["quota7dFraction"].flatMap(Double.init) : fraction,
-            severity: hasCanonical ? quotaSeverity(key: "quota7dSeverity") : severity,
-            diameter: ringDiameter, innerFraction: notice.metadata?["quota5hFraction"].flatMap(Double.init),
-            innerSeverity: quotaSeverity(key: "quota5hSeverity"))
+                                  fraction: hasCanonical ? notice.metadata?["quota7dFraction"].flatMap(Double.init) : fraction,
+                                  severity: hasCanonical ? quotaSeverity(key: "quota7dSeverity") : severity,
+                                  diameter: ringDiameter, innerFraction: notice.metadata?["quota5hFraction"].flatMap(Double.init),
+                                  innerSeverity: quotaSeverity(key: "quota5hSeverity"))
     }
 
     var body: some View {
@@ -247,7 +248,7 @@ struct CompactAIAccountBalanceBar: View {
                     HStack(alignment: .top, spacing: 2) {
                         ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                             VerticalStatusText(text: line, availableWidth: valueWidth,
-                                availableHeight: valueHeight, scrollsAutomatically: true)
+                                               availableHeight: valueHeight, scrollsAutomatically: true)
                                 .foregroundStyle(textColor(index: index))
                         }
                     }
@@ -280,12 +281,12 @@ struct CompactAIAccountBalanceBar: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                 MarqueeText(line, font: .system(size: lines.count > 1 ? 9 : 11).monospacedDigit(),
-                    textColor: textColor(index: index),
-                    fontWeight: lines.count > 1 ? .medium : .semibold,
-                    pointsPerSecond: CompactPillStatusPresentation.accountBalanceScrollSpeed,
-                    scrollDirection: direction == .rightToLeft ? .right : .left,
-                    repeats: false,
-                    viewportHeight: lines.count > 1 ? 11 : 16)
+                            textColor: textColor(index: index),
+                            fontWeight: lines.count > 1 ? .medium : .semibold,
+                            pointsPerSecond: CompactPillStatusPresentation.accountBalanceScrollSpeed,
+                            scrollDirection: direction == .rightToLeft ? .right : .left,
+                            repeats: false,
+                            viewportHeight: lines.count > 1 ? 11 : 16)
             }
         }
         .id(notice.metadata?["quotaAccountID"])

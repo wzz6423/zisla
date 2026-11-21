@@ -16,9 +16,9 @@ extension ContextNoteLocationReaderTests {
     private func windowInfo(frame: CGRect, layer: Int = 0, owner: pid_t = 42, alpha: Double = 1,
                             ownerName: String? = nil, number: Int? = nil) -> [String: Any] {
         var info: [String: Any] = [kCGWindowBounds as String: frame.dictionaryRepresentation,
-                                  kCGWindowLayer as String: layer,
-                                  kCGWindowOwnerPID as String: owner,
-                                  kCGWindowAlpha as String: alpha]
+                                   kCGWindowLayer as String: layer,
+                                   kCGWindowOwnerPID as String: owner,
+                                   kCGWindowAlpha as String: alpha]
         if let ownerName { info[kCGWindowOwnerName as String] = ownerName }
         if let number { info[kCGWindowNumber as String] = number }
         return info
@@ -30,13 +30,13 @@ extension ContextNoteLocationReaderTests {
         let layer = Int(CGWindowLevelForKey(.desktopIconWindow)) + 1
         let point = CGPoint(x: 100, y: 200)
         #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens,
-            windowInfo: [windowInfo(frame: bounds, layer: layer, ownerName: "Window Server")]) == 1)
+                                                         windowInfo: [windowInfo(frame: bounds, layer: layer, ownerName: "Window Server")]) == 1)
         for owner in [nil, "Finder", "Other"] as [String?] {
             #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens,
-                windowInfo: [windowInfo(frame: bounds, layer: layer, ownerName: owner)]) == nil)
+                                                             windowInfo: [windowInfo(frame: bounds, layer: layer, ownerName: owner)]) == nil)
         }
         #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens,
-            windowInfo: [windowInfo(frame: bounds, layer: layer + 1, ownerName: "Window Server")]) == nil)
+                                                         windowInfo: [windowInfo(frame: bounds, layer: layer + 1, ownerName: "Window Server")]) == nil)
     }
 
     @Test(arguments: [CGPoint(x: 720, y: 888), CGPoint(x: 100, y: 200)])
@@ -48,7 +48,7 @@ extension ContextNoteLocationReaderTests {
                        windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.desktopIconWindow)))]
         let result = ContextNoteLocationReader.observeFinder(isTrusted: true, focusedWindowLocation: { .location(folder) }) { skippingMenuBar in
             guard let display = ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens,
-                windowInfo: windows, skippingMenuBar: skippingMenuBar) else { return nil }
+                                                                         windowInfo: windows, skippingMenuBar: skippingMenuBar) else { return nil }
             return .desktop(displayID: String(display), displayName: "Screen")
         }
         #expect(result == .location(folder))
@@ -67,7 +67,7 @@ extension ContextNoteLocationReaderTests {
         let windows = [overlay, menuBar, folderElsewhere, desktop]
         let result = ContextNoteLocationReader.observeFinder(isTrusted: true, focusedWindowLocation: { nil }) { skippingMenuBar in
             guard let display = ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens,
-                windowInfo: windows, excludingProcessIdentifier: 99, skippingMenuBar: skippingMenuBar) else { return nil }
+                                                                         windowInfo: windows, excludingProcessIdentifier: 99, skippingMenuBar: skippingMenuBar) else { return nil }
             return .desktop(displayID: String(display), displayName: "Screen")
         }
         #expect(result == .location(.desktop(displayID: "1", displayName: "Screen")))
@@ -75,7 +75,7 @@ extension ContextNoteLocationReaderTests {
         for layer in [0, Int(CGWindowLevelForKey(.mainMenuWindow)), Int(CGWindowLevelForKey(.popUpMenuWindow))] {
             let blocker = windowInfo(frame: bounds, layer: layer, ownerName: "Other")
             #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens,
-                windowInfo: [menuBar, blocker, desktop], skippingMenuBar: true) == nil)
+                                                             windowInfo: [menuBar, blocker, desktop], skippingMenuBar: true) == nil)
         }
     }
 
@@ -85,7 +85,7 @@ extension ContextNoteLocationReaderTests {
         let desktop = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.desktopIconWindow)))
         #expect(ContextNoteLocationReader.focusedWindowIsDesktop(frame: bounds, processIdentifier: 42, windowInfo: [desktop]))
         #expect(!ContextNoteLocationReader.focusedWindowIsDesktop(frame: bounds, processIdentifier: 42,
-            windowInfo: [windowInfo(frame: bounds), desktop]))
+                                                                  windowInfo: [windowInfo(frame: bounds), desktop]))
         #expect(!ContextNoteLocationReader.focusedWindowIsDesktop(frame: bounds, processIdentifier: 43, windowInfo: [desktop]))
         #expect(!ContextNoteLocationReader.focusedWindowIsDesktop(frame: bounds.offsetBy(dx: 1, dy: 1), processIdentifier: 42, windowInfo: [desktop]))
         #expect(!ContextNoteLocationReader.focusedWindowIsDesktop(frame: nil, processIdentifier: 42, windowInfo: [desktop]))
@@ -133,12 +133,12 @@ extension ContextNoteLocationReaderTests {
         let desktop = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.desktopIconWindow)))
         let point = CGPoint(x: 100, y: 200)
         #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens, windowInfo: [overlay, desktop],
-                                                        excludingProcessIdentifier: 99) == 1)
+                                                         excludingProcessIdentifier: 99) == 1)
         #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens, windowInfo: [overlay, desktop]) == nil)
         for layer in [0, Int(CGWindowLevelForKey(.popUpMenuWindow))] {
             let other = windowInfo(frame: bounds, layer: layer)
             #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens, windowInfo: [overlay, other, desktop],
-                                                            excludingProcessIdentifier: 99) == nil)
+                                                             excludingProcessIdentifier: 99) == nil)
         }
     }
 
@@ -242,7 +242,7 @@ extension ContextNoteLocationReaderTests {
         }, desktopLocation: desktopLocation) { _, element in
             guard let element, let window = fixtures.first(where: { CFEqual($0.element, element) })?.window else { return .unavailable }
             return ContextNoteLocationReader.resolve(bundleIdentifier: bundleIdentifier, applicationName: applicationName,
-                windowTitle: window.title, isBrowser: false, pageAddress: nil)
+                                                     windowTitle: window.title, isBrowser: false, pageAddress: nil)
         }
     }
 
@@ -277,14 +277,14 @@ extension ContextNoteLocationReaderTests {
         let dock = windowInfo(frame: quartzFrame, layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
         let application = windowInfo(frame: bounds)
         let expected = ContextNoteObservation.location(.window(bundleIdentifier: bundleIdentifier,
-            applicationName: "Application", title: "Document"))
+                                                               applicationName: "Application", title: "Document"))
         for windows in [[application], [application], [high, low, application],
                         [high, dock, low, application], [high, low, application]] {
             let surface = ContextNoteLocationReader.captureSurface(at: point, windowInfo: windows,
-                screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
-                bundleIdentifier: { $0 == 84 ? "com.apple.dock" : bundleIdentifier })
+                                                                   screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
+                                                                   bundleIdentifier: { $0 == 84 ? "com.apple.dock" : bundleIdentifier })
             #expect(captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Document", frame: bounds)],
-                bundleIdentifier: bundleIdentifier, applicationName: "Application") == expected)
+                                  bundleIdentifier: bundleIdentifier, applicationName: "Application") == expected)
         }
     }
 
@@ -312,14 +312,14 @@ extension ContextNoteLocationReaderTests {
         for capture in captures {
             let desktopLocation: (ContextNoteLocationReader.WindowSnapshot?) -> ContextNoteLocation? = { surface in
                 guard let display = ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens,
-                    windowInfo: capture.windows, capturedSurface: surface) else { return nil }
+                                                                             windowInfo: capture.windows, capturedSurface: surface) else { return nil }
                 return .desktop(displayID: String(display), displayName: "Screen")
             }
             let result = ContextNoteLocationReader.observe(isTrusted: capture.isTrusted, desktopLocation: { desktopLocation(nil) }) {
                 #expect(capture.isTrusted, "A visible desktop must not need accessibility after excluding pass-through windows")
                 let surface = ContextNoteLocationReader.captureSurface(at: quartzPoint, windowInfo: capture.windows,
-                    screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
-                    bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
+                                                                       screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
+                                                                       bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
                 return captureWindow(surface: surface, hit: (42, nil), windows: nil, desktopLocation: { desktopLocation($0) })
             }
             #expect(result == .location(.desktop(displayID: String(screen.displayID), displayName: "Screen")))
@@ -341,13 +341,13 @@ extension ContextNoteLocationReaderTests {
         for passesInput in [true, true, false, true, false, true] {
             overlay.ignoresMouseEvents = passesInput
             let surface = ContextNoteLocationReader.captureSurface(at: point, windowInfo: windows,
-                screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
-                bundleIdentifier: { _ in isDesktop ? "com.apple.finder" : "test.chat" })
+                                                                   screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
+                                                                   bundleIdentifier: { _ in isDesktop ? "com.apple.finder" : "test.chat" })
             let result = captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Document", frame: bounds)],
-                desktopLocation: { _ in location })
+                                       desktopLocation: { _ in location })
             #expect(result == (passesInput ? .location(location) : .ignored))
             #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens, windowInfo: windows)
-                    == (isDesktop && passesInput ? 1 : nil))
+                == (isDesktop && passesInput ? 1 : nil))
         }
     }
 
@@ -365,8 +365,8 @@ extension ContextNoteLocationReaderTests {
             var blocker = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.statusWindow)), owner: owner)
             blocker[kCGWindowNumber as String] = number
             let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
-                windowInfo: [high, blocker, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
-                hitProcessIdentifier: 42, bundleIdentifier: { _ in "test.chat" })
+                                                                   windowInfo: [high, blocker, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
+                                                                   hitProcessIdentifier: 42, bundleIdentifier: { _ in "test.chat" })
             #expect(captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Document", frame: bounds)]) == .ignored)
         }
     }
@@ -379,8 +379,8 @@ extension ContextNoteLocationReaderTests {
         let foreign = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.floatingWindow)),
                                  owner: 43, number: overlay.windowNumber)
         let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
-            windowInfo: [foreign, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
-            hitProcessIdentifier: 42, bundleIdentifier: { _ in "test.chat" })
+                                                               windowInfo: [foreign, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
+                                                               hitProcessIdentifier: 42, bundleIdentifier: { _ in "test.chat" })
         #expect(surface?.ownerProcessIdentifier == 43)
         #expect(captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Document", frame: bounds)]) == .unavailable)
     }
@@ -393,7 +393,7 @@ extension ContextNoteLocationReaderTests {
         let windows = [CaptureWindow(title: "Other", frame: bounds.offsetBy(dx: 1000, dy: 0)),
                        CaptureWindow(title: "Conversation", frame: bounds)]
         #expect(captureWindow(surface: surface, hit: hit, windows: windows)
-                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+            == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
     }
 
     @Test
@@ -406,7 +406,7 @@ extension ContextNoteLocationReaderTests {
             #expect(captureWindow(surface: surface, hit: nil, windows: windows) == .unavailable)
         }
         #expect(captureWindow(surface: surface, hit: nil, windows: [window])
-                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+            == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
     }
 
     @Test(arguments: [Int(CGWindowLevelForKey(.floatingWindow)), Int(CGWindowLevelForKey(.popUpMenuWindow))])
@@ -424,11 +424,11 @@ extension ContextNoteLocationReaderTests {
         let window = CaptureWindow(title: "Conversation", frame: bounds)
         for metadata in [nil, []] as [[[String: Any]]?] {
             let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
-                windowInfo: metadata, screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
-                bundleIdentifier: { _ in "test.chat" })
+                                                                   windowInfo: metadata, screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
+                                                                   bundleIdentifier: { _ in "test.chat" })
             #expect(surface == nil)
             #expect(captureWindow(surface: surface, hit: (42, window), windows: nil)
-                    == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
         }
         #expect(captureWindow(surface: nil, hit: nil, windows: [window]) == .unavailable)
     }
@@ -437,7 +437,7 @@ extension ContextNoteLocationReaderTests {
     func ownVisibleWindowIsIgnoredEvenWhenAccessibilityHitsAnotherApplication() {
         let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
         let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0,
-            ownerProcessIdentifier: ProcessInfo.processInfo.processIdentifier)
+                                                               ownerProcessIdentifier: ProcessInfo.processInfo.processIdentifier)
         let result = ContextNoteLocationReader.captureWindow(surface: surface, hit: (42, AXUIElementCreateApplication(1000)), readAttribute: { _, _ in
             Issue.record("An own visible surface must not inspect application windows")
             return nil
@@ -455,9 +455,9 @@ extension ContextNoteLocationReaderTests {
         let window = CaptureWindow(title: "Conversation", frame: bounds)
         for listed in [nil, []] as [[CaptureWindow]?] {
             #expect(captureWindow(surface: surface, hit: nil, windows: listed,
-                focused: attribute == kAXFocusedWindowAttribute ? window : nil,
-                main: attribute == kAXMainWindowAttribute ? window : nil)
-                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+                                  focused: attribute == kAXFocusedWindowAttribute ? window : nil,
+                                  main: attribute == kAXMainWindowAttribute ? window : nil)
+                    == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
         }
     }
 
@@ -468,9 +468,9 @@ extension ContextNoteLocationReaderTests {
         let direct = CaptureWindow(title: title, frame: bounds)
         let canonical = CaptureWindow(title: "Conversation", frame: bounds)
         #expect(captureWindow(surface: surface, hit: (42, direct), windows: [canonical])
-                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+            == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
         #expect(captureWindow(surface: surface, hit: (42, direct), windows: nil, focused: canonical)
-                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+            == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
     }
 
     @Test
@@ -480,7 +480,7 @@ extension ContextNoteLocationReaderTests {
         let canonical = CaptureWindow(title: "Conversation", frame: bounds)
         let direct = CaptureWindow(title: "Other", frame: bounds.offsetBy(dx: 1000, dy: 0))
         #expect(captureWindow(surface: surface, hit: (42, direct), windows: [canonical])
-                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+            == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
     }
 
     @Test
@@ -496,7 +496,7 @@ extension ContextNoteLocationReaderTests {
         #expect(captureWindow(surface: surface, hit: (42, direct), windows: [], focused: canonical, main: canonical) == .unavailable)
         #expect(captureWindow(surface: nil, hit: (42, direct), windows: nil, focused: canonical) == .unavailable)
         let floating = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: Int(CGWindowLevelForKey(.floatingWindow)),
-            ownerProcessIdentifier: 42)
+                                                                ownerProcessIdentifier: 42)
         #expect(captureWindow(surface: floating, hit: nil, windows: [], focused: canonical) == .unavailable)
     }
 
@@ -522,8 +522,8 @@ extension ContextNoteLocationReaderTests {
     private func surfaceUnderDock(_ windows: [[String: Any]], hitProcessIdentifier: pid_t?,
                                   dockBundle: String? = "com.apple.dock", screenFrames: [CGRect]? = nil) -> ContextNoteLocationReader.WindowSnapshot? {
         ContextNoteLocationReader.captureSurface(at: CGPoint(x: 625.67578125, y: 523.05078125), windowInfo: windows,
-            screenFrames: screenFrames ?? dockScreenFrames, hitProcessIdentifier: hitProcessIdentifier,
-            bundleIdentifier: { $0 == 84 ? dockBundle : "test.chat" })
+                                                 screenFrames: screenFrames ?? dockScreenFrames, hitProcessIdentifier: hitProcessIdentifier,
+                                                 bundleIdentifier: { $0 == 84 ? dockBundle : "test.chat" })
     }
 
     @Test
@@ -547,8 +547,8 @@ extension ContextNoteLocationReaderTests {
                                  owner: desktopOwner, ownerName: windowServer ? "Window Server" : "Finder")
         let windows = [dock, desktop]
         let surface = ContextNoteLocationReader.captureSurface(at: point, windowInfo: windows,
-            screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
-            bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
+                                                               screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
+                                                               bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
         #expect(surface?.isDesktop == true)
         #expect(surface?.ownerProcessIdentifier == desktopOwner)
         #expect(surface?.frame == bounds)
@@ -561,7 +561,7 @@ extension ContextNoteLocationReaderTests {
         }, desktopLocation: { surface in
             let appKitPoint = CGPoint(x: screen.frame.midX, y: screen.frame.midY)
             guard let display = ContextNoteLocationReader.desktopDisplay(at: appKitPoint, screens: desktopScreens,
-                windowInfo: windows, capturedSurface: surface) else { return nil }
+                                                                         windowInfo: windows, capturedSurface: surface) else { return nil }
             return .desktop(displayID: String(display), displayName: "Screen")
         }) { _, _ in
             Issue.record("A verified desktop must not use an application's window title")
@@ -579,8 +579,8 @@ extension ContextNoteLocationReaderTests {
             var unmatched = desktop
             if let ownerName { unmatched[kCGWindowOwnerName as String] = ownerName }
             let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
-                windowInfo: [dock, unmatched], screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
-                bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
+                                                                   windowInfo: [dock, unmatched], screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
+                                                                   bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
             #expect(surface?.ownerProcessIdentifier == 84)
         }
         let windowServer = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.desktopIconWindow)) + 1,
@@ -588,16 +588,16 @@ extension ContextNoteLocationReaderTests {
         for hit in [nil, 84, 42] as [pid_t?] {
             for hitBundle in [nil, "test.chat"] as [String?] {
                 let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
-                    windowInfo: [dock, windowServer], screenFrames: dockScreenFrames, hitProcessIdentifier: hit,
-                    bundleIdentifier: { $0 == 84 ? "com.apple.dock" : hitBundle })
+                                                                       windowInfo: [dock, windowServer], screenFrames: dockScreenFrames, hitProcessIdentifier: hit,
+                                                                       bundleIdentifier: { $0 == 84 ? "com.apple.dock" : hitBundle })
                 #expect(surface?.ownerProcessIdentifier == 84)
             }
         }
         for layer in [0, Int(CGWindowLevelForKey(.floatingWindow))] {
             let blocker = windowInfo(frame: bounds, layer: layer, owner: 7, ownerName: "Window Server")
             let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
-                windowInfo: [dock, blocker, windowServer], screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
-                bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
+                                                                   windowInfo: [dock, blocker, windowServer], screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
+                                                                   bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
             #expect(surface?.ownerProcessIdentifier == 84)
         }
     }
@@ -605,7 +605,7 @@ extension ContextNoteLocationReaderTests {
     @Test
     func unavailableDesktopIdentityCannotBecomeAFinderWindowNote() {
         let surface = ContextNoteLocationReader.WindowSnapshot(frame: dockScreenFrames[0],
-            layer: Int(CGWindowLevelForKey(.desktopIconWindow)), ownerProcessIdentifier: 42)
+                                                               layer: Int(CGWindowLevelForKey(.desktopIconWindow)), ownerProcessIdentifier: 42)
         let result = ContextNoteLocationReader.captureWindow(surface: surface, hit: (42, nil), readAttribute: { _, _ in
             Issue.record("An unavailable display identity must not enumerate accessibility windows")
             return nil
@@ -633,16 +633,16 @@ extension ContextNoteLocationReaderTests {
         var hits = 0
         let result = ContextNoteLocationReader.observeFinder(isTrusted: true, focusedWindowLocation: { nil }) { skippingMenuBar in
             guard let display = ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens, windowInfo: windows,
-                hitProcessIdentifier: { hits += 1; return 42 },
-                bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" },
-                excludingProcessIdentifier: 99, skippingMenuBar: skippingMenuBar) else { return nil }
+                                                                         hitProcessIdentifier: { hits += 1; return 42 },
+                                                                         bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" },
+                                                                         excludingProcessIdentifier: 99, skippingMenuBar: skippingMenuBar) else { return nil }
             return .desktop(displayID: String(display), displayName: "Screen")
         }
         #expect(result == .location(.desktop(displayID: String(screen.displayID), displayName: "Screen")))
         #expect(hits == 1)
         let captureSurface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: bounds.midX, y: bounds.minY + 12),
-            windowInfo: windows, screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
-            bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
+                                                                      windowInfo: windows, screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
+                                                                      bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
         #expect(captureSurface?.ownerProcessIdentifier == 99)
     }
 
@@ -659,10 +659,10 @@ extension ContextNoteLocationReaderTests {
                 return .unavailable
             }) { skippingMenuBar in
                 guard let display = ContextNoteLocationReader.desktopDisplay(at: CGPoint(x: 500, y: 400),
-                    screens: desktopScreens, windowInfo: [dock, desktop],
-                    hitProcessIdentifier: skippingMenuBar ? { hits += 1; return hit } : nil,
-                    bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "test.chat" },
-                    skippingMenuBar: skippingMenuBar) else { return nil }
+                                                                             screens: desktopScreens, windowInfo: [dock, desktop],
+                                                                             hitProcessIdentifier: skippingMenuBar ? { hits += 1; return hit } : nil,
+                                                                             bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "test.chat" },
+                                                                             skippingMenuBar: skippingMenuBar) else { return nil }
                 return .desktop(displayID: String(display), displayName: "Screen")
             }
             #expect(result == .unavailable)
@@ -671,8 +671,8 @@ extension ContextNoteLocationReaderTests {
         for layer in [0, Int(CGWindowLevelForKey(.floatingWindow)), Int(CGWindowLevelForKey(.popUpMenuWindow))] {
             let blocker = windowInfo(frame: bounds, layer: layer)
             #expect(ContextNoteLocationReader.desktopDisplay(at: CGPoint(x: 500, y: 400), screens: desktopScreens,
-                windowInfo: [dock, blocker, desktop], hitProcessIdentifier: { 42 },
-                bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" }) == nil)
+                                                             windowInfo: [dock, blocker, desktop], hitProcessIdentifier: { 42 },
+                                                             bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" }) == nil)
         }
     }
 
@@ -685,10 +685,10 @@ extension ContextNoteLocationReaderTests {
             return nil
         }
         #expect(ContextNoteLocationReader.desktopDisplay(at: CGPoint(x: 500, y: 400), screens: desktopScreens,
-            windowInfo: [desktop], hitProcessIdentifier: hit) == 1)
+                                                         windowInfo: [desktop], hitProcessIdentifier: hit) == 1)
         #expect(ContextNoteLocationReader.desktopDisplay(at: .zero, screens: [], windowInfo: [desktop], hitProcessIdentifier: hit) == nil)
         #expect(ContextNoteLocationReader.desktopDisplay(at: CGPoint(x: 5000, y: 5000), screens: desktopScreens,
-            windowInfo: [desktop], hitProcessIdentifier: hit) == nil)
+                                                         windowInfo: [desktop], hitProcessIdentifier: hit) == nil)
     }
 
     @Test
@@ -773,8 +773,8 @@ extension ContextNoteLocationReaderTests {
             let point = CGPoint(x: bounds.midX, y: bounds.midY)
             let dock = windowInfo(frame: quartzFrame, layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
             let surface = ContextNoteLocationReader.captureSurface(at: point,
-                windowInfo: [dock, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
-                hitProcessIdentifier: 42, bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "test.chat" })
+                                                                   windowInfo: [dock, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
+                                                                   hitProcessIdentifier: 42, bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "test.chat" })
             #expect(surface?.ownerProcessIdentifier == 42)
             #expect(surface?.frame == bounds)
         }
@@ -829,15 +829,15 @@ extension ContextNoteLocationReaderTests {
     @Test(arguments: [nil, "chrome://newtab/", "chrome://settings/"] as [String?])
     func chromeInternalPageWithoutAReadableURLKeepsTheOriginalWindow(pageAddress: String?) {
         let address = ContextNoteLocationReader.findPageAddress(in: 0,
-            document: { _ in pageAddress }, role: { $0 == 1 ? "AXWebArea" : "AXWindow" },
-            url: { _ in pageAddress }, children: { node in
-                #expect(node == 0, "Internal pages must not expose page content to location capture")
-                return [1]
-            })
+                                                                document: { _ in pageAddress }, role: { $0 == 1 ? "AXWebArea" : "AXWindow" },
+                                                                url: { _ in pageAddress }, children: { node in
+                                                                    #expect(node == 0, "Internal pages must not expose page content to location capture")
+                                                                    return [1]
+                                                                })
         #expect(address == nil)
         let result = ContextNoteLocationReader.observe(isTrusted: true, desktopLocation: { nil }) {
             ContextNoteLocationReader.resolve(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome",
-                windowTitle: "New Tab", isBrowser: true, pageAddress: address)
+                                              windowTitle: "New Tab", isBrowser: true, pageAddress: address)
         }
         #expect(result == .location(.window(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome", title: "New Tab")))
     }
@@ -846,15 +846,15 @@ extension ContextNoteLocationReaderTests {
     func browserWithoutAReadableURLStillRequiresAnIdentifiableWindowTitle(title: String) {
         for address in [nil, "chrome://newtab/"] as [String?] {
             #expect(ContextNoteLocationReader.resolve(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome",
-                windowTitle: title, isBrowser: true, pageAddress: address) == .unavailable)
+                                                      windowTitle: title, isBrowser: true, pageAddress: address) == .unavailable)
         }
     }
 
     @Test(arguments: ["http://example.test/path?query=1#part", "https://example.test/path?query=1#part"])
     func readableBrowserURLKeepsPrecedenceEvenWithoutAWindowTitle(address: String) throws {
         #expect(ContextNoteLocationReader.resolve(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome",
-            windowTitle: "", isBrowser: true, pageAddress: address)
-            == .location(.webPage(url: try #require(URL(string: address)), title: "", applicationName: "Google Chrome")))
+                                                  windowTitle: "", isBrowser: true, pageAddress: address)
+                == .location(.webPage(url: try #require(URL(string: address)), title: "", applicationName: "Google Chrome")))
     }
 
     @Test

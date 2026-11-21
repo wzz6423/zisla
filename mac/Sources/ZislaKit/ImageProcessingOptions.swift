@@ -263,7 +263,7 @@ public struct ImageProcessingOptions: Equatable, Sendable {
     func dimensions(for summary: ImageFileSummary) -> (width: Int, height: Int) {
         let transformed = transform.dimensions(for: summary)
         let rotated = ImageFileSummary(width: transformed.width, height: transformed.height,
-            frameCount: summary.frameCount, fileSize: summary.fileSize, format: summary.format, hasMetadata: summary.hasMetadata)
+                                       frameCount: summary.frameCount, fileSize: summary.fileSize, format: summary.format, hasMetadata: summary.hasMetadata)
         return resize?.dimensions(for: rotated) ?? transformed
     }
 

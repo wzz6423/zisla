@@ -11,7 +11,7 @@
       "name": "Swift Tests",
       "file": "swift-tests.yml",
       "aliases": ["swift", "mac"],
-      "paths": ["mac/**", "Makefile", ".github/**"],
+      "paths": ["mac/**", "Makefile", ".swiftformat", ".github/**"],
       "checks": [
         "Swift Tests",
         "Swift Suites (0)",

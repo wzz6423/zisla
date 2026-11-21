@@ -201,9 +201,9 @@ enum SettingsSearchIndex {
         }
         entry(.ai, "各供应商额度", anchor: .group("各供应商额度"),
               keywords: ["监控额度", "展示额度", "Qoder 监控地区"] + AIAccountBalanceQoderRegion.allCases.map(\.title)
-                + AIProvider.allCases.map(AIAccountBalanceCatalog.providerName))
+                  + AIProvider.allCases.map(AIAccountBalanceCatalog.providerName))
         let websites = AIAccountBalanceWebsite.selected(for: settings.aiAccountBalanceMonitoredProviders,
-            qoderRegions: settings.aiAccountBalanceQoderRegions)
+                                                        qoderRegions: settings.aiAccountBalanceQoderRegions)
         if !websites.isEmpty {
             entry(.ai, "网站额度凭据", anchor: .group("网站额度凭据"),
                   keywords: ["粘贴网站 Cookie", "从默认浏览器导入"] + websites.map(\.title))
@@ -227,7 +227,7 @@ enum SettingsSearchIndex {
         for location in SaveLocation.allCases {
             entry(.saveLocations, location.title, anchor: .row(location.title),
                   keywords: ["默认保存位置", "更改保存位置"]
-                    + (location == .download ? ["默认下载目录", "下载目录"] : []))
+                      + (location == .download ? ["默认下载目录", "下载目录"] : []))
         }
         rows(.saveLocations, ["恢复默认位置"])
         entry(.weather, "地点", anchor: .group("地点"), keywords: ["城市、区县或地区", "搜索地区"])

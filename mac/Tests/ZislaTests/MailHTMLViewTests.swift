@@ -14,17 +14,17 @@ struct MailHTMLViewTests {
         defer { webView.stopLoading() }
         try await load(html, in: webView)
         let result = try #require(await webView.evaluateJavaScript("""
-            (() => {
-              const root = document.documentElement;
-              const bar = getComputedStyle(root, '::-webkit-scrollbar');
-              const track = getComputedStyle(root, '::-webkit-scrollbar-track');
-              const thumb = getComputedStyle(root, '::-webkit-scrollbar-thumb');
-              window.scrollTo(0, 150);
-              return { width: bar.width, track: track.backgroundColor,
-                       thumb: thumb.backgroundColor, radius: thumb.borderRadius,
-                       offset: window.scrollY, overflows: root.scrollHeight > window.innerHeight };
-            })()
-            """) as? [String: Any])
+        (() => {
+          const root = document.documentElement;
+          const bar = getComputedStyle(root, '::-webkit-scrollbar');
+          const track = getComputedStyle(root, '::-webkit-scrollbar-track');
+          const thumb = getComputedStyle(root, '::-webkit-scrollbar-thumb');
+          window.scrollTo(0, 150);
+          return { width: bar.width, track: track.backgroundColor,
+                   thumb: thumb.backgroundColor, radius: thumb.borderRadius,
+                   offset: window.scrollY, overflows: root.scrollHeight > window.innerHeight };
+        })()
+        """) as? [String: Any])
         #expect(result["width"] as? String == "3px")
         #expect(result["track"] as? String == "rgba(0, 0, 0, 0)")
         #expect(result["thumb"] as? String == "rgba(128, 128, 128, 0.65)")
@@ -40,21 +40,21 @@ struct MailHTMLViewTests {
         let webView = makeWebView()
         defer { webView.stopLoading() }
         try await load("""
-            <!doctype html><html><head><style>.button { background-color: rgb(33, 135, 57); padding: 16px; }</style></head>
-            <body><h1>Workflow run</h1><table><tr><td>Failed</td></tr></table>
-            <a class="button" href="https://example.com/run">View run</a>
-            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==">
-            </body></html>
-            """, in: webView)
+        <!doctype html><html><head><style>.button { background-color: rgb(33, 135, 57); padding: 16px; }</style></head>
+        <body><h1>Workflow run</h1><table><tr><td>Failed</td></tr></table>
+        <a class="button" href="https://example.com/run">View run</a>
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==">
+        </body></html>
+        """, in: webView)
         let result = try #require(await webView.evaluateJavaScript("""
-            (() => ({
-              heading: document.querySelector('h1').innerText,
-              cell: document.querySelector('td').innerText,
-              buttonColor: getComputedStyle(document.querySelector('.button')).backgroundColor,
-              background: getComputedStyle(document.body).backgroundColor,
-              imageWidth: document.querySelector('img').naturalWidth
-            }))()
-            """) as? [String: Any])
+        (() => ({
+          heading: document.querySelector('h1').innerText,
+          cell: document.querySelector('td').innerText,
+          buttonColor: getComputedStyle(document.querySelector('.button')).backgroundColor,
+          background: getComputedStyle(document.body).backgroundColor,
+          imageWidth: document.querySelector('img').naturalWidth
+        }))()
+        """) as? [String: Any])
         #expect(result["heading"] as? String == "Workflow run")
         #expect(result["cell"] as? String == "Failed")
         #expect(result["buttonColor"] as? String == "rgb(33, 135, 57)")
@@ -82,33 +82,33 @@ struct MailHTMLViewTests {
         let webView = makeWebView()
         defer { webView.stopLoading() }
         try await load("""
-            <style>td { background:#f6f8fa !important; }</style>
-            <html style="background: rgb(0,40,80) !important"><body style="background: #fff !important; color: #24292f">
-            <table bgcolor="#ffffff"><tr><td style="background-color:rgb(246,248,250)">
-            <span id="modern" style="color:color(display-p3 1 0 0)">Brand</span>
-            <div id="text" style="color: #24292f !important">Readable message</div>
-            <a id="link" href="https://example.com">View issue</a>
-            <a id="button" style="background:#218739;color:white;padding:12px" href="https://example.com"><span>View run</span></a>
-            <p id="warning" style="color: rgb(180,20,20)">Failed</p>
-            <div id="accent" style="background:rgb(255,220,0)"><span style="color:black">Status</span></div>
-            <span id="hidden" style="color:rgba(0,0,0,0)">Hidden preview</span>
-            <svg width="10" height="10" style="color:black"><rect id="graphic" width="10" height="10" fill="currentColor"/></svg>
-            </td></tr></table></body></html>
-            """, in: webView)
+        <style>td { background:#f6f8fa !important; }</style>
+        <html style="background: rgb(0,40,80) !important"><body style="background: #fff !important; color: #24292f">
+        <table bgcolor="#ffffff"><tr><td style="background-color:rgb(246,248,250)">
+        <span id="modern" style="color:color(display-p3 1 0 0)">Brand</span>
+        <div id="text" style="color: #24292f !important">Readable message</div>
+        <a id="link" href="https://example.com">View issue</a>
+        <a id="button" style="background:#218739;color:white;padding:12px" href="https://example.com"><span>View run</span></a>
+        <p id="warning" style="color: rgb(180,20,20)">Failed</p>
+        <div id="accent" style="background:rgb(255,220,0)"><span style="color:black">Status</span></div>
+        <span id="hidden" style="color:rgba(0,0,0,0)">Hidden preview</span>
+        <svg width="10" height="10" style="color:black"><rect id="graphic" width="10" height="10" fill="currentColor"/></svg>
+        </td></tr></table></body></html>
+        """, in: webView)
         let result = try #require(await webView.evaluateJavaScript("""
-            (() => ({
-              backgrounds: ['html', 'body', 'table', 'td'].map(selector => getComputedStyle(document.querySelector(selector)).backgroundColor),
-              text: getComputedStyle(document.getElementById('text')).color,
-              link: getComputedStyle(document.getElementById('link')).color,
-              button: getComputedStyle(document.getElementById('button')).backgroundColor,
-              warning: getComputedStyle(document.getElementById('warning')).color,
-              accent: getComputedStyle(document.getElementById('accent')).backgroundColor,
-              accentText: getComputedStyle(document.querySelector('#accent span')).color,
-              hidden: getComputedStyle(document.getElementById('hidden')).color,
-              modern: getComputedStyle(document.getElementById('modern')).color,
-              graphic: getComputedStyle(document.getElementById('graphic')).fill
-            }))()
-            """) as? [String: Any])
+        (() => ({
+          backgrounds: ['html', 'body', 'table', 'td'].map(selector => getComputedStyle(document.querySelector(selector)).backgroundColor),
+          text: getComputedStyle(document.getElementById('text')).color,
+          link: getComputedStyle(document.getElementById('link')).color,
+          button: getComputedStyle(document.getElementById('button')).backgroundColor,
+          warning: getComputedStyle(document.getElementById('warning')).color,
+          accent: getComputedStyle(document.getElementById('accent')).backgroundColor,
+          accentText: getComputedStyle(document.querySelector('#accent span')).color,
+          hidden: getComputedStyle(document.getElementById('hidden')).color,
+          modern: getComputedStyle(document.getElementById('modern')).color,
+          graphic: getComputedStyle(document.getElementById('graphic')).fill
+        }))()
+        """) as? [String: Any])
         #expect(result["backgrounds"] as? [String] == Array(repeating: "rgba(0, 0, 0, 0)", count: 4))
         #expect(result["text"] as? String == "rgba(255, 255, 255, 0.92)")
         #expect(result["link"] as? String == "rgb(74, 163, 255)")
@@ -129,19 +129,19 @@ struct MailHTMLViewTests {
         let webView = makeWebView()
         defer { webView.stopLoading() }
         try await load("""
-            <img width="800" height="800" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==">
-            <table width="800"><tr><td>Workflow</td></tr></table>
-            <p>\(String(repeating: "longword", count: 100))</p>
-            """, in: webView)
+        <img width="800" height="800" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==">
+        <table width="800"><tr><td>Workflow</td></tr></table>
+        <p>\(String(repeating: "longword", count: 100))</p>
+        """, in: webView)
         let result = try #require(await webView.evaluateJavaScript("""
-            (() => ({
-              image: document.querySelector('img').getBoundingClientRect().width,
-              imageHeight: document.querySelector('img').getBoundingClientRect().height,
-              table: document.querySelector('table').getBoundingClientRect().width,
-              width: document.documentElement.clientWidth,
-              scrollWidth: document.documentElement.scrollWidth
-            }))()
-            """) as? [String: Double])
+        (() => ({
+          image: document.querySelector('img').getBoundingClientRect().width,
+          imageHeight: document.querySelector('img').getBoundingClientRect().height,
+          table: document.querySelector('table').getBoundingClientRect().width,
+          width: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth
+        }))()
+        """) as? [String: Double])
         let width = try #require(result["width"])
         #expect(try #require(result["image"]) <= width)
         #expect(result["image"] == result["imageHeight"])
@@ -156,23 +156,23 @@ struct MailHTMLViewTests {
         var opened: [URL] = []
         webView.openLink = { opened.append($0) }
         try await load("""
-            <meta http-equiv="refresh" content="0;url=data:text/html,redirected">
-            <base href="https://example.com/">
-            <script>window.compromised = true</script>
-            <iframe src="data:text/html,<p>frame-content</p>"></iframe>
-            <img src="file:///does/not/exist" onerror="window.compromised = true">
-            <form action="data:text/html,submitted"><input name="secret" value="fixture"></form>
-            <p>Safe body</p>
-            """, in: webView)
+        <meta http-equiv="refresh" content="0;url=data:text/html,redirected">
+        <base href="https://example.com/">
+        <script>window.compromised = true</script>
+        <iframe src="data:text/html,<p>frame-content</p>"></iframe>
+        <img src="file:///does/not/exist" onerror="window.compromised = true">
+        <form action="data:text/html,submitted"><input name="secret" value="fixture"></form>
+        <p>Safe body</p>
+        """, in: webView)
         let result = try #require(await webView.evaluateJavaScript("""
-            (() => ({
-              compromised: Boolean(window.compromised),
-              frame: document.querySelector('iframe').contentDocument?.body?.innerText ?? '',
-              base: document.baseURI,
-              fileWidth: document.querySelector('img').naturalWidth,
-              text: document.body.innerText
-            }))()
-            """) as? [String: Any])
+        (() => ({
+          compromised: Boolean(window.compromised),
+          frame: document.querySelector('iframe').contentDocument?.body?.innerText ?? '',
+          base: document.baseURI,
+          fileWidth: document.querySelector('img').naturalWidth,
+          text: document.body.innerText
+        }))()
+        """) as? [String: Any])
         #expect(result["compromised"] as? Bool == false)
         #expect(result["frame"] as? String == "")
         #expect(result["base"] as? String == "about:blank")

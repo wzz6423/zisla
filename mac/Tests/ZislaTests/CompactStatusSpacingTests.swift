@@ -14,12 +14,13 @@ extension StatusIconDestinationIntegrationTests {
         let combined = spacingImage(color: .red, size: 36)
         for rows in [["C 15%", "G 0%"], ["C 100%", "G 100%"], []] {
             let image = rows.isEmpty ? nil : try #require(SystemMonitorMenuBarImageRenderer.stacked(
-                rows: rows, style: .compact))
+                rows: rows, style: .compact
+            ))
             let monitor = [
                 IslandStatusIcon(id: "combined", content: .combined(combined), tooltip: "Combined"),
                 IslandStatusIcon(id: "stacked", content: .stacked(image: image,
-                    readings: [.init(metric: .cpu, text: "15%"), .init(metric: .gpu, text: "0%")]),
-                    tooltip: rows.joined(separator: ", ")),
+                                                                  readings: [.init(metric: .cpu, text: "15%"), .init(metric: .gpu, text: "0%")]),
+                                 tooltip: rows.joined(separator: ", ")),
             ]
             var endInsets: [CGFloat] = []
             for showsApplication in [false, true] {
@@ -27,8 +28,8 @@ extension StatusIconDestinationIntegrationTests {
                     ? [IslandStatusIcon(id: "application", content: .application, tooltip: "zisla")] : []) + monitor
                 let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
                 let bitmap = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge,
-                    date: .distantPast).environment(\.layoutDirection, direction)
-                    .environment(\._accessibilityReduceMotion, true), size: size)
+                                                                             date: .distantPast).environment(\.layoutDirection, direction)
+                        .environment(\._accessibilityReduceMotion, true), size: size)
                 let combinedBounds = try spacingPixelBounds(bitmap, size: size, edge: edge) {
                     $0.redComponent > 0.7 && $0.greenComponent < 0.2 && $0.blueComponent < 0.2
                 }
@@ -69,7 +70,7 @@ extension StatusIconDestinationIntegrationTests {
         let monitors = [
             IslandStatusIcon(id: "combined", content: .combined(spacingImage(color: .red, size: 36)), tooltip: "Combined"),
             IslandStatusIcon(id: "stacked", content: .stacked(image: image,
-                readings: [.init(metric: .cpu, text: "15%"), .init(metric: .gpu, text: "0%")]), tooltip: "C 15%, G 0%"),
+                                                              readings: [.init(metric: .cpu, text: "15%"), .init(metric: .gpu, text: "0%")]), tooltip: "C 15%, G 0%"),
         ]
         let notices = (1...2).map { IslandNotice(id: "ai-active-openai-\($0)", title: "AI") }
         notices.forEach { fixture.queue.enqueue($0, expiresAfter: nil) }
@@ -77,14 +78,14 @@ extension StatusIconDestinationIntegrationTests {
         state.islandEdge = edge
         state.placementMode = .custom
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         for showsApplication in [false, true] {
             let icons = (showsApplication
                 ? [IslandStatusIcon(id: "application", content: .application, tooltip: "zisla")] : []) + monitors
             state.statusIcons = icons
             let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
-                settings: fixture.settings.settings, item: nil, at: date))
+                                                                      settings: fixture.settings.settings, item: nil, at: date))
             state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
             let bitmap = try await renderOffscreen(view
                 .environment(\.layoutDirection, direction)
@@ -126,19 +127,19 @@ extension StatusIconDestinationIntegrationTests {
     ) async throws {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         var settings = FeatureSettings(statusIconDestination: .island, islandShowMoreInformation: true,
-            islandLayoutStyle: .pill, islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                                       islandLayoutStyle: .pill, islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         settings.collapsedProgressGlowEnabled = false
         let ai = IslandNotice(id: "ai-active-openai-1", title: "AI")
         let reminder = IslandNotice(id: "toolbox-reminder-left", title: "Awake", detail: "30:00",
-            artworkData: spacingImage(color: .blue, size: 24).tiffRepresentation)
+                                    artworkData: spacingImage(color: .blue, size: 24).tiffRepresentation)
         for notices in [[ai], [ai, reminder]] {
             let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: [],
-                settings: settings, item: nil, at: date))
+                                                                      settings: settings, item: nil, at: date))
             let bitmap = try await renderOffscreen(FloatingIslandInformationView(layout: layout,
-                visualizationStyle: .waveform, item: nil, date: date)
-                .environment(\.colorScheme, .dark)
-                .environment(\.layoutDirection, direction)
-                .environment(\._accessibilityReduceMotion, true), size: layout.size)
+                                                                                 visualizationStyle: .waveform, item: nil, date: date)
+                    .environment(\.colorScheme, .dark)
+                    .environment(\.layoutDirection, direction)
+                    .environment(\._accessibilityReduceMotion, true), size: layout.size)
             let first = try #require(layout.primary.first)
             let length = edge.isVertical ? layout.size.height : layout.size.width
             let forward = edge.isVertical || direction == .leftToRight
@@ -184,7 +185,7 @@ extension StatusIconDestinationIntegrationTests {
                 let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
                 if matches(color) {
                     bounds = bounds.union(CGRect(x: CGFloat(x) / scale, y: CGFloat(y) / scale,
-                        width: 1 / scale, height: 1 / scale))
+                                                 width: 1 / scale, height: 1 / scale))
                 }
             }
         }

@@ -151,7 +151,7 @@ struct RecordingExportMedia {
         let sourceBounds = CGRect(origin: .zero, size: naturalSize).applying(transform)
         let sourceRange = try await availableRange(of: sourceVideo)
         guard timeline.slices.allSatisfy({ $0.sourceStart < sourceRange.end.seconds
-            && $0.sourceEnd <= sourceRange.end.seconds + 0.001 }) else {
+                && $0.sourceEnd <= sourceRange.end.seconds + 0.001 }) else {
             throw ScreenRecordingExportError.timelineOutsideMedia
         }
         var video = try makeTrack(source: sourceVideo, range: sourceRange, transform: transform,
@@ -175,7 +175,7 @@ struct RecordingExportMedia {
         }
         if let microphoneFile = project.editingMicrophoneFile {
             let microphoneAsset = try await voiceMedia.asset(from: AVURLAsset(url: try store.mediaURL(microphoneFile, in: directory)),
-                effects: project.edits.voiceEffects ?? .init())
+                                                             effects: project.edits.voiceEffects ?? .init())
             sourceAssets.append(microphoneAsset)
             guard let sourceMicrophone = try await microphoneAsset.loadTracks(withMediaType: .audio).first else {
                 throw ScreenRecordingExportError.unavailableMedia
@@ -226,7 +226,7 @@ struct RecordingExportMedia {
             let sourceDuration = CMTime(seconds: end - start, preferredTimescale: 60_000)
             let destinationDuration = CMTime(seconds: (end - start) / slice.speed, preferredTimescale: 60_000)
             try track.insertTimeRange(CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 60_000),
-                                                 duration: sourceDuration), of: source, at: destinationStart)
+                                                  duration: sourceDuration), of: source, at: destinationStart)
             track.scaleTimeRange(CMTimeRange(start: destinationStart, duration: sourceDuration),
                                  toDuration: destinationDuration)
             ranges.append(CMTimeRange(start: destinationStart, duration: destinationDuration))

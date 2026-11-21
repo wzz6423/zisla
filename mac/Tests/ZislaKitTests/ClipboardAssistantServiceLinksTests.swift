@@ -25,7 +25,7 @@ struct ClipboardAssistantServiceLinksTests {
         let lookup = ClipboardAssistantAction.openService(service: service, url: url)
         #expect(result.actions.contains(.search(search)))
         let ordered = ClipboardAssistantActionOrder.ordered(result.actions, for: kind,
-            using: FeatureSettings.default.clipboardAssistantActionOrders)
+                                                            using: FeatureSettings.default.clipboardAssistantActionOrders)
         #expect(ordered.first == lookup)
         #expect(Set(ordered.map(\.identifier)).count == ordered.count)
 
@@ -42,11 +42,11 @@ struct ClipboardAssistantServiceLinksTests {
         for (text, country, number) in [("LA1234", "BR", "LA1234"), ("Flight ZZ123", "US", "ZZ123"),
                                         ("航班 ZZ123", "CN", "ZZ123")] {
             let result = try #require(ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: [.flight],
-                countryCode: country, now: now, timeZone: TimeZone(secondsFromGMT: 0)!))
+                                                                                      countryCode: country, now: now, timeZone: TimeZone(secondsFromGMT: 0)!))
             #expect(result.actions.filter { $0 == .search(number) }.count == 1)
             #expect(Set(result.actions.map(\.identifier)).count == result.actions.count)
             let ordered = ClipboardAssistantActionOrder.ordered(result.actions, for: .flight,
-                using: FeatureSettings.default.clipboardAssistantActionOrders)
+                                                                using: FeatureSettings.default.clipboardAssistantActionOrders)
             if country == "CN" {
                 let url = try #require(serviceURL(result, .umetrip))
                 #expect(ordered.first == .openService(service: .umetrip, url: url))
@@ -102,7 +102,7 @@ struct ClipboardAssistantServiceLinksTests {
     @Test func railwayDateChangesAtMidnightInChina() throws {
         for (instant, expected) in [(now.addingTimeInterval(-1), "2026-09-21"), (now, "2026-09-22")] {
             let result = try #require(ClipboardAssistantDetector.smartActionDetection("D2281", enabledKinds: [.train],
-                countryCode: "US", now: instant, timeZone: TimeZone(identifier: "America/Los_Angeles")!))
+                                                                                      countryCode: "US", now: instant, timeZone: TimeZone(identifier: "America/Los_Angeles")!))
             let url = try #require(serviceURL(result, .railway12306))
             #expect(query(url, "date") == expected)
         }
@@ -146,7 +146,7 @@ struct ClipboardAssistantServiceLinksTests {
             let number = String(seed % 9_999 + 1)
             for text in ["CA\(number)&flightNo=evil", "G\(number)?date=2000-01-01", "ICE \(number)#evil", "TGV \(number)/../evil"] {
                 let result = ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: [.flight, .train],
-                    countryCode: "CN", now: now, timeZone: TimeZone(secondsFromGMT: 0)!)
+                                                                             countryCode: "CN", now: now, timeZone: TimeZone(secondsFromGMT: 0)!)
                 #expect(result == nil, "编号后的URL控制字符必须拒绝：\(text)")
             }
         }
@@ -157,7 +157,7 @@ struct ClipboardAssistantServiceLinksTests {
 
     private func detect(_ text: String) -> ClipboardAssistantDetection? {
         ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: [.address, .flight, .train, .tracking],
-            countryCode: "CN", now: now, timeZone: TimeZone(secondsFromGMT: 0)!)
+                                                        countryCode: "CN", now: now, timeZone: TimeZone(secondsFromGMT: 0)!)
     }
 
     private func serviceURL(_ result: ClipboardAssistantDetection, _ service: ClipboardAssistantService) -> URL? {

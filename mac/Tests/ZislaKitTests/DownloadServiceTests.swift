@@ -1190,8 +1190,7 @@ private actor RecordingBilibiliDownloader: BilibiliDownloading {
     }
 
     func downloadComponents(from urlString: String, to directory: URL) async throws
-        -> [DownloadedMediaComponent]
-    {
+        -> [DownloadedMediaComponent] {
         invocationCount += 1
         if pausesFirstDownload, invocationCount == 1 {
             await withCheckedContinuation { continuation in
@@ -1246,8 +1245,7 @@ private actor StubBilibiliHTTPClient: BilibiliHTTPClient {
     }
 
     func download(for request: URLRequest, to destinationURL: URL) async throws
-        -> BilibiliHTTPResponse
-    {
+        -> BilibiliHTTPResponse {
         let url = try #require(request.url)
         requestedMediaURLs.append(url)
         try FileManager.default.createDirectory(

@@ -159,8 +159,8 @@ public enum AIMascotLibrary {
         fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
     ) -> (provider: AIProvider, url: URL)? {
         guard let url = installedApplicationURL(bundleIdentifiers: ["com.openai.codex", "com.openai.chat"],
-            applicationNames: ["ChatGPT", "Codex"], resolveBundleIdentifier: resolveBundleIdentifier,
-            applicationDirectories: applicationDirectories, fileExists: fileExists) else { return nil }
+                                                applicationNames: ["ChatGPT", "Codex"], resolveBundleIdentifier: resolveBundleIdentifier,
+                                                applicationDirectories: applicationDirectories, fileExists: fileExists) else { return nil }
         let name = InstalledApplicationCatalog.installedApplication(at: url)?.displayName
             ?? url.deletingPathExtension().lastPathComponent
         guard let provider = AIProvider(token: name), provider == .codex || provider == .gpt else { return nil }

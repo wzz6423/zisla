@@ -1,0 +1,5 @@
+--rules indent,linebreaks,linebreakAtEndOfFile,trailingSpace,consecutiveSpaces,consecutiveBlankLines,braces,elseOnSameLine,spaceAroundBraces,spaceInsideBraces,spaceAroundBrackets,spaceInsideBrackets,spaceAroundGenerics,spaceInsideGenerics,spaceAroundOperators,spaceAroundParens,spaceInsideParens,wrapArguments
+--indent 4
+--ranges no-space
+--swift-version 6.0
+--exclude mac/Vendor,mac/.build,mac/.swiftpm,mac/DerivedData,mac/dist

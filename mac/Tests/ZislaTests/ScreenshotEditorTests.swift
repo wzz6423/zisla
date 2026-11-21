@@ -403,8 +403,7 @@ struct ScreenshotEditorTests {
                 onPinToggle: { _ in },
                 onLongCapture: {}
             )
-            .frame(width: size.width, height: size.height)
-        )
+            .frame(width: size.width, height: size.height))
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless],
@@ -1021,8 +1020,7 @@ struct ScreenshotEditorTests {
                 onPinToggle: { _ in },
                 onLongCapture: {}
             )
-            .frame(width: size.width, height: size.height)
-        )
+            .frame(width: size.width, height: size.height))
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless],
@@ -1968,8 +1966,7 @@ struct ScreenshotEditorTests {
                 onClose: {},
                 toolbarVisible: true
             )
-            .frame(width: size.width, height: size.height)
-        )
+            .frame(width: size.width, height: size.height))
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless],
@@ -2155,7 +2152,7 @@ struct ScreenshotEditorTests {
         let output = ProcessInfo.processInfo.environment["ZISLA_XLSX_TEST_OUTPUT"]
             .map(URL.init(fileURLWithPath:))
             ?? FileManager.default.temporaryDirectory
-                .appendingPathComponent("zisla-xlsx-export-test-\(UUID().uuidString).xlsx")
+            .appendingPathComponent("zisla-xlsx-export-test-\(UUID().uuidString).xlsx")
         let shouldCleanUp = ProcessInfo.processInfo.environment["ZISLA_XLSX_TEST_OUTPUT"] == nil
         defer { if shouldCleanUp { try? FileManager.default.removeItem(at: output) } }
         let table = ScreenshotRecognizedTable(
@@ -2802,8 +2799,7 @@ struct ScreenshotEditorTests {
                 onPinToggle: { _ in },
                 onLongCapture: {}
             )
-            .frame(width: size.width, height: size.height)
-        )
+            .frame(width: size.width, height: size.height))
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless],
@@ -2879,8 +2875,7 @@ struct ScreenshotEditorTests {
                 onPinToggle: { _ in },
                 onLongCapture: {}
             )
-            .frame(width: size.width, height: size.height)
-        )
+            .frame(width: size.width, height: size.height))
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless],
@@ -2954,8 +2949,7 @@ struct ScreenshotEditorTests {
                 onPinToggle: { _ in },
                 onLongCapture: {}
             )
-            .frame(width: size.width, height: size.height)
-        )
+            .frame(width: size.width, height: size.height))
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless],
@@ -3792,8 +3786,7 @@ struct ScreenshotEditorTests {
                 onPinToggle: { _ in },
                 onLongCapture: {}
             )
-            .frame(width: size.width, height: size.height)
-        )
+            .frame(width: size.width, height: size.height))
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless],
@@ -3936,8 +3929,7 @@ struct ScreenshotEditorTests {
                 toolbarVisible: false,
                 focusState: focusState
             )
-            .frame(width: size.width, height: size.height)
-        )
+            .frame(width: size.width, height: size.height))
         let window = NSWindow(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless],

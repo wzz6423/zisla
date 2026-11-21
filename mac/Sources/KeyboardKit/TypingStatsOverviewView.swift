@@ -505,7 +505,7 @@ private struct TypingAppTimelinePanel: View {
         KeyboardHeatmapLegend(
             leadingLabel: heatScale.hasValues
                 ? L10n.format("低 %@ ", statsCount(Int64(heatScale.low.rounded())))
-                    .trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: .whitespaces)
                 : L10n.tr("低 0"),
             trailingLabel: heatScale.hasValues
                 ? L10n.format("高 ≥%@", statsCount(Int64(heatScale.high.rounded())))
@@ -535,7 +535,7 @@ private struct TypingAppTimelinePanel: View {
             if let buckets = timelines.first?.buckets,
                let first = buckets.first,
                let middle = buckets.dropFirst(buckets.count / 2).first,
-                let last = timelines.first?.buckets.last {
+               let last = timelines.first?.buckets.last {
                 HStack {
                     Text(timelineAxisLabel(first.start))
                     Spacer()

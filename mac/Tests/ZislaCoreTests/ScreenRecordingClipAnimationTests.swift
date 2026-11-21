@@ -25,14 +25,14 @@ struct ScreenRecordingClipAnimationTests {
         try project.validate()
         #expect(try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(project)) == project)
         #expect(String(decoding: manifest, as: UTF8.self).contains("entranceAnimation") == false,
-            "Nil animation fields must not be written into existing manifests")
+                "Nil animation fields must not be written into existing manifests")
     }
 
     @Test(arguments: [0.25, 1.0, 2.0, 8.0])
     func animationsUseOutputSecondsAndShortClipsFitEntranceAndExit(_ speed: Double) {
         let clip = RecordingTimelineClip(trackID: "video", content: .video(UUID()), start: 4,
-            sourceStart: 3, sourceEnd: 11, speed: speed,
-            entranceAnimation: .init(kind: .fade, duration: 0.25), exitAnimation: .init(kind: .fade, duration: 0.25))
+                                         sourceStart: 3, sourceEnd: 11, speed: speed,
+                                         entranceAnimation: .init(kind: .fade, duration: 0.25), exitAnimation: .init(kind: .fade, duration: 0.25))
         #expect(RecordingClipAnimationSample.sample(clip, at: 4).opacity == 0)
         #expect(abs(RecordingClipAnimationSample.sample(clip, at: 4.125).opacity - 0.5) < 0.000_001)
         #expect(RecordingClipAnimationSample.sample(clip, at: 4.25).opacity == 1)
@@ -46,13 +46,13 @@ struct ScreenRecordingClipAnimationTests {
         #expect(abs(RecordingClipAnimationSample.sample(short, at: 4.05).opacity - 1) < 0.000_001)
         #expect(abs(RecordingClipAnimationSample.sample(short, at: 4.075).opacity - 0.5) < 0.000_001)
         #expect(short.entranceAnimation?.duration == 2 && short.exitAnimation?.duration == 2,
-            "Sampling must not rewrite the user's saved duration after trimming")
+                "Sampling must not rewrite the user's saved duration after trimming")
     }
 
     @Test(arguments: RecordingClipAnimationKind.allCases)
     func samplingEndsInTheOriginalLayoutAndPreservesDirection(_ kind: RecordingClipAnimationKind) {
         let clip = RecordingTimelineClip(trackID: "visual", content: .annotation(UUID()), start: 1, sourceEnd: 3,
-            entranceAnimation: .init(kind: kind, duration: 1))
+                                         entranceAnimation: .init(kind: kind, duration: 1))
         let middle = RecordingClipAnimationSample.sample(clip, at: 1.5, characterCount: 6)
         #expect(RecordingClipAnimationSample.sample(clip, at: 2).scale == 1)
         #expect(RecordingClipAnimationSample.sample(clip, at: 2).offsetX == 0)
@@ -72,7 +72,7 @@ struct ScreenRecordingClipAnimationTests {
         let text = "你👨‍👩‍👧‍👦e\u{301}\n!"
         #expect(text.count == 5 && text.utf16.count > text.count)
         let clip = RecordingTimelineClip(trackID: "text", content: .caption(UUID()), start: 0, sourceEnd: 3,
-            entranceAnimation: .init(kind: .typewriter, duration: 1))
+                                         entranceAnimation: .init(kind: .typewriter, duration: 1))
         for index in 0...5 {
             let sample = RecordingClipAnimationSample.sample(clip, at: Double(index) / 5, characterCount: text.count)
             #expect(sample.visibleCharacters == index)
@@ -123,7 +123,7 @@ struct ScreenRecordingClipAnimationTests {
 
     @Test func unknownEffectNamesAreRejectedRatherThanSilentlyDropped() throws {
         let clip = RecordingTimelineClip(trackID: "track", content: .video(UUID()), start: 0, sourceEnd: 1,
-            entranceAnimation: .init(kind: .fade))
+                                         entranceAnimation: .init(kind: .fade))
         var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(clip)) as? [String: Any])
         object["entranceAnimation"] = ["kind": "unknown", "duration": 0.5]
         #expect(throws: DecodingError.self) {
@@ -133,9 +133,9 @@ struct ScreenRecordingClipAnimationTests {
 
     @Test func splittingKeepsEntranceAndTransitionAtTheOriginalStartAndExitAtTheOriginalEnd() throws {
         let source = RecordingTimelineClip(id: "source", trackID: "track", content: .video(UUID()),
-            start: 2, sourceStart: 1, sourceEnd: 5, speed: 2,
-            entranceAnimation: .init(kind: .fade), exitAnimation: .init(kind: .slideDown),
-            transition: .init(kind: .dissolve))
+                                           start: 2, sourceStart: 1, sourceEnd: 5, speed: 2,
+                                           entranceAnimation: .init(kind: .fade), exitAnimation: .init(kind: .slideDown),
+                                           transition: .init(kind: .dissolve))
         var timeline = RecordingMultitrackTimeline(clips: [source])
         let splitID = timeline.splitClip(source.id, at: 3)
         let tailID = try #require(splitID)
@@ -150,7 +150,7 @@ struct ScreenRecordingClipAnimationTests {
 
     @Test func invalidSamplingInputsCannotProduceNonfiniteTransformsOrTrapTypewriterCounts() {
         let clip = RecordingTimelineClip(trackID: "text", content: .caption(UUID()), start: 1, sourceEnd: 2,
-            entranceAnimation: .init(kind: .typewriter, duration: 1), exitAnimation: .init(kind: .fade))
+                                         entranceAnimation: .init(kind: .typewriter, duration: 1), exitAnimation: .init(kind: .fade))
         for time in [Double.nan, .infinity, -.infinity] {
             #expect(RecordingClipAnimationSample.sample(clip, at: time, characterCount: 5) == .init())
         }
@@ -162,9 +162,9 @@ struct ScreenRecordingClipAnimationTests {
     @Test(arguments: RecordingClipTransitionKind.allCases)
     func transitionsUseOnlyExistingOverlapAndKeepTheCompletedIncomingLayer(_ kind: RecordingClipTransitionKind) throws {
         let outgoing = RecordingTimelineClip(id: "outgoing", trackID: "mixed", content: .video(UUID()),
-            start: 1, sourceStart: 3, sourceEnd: 9, speed: 2)
+                                             start: 1, sourceStart: 3, sourceEnd: 9, speed: 2)
         let incoming = RecordingTimelineClip(id: "incoming", trackID: "mixed", content: .image(UUID()),
-            start: 3, sourceEnd: 3, transition: .init(kind: kind, duration: 0.5))
+                                             start: 3, sourceEnd: 3, transition: .init(kind: kind, duration: 0.5))
         let originals = [outgoing, incoming]
         let start = try #require(RecordingClipTransitionSample.sample(incoming, from: outgoing, at: 3))
         let middle = try #require(RecordingClipTransitionSample.sample(incoming, from: outgoing, at: 3.25))
@@ -192,10 +192,10 @@ struct ScreenRecordingClipAnimationTests {
         other.id = "other"
         other.trackID = "other"
         let timeline = RecordingMultitrackTimeline(tracks: [.init(id: "track"), .init(id: "hidden", isHidden: true),
-            .init(id: "other")], clips: [later, first, blocker, audio, equal, hidden, other])
+                                                            .init(id: "other")], clips: [later, first, blocker, audio, equal, hidden, other])
         #expect(timeline.transitionSources() == ["blocker": first, "equal": later])
         #expect(timeline.transitionSources()["later"] == nil,
-            "An ended direct predecessor must not be replaced by an older overlapping clip")
+                "An ended direct predecessor must not be replaced by an older overlapping clip")
         #expect(timeline.clips.allSatisfy { $0.transition == nil }, "Candidate lookup must not add an effect")
     }
 
@@ -220,12 +220,12 @@ struct ScreenRecordingClipAnimationTests {
             let duration = Double(seed % 3_000 + 1) / 100
             let animation = RecordingClipAnimationKind.allCases[index % RecordingClipAnimationKind.allCases.count]
             let clip = RecordingTimelineClip(trackID: "seed", content: .caption(UUID()), start: Double(index),
-                sourceEnd: duration, entranceAnimation: .init(kind: animation, duration: Double((seed >> 24) % 3_000 + 1) / 100))
+                                             sourceEnd: duration, entranceAnimation: .init(kind: animation, duration: Double((seed >> 24) % 3_000 + 1) / 100))
             var previousVisibility = 0.0
             var previousCount = 0
             for step in 0...24 {
                 let sample = RecordingClipAnimationSample.sample(clip, at: clip.start + clip.duration * Double(step) / 24,
-                    characterCount: 31)
+                                                                 characterCount: 31)
                 #expect([sample.opacity, sample.offsetX, sample.offsetY, sample.scale].allSatisfy { $0.isFinite })
                 #expect((0...1).contains(sample.opacity) && (0.5...1).contains(sample.scale))
                 #expect((-1...1).contains(sample.offsetX) && (-1...1).contains(sample.offsetY))

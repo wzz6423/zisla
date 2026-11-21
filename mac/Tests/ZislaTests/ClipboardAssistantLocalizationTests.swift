@@ -411,7 +411,7 @@ struct ClipboardAssistantLocalizationTests {
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 520, height: 500),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.contentView = host
         defer { panel.contentView = nil; panel.close() }

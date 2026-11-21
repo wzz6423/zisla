@@ -35,7 +35,7 @@ final class RecordingVoiceProcessor {
         }
         buffer.frameLength = buffer.frameCapacity
         guard CMSampleBufferCopyPCMDataIntoAudioBufferList(sample, at: 0, frameCount: Int32(sample.numSamples),
-                                                          into: buffer.mutableAudioBufferList) == noErr else {
+                                                           into: buffer.mutableAudioBufferList) == noErr else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         if format?.isEqual(sourceFormat) != true || preset != effects.preset {
@@ -113,21 +113,21 @@ final class RecordingVoiceProcessor {
         var timingCount = 0
         var sizeCount = 0
         let sizeStatus = CMSampleBufferGetSampleSizeArray(sample, entryCount: 0, arrayToFill: nil,
-                                                        entriesNeededOut: &sizeCount)
+                                                          entriesNeededOut: &sizeCount)
         guard CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil,
-                                                    entriesNeededOut: &timingCount) == noErr,
-              sizeStatus == noErr || sizeStatus == kCMSampleBufferError_BufferHasNoSampleSizes else {
+                                                     entriesNeededOut: &timingCount) == noErr,
+            sizeStatus == noErr || sizeStatus == kCMSampleBufferError_BufferHasNoSampleSizes else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         var timings = Array(repeating: CMSampleTimingInfo(), count: timingCount)
         var sizes = Array(repeating: 0, count: sizeCount)
         guard CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: timings.count, arrayToFill: &timings,
-                                                    entriesNeededOut: nil) == noErr else {
+                                                     entriesNeededOut: nil) == noErr else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         if !sizes.isEmpty {
             guard CMSampleBufferGetSampleSizeArray(sample, entryCount: sizes.count, arrayToFill: &sizes,
-                                                  entriesNeededOut: nil) == noErr else {
+                                                   entriesNeededOut: nil) == noErr else {
                 throw ScreenRecordingCaptureError.writerUnavailable
             }
         }
@@ -136,10 +136,10 @@ final class RecordingVoiceProcessor {
                                         sampleCount: sample.numSamples, sampleTimingEntryCount: timings.count,
                                         sampleTimingArray: &timings, sampleSizeEntryCount: sizes.count,
                                         sampleSizeArray: &sizes, sampleBufferOut: &result) == noErr,
-              let result,
-              CMSampleBufferSetDataBufferFromAudioBufferList(result, blockBufferAllocator: kCFAllocatorDefault,
-                                                            blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0,
-                                                            bufferList: buffer.audioBufferList) == noErr else {
+            let result,
+            CMSampleBufferSetDataBufferFromAudioBufferList(result, blockBufferAllocator: kCFAllocatorDefault,
+                                                           blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0,
+                                                           bufferList: buffer.audioBufferList) == noErr else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         CMPropagateAttachments(sample, destination: result)

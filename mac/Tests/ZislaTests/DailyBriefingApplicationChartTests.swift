@@ -214,7 +214,7 @@ struct DailyBriefingApplicationChartTests {
         formatDuration: @escaping (TimeInterval) -> String = { _ in "Duration" }
     ) throws -> CGImage {
         let chart = DailyBriefingApplicationChart(applications: applications, language: language,
-            accent: Color(red: 0.9, green: 0.05, blue: 0.05), ink: ink, formatDuration: formatDuration)
+                                                  accent: Color(red: 0.9, green: 0.05, blue: 0.05), ink: ink, formatDuration: formatDuration)
         let renderer = ImageRenderer(content: chart.frame(width: 788).background(background).environment(\.colorScheme, .light))
         renderer.scale = 1
         return try #require(renderer.cgImage)

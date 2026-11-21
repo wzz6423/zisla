@@ -70,7 +70,7 @@ public final class ApplicationOpenFailureMonitor {
                 guard self.dependencies.isTrusted() else { self.stop(); return }
                 let candidates = alert.applicationURLs.isEmpty ? self.dependencies.finderSelection() : []
                 guard let url = Self.application(for: alert, templates: self.dependencies.templates(),
-                    candidates: candidates, names: self.dependencies.applicationNames) else { return }
+                                                 candidates: candidates, names: self.dependencies.applicationNames) else { return }
                 let key = "\(pid):\(alert.identifier):\(url.path)"
                 guard !self.seen.contains(key) else { return }
                 self.seen.append(key)
@@ -137,9 +137,9 @@ public final class ApplicationOpenFailureMonitor {
             applicationNames: { url in
                 let bundle = Bundle(url: url)
                 return [url.lastPathComponent, url.deletingPathExtension().lastPathComponent,
-                    FileManager.default.displayName(atPath: url.path),
-                    bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
-                    bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String].compactMap { $0 }
+                        FileManager.default.displayName(atPath: url.path),
+                        bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+                        bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String].compactMap { $0 }
             }
         )
     }

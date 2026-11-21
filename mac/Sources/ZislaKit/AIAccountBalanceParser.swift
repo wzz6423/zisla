@@ -96,7 +96,7 @@ enum AIAccountBalanceParser {
             guard let raw = root[key], !(raw is NSNull) else { continue }
             let value = try object(raw)
             windows.append(.init(id: key, kind: kind, remainingPercent: 100 - (try percent(value["utilization"])),
-                resetsAt: try date(value["resets_at"]), durationSeconds: key == "five_hour" ? 18_000 : 604_800, name: name))
+                                 resetsAt: try date(value["resets_at"]), durationSeconds: key == "five_hour" ? 18_000 : 604_800, name: name))
         }
         if let raw = root["extra_usage"], !(raw is NSNull) {
             let extra = try object(raw)
@@ -153,7 +153,7 @@ enum AIAccountBalanceParser {
                 } else if let raw = limit["remaining_percent"], !(raw is NSNull) {
                     let left = try percent(raw)
                     windows.append(.init(id: "spend_control", kind: .credits, remainingPercent: left,
-                        remaining: cap * left / 100, limit: cap, unit: .credits, resetsAt: reset))
+                                         remaining: cap * left / 100, limit: cap, unit: .credits, resetsAt: reset))
                 } else { throw AIAccountBalanceError.invalidResponse }
             }
         }
@@ -169,8 +169,8 @@ enum AIAccountBalanceParser {
             let rawDuration = window["limit_window_seconds"]
             let duration = try rawDuration == nil || rawDuration is NSNull ? nil : number(rawDuration)
             windows.append(.init(id: prefix + key, kind: kind(duration: duration),
-                remainingPercent: 100 - (try percent(window["used_percent"])),
-                resetsAt: try date(window["reset_at"]), durationSeconds: duration, name: name))
+                                 remainingPercent: 100 - (try percent(window["used_percent"])),
+                                 resetsAt: try date(window["reset_at"]), durationSeconds: duration, name: name))
         }
         return windows
     }
@@ -187,7 +187,7 @@ enum AIAccountBalanceParser {
             let fraction = try number(bucket["remainingFraction"])
             guard fraction <= 1 else { throw AIAccountBalanceError.invalidResponse }
             let window = AIAccountQuotaWindow(id: "model:" + model, kind: .model, remainingPercent: fraction * 100,
-                resetsAt: try date(bucket["resetTime"]), name: model)
+                                              resetsAt: try date(bucket["resetTime"]), name: model)
             if models[model].map({ ($0.remainingPercent ?? 100) <= fraction * 100 }) != true { models[model] = window }
         }
         return models.keys.sorted().compactMap { models[$0] }
@@ -200,13 +200,13 @@ enum AIAccountBalanceParser {
         if let raw = root["usages"], !(raw is NSNull) {
             let pools = try object(raw)
             for (key, kind, duration) in [("limit_5h", AIAccountQuotaKind.fiveHours, 18_000.0),
-                                           ("limit_7d", .weekly, 604_800), ("limit_month_total", .monthly, nil)] as [(String, AIAccountQuotaKind, Double?)] {
+                                          ("limit_7d", .weekly, 604_800), ("limit_month_total", .monthly, nil)] as [(String, AIAccountQuotaKind, Double?)] {
                 guard let raw = pools[key], !(raw is NSNull) else { continue }
                 let pool = try object(raw)
                 let ratio = try number(pool["used_ratio"])
                 guard ratio <= 1 else { throw AIAccountBalanceError.invalidResponse }
                 windows.append(.init(id: key, kind: kind, remainingPercent: 100 - ratio * 100,
-                    resetsAt: try date(pool["reset_time"]), durationSeconds: duration))
+                                     resetsAt: try date(pool["reset_time"]), durationSeconds: duration))
             }
             if !windows.isEmpty { return windows }
         }
@@ -241,9 +241,9 @@ enum AIAccountBalanceParser {
         if let raw = detail["remaining"], !(raw is NSNull) { remaining = min(cap, try number(raw)) }
         else { remaining = max(0, cap - (try number(detail["used"]))) }
         return .init(id: id, kind: kind, remainingPercent: cap > 0 ? remaining / cap * 100 : nil,
-            remaining: remaining, limit: cap, unit: .requests,
-            resetsAt: try date(detail["resetTime"] ?? detail["resetAt"] ?? detail["reset_time"] ?? detail["reset_at"]),
-            durationSeconds: duration)
+                     remaining: remaining, limit: cap, unit: .requests,
+                     resetsAt: try date(detail["resetTime"] ?? detail["resetAt"] ?? detail["reset_time"] ?? detail["reset_at"]),
+                     durationSeconds: duration)
     }
 
     /// Unified plans require current-window data; legacy zero-usage placeholders cannot substitute.
@@ -255,9 +255,9 @@ enum AIAccountBalanceParser {
         var windows: [AIAccountQuotaWindow] = []
         if let sand, sand["hasNonZeroIncludedLimit"] as? Bool == true || sand["includedLimitZero"] as? Bool == false {
             windows.append(.init(id: "grok_bot", kind: .weekly,
-                remainingPercent: 100 - (try percent(sand["usagePercent"])),
-                resetsAt: try date(sand["nextResetTimestampUtc"]), durationSeconds: 604_800,
-                name: isUnified || sand["isUnified"] as? Bool == true ? nil : "Grok Bot"))
+                                 remainingPercent: 100 - (try percent(sand["usagePercent"])),
+                                 resetsAt: try date(sand["nextResetTimestampUtc"]), durationSeconds: 604_800,
+                                 name: isUnified || sand["isUnified"] as? Bool == true ? nil : "Grok Bot"))
         }
         if isUnified {
             guard let unified, unified["availability"] as? String == "available",
@@ -268,7 +268,7 @@ enum AIAccountBalanceParser {
                 throw AIAccountBalanceError.noQuota
             }
             windows.append(amount(id: "monthly", kind: .budget, used: try number(usage["usedCents"]),
-                cap: try number(usage["limitCents"]), unit: .usd, scale: 100, reset: reset))
+                                  cap: try number(usage["limitCents"]), unit: .usd, scale: 100, reset: reset))
             return windows
         }
         let reset = try date(root["billingCycleEnd"])
@@ -278,13 +278,13 @@ enum AIAccountBalanceParser {
         let individual = try root["individualUsage"].map(object) ?? [:]
         let team = try root["teamUsage"].map(object) ?? [:]
         for (id, raw, nameKey) in [("plan", individual["plan"], nil), ("overall", individual["overall"], "账户上限"),
-                                  ("onDemand", individual["onDemand"], "额外预算"), ("pooled", team["pooled"], "团队额度")] as [(String, Any?, String?)] {
+                                   ("onDemand", individual["onDemand"], "额外预算"), ("pooled", team["pooled"], "团队额度")] as [(String, Any?, String?)] {
             guard let raw, !(raw is NSNull) else { continue }
             let value = try object(raw)
             guard value["enabled"] as? Bool != false else { continue }
             if let cap = value["limit"], !(cap is NSNull) {
                 windows.append(amount(id: id, kind: .budget, used: try number(value["used"]), cap: try number(cap),
-                    unit: .usd, scale: 100, reset: reset, nameKey: nameKey))
+                                      unit: .usd, scale: 100, reset: reset, nameKey: nameKey))
             } else if id == "plan", let percentValue = value["totalPercentUsed"] {
                 windows.append(.init(id: id, kind: .all, remainingPercent: 100 - (try percent(percentValue)), resetsAt: reset))
             }
@@ -325,8 +325,8 @@ enum AIAccountBalanceParser {
                 duration = multiplier.map { $0 * count }
             }
             windows.append(.init(id: "quota:\(index)", kind: type == "TIME_LIMIT" ? .monthly : kind(duration: duration),
-                remainingPercent: remainingPercent, resetsAt: try date(limit["nextResetTime"] ?? limit["next_reset_time"], milliseconds: true),
-                durationSeconds: duration, name: type == "TIME_LIMIT" ? "MCP" : nil))
+                                 remainingPercent: remainingPercent, resetsAt: try date(limit["nextResetTime"] ?? limit["next_reset_time"], milliseconds: true),
+                                 durationSeconds: duration, name: type == "TIME_LIMIT" ? "MCP" : nil))
         }
         return windows
     }
@@ -340,13 +340,13 @@ enum AIAccountBalanceParser {
                 let cap = try number(capValue)
                 if cap > 0 {
                     windows.append(amount(id: "token_spend", kind: .budget, used: try number(current["token_spend_in_cents"] ?? spend["spend_in_cents"]),
-                        cap: cap, unit: .usd, scale: 100))
+                                          cap: cap, unit: .usd, scale: 100))
                 }
             }
             if let predictions = current["edit_predictions"] as? [String: Any] {
                 if predictions["limit"] is NSNull { windows.append(.init(id: "edit_predictions", kind: .predictions, unit: .requests, unlimited: true)) }
                 else { windows.append(amount(id: "edit_predictions", kind: .predictions, used: try number(predictions["used"]),
-                    cap: try number(predictions["limit"]), unit: .requests)) }
+                                             cap: try number(predictions["limit"]), unit: .requests)) }
             }
             return windows
         }
@@ -387,8 +387,8 @@ enum AIAccountBalanceParser {
                 else if cap == nil && remaining == nil { continue }
                 else { throw AIAccountBalanceError.invalidResponse }
                 windows.append(.init(id: key, kind: .model, remainingPercent: fraction,
-                    remaining: remaining.map { min(cap ?? $0, $0) }, limit: cap,
-                    unit: remaining == nil ? .percent : .requests, resetsAt: reset, name: label == nil ? key : nil, nameKey: label))
+                                     remaining: remaining.map { min(cap ?? $0, $0) }, limit: cap,
+                                     unit: remaining == nil ? .percent : .requests, resetsAt: reset, name: label == nil ? key : nil, nameKey: label))
             }
         }
         if let monthly = root["monthly_quotas"] as? [String: Any], let remaining = root["limited_user_quotas"] as? [String: Any] {
@@ -398,7 +398,7 @@ enum AIAccountBalanceParser {
                 let cap = try number(capValue), left = try number(leftValue)
                 guard cap > 0 else { continue }
                 windows.append(.init(id: key, kind: .model, remainingPercent: min(100, left / cap * 100),
-                    remaining: min(cap, left), limit: cap, unit: .requests, resetsAt: reset, nameKey: label))
+                                     remaining: min(cap, left), limit: cap, unit: .requests, resetsAt: reset, nameKey: label))
             }
         }
         return windows
@@ -422,7 +422,7 @@ enum AIAccountBalanceParser {
             remaining += try explicit.map { min(limit, try number($0)) } ?? max(0, limit - used)
         }
         return [.init(id: "credits", kind: .credits, remainingPercent: cap > 0 ? remaining / cap * 100 : nil,
-            remaining: remaining, limit: cap, unit: .credits, resetsAt: try date(data["nextResetAt"] ?? data["next_reset_at"]))]
+                      remaining: remaining, limit: cap, unit: .credits, resetsAt: try date(data["nextResetAt"] ?? data["next_reset_at"]))]
     }
 
     /// Accepts only TRAE's confirmed credits-billing schema, preserving expired-session and absent-quota failures.
@@ -432,7 +432,7 @@ enum AIAccountBalanceParser {
             throw AIAccountBalanceError.noQuota
         }
         return [amount(id: "credits", kind: .credits, used: try number(summary["consumed_amount"]),
-            cap: try number(summary["total_amount"]), unit: .credits)]
+                       cap: try number(summary["total_amount"]), unit: .credits)]
     }
 
     /// Treats -1 as the explicit unlimited sentinel and sums only active, complete credit packages.
@@ -462,7 +462,7 @@ enum AIAccountBalanceParser {
         }
         guard active > 0 else { throw AIAccountBalanceError.noQuota }
         return [.init(id: "credits", kind: .credits, remainingPercent: total > 0 ? remaining / total * 100 : nil,
-            remaining: remaining, limit: total, unit: .credits)]
+                      remaining: remaining, limit: total, unit: .credits)]
     }
 
     /// Requires both rolling and weekly windows; an explicit rate-limited state means zero remaining allowance.
@@ -498,8 +498,8 @@ enum AIAccountBalanceParser {
             let window = try object(raw)
             let duration = try window["windowDurationMins"].map(number).map { $0 * 60 }
             windows.append(.init(id: key, kind: key == "window" ? (duration.map { kind(duration: $0) } ?? defaultKind) : defaultKind,
-                remainingPercent: 100 - (try percent(window["usedPercent"])),
-                resetsAt: try date(window["resetsAtMs"], milliseconds: true), durationSeconds: duration))
+                                 remainingPercent: 100 - (try percent(window["usedPercent"])),
+                                 resetsAt: try date(window["resetsAtMs"], milliseconds: true), durationSeconds: duration))
         }
         return windows
     }
@@ -510,6 +510,6 @@ enum AIAccountBalanceParser {
                                nameKey: String? = nil) -> AIAccountQuotaWindow {
         let remaining = max(0, cap - used)
         return .init(id: id, kind: kind, remainingPercent: cap > 0 ? remaining / cap * 100 : nil,
-            remaining: remaining / scale, limit: cap / scale, unit: unit, resetsAt: reset, nameKey: nameKey)
+                     remaining: remaining / scale, limit: cap / scale, unit: unit, resetsAt: reset, nameKey: nameKey)
     }
 }

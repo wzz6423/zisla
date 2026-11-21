@@ -262,13 +262,13 @@ private enum AppleMobileDeviceBridge {
         symbols: Symbols
     ) -> [NetworkBatteryDevice] {
         guard let registry = sendServiceRequest(
-            service: "com.apple.companion_proxy",
-            request: ["Command": "GetDeviceRegistry"],
-            format: .binaryFormat_v1_0,
-            device: device,
-            symbols: symbols
-        ),
-            let identifiers = registry["PairedDevicesArray"] as? [String]
+                  service: "com.apple.companion_proxy",
+                  request: ["Command": "GetDeviceRegistry"],
+                  format: .binaryFormat_v1_0,
+                  device: device,
+                  symbols: symbols
+              ),
+              let identifiers = registry["PairedDevicesArray"] as? [String]
         else {
             return []
         }
@@ -304,17 +304,17 @@ private enum AppleMobileDeviceBridge {
         symbols: Symbols
     ) -> Any? {
         guard let response = sendServiceRequest(
-            service: "com.apple.companion_proxy",
-            request: [
-                "Command": "GetValueFromRegistry",
-                "GetValueGizmoUDIDKey": watchIdentifier,
-                "GetValueKeyKey": key,
-            ],
-            format: .binaryFormat_v1_0,
-            device: device,
-            symbols: symbols
-        ),
-            let dictionary = response["RetrievedValueDictionary"] as? [String: Any]
+                  service: "com.apple.companion_proxy",
+                  request: [
+                      "Command": "GetValueFromRegistry",
+                      "GetValueGizmoUDIDKey": watchIdentifier,
+                      "GetValueKeyKey": key,
+                  ],
+                  format: .binaryFormat_v1_0,
+                  device: device,
+                  symbols: symbols
+              ),
+              let dictionary = response["RetrievedValueDictionary"] as? [String: Any]
         else {
             return nil
         }
@@ -326,18 +326,18 @@ private enum AppleMobileDeviceBridge {
         symbols: Symbols
     ) -> [String: Any]? {
         guard let response = sendServiceRequest(
-            service: "com.apple.mobile.diagnostics_relay",
-            request: [
-                "Request": "IORegistry",
-                "EntryClass": "AppleSmartBattery",
-            ],
-            format: .xmlFormat_v1_0,
-            device: device,
-            symbols: symbols
-        ),
-            response["Status"] as? String == "Success",
-            let diagnostics = response["Diagnostics"] as? [String: Any],
-            let registry = diagnostics["IORegistry"] as? [String: Any]
+                  service: "com.apple.mobile.diagnostics_relay",
+                  request: [
+                      "Request": "IORegistry",
+                      "EntryClass": "AppleSmartBattery",
+                  ],
+                  format: .xmlFormat_v1_0,
+                  device: device,
+                  symbols: symbols
+              ),
+              response["Status"] as? String == "Success",
+              let diagnostics = response["Diagnostics"] as? [String: Any],
+              let registry = diagnostics["IORegistry"] as? [String: Any]
         else {
             return nil
         }

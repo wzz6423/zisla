@@ -162,9 +162,9 @@ public enum AIUsageAnalytics {
         var summaries: [ModelDay: AIUsageSample] = [:]
         for sample in samples {
             let key = ModelDay(date: calendar.startOfDay(for: sample.timestamp), provider: sample.provider,
-                model: normalizedModel(sample.model))
+                               model: normalizedModel(sample.model))
             var summary = summaries[key] ?? AIUsageSample(provider: key.provider, timestamp: key.date,
-                inputTokens: 0, outputTokens: 0, model: key.model)
+                                                          inputTokens: 0, outputTokens: 0, model: key.model)
             summary.inputTokens = AIUsageTokenMath.adding(summary.inputTokens, sample.inputTokens)
             summary.outputTokens = AIUsageTokenMath.adding(summary.outputTokens, sample.outputTokens)
             summaries[key] = summary
@@ -178,32 +178,33 @@ public enum AIUsageAnalytics {
 
     /// Makes the aggregate authoritative: unexplained or excessive model splits become unclassified usage.
     public static func dailyModelUsage(history: AIUsageHistory, endingAt end: Date,
-        calendar: Calendar = .current) -> [AIDailyModelUsage] {
+                                       calendar: Calendar = .current) -> [AIDailyModelUsage] {
         let totals = dailyUsageSamples(samples: history.usageSamples.filter { $0.timestamp <= end }, calendar: calendar)
         let modelsByDay = Dictionary(grouping: dailyModelUsageSamples(
-            samples: history.modelUsageSamples.filter { $0.timestamp <= end }, calendar: calendar), by: \.timestamp)
+            samples: history.modelUsageSamples.filter { $0.timestamp <= end }, calendar: calendar
+        ), by: \.timestamp)
         return totals.compactMap { total in
             guard total.totalTokens > 0 else { return nil }
             var models = (modelsByDay[total.timestamp] ?? []).filter { $0.totalTokens > 0 }.map {
                 AIModelUsage(provider: $0.provider, model: $0.model,
-                    inputTokens: $0.inputTokens, outputTokens: $0.outputTokens)
+                             inputTokens: $0.inputTokens, outputTokens: $0.outputTokens)
             }
             let input = models.reduce(0) { AIUsageTokenMath.adding($0, $1.inputTokens) }
             let output = models.reduce(0) { AIUsageTokenMath.adding($0, $1.outputTokens) }
             if input > total.inputTokens || output > total.outputTokens {
                 models = [AIModelUsage(provider: nil, model: nil,
-                    inputTokens: total.inputTokens, outputTokens: total.outputTokens)]
+                                       inputTokens: total.inputTokens, outputTokens: total.outputTokens)]
             } else if input < total.inputTokens || output < total.outputTokens {
                 // Old daily totals retained only the first model, so the missing split cannot be reconstructed.
                 models.append(AIModelUsage(provider: nil, model: nil,
-                    inputTokens: total.inputTokens - input, outputTokens: total.outputTokens - output))
+                                           inputTokens: total.inputTokens - input, outputTokens: total.outputTokens - output))
             }
             models.sort {
                 if $0.totalTokens != $1.totalTokens { return $0.totalTokens > $1.totalTokens }
                 return $0.id < $1.id
             }
             return AIDailyModelUsage(date: total.timestamp, inputTokens: total.inputTokens,
-                outputTokens: total.outputTokens, models: models)
+                                     outputTokens: total.outputTokens, models: models)
         }.reversed()
     }
 

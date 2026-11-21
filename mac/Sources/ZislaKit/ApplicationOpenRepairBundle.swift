@@ -64,7 +64,7 @@ struct ApplicationOpenRepairBundle: Sendable {
                 throw ApplicationOpenRepairError.inspectionLimit
             }
             let entry = try readEntry(descriptor, path: path, linkTarget: linkTarget, isCancelled: isCancelled,
-                infoData: &infoData)
+                                      infoData: &infoData)
             guard entries.first.map({ $0.device == entry.device }) ?? true else {
                 throw ApplicationOpenRepairError.unsupportedBundle
             }
@@ -132,7 +132,7 @@ struct ApplicationOpenRepairBundle: Sendable {
             var ignored = Data()
             // Symlink targets cannot change in place; the checked inode pins the link itself.
             let current = try Self.readEntry(descriptor, path: entry.path, linkTarget: entry.linkTarget,
-                isCancelled: isCancelled, infoData: &ignored)
+                                             isCancelled: isCancelled, infoData: &ignored)
             guard Self.sameEntry(entry, current) else { throw ApplicationOpenRepairError.applicationChanged }
             try remove(descriptor)
             guard fgetxattr(descriptor, Self.quarantineAttribute, nil, 0, 0, 0) < 0, errno == ENOATTR else {
@@ -283,9 +283,9 @@ struct ApplicationOpenRepairBundle: Sendable {
             throw ApplicationOpenRepairError.applicationChanged
         }
         return Entry(path: path, device: status.st_dev, inode: status.st_ino, mode: status.st_mode,
-            owner: status.st_uid, links: status.st_nlink, size: status.st_size,
-            modifiedSeconds: status.st_mtimespec.tv_sec, modifiedNanoseconds: status.st_mtimespec.tv_nsec,
-            digest: digest, linkTarget: linkTarget, attributes: attributes)
+                     owner: status.st_uid, links: status.st_nlink, size: status.st_size,
+                     modifiedSeconds: status.st_mtimespec.tv_sec, modifiedNanoseconds: status.st_mtimespec.tv_nsec,
+                     digest: digest, linkTarget: linkTarget, attributes: attributes)
     }
 
     private static func readAttributes(_ descriptor: Int32) throws -> [String: Data] {

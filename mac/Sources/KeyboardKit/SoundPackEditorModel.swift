@@ -340,7 +340,7 @@ final class SoundPackEditorModel: ObservableObject {
                     collisionPolicy: .duplicate
                 )
                 guard let id = descriptor.customPackID else {
-            throw SoundPackError.invalidManifest(L10n.tr("导入结果不是自定义音色包"))
+                    throw SoundPackError.invalidManifest(L10n.tr("导入结果不是自定义音色包"))
                 }
                 let descriptors = try await library.descriptors()
                 customPacks = descriptors.filter { !$0.isReadOnly }

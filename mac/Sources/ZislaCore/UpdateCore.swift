@@ -117,7 +117,7 @@ public struct SemanticVersion: Equatable, Comparable, Sendable {
     /// SemVer rule: a version with a prerelease identifier is lower than the same core version without one.
     private static func comparePrerelease(_ lhs: [String], _ rhs: [String]) -> Int {
         if lhs.isEmpty && rhs.isEmpty { return 0 }
-        if lhs.isEmpty { return 1 }   // release > pre-release
+        if lhs.isEmpty { return 1 } // release > pre-release
         if rhs.isEmpty { return -1 }
 
         for (a, b) in zip(lhs, rhs) {
@@ -126,7 +126,7 @@ public struct SemanticVersion: Equatable, Comparable, Sendable {
             case let (.some(x), .some(y)) where x != y:
                 return x < y ? -1 : 1
             case (.some, .none):
-                return -1          // numeric identifiers have lower precedence than alphanumeric
+                return -1 // numeric identifiers have lower precedence than alphanumeric
             case (.none, .some):
                 return 1
             case (.none, .none) where a != b:

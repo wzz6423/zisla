@@ -41,10 +41,10 @@ struct BrowserDownloadHistoryFixture {
         #expect(opened == SQLITE_OK)
         let database = try #require(connection)
         #expect(sqlite3_exec(database, """
-            CREATE TABLE IF NOT EXISTS downloads (
-                current_path TEXT, target_path TEXT, state INTEGER, start_time INTEGER
-            )
-            """, nil, nil, nil) == SQLITE_OK)
+        CREATE TABLE IF NOT EXISTS downloads (
+            current_path TEXT, target_path TEXT, state INTEGER, start_time INTEGER
+        )
+        """, nil, nil, nil) == SQLITE_OK)
         var statement: OpaquePointer?
         #expect(sqlite3_prepare_v2(database, "INSERT INTO downloads VALUES (?, ?, ?, ?)", -1, &statement, nil) == SQLITE_OK)
         defer { sqlite3_finalize(statement) }
@@ -197,11 +197,11 @@ struct BrowserDownloadFileNameResolverTests {
         #expect(sqlite3_open(fixture.databaseURL.path, &database) == SQLITE_OK)
         defer { sqlite3_close(database) }
         #expect(sqlite3_exec(database, """
-            WITH RECURSIVE records(id) AS (
-                SELECT 1 UNION ALL SELECT id + 1 FROM records WHERE id < 10000
-            ) INSERT INTO downloads
-                SELECT '/Other/' || id || '.crdownload', '/Other/' || id || '.dmg', 0, id FROM records
-            """, nil, nil, nil) == SQLITE_OK)
+        WITH RECURSIVE records(id) AS (
+            SELECT 1 UNION ALL SELECT id + 1 FROM records WHERE id < 10000
+        ) INSERT INTO downloads
+            SELECT '/Other/' || id || '.crdownload', '/Other/' || id || '.dmg', 0, id FROM records
+        """, nil, nil, nil) == SQLITE_OK)
         try fixture.insertDownload(targetPath: "/Downloads/Cursor.dmg")
         #expect(BrowserDownloadFileNameResolver(homeDirectory: fixture.home)
             .fileNames(for: [fixture.temporaryURL: .chrome])[fixture.temporaryURL] == "Cursor.dmg")
@@ -216,11 +216,11 @@ struct BrowserDownloadFileNameResolverTests {
         #expect(sqlite3_open(fixture.databaseURL.path, &database) == SQLITE_OK)
         defer { sqlite3_close(database) }
         #expect(sqlite3_exec(database, """
-            PRAGMA locking_mode=EXCLUSIVE;
-            PRAGMA journal_mode=\(journalMode);
-            PRAGMA wal_autocheckpoint=0;
-            UPDATE downloads SET target_path='/Downloads/Cursor.dmg';
-            """, nil, nil, nil) == SQLITE_OK)
+        PRAGMA locking_mode=EXCLUSIVE;
+        PRAGMA journal_mode=\(journalMode);
+        PRAGMA wal_autocheckpoint=0;
+        UPDATE downloads SET target_path='/Downloads/Cursor.dmg';
+        """, nil, nil, nil) == SQLITE_OK)
         let directory = fixture.databaseURL.deletingLastPathComponent()
         let filesBefore = try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
         let dataBefore = try filesBefore.map { try Data(contentsOf: directory.appendingPathComponent($0)) }

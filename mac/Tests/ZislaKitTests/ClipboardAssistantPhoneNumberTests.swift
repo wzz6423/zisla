@@ -92,7 +92,7 @@ struct ClipboardAssistantPhoneNumberTests {
         let locale = Locale(identifier: "fr_FR")
         let result = ClipboardAssistantDetector.detect(text: "2125550123", enabledKinds: [.phone], locale: locale)
         #expect(result == ClipboardAssistantDetector.detect(text: "2125550123", enabledKinds: [.phone],
-            locale: locale, countryCode: Locale.current.region?.identifier))
+                                                            locale: locale, countryCode: Locale.current.region?.identifier))
         #expect(ClipboardAssistantDetector.detect(content: .text("09012345678"), enabledKinds: [.phone], countryCode: "JP")?.action
             == .callPhone("+819012345678"))
         #expect(detect("09012345678", country: "US", kinds: [.phone]) == nil)
@@ -163,10 +163,10 @@ struct ClipboardAssistantPhoneNumberTests {
     }
 
     @Test(arguments: ["", "+", "5551234", "123456789012", "0000000000", "+999123456789", "+1201555012345678",
-        "+1 (201 5550123", "+1 ((201)) 5550123", "+1 201--555-0123", "+1 2015550123;ext=8",
-        "+12015550123&next=https://evil.example", "Phone: +12015550123\n123", "+12015550123\u{202E}",
-        "+12015550123\u{0}", "Phone\nnumber: +12015550123", "2024-03-05", "21255501.23", "+¹2015550123", "tel:+12015550123?x=1",
-        "+49301234567890123"])
+                      "+1 (201 5550123", "+1 ((201)) 5550123", "+1 201--555-0123", "+1 2015550123;ext=8",
+                      "+12015550123&next=https://evil.example", "Phone: +12015550123\n123", "+12015550123\u{202E}",
+                      "+12015550123\u{0}", "Phone\nnumber: +12015550123", "2024-03-05", "21255501.23", "+¹2015550123", "tel:+12015550123?x=1",
+                      "+49301234567890123"])
     func malformedNumbersNeverOfferDialling(_ input: String) {
         #expect(detect(input, country: "US", kinds: [.phone]) == nil)
     }
@@ -187,8 +187,8 @@ struct ClipboardAssistantPhoneNumberTests {
     private func detect(_ text: String, country: String?, locale: Locale = Locale(identifier: "en_US"),
                         kinds: Set<ClipboardAssistantKind> = Set(ClipboardAssistantKind.allCases)) -> ClipboardAssistantDetection? {
         ClipboardAssistantDetector.detect(text: text, enabledKinds: kinds, systemLanguageIdentifier: "en",
-            now: Date(timeIntervalSince1970: 1_790_035_200), timeZone: TimeZone(secondsFromGMT: 0)!,
-            locale: locale, countryCode: country)
+                                          now: Date(timeIntervalSince1970: 1_790_035_200), timeZone: TimeZone(secondsFromGMT: 0)!,
+                                          locale: locale, countryCode: country)
     }
 
     // Official examples for all supported number types from the same pinned metadata revision.

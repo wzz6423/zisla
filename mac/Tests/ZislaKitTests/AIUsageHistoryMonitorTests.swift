@@ -40,7 +40,7 @@ struct AIUsageHistoryMonitorTests {
         let value = sample("clear-replay", at: now)
         try repository.recordDetectedUsage([value])
         let detector = BlockingHistoryActivityDetector(task: AIProgressTask(id: "active", provider: .codex,
-            title: "Fixture", progress: nil, updatedAt: now))
+                                                                            title: "Fixture", progress: nil, updatedAt: now))
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [detector], environment: [:], now: { now })
         defer { detector.release(); monitor.stop() }
         monitor.refreshActiveTasks()
@@ -132,31 +132,31 @@ struct AIUsageHistoryMonitorTests {
     }
 
     #if DEBUG
-    /// Clearing simulation changes only this process's preview; a new monitor restores it without modifying real reports.
-    @Test @MainActor
-    func debugClearAndRestartKeepRealReportsUntouched() async throws {
-        let root = directory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let repository = AIStateRepository(directoryURL: root)
-        try repository.recordUsage(sample("real", at: now))
-        let real = try repository.loadUsageHistory()
-        let environment = ["ZISLA_DEBUG_AI_MODEL_USAGE": "codex:preview:100:20"]
-        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], environment: environment, now: { now })
-        defer { monitor.stop() }
-        #expect(try await monitor.readUsageHistory().usageSamples.map(\.totalTokens) == [120])
-        monitor.loadUsageHistory()
-        try await monitor.clearUsageHistory()
-        #expect(try await monitor.readUsageHistory() == AIUsageHistory())
-        monitor.unloadUsageHistory()
-        monitor.loadUsageHistory()
-        monitor.reload()
-        #expect(monitor.state.usageSamples.isEmpty && monitor.state.modelUsageSamples.isEmpty)
-        #expect(try repository.loadUsageHistory() == real)
-        let restarted = AIStateMonitor(directoryURL: root, activityDetectors: [], environment: environment, now: { now })
-        defer { restarted.stop() }
-        #expect(try await restarted.readUsageHistory().modelUsageSamples.map(\.model) == ["preview"])
-        #expect(try repository.loadUsageHistory() == real)
-    }
+        /// Clearing simulation changes only this process's preview; a new monitor restores it without modifying real reports.
+        @Test @MainActor
+        func debugClearAndRestartKeepRealReportsUntouched() async throws {
+            let root = directory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let repository = AIStateRepository(directoryURL: root)
+            try repository.recordUsage(sample("real", at: now))
+            let real = try repository.loadUsageHistory()
+            let environment = ["ZISLA_DEBUG_AI_MODEL_USAGE": "codex:preview:100:20"]
+            let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], environment: environment, now: { now })
+            defer { monitor.stop() }
+            #expect(try await monitor.readUsageHistory().usageSamples.map(\.totalTokens) == [120])
+            monitor.loadUsageHistory()
+            try await monitor.clearUsageHistory()
+            #expect(try await monitor.readUsageHistory() == AIUsageHistory())
+            monitor.unloadUsageHistory()
+            monitor.loadUsageHistory()
+            monitor.reload()
+            #expect(monitor.state.usageSamples.isEmpty && monitor.state.modelUsageSamples.isEmpty)
+            #expect(try repository.loadUsageHistory() == real)
+            let restarted = AIStateMonitor(directoryURL: root, activityDetectors: [], environment: environment, now: { now })
+            defer { restarted.stop() }
+            #expect(try await restarted.readUsageHistory().modelUsageSamples.map(\.model) == ["preview"])
+            #expect(try repository.loadUsageHistory() == real)
+        }
     #endif
 
     private func sample(_ id: String, at date: Date) -> AIUsageSample {

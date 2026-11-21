@@ -39,7 +39,7 @@ struct AISubscriptionCredentialsTests {
         defer { sqlite3_close(handle) }
         #expect(sqlite3_exec(handle, "CREATE TABLE ItemTable (key TEXT, value TEXT)", nil, nil, nil) == SQLITE_OK)
         #expect(sqlite3_exec(handle,
-            "INSERT INTO ItemTable VALUES ('cursorAuth/accessToken','cursor-safe-storage:v1:\(encrypted)')", nil, nil, nil) == SQLITE_OK)
+                             "INSERT INTO ItemTable VALUES ('cursorAuth/accessToken','cursor-safe-storage:v1:\(encrypted)')", nil, nil, nil) == SQLITE_OK)
         let credentials = AISubscriptionCredentials(home: root, environment: [:], keychainRead: { service, account in
             service == "Cursor Safe Storage" && account == "Cursor" ? Data("fixture-password".utf8) : nil
         })
@@ -63,22 +63,22 @@ struct AISubscriptionCredentialsTests {
         for status in [errSecItemNotFound, errSecInteractionNotAllowed] {
             var calls = 0
             let result = AISubscriptionCredentials.readKeychainWithoutPrompt(service: "fixture", account: "fixture",
-                copyMatching: { query in
-                    calls += 1
-                    let values = query as NSDictionary
-                    #expect(values[kSecReturnData] == nil)
-                    #expect((values[kSecUseAuthenticationContext] as? LAContext)?.interactionNotAllowed == true)
-                    #expect(values[kSecUseAuthenticationUI] as? String == "u_AuthUIF")
-                    return (status, nil)
-                }, allowsRead: { _ in Issue.record("Locked item must not inspect ACL"); return true })
+                                                                             copyMatching: { query in
+                                                                                 calls += 1
+                                                                                 let values = query as NSDictionary
+                                                                                 #expect(values[kSecReturnData] == nil)
+                                                                                 #expect((values[kSecUseAuthenticationContext] as? LAContext)?.interactionNotAllowed == true)
+                                                                                 #expect(values[kSecUseAuthenticationUI] as? String == "u_AuthUIF")
+                                                                                 return (status, nil)
+                                                                             }, allowsRead: { _ in Issue.record("Locked item must not inspect ACL"); return true })
             #expect(result == nil && calls == 1)
         }
         var calls = 0
         let result = AISubscriptionCredentials.readKeychainWithoutPrompt(service: "fixture", account: "fixture",
-            copyMatching: { _ in
-                calls += 1
-                return (errSecSuccess, [kSecValueRef as String: "fixture-ref"] as CFDictionary)
-            }, allowsRead: { _ in false })
+                                                                         copyMatching: { _ in
+                                                                             calls += 1
+                                                                             return (errSecSuccess, [kSecValueRef as String: "fixture-ref"] as CFDictionary)
+                                                                         }, allowsRead: { _ in false })
         #expect(result == nil && calls == 1)
     }
 
@@ -86,56 +86,56 @@ struct AISubscriptionCredentialsTests {
         var calls = 0
         let expected = Data("fixture-secret".utf8)
         let result = AISubscriptionCredentials.readKeychainWithoutPrompt(service: "fixture", account: "fixture",
-            copyMatching: { query in
-                calls += 1
-                let values = query as NSDictionary
-                #expect((values[kSecUseAuthenticationContext] as? LAContext)?.interactionNotAllowed == true)
-                #expect(values[kSecUseAuthenticationUI] as? String == "u_AuthUIF")
-                if calls == 1 { return (errSecSuccess, [kSecValueRef as String: "fixture-ref"] as CFDictionary) }
-                #expect(values[kSecReturnData] as? Bool == true)
-                #expect(values[kSecReturnRef] == nil)
-                #expect(values[kSecMatchItemList] as? [String] == ["fixture-ref"])
-                return (errSecSuccess, expected as CFData)
-            }, allowsRead: { _ in true })
+                                                                         copyMatching: { query in
+                                                                             calls += 1
+                                                                             let values = query as NSDictionary
+                                                                             #expect((values[kSecUseAuthenticationContext] as? LAContext)?.interactionNotAllowed == true)
+                                                                             #expect(values[kSecUseAuthenticationUI] as? String == "u_AuthUIF")
+                                                                             if calls == 1 { return (errSecSuccess, [kSecValueRef as String: "fixture-ref"] as CFDictionary) }
+                                                                             #expect(values[kSecReturnData] as? Bool == true)
+                                                                             #expect(values[kSecReturnRef] == nil)
+                                                                             #expect(values[kSecMatchItemList] as? [String] == ["fixture-ref"])
+                                                                             return (errSecSuccess, expected as CFData)
+                                                                         }, allowsRead: { _ in true })
         #expect(result == expected && calls == 2)
     }
 
     @Test func keychainReadRejectsMissingUIPolicyBeforeInspectingCredentials() {
         let result = AISubscriptionCredentials.readKeychainWithoutPrompt(service: "fixture", account: "fixture",
-            copyMatching: { _ in Issue.record("Missing UI-fail policy must not query Keychain"); return (errSecSuccess, nil) },
-            allowsRead: { _ in Issue.record("Missing UI-fail policy must not inspect ACL"); return true },
-            uiFailPolicy: nil)
+                                                                         copyMatching: { _ in Issue.record("Missing UI-fail policy must not query Keychain"); return (errSecSuccess, nil) },
+                                                                         allowsRead: { _ in Issue.record("Missing UI-fail policy must not inspect ACL"); return true },
+                                                                         uiFailPolicy: nil)
         #expect(result == nil)
     }
 
     @Test func keychainReadRejectsInvalidReferencesAndSecondReadFailures() {
         for result in [nil, "invalid-result" as CFString?, [:] as CFDictionary?] as [CFTypeRef?] {
             #expect(AISubscriptionCredentials.readKeychainWithoutPrompt(service: "fixture", account: "fixture",
-                copyMatching: { _ in (errSecSuccess, result) },
-                allowsRead: { _ in Issue.record("Invalid preflight must not inspect ACL"); return true }) == nil)
+                                                                        copyMatching: { _ in (errSecSuccess, result) },
+                                                                        allowsRead: { _ in Issue.record("Invalid preflight must not inspect ACL"); return true }) == nil)
         }
         #expect(AISubscriptionCredentials.readKeychainWithoutPrompt(service: "fixture", account: "fixture",
-            copyMatching: { _ in (errSecSuccess, [kSecValueRef as String: "invalid-reference"] as CFDictionary) }) == nil)
+                                                                    copyMatching: { _ in (errSecSuccess, [kSecValueRef as String: "invalid-reference"] as CFDictionary) }) == nil)
         for status in [errSecInteractionNotAllowed, errSecAuthFailed] {
             var calls = 0
             #expect(AISubscriptionCredentials.readKeychainWithoutPrompt(service: "fixture", account: "fixture",
-                copyMatching: { _ in
-                    calls += 1
-                    return calls == 1
-                        ? (errSecSuccess, [kSecValueRef as String: "fixture-ref"] as CFDictionary)
-                        : (status, Data("fixture-secret".utf8) as CFData)
-                }, allowsRead: { _ in true }) == nil)
+                                                                        copyMatching: { _ in
+                                                                            calls += 1
+                                                                            return calls == 1
+                                                                                ? (errSecSuccess, [kSecValueRef as String: "fixture-ref"] as CFDictionary)
+                                                                                : (status, Data("fixture-secret".utf8) as CFData)
+                                                                        }, allowsRead: { _ in true }) == nil)
             #expect(calls == 2)
         }
         for payload in [nil, "invalid-payload" as CFString?, [:] as CFDictionary?] as [CFTypeRef?] {
             var calls = 0
             #expect(AISubscriptionCredentials.readKeychainWithoutPrompt(service: "fixture", account: "fixture",
-                copyMatching: { _ in
-                    calls += 1
-                    return calls == 1
-                        ? (errSecSuccess, [kSecValueRef as String: "fixture-ref"] as CFDictionary)
-                        : (errSecSuccess, payload)
-                }, allowsRead: { _ in true }) == nil)
+                                                                        copyMatching: { _ in
+                                                                            calls += 1
+                                                                            return calls == 1
+                                                                                ? (errSecSuccess, [kSecValueRef as String: "fixture-ref"] as CFDictionary)
+                                                                                : (errSecSuccess, payload)
+                                                                        }, allowsRead: { _ in true }) == nil)
             #expect(calls == 2)
         }
     }
@@ -273,14 +273,17 @@ private final class KeychainACLFixture {
     static var current: KeychainACLFixture { Thread.current.threadDictionary[contextKey] as! KeychainACLFixture }
     private typealias CreateAccess = @convention(c) (CFString, CFArray?, UnsafeMutablePointer<Unmanaged<SecAccess>?>) -> OSStatus
     private typealias CreateACL = @convention(c) (
-        SecAccess, CFArray?, CFString, SecKeychainPromptSelector, UnsafeMutablePointer<Unmanaged<SecACL>?>) -> OSStatus
+        SecAccess, CFArray?, CFString, SecKeychainPromptSelector, UnsafeMutablePointer<Unmanaged<SecACL>?>
+    ) -> OSStatus
     private typealias CreateApplication = @convention(c) (
-        UnsafePointer<CChar>?, UnsafeMutablePointer<Unmanaged<SecTrustedApplication>?>) -> OSStatus
+        UnsafePointer<CChar>?, UnsafeMutablePointer<Unmanaged<SecTrustedApplication>?>
+    ) -> OSStatus
 }
 
 private let fixtureItemTypeID: @convention(c) () -> CFTypeID = { CFStringGetTypeID() }
 private let fixtureCopyAccess: @convention(c) (
-    CFTypeRef, UnsafeMutablePointer<Unmanaged<SecAccess>?>) -> OSStatus = { _, result in
+    CFTypeRef, UnsafeMutablePointer<Unmanaged<SecAccess>?>
+) -> OSStatus = { _, result in
     let fixture = KeychainACLFixture.current
     result.pointee = fixture.returnsAccess ? .passRetained(fixture.access) : nil
     return fixture.accessStatus
@@ -291,7 +294,8 @@ private let fixtureCopyACLs: @convention(c) (SecAccess, CFTypeRef) -> Unmanaged<
 }
 private let fixtureCopyContents: @convention(c) (
     SecACL, UnsafeMutablePointer<Unmanaged<CFArray>?>, UnsafeMutablePointer<Unmanaged<CFString>?>,
-    UnsafeMutablePointer<SecKeychainPromptSelector>) -> OSStatus = { acl, applications, description, selector in
+    UnsafeMutablePointer<SecKeychainPromptSelector>
+) -> OSStatus = { acl, applications, description, selector in
     let fixture = KeychainACLFixture.current
     guard CFEqual(acl, fixture.acl) else { return errSecParam }
     applications.pointee = fixture.returnedApplications.map { .passRetained($0) }
@@ -302,6 +306,6 @@ private let fixtureCopyContents: @convention(c) (
 private let fixtureValidateApplication: @convention(c) (SecTrustedApplication, UnsafePointer<CChar>) -> OSStatus = { application, path in
     let fixture = KeychainACLFixture.current
     guard CFArrayContainsValue(fixture.applications, CFRange(location: 0, length: 1),
-                              Unmanaged.passUnretained(application).toOpaque()) else { return errSecParam }
+                               Unmanaged.passUnretained(application).toOpaque()) else { return errSecParam }
     return String(cString: path) == "/fixture/zisla" ? fixture.validationStatus : errSecAuthFailed
 }

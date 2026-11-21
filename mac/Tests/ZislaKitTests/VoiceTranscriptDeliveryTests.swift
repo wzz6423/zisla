@@ -128,8 +128,8 @@ struct VoiceTranscriptDeliveryTests {
         let outcome = delivery.deliver("直接输入这里", to: 4_242)
 
         #expect(outcome == .copiedAndPasted)
-        #expect(hoveredTranscript == nil)  // A known target PID bypasses hovered input.
-        #expect(postedPID == 4_242)        // Paste directly into the target process.
+        #expect(hoveredTranscript == nil) // A known target PID bypasses hovered input.
+        #expect(postedPID == 4_242) // Paste directly into the target process.
         #expect(pasteboard.string(forType: .string) == "直接输入这里")
     }
 
@@ -154,7 +154,7 @@ struct VoiceTranscriptDeliveryTests {
         let outcome = delivery.deliver("回退输入", to: nil)
 
         #expect(outcome == .copiedAndPasted)
-        #expect(hoveredInputAttempts == 1)  // Without a target PID, use hovered input.
+        #expect(hoveredInputAttempts == 1) // Without a target PID, use hovered input.
         #expect(postedPID == nil)
         #expect(pasteboard.string(forType: .string) == "回退输入")
     }

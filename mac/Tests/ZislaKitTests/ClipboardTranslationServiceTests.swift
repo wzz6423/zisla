@@ -193,7 +193,7 @@ struct ClipboardTranslationServiceTests {
     func myMemorySegmentsUTF8AndPreservesAllSourceWhitespace(whitespaceChunk: Bool) async throws {
         let prefix = whitespaceChunk
             ? "Hello world. This paragraph describes how we translate complete English sentences while keeping whitespace unchanged. "
-                + String(repeating: " ", count: 1_200)
+            + String(repeating: " ", count: 1_200)
             : " \n\t"
         let text = prefix + String(repeating: "This is English text with + symbols & punctuation.\n", count: 35) + "\tEND. \n"
         let session = session { request in

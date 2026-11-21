@@ -208,7 +208,8 @@ struct BrowserDownloadMetadataReaderTests {
         let fixture = try BrowserDownloadMetadataFixture(profile: profile)
         defer { try? FileManager.default.removeItem(at: fixture.history.root) }
         try fixture.write([.init(value: BrowserDownloadMetadataFixture.download(
-            current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg"))])
+            current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg"
+        ))])
         #expect(BrowserDownloadFileNameResolver(homeDirectory: fixture.history.home)
             .fileNames(for: [fixture.history.temporaryURL: agent])[fixture.history.temporaryURL] == "Cursor.dmg")
     }
@@ -239,9 +240,9 @@ struct BrowserDownloadMetadataReaderTests {
         try fixture.history.insertDownload(targetPath: "/Downloads/stale-history.dmg")
         try fixture.write([.init(value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/stale-table.dmg"))], storage: .snappyTwo)
         let latest = BrowserDownloadMetadataFixture.Record(sequence: 20,
-            value: deleted ? nil : BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/Cursor.dmg"))
+                                                           value: deleted ? nil : BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/Cursor.dmg"))
         let old = BrowserDownloadMetadataFixture.Record(sequence: 3,
-            value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/stale-log.dmg"))
+                                                        value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/stale-log.dmg"))
         try BrowserDownloadMetadataFixture.log([BrowserDownloadMetadataFixture.batch(latest), BrowserDownloadMetadataFixture.batch(old)])
             .write(to: fixture.directory.appendingPathComponent("000002.log"))
         let names = BrowserDownloadFileNameResolver(homeDirectory: fixture.history.home).fileNames(for: [current: .chrome])
@@ -254,7 +255,8 @@ struct BrowserDownloadMetadataReaderTests {
         defer { try? FileManager.default.removeItem(at: fixture.history.root) }
         try fixture.history.insertDownload(targetPath: "/Downloads/stale.dmg")
         try fixture.write([.init(value: BrowserDownloadMetadataFixture.download(
-            current: fixture.history.temporaryURL.path, target: "/Downloads/old.dmg", state: state))])
+            current: fixture.history.temporaryURL.path, target: "/Downloads/old.dmg", state: state
+        ))])
         #expect(BrowserDownloadFileNameResolver(homeDirectory: fixture.history.home)
             .fileNames(for: [fixture.history.temporaryURL: .chrome]).isEmpty)
     }
@@ -274,7 +276,8 @@ struct BrowserDownloadMetadataReaderTests {
         let fixture = try BrowserDownloadMetadataFixture()
         defer { try? FileManager.default.removeItem(at: fixture.history.root) }
         try fixture.write([.init(key: "20_other-client", value: BrowserDownloadMetadataFixture.download(
-            current: fixture.history.temporaryURL.path, target: "/Downloads/unrelated.dmg"))])
+            current: fixture.history.temporaryURL.path, target: "/Downloads/unrelated.dmg"
+        ))])
         #expect(BrowserDownloadFileNameResolver(homeDirectory: fixture.history.home)
             .fileNames(for: [fixture.history.temporaryURL: .chrome]).isEmpty)
     }
@@ -289,7 +292,7 @@ struct BrowserDownloadMetadataReaderTests {
         try fixture.write([
             .init(value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/Cursor.dmg")),
             .init(key: "21_download,other-guid", sequence: 2,
-                value: BrowserDownloadMetadataFixture.field(1, BrowserDownloadMetadataFixture.field(4, malformedProgress))),
+                  value: BrowserDownloadMetadataFixture.field(1, BrowserDownloadMetadataFixture.field(4, malformedProgress))),
         ])
         let rows = try BrowserDownloadMetadataReader.rows(at: fixture.directory, currentPaths: [current.path])
         #expect(rows == [["current_path": current.path, "target_path": "/Downloads/Cursor.dmg"]])
@@ -306,7 +309,7 @@ struct BrowserDownloadMetadataReaderTests {
             let current = fixture.history.temporaryURL.deletingLastPathComponent().appendingPathComponent("未确认 '\(index)'😺.crdownload")
             let target = "学习资料 '\(index)'😺.zip"
             records.append(.init(key: "21_download,guid-\(index)", sequence: UInt64(index + 1),
-                value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/\(target)")))
+                                 value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/\(target)")))
             downloads[current] = .chrome
             expected[current] = target
         }
@@ -321,7 +324,8 @@ struct BrowserDownloadMetadataReaderTests {
         defer { try? FileManager.default.removeItem(at: fixture.history.root) }
         let record = BrowserDownloadMetadataFixture.Record(value: BrowserDownloadMetadataFixture.download(
             current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg",
-            extra: BrowserDownloadMetadataFixture.field(1, Data(repeating: 120, count: 90_000))))
+            extra: BrowserDownloadMetadataFixture.field(1, Data(repeating: 120, count: 90_000))
+        ))
         try fixture.write([record])
         let log = fixture.directory.appendingPathComponent("000002.log")
         let tail = BrowserDownloadMetadataFixture.physical(BrowserDownloadMetadataFixture.batch(.init(sequence: 50, value: nil)))
@@ -341,13 +345,13 @@ struct BrowserDownloadMetadataReaderTests {
         let current = fixture.history.temporaryURL
         try fixture.write([.init(sequence: 99, value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/obsolete.dmg"))], storage: .table)
         let live = BrowserDownloadMetadataFixture.table([.init(sequence: 5,
-            value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/Cursor.dmg"))])
+                                                               value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/Cursor.dmg"))])
         try live.write(to: fixture.directory.appendingPathComponent("000004.ldb"))
         let initial = Data([2, 2]) + BrowserDownloadMetadataFixture.newTable(number: 3, size: 1)
         let edit = Data([6, 0, 3, 2, 6]) + BrowserDownloadMetadataFixture.newTable(number: 4, size: live.count)
         try BrowserDownloadMetadataFixture.log([initial, edit]).write(to: fixture.directory.appendingPathComponent("MANIFEST-000001"))
         try BrowserDownloadMetadataFixture.log([BrowserDownloadMetadataFixture.batch(.init(sequence: 100,
-            value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/obsolete-log.dmg")))])
+                                                                                           value: BrowserDownloadMetadataFixture.download(current: current.path, target: "/Downloads/obsolete-log.dmg")))])
             .write(to: fixture.directory.appendingPathComponent("000002.log"))
         try Data().write(to: fixture.directory.appendingPathComponent("000006.log"))
         #expect(BrowserDownloadFileNameResolver(homeDirectory: fixture.history.home).fileNames(for: [current: .chrome])[current] == "Cursor.dmg")
@@ -358,10 +362,11 @@ struct BrowserDownloadMetadataReaderTests {
         let fixture = try BrowserDownloadMetadataFixture()
         defer { try? FileManager.default.removeItem(at: fixture.history.root) }
         try fixture.write([.init(value: BrowserDownloadMetadataFixture.download(
-            current: fixture.history.temporaryURL.path, target: "/Downloads/older.dmg"))], storage: .table)
+            current: fixture.history.temporaryURL.path, target: "/Downloads/older.dmg"
+        ))], storage: .table)
         try FileManager.default.removeItem(at: fixture.directory.appendingPathComponent("000003.ldb"))
         try BrowserDownloadMetadataFixture.log([BrowserDownloadMetadataFixture.batch(.init(sequence: 5,
-            value: BrowserDownloadMetadataFixture.download(current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg")))])
+                                                                                           value: BrowserDownloadMetadataFixture.download(current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg")))])
             .write(to: fixture.directory.appendingPathComponent("000002.log"))
         #expect(throws: BrowserDownloadMetadataReader.ReadError.self) {
             try BrowserDownloadMetadataReader.rows(at: fixture.directory, currentPaths: [fixture.history.temporaryURL.path])
@@ -382,7 +387,8 @@ struct BrowserDownloadMetadataReaderTests {
         let fixture = try BrowserDownloadMetadataFixture()
         defer { try? FileManager.default.removeItem(at: fixture.history.root) }
         let record = BrowserDownloadMetadataFixture.Record(value: BrowserDownloadMetadataFixture.download(
-            current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg"))
+            current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg"
+        ))
         try fixture.write([record], storage: failure == "tableChecksum" || failure == "missingTable" ? .snappyTwo : .log)
         let log = fixture.directory.appendingPathComponent("000002.log")
         switch failure {
@@ -442,7 +448,8 @@ struct BrowserDownloadMetadataReaderTests {
         defer { try? FileManager.default.removeItem(at: fixture.history.root) }
         let resolver = BrowserDownloadFileNameResolver(homeDirectory: fixture.history.home)
         let record = BrowserDownloadMetadataFixture.Record(value: BrowserDownloadMetadataFixture.download(
-            current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg"))
+            current: fixture.history.temporaryURL.path, target: "/Downloads/Cursor.dmg"
+        ))
         try fixture.write([record])
         let batch = BrowserDownloadMetadataFixture.batch(record)
         let log = fixture.directory.appendingPathComponent("000002.log")

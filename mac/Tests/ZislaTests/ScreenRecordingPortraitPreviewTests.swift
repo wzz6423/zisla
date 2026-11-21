@@ -124,14 +124,14 @@ struct ScreenRecordingPortraitPreviewTests {
         var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 30), presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         try #require(CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: buffer,
-            formatDescription: try #require(description), sampleTiming: &timing, sampleBufferOut: &sample) == noErr)
+                                                              formatDescription: try #require(description), sampleTiming: &timing, sampleBufferOut: &sample) == noErr)
         return try #require(sample)
     }
 
     private func missingImage() throws -> CMSampleBuffer {
         var sample: CMSampleBuffer?
         try #require(CMSampleBufferCreateReady(allocator: nil, dataBuffer: nil, formatDescription: nil, sampleCount: 0,
-            sampleTimingEntryCount: 0, sampleTimingArray: nil, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &sample) == noErr)
+                                               sampleTimingEntryCount: 0, sampleTimingArray: nil, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &sample) == noErr)
         return try #require(sample)
     }
 }

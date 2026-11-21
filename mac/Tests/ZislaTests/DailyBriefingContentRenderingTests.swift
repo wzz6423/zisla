@@ -44,7 +44,7 @@ struct DailyBriefingContentRenderingTests {
         #expect(image.width == 225)
         let charts: Set<DailyBriefingContent> = [.hourlyUsage, .applicationUsage, .keyPressTrend, .powerTrend]
         #expect(image.height - empty.height >= (charts.contains(content) ? 40 : 12),
-            "The chosen content must allocate its visible content, beyond container spacing")
+                "The chosen content must allocate its visible content, beyond container spacing")
     }
 
     @Test(arguments: DailyBriefingTemplate.allCases)
@@ -75,9 +75,9 @@ struct DailyBriefingContentRenderingTests {
         day.hourlyKeyPresses = Array(repeating: 0, count: 24)
         day.powerSamples = [.init(date: day.date, averageWatts: 0)]
         let selected: Set<DailyBriefingContent> = [.localUsage, .workTime, .notificationCount,
-            .clipboardCaptured, .completedFocusTime, .keyPressTrend, .powerTrend, .peakFan, .allDevicesUsage]
+                                                   .clipboardCaptured, .completedFocusTime, .keyPressTrend, .powerTrend, .peakFan, .allDevicesUsage]
         let report = DailyBriefingReport(day: day, generatedAt: date, typing: nil,
-            allDeviceSeconds: 0, notificationCount: 0, selectedContent: selected)
+                                         allDeviceSeconds: 0, notificationCount: 0, selectedContent: selected)
         let view = poster(report)
         #expect(view.displayedContent == selected.subtracting([.peakFan]))
         #expect(view.value(for: .notificationCount) == "0")
@@ -101,7 +101,7 @@ struct DailyBriefingContentRenderingTests {
     func knownActivityDoesNotInventUsageAndPreservesLegitimateZeroCounts() {
         let day = DailyBriefingDay(date: date, calendar: DailyBriefingDay.calendar)
         let report = DailyBriefingReport(day: day, generatedAt: date, typing: nil, allDeviceSeconds: nil,
-            selectedContent: [.localUsage, .workTime, .islandOpenings, .clipboardCaptured, .completedFocusTime])
+                                         selectedContent: [.localUsage, .workTime, .islandOpenings, .clipboardCaptured, .completedFocusTime])
         #expect(poster(report).displayedContent == [.islandOpenings, .clipboardCaptured, .completedFocusTime])
 
         var archived = report
@@ -161,9 +161,9 @@ struct DailyBriefingContentRenderingTests {
     func activityMetricsUseTheirMatchingRecordedEvents() {
         let view = poster(.example(at: date))
         let expected: [DailyBriefingContent: String] = [.clipboardCaptured: "34", .clipboardReused: "12",
-            .shelfItemsAdded: "9", .shelfItemsCopied: "6", .pomodoroStarted: "5", .pomodoroCompleted: "3",
-            .noteCreated: "3", .noteSaved: "7", .noteDeleted: "1", .quickNoteCreated: "2",
-            .quickNoteSaved: "4", .quickNoteDeleted: "1", .unlockCount: "8"]
+                                                        .shelfItemsAdded: "9", .shelfItemsCopied: "6", .pomodoroStarted: "5", .pomodoroCompleted: "3",
+                                                        .noteCreated: "3", .noteSaved: "7", .noteDeleted: "1", .quickNoteCreated: "2",
+                                                        .quickNoteSaved: "4", .quickNoteDeleted: "1", .unlockCount: "8"]
         for (content, value) in expected { #expect(view.value(for: content) == value) }
     }
 

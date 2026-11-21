@@ -48,7 +48,7 @@ struct AIModelUsagePresentationTests {
         #expect(DailyModelUsageList.tokenBreakdown(model, locale: AppLanguage.german.locale) == "Eingabe 2000 M · Ausgabe 7,3 M")
         #expect(DailyModelUsageList.tokenBreakdown(model, locale: Locale(identifier: "en_US")) == "Input 2000 M · Output 7.3 M")
         #expect(DailyModelUsageList.modelName(AIModelUsage(provider: .claude, model: nil, inputTokens: 1, outputTokens: 0),
-            locale: Locale(identifier: "ar_EG")) == AppLocalization.string("未知模型", language: .arabic))
+                                              locale: Locale(identifier: "ar_EG")) == AppLocalization.string("未知模型", language: .arabic))
         #expect(model.provider == .codex)
         #expect(AIUsageAnalytics.formatTokenAxisValue(model.inputTokens) == "2B")
     }
@@ -102,7 +102,7 @@ struct AIModelUsagePresentationTests {
             AIModelUsage(provider: .claude, model: "claude-fable-5.2", inputTokens: 54_100_000, outputTokens: 1_000_000),
         ]
         let day = AIDailyModelUsage(date: Date(timeIntervalSince1970: 1_800_000_000),
-            inputTokens: 2_055_400_000, outputTokens: 8_308_000, models: models)
+                                    inputTokens: 2_055_400_000, outputTokens: 8_308_000, models: models)
         let root = DailyModelUsageList(day: day)
             .environment(\.locale, language.locale)
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
@@ -110,7 +110,7 @@ struct AIModelUsagePresentationTests {
         let host = NSHostingView(rootView: root)
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 220, height: 300),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -130,7 +130,7 @@ struct AIModelUsagePresentationTests {
             let countsFrame = counts.accessibilityFrame()
             let referenceWidth = NSAttributedString(string: model.model ?? "", attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium)]).size().width
             #expect(nameFrame.width >= referenceWidth * 0.75 - 1 && nameFrame.height >= 9,
-                "Model \(model.model ?? "") cannot collapse: frame \(nameFrame), natural width \(referenceWidth)")
+                    "Model \(model.model ?? "") cannot collapse: frame \(nameFrame), natural width \(referenceWidth)")
             #expect(countsFrame.width > 0 && countsFrame.height >= 9)
             #expect(abs(nameFrame.midY - countsFrame.midY) < 2, "Model name and counts must occupy one line")
             #expect(contentBounds.insetBy(dx: -1, dy: -1).contains(nameFrame))
@@ -147,9 +147,9 @@ struct AIModelUsagePresentationTests {
     @Test @MainActor
     func modelRowsFitNarrowIslandWidthsWithLongNamesAndRTL() throws {
         let model = AIModelUsage(provider: .codex, model: String(repeating: "gpt-model-long-name-", count: 8),
-            inputTokens: Int.max, outputTokens: 99_999)
+                                 inputTokens: Int.max, outputTokens: 99_999)
         let day = AIDailyModelUsage(date: Date(timeIntervalSince1970: 1_800_000_000),
-            inputTokens: Int.max, outputTokens: 99_999, models: [model])
+                                    inputTokens: Int.max, outputTokens: 99_999, models: [model])
         for width in [CGFloat(120), 220, 340] {
             let view = DailyModelUsageList(day: day)
                 .frame(width: width)
@@ -175,7 +175,7 @@ struct AIModelUsagePresentationTests {
         let poster = DailyBriefingPoster(report: report, template: template, language: language)
         let host = NSHostingView(rootView: poster)
         let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 900, height: 800),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -205,7 +205,7 @@ struct AIModelUsagePresentationTests {
         let darkImage = try #require(dark.cgImage)
         #expect(lightImage.width == darkImage.width && lightImage.height == darkImage.height)
         #expect(try #require(lightImage.dataProvider?.data) as Data == #require(darkImage.dataProvider?.data) as Data,
-            "The poster's fixed background must keep matching brand icon colors in both desktop appearances")
+                "The poster's fixed background must keep matching brand icon colors in both desktop appearances")
         #expect(!window.isVisible)
     }
 
@@ -218,27 +218,27 @@ struct AIModelUsagePresentationTests {
         let day = DailyBriefingDay.calendar.startOfDay(for: date)
         let repository = AIStateRepository(directoryURL: root.appendingPathComponent("ai"))
         try repository.recordDetectedUsage([AIUsageSample(sourceID: "briefing", provider: .codex,
-            timestamp: date, inputTokens: 10, outputTokens: 2, model: "gpt-6.1-sol")])
+                                                          timestamp: date, inputTokens: 10, outputTokens: 2, model: "gpt-6.1-sol")])
         var exported: [DailyBriefingReport] = []
         let controller = DailyBriefingController(store: DailyBriefingStore(fileURL: root.appendingPathComponent("briefing.json")),
-            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: nil) },
-            typing: { _ in nil }, readScreenTime: { _ in .init() },
-            readAIUsage: { range in
-                #expect(range.start == day)
-                return try repository.loadUsageHistory(startingAt: range.start, endingBefore: range.end)
-            }, export: { report, _, _, folder in
-                exported.append(report)
-                return folder.appendingPathComponent("fixture.png")
-            })
+                                                 observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: nil) },
+                                                 typing: { _ in nil }, readScreenTime: { _ in .init() },
+                                                 readAIUsage: { range in
+                                                     #expect(range.start == day)
+                                                     return try repository.loadUsageHistory(startingAt: range.start, endingBefore: range.end)
+                                                 }, export: { report, _, _, folder in
+                                                     exported.append(report)
+                                                     return folder.appendingPathComponent("fixture.png")
+                                                 })
         controller.configure(settings: .init(readsSystemScreenTime: false, selectedContent: [.aiModelUsage]),
-            directory: root, language: .english, startsTimer: false)
+                             directory: root, language: .english, startsTimer: false)
         await controller.exportToday(at: date.addingTimeInterval(30))
         let report = try #require(exported.first)
         #expect(report.aiUsage?.totalTokens == 12)
         #expect(report.aiUsage?.models.first?.model == "gpt-6.1-sol")
         #expect(DailyBriefingPoster(report: report, template: .minimal, language: .english).displayedContent == [.aiModelUsage])
         controller.configure(settings: .init(readsSystemScreenTime: false, selectedContent: []),
-            directory: root, language: .english, startsTimer: false)
+                             directory: root, language: .english, startsTimer: false)
         await controller.exportToday(at: date.addingTimeInterval(60))
         #expect(exported.count == 2)
         #expect(exported.last?.aiUsage == nil)
@@ -250,11 +250,11 @@ struct AIModelUsagePresentationTests {
         defer { try? FileManager.default.removeItem(at: root) }
         var exports = 0
         let controller = DailyBriefingController(store: DailyBriefingStore(fileURL: root.appendingPathComponent("briefing.json")),
-            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: false, isListening: nil) },
-            typing: { _ in nil }, readScreenTime: { _ in .init() }, readAIUsage: { _ in throw CocoaError(.fileReadCorruptFile) },
-            export: { _, _, _, folder in exports += 1; return folder.appendingPathComponent("fixture.png") })
+                                                 observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: false, isListening: nil) },
+                                                 typing: { _ in nil }, readScreenTime: { _ in .init() }, readAIUsage: { _ in throw CocoaError(.fileReadCorruptFile) },
+                                                 export: { _, _, _, folder in exports += 1; return folder.appendingPathComponent("fixture.png") })
         controller.configure(settings: .init(readsSystemScreenTime: false, selectedContent: [.aiModelUsage]),
-            directory: root, language: .english, startsTimer: false)
+                             directory: root, language: .english, startsTimer: false)
         await controller.exportToday(at: Date(timeIntervalSince1970: 1_800_000_000))
         #expect(exports == 0)
         #expect(controller.errorMessage != nil)

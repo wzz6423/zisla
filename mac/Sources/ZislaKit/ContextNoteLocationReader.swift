@@ -50,8 +50,8 @@ public enum ContextNoteLocationReader {
             return (processIdentifier: hit.processIdentifier, window: direct)
         }
         let surface = captureSurface(at: point, windowInfo: windowInfo, screenFrames: screenFrames,
-            hitProcessIdentifier: hit?.processIdentifier,
-            bundleIdentifier: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier })
+                                     hitProcessIdentifier: hit?.processIdentifier,
+                                     bundleIdentifier: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier })
         return captureWindow(surface: surface, hit: hit, readAttribute: { pid, name in
             let application = AXUIElementCreateApplication(pid)
             AXUIElementSetMessagingTimeout(application, 0.1)
@@ -106,10 +106,10 @@ public enum ContextNoteLocationReader {
               }) else { return surface }
         guard let underlying = topWindow(at: point, windowInfo: windowInfo, excludingProcessIdentifier: excludingProcessIdentifier,
                                          skippingMenuBar: skippingMenuBar, excludingSurface: surface),
-              underlying.layer == CGWindowLevelForKey(.normalWindow) || underlying.isDesktop,
-              underlying.ownerProcessIdentifier == hitProcessIdentifier
-                || (underlying.isDesktop && underlying.ownerName == "Window Server"
-                    && bundleIdentifier(hitProcessIdentifier) == "com.apple.finder") else { return surface }
+            underlying.layer == CGWindowLevelForKey(.normalWindow) || underlying.isDesktop,
+            underlying.ownerProcessIdentifier == hitProcessIdentifier
+            || (underlying.isDesktop && underlying.ownerName == "Window Server"
+                && bundleIdentifier(hitProcessIdentifier) == "com.apple.finder") else { return surface }
         return underlying
     }
 
@@ -219,8 +219,8 @@ public enum ContextNoteLocationReader {
                                                    excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar)
         if surface?.isDesktop != true, let hitProcessIdentifier {
             surface = captureSurface(at: quartzPoint, windowInfo: windowInfo, screenFrames: screens.map(\.frame),
-                hitProcessIdentifier: hitProcessIdentifier(), bundleIdentifier: bundleIdentifier,
-                excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar)
+                                     hitProcessIdentifier: hitProcessIdentifier(), bundleIdentifier: bundleIdentifier,
+                                     excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar)
         }
         guard surface?.isDesktop == true else { return nil }
         return screen.displayID
@@ -232,10 +232,10 @@ public enum ContextNoteLocationReader {
                                         excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false) -> ContextNoteLocation? {
         let snapshots = screens.compactMap { ScreenSnapshot(screen: $0) }
         guard let display = desktopDisplay(at: point, screens: snapshots, windowInfo: windowInfo,
-                                          capturedSurface: capturedSurface, hitProcessIdentifier: hitProcessIdentifier,
-                                          excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar),
-              let screen = screens.first(where: { ScreenSnapshot(screen: $0)?.displayID == display }),
-              let uuid = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue() else { return nil }
+                                           capturedSurface: capturedSurface, hitProcessIdentifier: hitProcessIdentifier,
+                                           excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar),
+            let screen = screens.first(where: { ScreenSnapshot(screen: $0)?.displayID == display }),
+            let uuid = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue() else { return nil }
         return .desktop(displayID: CFUUIDCreateString(nil, uuid) as String, displayName: screen.localizedName)
     }
 
@@ -285,24 +285,23 @@ public enum ContextNoteLocationReader {
 
     private static func pageAddress(in window: AXUIElement) -> String? {
         findPageAddress(in: window,
-            document: { address(attribute(kAXDocumentAttribute, from: $0)) },
-            role: {
-                AXUIElementSetMessagingTimeout($0, 0.05)
-                return attribute(kAXRoleAttribute, from: $0) as? String
-            },
-            url: { address(attribute(kAXURLAttribute, from: $0)) },
-            children: {
-                var values: CFArray?
-                guard AXUIElementCopyAttributeValues($0, kAXChildrenAttribute as CFString, 0, 80, &values) == .success
-                else { return [] }
-                return values as? [AXUIElement] ?? []
-            }
-        )
+                        document: { address(attribute(kAXDocumentAttribute, from: $0)) },
+                        role: {
+                            AXUIElementSetMessagingTimeout($0, 0.05)
+                            return attribute(kAXRoleAttribute, from: $0) as? String
+                        },
+                        url: { address(attribute(kAXURLAttribute, from: $0)) },
+                        children: {
+                            var values: CFArray?
+                            guard AXUIElementCopyAttributeValues($0, kAXChildrenAttribute as CFString, 0, 80, &values) == .success
+                            else { return [] }
+                            return values as? [AXUIElement] ?? []
+                        })
     }
 
     static func findPageAddress<Node>(in root: Node, document: (Node) -> String?, role: (Node) -> String?,
-                                     url: (Node) -> String?, children: (Node) -> [Node],
-                                     now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) -> String? {
+                                      url: (Node) -> String?, children: (Node) -> [Node],
+                                      now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) -> String? {
         if let document = document(root), webURL(document) != nil { return document }
         // Stop at web areas: traversing the page DOM would read unrelated content and grow without bound.
         var queue = [root]

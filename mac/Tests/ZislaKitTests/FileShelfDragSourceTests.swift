@@ -128,13 +128,13 @@ struct FileShelfDragSourceTests {
         source.onSelect = { selections += 1 }
         for count in [1, 2] {
             let event = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [],
-                timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: count, pressure: 1))
+                                                        timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: count, pressure: 1))
             source.mouseUp(with: event)
         }
         #expect(selections == 1 && opens == 0)
         source.onSelect = nil
         let doubleClick = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [],
-            timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 2, pressure: 1))
+                                                          timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 2, pressure: 1))
         source.mouseUp(with: doubleClick)
         #expect(opens == 1)
         let menu = NSMenu()

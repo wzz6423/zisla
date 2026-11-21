@@ -65,7 +65,7 @@ struct DailyBriefingContentTests {
             #expect(try JSONDecoder().decode(DailyBriefingSettings.self, from: data).selectedContent == selection)
         }
         let unknown = try JSONDecoder().decode(DailyBriefingSettings.self,
-            from: Data(#"{"selectedContent":["noteSaved","futureContent"]}"#.utf8))
+                                               from: Data(#"{"selectedContent":["noteSaved","futureContent"]}"#.utf8))
         #expect(unknown.selectedContent == [.noteSaved])
         #expect(throws: (any Error).self) {
             try JSONDecoder().decode(DailyBriefingSettings.self, from: Data(#"{"selectedContent":"all"}"#.utf8))

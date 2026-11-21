@@ -37,7 +37,7 @@ struct AIUsageHistoryControllerTests {
     func readAndClearFailuresRetainHistoryAndCanRetry() async {
         let reads = HistoryReadGate()
         let controller = AIUsageHistoryController(read: { try await reads.read() },
-            clear: { throw CocoaError(.fileWriteNoPermission) }, write: { _, _ in })
+                                                  clear: { throw CocoaError(.fileWriteNoPermission) }, write: { _, _ in })
         let initial = Task { await controller.load() }
         for await _ in reads.started { break }
         reads.complete(0, with: .success(history(10)))
@@ -63,7 +63,7 @@ struct AIUsageHistoryControllerTests {
         #expect(controller.loadState == .loaded && controller.history == history(20))
         let emptyRead = HistoryReadGate()
         let emptyController = AIUsageHistoryController(read: { try await emptyRead.read() },
-            clear: { throw CocoaError(.fileWriteNoPermission) }, write: { _, _ in })
+                                                       clear: { throw CocoaError(.fileWriteNoPermission) }, write: { _, _ in })
         let pending = Task { await emptyController.load() }
         for await _ in emptyRead.started { break }
         await emptyController.clearHistory()
@@ -91,7 +91,7 @@ struct AIUsageHistoryControllerTests {
         var snapshot = history(10)
         var exports: [AIUsageHistory] = []
         let controller = AIUsageHistoryController(read: { snapshot }, clear: { snapshot = .init() },
-            write: { value, _ in exports.append(value) })
+                                                  write: { value, _ in exports.append(value) })
         await controller.load()
         snapshot = history(20)
         await controller.load()
@@ -160,7 +160,7 @@ struct AIUsageHistoryControllerTests {
     @MainActor
     private func history(_ input: Int) -> AIUsageHistory {
         let sample = AIUsageSample(provider: .codex, timestamp: Date(timeIntervalSince1970: 1_800_000_000),
-            inputTokens: input, outputTokens: 2, model: "fixture")
+                                   inputTokens: input, outputTokens: 2, model: "fixture")
         return AIUsageHistory(usageSamples: [sample], modelUsageSamples: [sample])
     }
 }

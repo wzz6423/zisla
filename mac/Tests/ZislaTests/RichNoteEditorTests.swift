@@ -24,14 +24,14 @@ struct RichNoteEditorTests {
         let webView = try await waitForWebView(in: hosting)
         try await waitUntilEditorIsReady(in: webView)
         let result = try #require(await webView.evaluateJavaScript("""
-            (() => {
-              const root = document.documentElement;
-              const bar = getComputedStyle(root, '::-webkit-scrollbar');
-              window.scrollTo(0, 150);
-              return { width: bar.width, offset: window.scrollY,
-                       text: document.querySelector('#editor b').textContent };
-            })()
-            """) as? [String: Any])
+        (() => {
+          const root = document.documentElement;
+          const bar = getComputedStyle(root, '::-webkit-scrollbar');
+          window.scrollTo(0, 150);
+          return { width: bar.width, offset: window.scrollY,
+                   text: document.querySelector('#editor b').textContent };
+        })()
+        """) as? [String: Any])
         #expect(result["width"] as? String == "3px")
         #expect(result["offset"] as? Double == 150)
         #expect(result["text"] as? String == "Fixture note")
@@ -43,8 +43,7 @@ struct RichNoteEditorTests {
     func inputMethodReportsIslandWindowLevelWithoutChangingPanelOrdering() async throws {
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(html: "<div><br></div>", command: nil, isEditable: true, onChange: { _, _ in })
-                .frame(width: 320, height: 240)
-        )
+                .frame(width: 320, height: 240))
         let panel = IslandPanel(
             contentView: hostingView,
             frame: CGRect(x: 0, y: 0, width: 320, height: 240)
@@ -63,8 +62,7 @@ struct RichNoteEditorTests {
     func inputMethodTracksExpandedEditorWindowLevel() async throws {
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(html: "<div>输入</div>", command: nil, isEditable: true, onChange: { _, _ in })
-                .frame(width: 320, height: 240)
-        )
+                .frame(width: 320, height: 240))
         let window = QuickNotesEditorWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.titled],
@@ -97,8 +95,7 @@ struct RichNoteEditorTests {
     func inputMethodUsesNormalLevelAfterEditorDetachesFromWindow() async throws {
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(html: "<div><br></div>", command: nil, isEditable: true, onChange: { _, _ in })
-                .frame(width: 320, height: 240)
-        )
+                .frame(width: 320, height: 240))
         let panel = IslandPanel(
             contentView: hostingView,
             frame: CGRect(x: 0, y: 0, width: 320, height: 240)
@@ -159,13 +156,13 @@ struct RichNoteEditorTests {
             let copiedHTML = try #require(pasteboard.string(forType: .html))
             let arguments = String(decoding: try JSONSerialization.data(withJSONObject: [copiedHTML, selector]), as: UTF8.self)
             let formattedText = try await webView.evaluateJavaScript("""
-                (() => {
-                  const [html, selector] = \(arguments);
-                  const template = document.createElement('template');
-                  template.innerHTML = html;
-                  return template.content.querySelector(selector)?.textContent ?? null;
-                })();
-                """)
+            (() => {
+              const [html, selector] = \(arguments);
+              const template = document.createElement('template');
+              template.innerHTML = html;
+              return template.content.querySelector(selector)?.textContent ?? null;
+            })();
+            """)
             #expect(formattedText as? String == plainText)
             #expect(copyCount == 1)
         }
@@ -228,11 +225,11 @@ struct RichNoteEditorTests {
             onCopy: { copiedValues.append(pasteboard.string(forType: .string)) }
         ) { webView, changes in
             _ = try await dispatchCopy(in: webView, selection: """
-                range.selectNodeContents(editor.querySelector('#first')); selection.addRange(range);
-                editor.dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true }));
-                selection.removeAllRanges();
-                range.selectNodeContents(editor.querySelector('#second')); selection.addRange(range);
-                """)
+            range.selectNodeContents(editor.querySelector('#first')); selection.addRange(range);
+            editor.dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true }));
+            selection.removeAllRanges();
+            range.selectNodeContents(editor.querySelector('#second')); selection.addRange(range);
+            """)
             _ = try await waitForChange(in: changes) { _ in true }
             #expect(copiedValues == ["first", "second"])
             #expect(pasteboard.string(forType: .string) == "second")
@@ -324,10 +321,10 @@ struct RichNoteEditorTests {
         var edits: [NotesNativeTextEdit] = []
         var htmlChanges = 0
         let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
-            isEditable: true, nativeTextContent: content, onNativeTextChange: { id, edit in
-                #expect(id == "native")
-                edits.append(edit)
-            }, onChange: { _, _, _ in htmlChanges += 1 }).frame(width: 320, height: 240))
+                                                             isEditable: true, nativeTextContent: content, onNativeTextChange: { id, edit in
+                                                                 #expect(id == "native")
+                                                                 edits.append(edit)
+                                                             }, onChange: { _, _, _ in htmlChanges += 1 }).frame(width: 320, height: 240))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = hosting
@@ -336,37 +333,37 @@ struct RichNoteEditorTests {
         try await waitUntilEditorIsReady(in: webView)
         #expect(edits.isEmpty)
         _ = try await webView.evaluateJavaScript("""
-            (() => { window.webkit.messageHandlers.richNoteChanged.postMessage({
-              html: '<div>invalid native payload</div>', token: window.zisla.documentToken()
-            }); return true; })()
-            """)
+        (() => { window.webkit.messageHandlers.richNoteChanged.postMessage({
+          html: '<div>invalid native payload</div>', token: window.zisla.documentToken()
+        }); return true; })()
+        """)
         let result = try #require(await webView.evaluateJavaScript("""
-            (() => {
-              const editor = document.getElementById('editor');
-              const fields = editor.querySelectorAll('[data-zisla-native-text]');
-              const drawing = editor.querySelector('[data-zisla-native-content]');
-              const original = drawing.innerHTML;
-              const select = field => {
-                field.focus();
-                const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
-                const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-              };
-              select(fields[0]); window.zisla.exec('insertText', '标题\\n');
-              select(fields[1]); window.zisla.exec('insertText', '\\n结尾 👩‍💻');
-              const range = document.createRange(); range.selectNode(drawing);
-              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-              window.zisla.exec('delete'); window.zisla.exec('bold'); window.zisla.block('h1');
-              range.setStart(fields[0], 0); range.setEnd(fields[1], fields[1].childNodes.length);
-              selection.removeAllRanges(); selection.addRange(range);
-              const input = new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'deleteContentBackward' });
-              const cut = new ClipboardEvent('cut', { bubbles: true, cancelable: true });
-              const drop = new DragEvent('drop', { bubbles: true, cancelable: true });
-              fields[0].dispatchEvent(input); fields[0].dispatchEvent(cut); fields[0].dispatchEvent(drop);
-              return { unchanged: drawing.innerHTML === original, readonly: !drawing.isContentEditable,
-                       fields: [...fields].map(field => field.isContentEditable), source: drawing.querySelector('img').getAttribute('src'),
-                       protectedInput: input.defaultPrevented && cut.defaultPrevented && drop.defaultPrevented };
-            })()
-            """) as? [String: Any])
+        (() => {
+          const editor = document.getElementById('editor');
+          const fields = editor.querySelectorAll('[data-zisla-native-text]');
+          const drawing = editor.querySelector('[data-zisla-native-content]');
+          const original = drawing.innerHTML;
+          const select = field => {
+            field.focus();
+            const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+            const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+          };
+          select(fields[0]); window.zisla.exec('insertText', '标题\\n');
+          select(fields[1]); window.zisla.exec('insertText', '\\n结尾 👩‍💻');
+          const range = document.createRange(); range.selectNode(drawing);
+          const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+          window.zisla.exec('delete'); window.zisla.exec('bold'); window.zisla.block('h1');
+          range.setStart(fields[0], 0); range.setEnd(fields[1], fields[1].childNodes.length);
+          selection.removeAllRanges(); selection.addRange(range);
+          const input = new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'deleteContentBackward' });
+          const cut = new ClipboardEvent('cut', { bubbles: true, cancelable: true });
+          const drop = new DragEvent('drop', { bubbles: true, cancelable: true });
+          fields[0].dispatchEvent(input); fields[0].dispatchEvent(cut); fields[0].dispatchEvent(drop);
+          return { unchanged: drawing.innerHTML === original, readonly: !drawing.isContentEditable,
+                   fields: [...fields].map(field => field.isContentEditable), source: drawing.querySelector('img').getAttribute('src'),
+                   protectedInput: input.defaultPrevented && cut.defaultPrevented && drop.defaultPrevented };
+        })()
+        """) as? [String: Any])
         for _ in 0..<100 {
             if !edits.isEmpty { break }
             try await Task.sleep(for: .milliseconds(10))
@@ -389,8 +386,8 @@ struct RichNoteEditorTests {
         let content = NotesAppBridge.NoteContent(plainText: "前面\n\u{FFFC}\n后面", bodyHTML: "<div>前面</div><div><img src='data:image/png;base64,AAAA'></div><div>后面</div>", requiresNativeTextEditing: true)
         var edit: NotesNativeTextEdit?
         let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
-            isEditable: true, nativeTextContent: content, onNativeTextChange: { _, value in edit = value },
-            onChange: { _, _, _ in Issue.record("Native paste must not write HTML") }).frame(width: 320, height: 240))
+                                                             isEditable: true, nativeTextContent: content, onNativeTextChange: { _, value in edit = value },
+                                                             onChange: { _, _, _ in Issue.record("Native paste must not write HTML") }).frame(width: 320, height: 240))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = hosting
@@ -398,23 +395,23 @@ struct RichNoteEditorTests {
         let webView = try await waitForWebView(in: hosting)
         try await waitUntilEditorIsReady(in: webView)
         let result = try #require(await webView.evaluateJavaScript("""
-            (() => {
-              const editor = document.getElementById('editor');
-              const field = editor.querySelector('[data-zisla-native-text]');
-              const fields = editor.querySelectorAll('[data-zisla-native-text]');
-              field.focus();
-              const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
-              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-              const data = new DataTransfer(); data.setData('text/plain', '<b>粘贴</b>'); data.setData('text/html', '<img src="https://example.com">');
-              const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
-              field.dispatchEvent(event);
-              window.zisla.setEditable(false);
-              const original = field.innerHTML;
-              window.zisla.exec('insertText', '不应插入');
-              return { prevented: event.defaultPrevented, imageCount: editor.querySelectorAll('img').length,
-                       fields: [...fields].map(field => field.isContentEditable), readonly: original === field.innerHTML };
-            })()
-            """) as? [String: Any])
+        (() => {
+          const editor = document.getElementById('editor');
+          const field = editor.querySelector('[data-zisla-native-text]');
+          const fields = editor.querySelectorAll('[data-zisla-native-text]');
+          field.focus();
+          const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+          const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+          const data = new DataTransfer(); data.setData('text/plain', '<b>粘贴</b>'); data.setData('text/html', '<img src="https://example.com">');
+          const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
+          field.dispatchEvent(event);
+          window.zisla.setEditable(false);
+          const original = field.innerHTML;
+          window.zisla.exec('insertText', '不应插入');
+          return { prevented: event.defaultPrevented, imageCount: editor.querySelectorAll('img').length,
+                   fields: [...fields].map(field => field.isContentEditable), readonly: original === field.innerHTML };
+        })()
+        """) as? [String: Any])
         for _ in 0..<100 {
             if edit != nil { break }
             try await Task.sleep(for: .milliseconds(10))
@@ -450,9 +447,9 @@ struct RichNoteEditorTests {
                 #expect(try #require(await iterator.next()).suffix == expected, "Undo and redo must save the exact native text")
             }
             _ = try await webView.evaluateJavaScript("""
-                document.execCommand('insertLineBreak', false, null);
-                window.zisla.exec('insertText', '结尾');
-                """)
+            document.execCommand('insertLineBreak', false, null);
+            window.zisla.exec('insertText', '结尾');
+            """)
             #expect(try #require(await iterator.next()).suffix == text + "\n结尾", "A keyboard line break must preserve its text newline")
             for (html, expected) in [
                 ("首行<br>次行<br><br>", "首行\n次行\n"),
@@ -467,12 +464,12 @@ struct RichNoteEditorTests {
             ] {
                 let markup = try javaScriptStringLiteral(html)
                 _ = try await webView.evaluateJavaScript("""
-                    (() => {
-                      const field = document.querySelectorAll('[data-zisla-native-text]')[1];
-                      field.innerHTML = \(markup);
-                      field.dispatchEvent(new Event('input', { bubbles: true }));
-                    })()
-                    """)
+                (() => {
+                  const field = document.querySelectorAll('[data-zisla-native-text]')[1];
+                  field.innerHTML = \(markup);
+                  field.dispatchEvent(new Event('input', { bubbles: true }));
+                })()
+                """)
                 #expect(try #require(await iterator.next()).suffix == expected, "Editable DOM line boundaries must preserve plain text: \(html)")
             }
         }
@@ -487,27 +484,27 @@ struct RichNoteEditorTests {
             #expect(previous.prefix == "\n\n")
             #expect(previous.suffix == "\n\n!")
             _ = try await webView.evaluateJavaScript("""
-                (() => {
-                  const originalSet = window.setTimeout;
-                  const originalClear = window.clearTimeout;
-                  const held = new Map();
-                  let nextID = -1;
-                  window.setTimeout = (callback, delay, ...args) => {
-                    if (delay !== 80) return originalSet(callback, delay, ...args);
-                    const id = nextID--; held.set(id, () => callback(...args)); return id;
-                  };
-                  window.clearTimeout = id => held.has(id) ? held.delete(id) : originalClear(id);
-                  window.releaseNativeEmits = () => {
-                    window.setTimeout = originalSet;
-                    window.clearTimeout = originalClear;
-                    const callbacks = [...held.values()]; held.clear();
-                    callbacks.forEach(callback => callback());
-                    return callbacks.length;
-                  };
-                  window.zisla.setHTML("<img src='data:image/png;base64,AAAA'>", window.zisla.documentToken(),
-                    { prefix: '文字\\n', suffix: '文字\\n', protectedText: '\\uFFFC' });
-                })()
-                """)
+            (() => {
+              const originalSet = window.setTimeout;
+              const originalClear = window.clearTimeout;
+              const held = new Map();
+              let nextID = -1;
+              window.setTimeout = (callback, delay, ...args) => {
+                if (delay !== 80) return originalSet(callback, delay, ...args);
+                const id = nextID--; held.set(id, () => callback(...args)); return id;
+              };
+              window.clearTimeout = id => held.has(id) ? held.delete(id) : originalClear(id);
+              window.releaseNativeEmits = () => {
+                window.setTimeout = originalSet;
+                window.clearTimeout = originalClear;
+                const callbacks = [...held.values()]; held.clear();
+                callbacks.forEach(callback => callback());
+                return callbacks.length;
+              };
+              window.zisla.setHTML("<img src='data:image/png;base64,AAAA'>", window.zisla.documentToken(),
+                { prefix: '文字\\n', suffix: '文字\\n', protectedText: '\\uFFFC' });
+            })()
+            """)
             try await insertAtNativeSuffixEnd("!", in: webView)
 
             let started = AsyncStream<Void>.makeStream()
@@ -540,8 +537,8 @@ struct RichNoteEditorTests {
         let second = NotesAppBridge.NoteContent(plainText: "第二条\u{FFFC}", bodyHTML: first.bodyHTML, requiresNativeTextEditing: true)
         var edits: [(String?, NotesNativeTextEdit)] = []
         let coordinator = RichNoteEditor.Coordinator(onChange: { _, _, _ in Issue.record("Native callbacks must not write HTML") },
-            onNativeTextChange: { edits.append(($0, $1)) }, onCopy: nil,
-            pasteboard: RejectingRichNotePasteboard(), isEditable: true)
+                                                     onNativeTextChange: { edits.append(($0, $1)) }, onCopy: nil,
+                                                     pasteboard: RejectingRichNotePasteboard(), isEditable: true)
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(coordinator, name: "richNoteChanged")
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 240), configuration: configuration)
@@ -551,13 +548,13 @@ struct RichNoteEditorTests {
         coordinator.setDocument(noteID: "first", html: first.bodyHTML, nativeTextContent: first)
         try await waitUntilEditorIsReady(in: webView)
         _ = try await webView.evaluateJavaScript("""
-            (() => {
-              const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();
-              const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
-              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-              window.zisla.exec('insertText', '更新');
-            })()
-            """)
+        (() => {
+          const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();
+          const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+          const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+          window.zisla.exec('insertText', '更新');
+        })()
+        """)
         coordinator.setDocument(noteID: "second", html: second.bodyHTML, nativeTextContent: second)
         for _ in 0..<100 {
             if !edits.isEmpty { break }
@@ -637,8 +634,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { _, _ in }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -678,8 +674,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { _, _ in }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -705,8 +700,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { _, _ in }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -755,8 +749,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { _, _ in }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -814,8 +807,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { html, _ in changeCapture.html = html }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -876,8 +868,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { _, _ in }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -927,8 +918,7 @@ struct RichNoteEditorTests {
         """
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(html: sourceHTML, command: nil, isEditable: true, onChange: { _, _ in })
-                .frame(width: 320, height: 240)
-        )
+                .frame(width: 320, height: 240))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: [.borderless], backing: .buffered, defer: false)
         window.alphaValue = 0
         window.contentView = hostingView
@@ -1007,8 +997,7 @@ struct RichNoteEditorTests {
             RichNoteEditorDocumentHost(state: state) { id, html, plainText in
                 capture.changes.append((id, html, plainText))
             }
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: [.borderless], backing: .buffered, defer: false)
         window.alphaValue = 0
         window.contentView = hostingView
@@ -1046,19 +1035,19 @@ struct RichNoteEditorTests {
         let literal = try javaScriptStringLiteral(html)
         try await withCopyEditor(html: "<div><br></div>", pasteboard: RejectingRichNotePasteboard(), onCopy: {}) { webView, changes in
             let result = try #require(await webView.evaluateJavaScript("""
-                (() => {
-                  const editor = document.getElementById('editor');
-                  editor.focus();
-                  const range = document.createRange(); range.selectNodeContents(editor.firstElementChild); range.collapse(true);
-                  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-                  const data = new DataTransfer(); data.setData('text/html', \(literal)); data.setData('text/plain', '粘贴正文');
-                  const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
-                  editor.dispatchEvent(event);
-                  // Synthetic paste events do not run WebKit's native clipboard insertion.
-                  if (!event.defaultPrevented) document.execCommand('insertHTML', false, data.getData('text/html'));
-                  return { prevented: event.defaultPrevented, size: getComputedStyle(editor.lastElementChild).fontSize };
-                })()
-                """) as? [String: Any])
+            (() => {
+              const editor = document.getElementById('editor');
+              editor.focus();
+              const range = document.createRange(); range.selectNodeContents(editor.firstElementChild); range.collapse(true);
+              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              const data = new DataTransfer(); data.setData('text/html', \(literal)); data.setData('text/plain', '粘贴正文');
+              const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
+              editor.dispatchEvent(event);
+              // Synthetic paste events do not run WebKit's native clipboard insertion.
+              if (!event.defaultPrevented) document.execCommand('insertHTML', false, data.getData('text/html'));
+              return { prevented: event.defaultPrevented, size: getComputedStyle(editor.lastElementChild).fontSize };
+            })()
+            """) as? [String: Any])
             #expect(result["prevented"] as? Bool == true, "HTML paste must match the destination style instead of retaining the source's white/small text")
             let saved = try await waitForChange(in: changes) { $0.1.contains("粘贴正文") }
             #expect(result["size"] as? String == "13px")
@@ -1086,28 +1075,28 @@ struct RichNoteEditorTests {
         let existing = "<div><span id='existing' style='color: red; font-size: 18px'>原文</span></div><div id='target'><br></div>"
         try await withCopyEditor(html: existing, pasteboard: RejectingRichNotePasteboard(), onCopy: {}) { webView, changes in
             _ = try await webView.evaluateJavaScript("""
-                (() => {
-                  const editor = document.getElementById('editor'); editor.focus();
-                  const range = document.createRange(); range.selectNodeContents(document.getElementById('target')); range.collapse(true);
-                  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-                  const data = new DataTransfer(); data.setData('text/html', \(literal));
-                  editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
-                })()
-                """)
+            (() => {
+              const editor = document.getElementById('editor'); editor.focus();
+              const range = document.createRange(); range.selectNodeContents(document.getElementById('target')); range.collapse(true);
+              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              const data = new DataTransfer(); data.setData('text/html', \(literal));
+              editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+            })()
+            """)
             let saved = try await waitForChange(in: changes) { $0.1.contains("单元格") }
             let savedLiteral = try javaScriptStringLiteral(saved.1)
             let result = try #require(await webView.evaluateJavaScript("""
-                (() => {
-                  const template = document.createElement('template'); template.innerHTML = \(savedLiteral);
-                  const root = template.content;
-                  const original = root.querySelector('#existing');
-                  return {
-                    color: original.style.color, size: original.style.fontSize,
-                    richContent: ['h2', 'b', 'i', 'u', 'a[href="https://example.com"]', 'ul li', 'table td', 'hr[size="4"]', 'img[src="data:image/png;base64,AAAA"]'].every(selector => root.querySelector(selector)),
-                    unsafeContent: Boolean(root.querySelector('script, form, [onclick], [onerror], a[href^="javascript:"]')) || Boolean(window.zislaCompromised)
-                  };
-                })()
-                """) as? [String: Any])
+            (() => {
+              const template = document.createElement('template'); template.innerHTML = \(savedLiteral);
+              const root = template.content;
+              const original = root.querySelector('#existing');
+              return {
+                color: original.style.color, size: original.style.fontSize,
+                richContent: ['h2', 'b', 'i', 'u', 'a[href="https://example.com"]', 'ul li', 'table td', 'hr[size="4"]', 'img[src="data:image/png;base64,AAAA"]'].every(selector => root.querySelector(selector)),
+                unsafeContent: Boolean(root.querySelector('script, form, [onclick], [onerror], a[href^="javascript:"]')) || Boolean(window.zislaCompromised)
+              };
+            })()
+            """) as? [String: Any])
             #expect(result["color"] as? String == "red")
             #expect(result["size"] as? String == "18px")
             #expect(result["richContent"] as? Bool == true, "Matching paste typography must preserve headings, emphasis, links, lists, tables, and images")
@@ -1122,28 +1111,28 @@ struct RichNoteEditorTests {
         try await withCopyEditor(html: "<div>原文</div>", isEditable: isEditable,
                                  pasteboard: RejectingRichNotePasteboard(), onCopy: {}) { webView, changes in
             let result = try #require(await webView.evaluateJavaScript("""
-                (() => {
-                  const editor = document.getElementById('editor');
-                  const original = editor.innerHTML;
-                  return ['', '粘贴正文'].map(text => {
-                    const data = new DataTransfer(); data.setData('text/plain', text);
-                    const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
-                    editor.dispatchEvent(event);
-                    return !event.defaultPrevented && editor.innerHTML === original;
-                  });
-                })()
-                """) as? [Bool])
+            (() => {
+              const editor = document.getElementById('editor');
+              const original = editor.innerHTML;
+              return ['', '粘贴正文'].map(text => {
+                const data = new DataTransfer(); data.setData('text/plain', text);
+                const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
+                editor.dispatchEvent(event);
+                return !event.defaultPrevented && editor.innerHTML === original;
+              });
+            })()
+            """) as? [Bool])
             #expect(result == [true, true], "Empty and plain-text clipboard data must retain WebKit's native paste behavior")
             #expect(changes.changes.isEmpty)
             if !isEditable {
                 let unchanged = try await webView.evaluateJavaScript("""
-                    (() => {
-                      const editor = document.getElementById('editor'); const original = editor.innerHTML;
-                      const data = new DataTransfer(); data.setData('text/html', '<div style="color: white">不应插入</div>');
-                      editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
-                      return editor.innerHTML === original;
-                    })()
-                    """) as? Bool
+                (() => {
+                  const editor = document.getElementById('editor'); const original = editor.innerHTML;
+                  const data = new DataTransfer(); data.setData('text/html', '<div style="color: white">不应插入</div>');
+                  editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+                  return editor.innerHTML === original;
+                })()
+                """) as? Bool
                 #expect(unchanged == true)
             }
         }
@@ -1154,16 +1143,16 @@ struct RichNoteEditorTests {
         let image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZuoAAAAASUVORK5CYII="
         try await withCopyEditor(html: "<div><br></div>", pasteboard: RejectingRichNotePasteboard(), onCopy: {}) { webView, changes in
             _ = try await webView.evaluateJavaScript("""
-                (() => {
-                  const editor = document.getElementById('editor'); editor.focus();
-                  const range = document.createRange(); range.selectNodeContents(editor.firstElementChild); range.collapse(true);
-                  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-                  const data = new DataTransfer(); data.setData('text/html', '<div>不应插入</div>');
-                  const bytes = Uint8Array.from(atob('\(image)'), char => char.charCodeAt(0));
-                  data.items.add(new File([bytes], 'pixel.png', {type: 'image/png'}));
-                  editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
-                })()
-                """)
+            (() => {
+              const editor = document.getElementById('editor'); editor.focus();
+              const range = document.createRange(); range.selectNodeContents(editor.firstElementChild); range.collapse(true);
+              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              const data = new DataTransfer(); data.setData('text/html', '<div>不应插入</div>');
+              const bytes = Uint8Array.from(atob('\(image)'), char => char.charCodeAt(0));
+              data.items.add(new File([bytes], 'pixel.png', {type: 'image/png'}));
+              editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+            })()
+            """)
             let saved = try await waitForChange(in: changes) { $0.1.contains("<img") }
             #expect(saved.1.contains("data:image/png;base64,\(image)"))
             #expect(saved.1.contains("alt=\"pixel.png\""))
@@ -1181,8 +1170,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { html, _ in changeCapture.html = html }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -1263,8 +1251,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { html, _ in changeCapture.html = html }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -1334,8 +1321,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { html, _ in changeCapture.html = html }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -1399,8 +1385,7 @@ struct RichNoteEditorTests {
         )
         let hostingView = NSHostingView(rootView:
             RichNoteEditorCommandHost(state: state)
-                .frame(width: 320, height: 240)
-        )
+                .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -1453,8 +1438,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { _, _ in }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.borderless],
@@ -1501,8 +1485,7 @@ struct RichNoteEditorTests {
                 isEditable: true,
                 onChange: { _, _ in }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = QuickNotesEditorWindow(
             contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.titled],
@@ -1555,12 +1538,12 @@ struct RichNoteEditorTests {
         body: (WKWebView, AsyncStream<NotesNativeTextEdit>) async throws -> Void
     ) async throws {
         let content = NotesAppBridge.NoteContent(plainText: text + "\u{FFFC}" + text,
-            bodyHTML: "<img src='data:image/png;base64,AAAA'>", requiresNativeTextEditing: true)
+                                                 bodyHTML: "<img src='data:image/png;base64,AAAA'>", requiresNativeTextEditing: true)
         let edits = AsyncStream<NotesNativeTextEdit>.makeStream()
         let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
-            isEditable: true, pasteboard: RejectingRichNotePasteboard(), nativeTextContent: content,
-            onNativeTextChange: { _, edit in edits.continuation.yield(edit) },
-            onChange: { _, _, _ in Issue.record("Native text must not write HTML") }).frame(width: 320, height: 240))
+                                                             isEditable: true, pasteboard: RejectingRichNotePasteboard(), nativeTextContent: content,
+                                                             onNativeTextChange: { _, edit in edits.continuation.yield(edit) },
+                                                             onChange: { _, _, _ in Issue.record("Native text must not write HTML") }).frame(width: 320, height: 240))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = hosting
@@ -1569,17 +1552,17 @@ struct RichNoteEditorTests {
         try await waitUntilEditorIsReady(in: webView)
         if exportsLayoutNewline {
             _ = try await webView.evaluateJavaScript("""
-                (() => {
-                  const innerText = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText').get;
-                  for (const field of document.querySelectorAll('[data-zisla-native-text]')) {
-                    // Older WebKit includes a block's layout newline even when its DOM text is unchanged.
-                    Object.defineProperty(field, 'innerText', { get() {
-                      const text = innerText.call(this);
-                      return this.lastElementChild?.textContent ? text + '\\n' : text;
-                    }});
-                  }
-                })()
-                """)
+            (() => {
+              const innerText = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText').get;
+              for (const field of document.querySelectorAll('[data-zisla-native-text]')) {
+                // Older WebKit includes a block's layout newline even when its DOM text is unchanged.
+                Object.defineProperty(field, 'innerText', { get() {
+                  const text = innerText.call(this);
+                  return this.lastElementChild?.textContent ? text + '\\n' : text;
+                }});
+              }
+            })()
+            """)
         }
         try await body(webView, edits.stream)
     }
@@ -1592,13 +1575,13 @@ struct RichNoteEditorTests {
     private func insertAtNativeSuffixEnd(_ text: String, in webView: WKWebView) async throws {
         let value = try javaScriptStringLiteral(text)
         _ = try await webView.evaluateJavaScript("""
-            (() => {
-              const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();
-              const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
-              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-              window.zisla.exec('insertText', \(value));
-            })()
-            """)
+        (() => {
+          const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();
+          const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+          const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+          window.zisla.exec('insertText', \(value));
+        })()
+        """)
     }
 
     private func withCopyEditor(
@@ -1618,8 +1601,7 @@ struct RichNoteEditorTests {
                 pasteboard: pasteboard,
                 onChange: { changes.changes.append(($0, $1, $2)) }
             )
-            .frame(width: 320, height: 240)
-        )
+            .frame(width: 320, height: 240))
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: [.borderless], backing: .buffered, defer: false)
         window.alphaValue = 0
         window.contentView = hostingView

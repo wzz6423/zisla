@@ -14,7 +14,7 @@ struct CompactStatusBarAnimationTests {
         func host(progress: Double?, reference: Bool = false) -> NSHostingView<some View> {
             NSHostingView(rootView: CompactStatusBarSurface(frame: frame, panelFrame: frame) { _ in
                 let marquee = MarqueeText(text, font: .system(size: 11, weight: .medium), textColor: .white,
-                    pointsPerSecond: TransientNoticeMetrics.pointsPerSecond, repeats: false, scrollProgress: progress)
+                                          pointsPerSecond: TransientNoticeMetrics.pointsPerSecond, repeats: false, scrollProgress: progress)
                 Group {
                     if reference {
                         if reduceMotion {
@@ -96,9 +96,9 @@ struct CompactStatusBarAnimationTests {
         for shrinking in [false, true] {
             let vertical = edge.isVertical
             let short = CGRect(x: vertical ? 10 : 80, y: vertical ? 80 : 10,
-                width: vertical ? 32 : 80, height: vertical ? 80 : 32)
+                               width: vertical ? 32 : 80, height: vertical ? 80 : 32)
             let long = CGRect(x: vertical ? 10 : 20, y: vertical ? 20 : 10,
-                width: vertical ? 32 : 200, height: vertical ? 200 : 32)
+                              width: vertical ? 32 : 200, height: vertical ? 200 : 32)
             let previous = shrinking ? long : short
             let target = shrinking ? short : long
             let panel = CGRect(x: 0, y: 0, width: vertical ? 52 : 240, height: vertical ? 240 : 52)
@@ -114,7 +114,7 @@ struct CompactStatusBarAnimationTests {
             host.rootView = SampledSurface(frame: target, panelFrame: panel, style: style)
 
             let expected = CGRect(x: (short.minX + long.minX) / 2, y: (short.minY + long.minY) / 2,
-                width: (short.width + long.width) / 2, height: (short.height + long.height) / 2)
+                                  width: (short.width + long.width) / 2, height: (short.height + long.height) / 2)
             var bounds = CGRect.null
             let deadline = Date().addingTimeInterval(1)
             repeat {
@@ -123,7 +123,7 @@ struct CompactStatusBarAnimationTests {
                 host.cacheDisplay(in: host.bounds, to: bitmap)
                 bounds = try foregroundBounds(bitmap, panel: panel)
             } while (abs(bounds.width - expected.width) > 1 || abs(bounds.height - expected.height) > 1)
-                    && Date() < deadline
+                && Date() < deadline
 
             #expect(abs(bounds.width - expected.width) <= 1 && abs(bounds.height - expected.height) <= 1,
                     "The collapsed outline must reach the sampled size instead of snapping to its destination")
@@ -155,10 +155,10 @@ struct CompactStatusBarAnimationTests {
         state.placementMode = .custom
         state.compactStatusHidden = true
         state.compactLayout = CompactStatusBarLayout(frame: CGRect(x: 10, y: 10, width: 80, height: 32),
-            panelFrame: CGRect(x: 0, y: 0, width: 240, height: 52), animation: nil)
+                                                     panelFrame: CGRect(x: 0, y: 0, width: 240, height: 52), animation: nil)
         let view = CompactStatusBarView(queue: SideNoticeQueue(), displayState: state,
-            media: NowPlayingService(), browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
-            resultSweep: AIResultSweepController(), pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
+                                        media: NowPlayingService(), browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
+                                        resultSweep: AIResultSweepController(), pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         let renderer = ImageRenderer(content: view.statusBarContent(at: Date(timeIntervalSince1970: 100))
             .environment(\.layoutDirection, direction)
             .transaction { $0.disablesAnimations = true }
@@ -175,7 +175,7 @@ struct CompactStatusBarAnimationTests {
         let vertical = edge.isVertical
         let previous = CGRect(x: 80, y: 80, width: vertical ? 32 : 80, height: vertical ? 80 : 32)
         let target = CGRect(x: vertical ? 80 : 20, y: vertical ? 20 : 80,
-            width: vertical ? 32 : 200, height: vertical ? 200 : 32)
+                            width: vertical ? 32 : 200, height: vertical ? 200 : 32)
         let canvas = previous.union(target)
         let window = NSWindow(contentRect: previous, styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -189,7 +189,7 @@ struct CompactStatusBarAnimationTests {
         window.setFrame(canvas, display: true)
         host.rootView = SampledSurface(frame: target, panelFrame: canvas, style: .pill)
         let expected = CGRect(x: (previous.minX + target.minX) / 2, y: (previous.minY + target.minY) / 2,
-            width: (previous.width + target.width) / 2, height: (previous.height + target.height) / 2)
+                              width: (previous.width + target.width) / 2, height: (previous.height + target.height) / 2)
         let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
         var rendered = CGRect.null
         let deadline = Date().addingTimeInterval(1)
@@ -199,7 +199,7 @@ struct CompactStatusBarAnimationTests {
             host.cacheDisplay(in: host.bounds, to: bitmap)
             rendered = try foregroundBounds(bitmap, panel: canvas).offsetBy(dx: canvas.minX, dy: canvas.minY)
         } while (abs(rendered.width - expected.width) > 1 || abs(rendered.height - expected.height) > 1)
-                && Date() < deadline
+            && Date() < deadline
         #expect(abs(rendered.midX - expected.midX) <= 1 && abs(rendered.midY - expected.midY) <= 1,
                 "The animated frame must not inherit the panel canvas's immediate origin change")
     }
@@ -212,7 +212,7 @@ struct CompactStatusBarAnimationTests {
                 let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
                 if color.redComponent < 0.5 {
                     bounds = bounds.union(CGRect(x: CGFloat(x) * pixel.width,
-                        y: panel.height - CGFloat(y + 1) * pixel.height, width: pixel.width, height: pixel.height))
+                                                 y: panel.height - CGFloat(y + 1) * pixel.height, width: pixel.width, height: pixel.height))
                 }
             }
         }

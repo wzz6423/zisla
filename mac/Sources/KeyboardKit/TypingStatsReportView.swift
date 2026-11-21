@@ -101,21 +101,21 @@ struct TypingStatsHistoryView: View {
                             heatmapMetrics: heatmapMetrics,
                             usesHorizontalTopPanels: usesHorizontalTopPanels
                         )
-                            .opacity(model.isLoadingReport ? 0.62 : 1)
-                            .overlay {
-                                if model.isLoadingReport {
-                                    ProgressView(L10n.tr("正在更新年度统计…"))
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 12)
-                                        .background(.regularMaterial, in: Capsule())
-                                        .shadow(
-                                            color: KeyboardVisualStyle.tooltipShadow,
-                                            radius: 8,
-                                            y: 3
-                                        )
-                                }
+                        .opacity(model.isLoadingReport ? 0.62 : 1)
+                        .overlay {
+                            if model.isLoadingReport {
+                                ProgressView(L10n.tr("正在更新年度统计…"))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(.regularMaterial, in: Capsule())
+                                    .shadow(
+                                        color: KeyboardVisualStyle.tooltipShadow,
+                                        radius: 8,
+                                        y: 3
+                                    )
                             }
-                            .animation(.easeOut(duration: 0.18), value: model.isLoadingReport)
+                        }
+                        .animation(.easeOut(duration: 0.18), value: model.isLoadingReport)
                     } else if model.isLoadingReport {
                         VStack(spacing: 12) {
                             ProgressView()
@@ -177,7 +177,7 @@ struct TypingStatsHistoryView: View {
                         heatmapMetrics: heatmapMetrics,
                         panelHeight: topPanelHeight
                     )
-                        .frame(minWidth: 530, maxWidth: .infinity, alignment: .topLeading)
+                    .frame(minWidth: 530, maxWidth: .infinity, alignment: .topLeading)
                     applicationChanges(report, panelHeight: topPanelHeight)
                         .frame(minWidth: 400, maxWidth: 470, alignment: .topLeading)
                 }
@@ -503,7 +503,7 @@ struct TypingStatsHistoryView: View {
 
         return VStack(spacing: 0) {
             applicationTableHeader(hasComparison: hasComparison)
-            .padding(.bottom, 8)
+                .padding(.bottom, 8)
 
             Rectangle()
                 .fill(KeyboardVisualStyle.instrumentSeparator)
@@ -599,8 +599,8 @@ struct TypingStatsHistoryView: View {
                             "\(report.applications.count)"
                         )
                     )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button(AppLocalization.text("完成")) {
@@ -622,10 +622,10 @@ struct TypingStatsHistoryView: View {
     }
 
     private func tableHeader(_ title: String) -> some View {
-            Text(L10n.tr(title))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
-                .fitsLines(2)
+        Text(L10n.tr(title))
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
+            .fitsLines(2)
     }
 
     private func tableValue(_ value: String) -> some View {
@@ -1053,7 +1053,7 @@ private struct TypingWeekdayHourHeatmap: View, Equatable {
                 KeyboardHeatmapLegend(
                     leadingLabel: currentScale.hasValues
                         ? L10n.format("低 %@ ", averageText(currentScale.low))
-                            .trimmingCharacters(in: .whitespaces)
+                        .trimmingCharacters(in: .whitespaces)
                         : L10n.tr("低 0"),
                     trailingLabel: currentScale.hasValues
                         ? L10n.format("高 ≥%@", averageText(currentScale.high))

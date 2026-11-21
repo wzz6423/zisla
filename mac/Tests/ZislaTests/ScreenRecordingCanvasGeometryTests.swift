@@ -21,7 +21,7 @@ struct ScreenRecordingCanvasGeometryTests {
         let annotation = RecordingAnnotation(kind: kind, start: 0, end: 1, x: 0.7, y: 0.6, endX: 0.2, endY: 0.2, text: "1234")
         let original = RecordingCanvasElement.annotation(annotation)
         guard case let .annotation(moved) = RecordingCanvasGeometry.transformed(original,
-            by: CGSize(width: 1_000, height: -1_000), handle: nil, canvas: canvas) else { Issue.record("Expected annotation"); return }
+                                                                                by: CGSize(width: 1_000, height: -1_000), handle: nil, canvas: canvas) else { Issue.record("Expected annotation"); return }
         let bounds = RecordingCanvasElement.annotation(moved).bounds(canvas: canvas)
         #expect(abs(bounds.maxX - canvas.width) < 1 && bounds.minY == 0)
         #expect(abs(bounds.width - original.bounds(canvas: canvas).width) < 1)
@@ -36,7 +36,7 @@ struct ScreenRecordingCanvasGeometryTests {
         let original = RecordingAnnotation(kind: .text, start: 0, end: 1, x: 0.1, y: 0.1, endX: 0.3, endY: 0.3, text: "1234")
         let originalBounds = RecordingCanvasElement.annotation(original).bounds(canvas: canvas)
         guard case let .annotation(resized) = RecordingCanvasGeometry.transformed(.annotation(original),
-            by: originalBounds.size, handle: .bottomRight, canvas: canvas) else { Issue.record("Expected annotation"); return }
+                                                                                  by: originalBounds.size, handle: .bottomRight, canvas: canvas) else { Issue.record("Expected annotation"); return }
         #expect(resized.x == original.x && resized.y == original.y)
         let resizedBounds = RecordingCanvasElement.annotation(resized).bounds(canvas: canvas)
         #expect(abs(resizedBounds.width - originalBounds.width * 2) <= 1)
@@ -50,7 +50,7 @@ struct ScreenRecordingCanvasGeometryTests {
         let original = RecordingAnnotation(kind: .rectangle, start: 0, end: 1)
         for delta in [CGSize(width: 10_000, height: 10_000), CGSize(width: -10_000, height: -10_000)] {
             guard case let .annotation(resized) = RecordingCanvasGeometry.transformed(.annotation(original), by: delta,
-                handle: handle, canvas: canvas) else { Issue.record("Expected annotation"); return }
+                                                                                      handle: handle, canvas: canvas) else { Issue.record("Expected annotation"); return }
             #expect(resized.isValid(duration: 1))
             #expect(resized.fontSize == original.fontSize && resized.lineWidth == original.lineWidth)
         }
@@ -63,7 +63,7 @@ struct ScreenRecordingCanvasGeometryTests {
         #expect(RecordingCanvasGeometry.hit(element, at: CGPoint(x: 400, y: 300), canvas: canvas, tolerance: 6))
         #expect(!RecordingCanvasGeometry.hit(element, at: CGPoint(x: 400, y: 150), canvas: canvas, tolerance: 6))
         guard case let .annotation(moved) = RecordingCanvasGeometry.transformed(element,
-            by: CGSize(width: -600, height: 0), handle: .end, canvas: canvas) else { Issue.record("Expected annotation"); return }
+                                                                                by: CGSize(width: -600, height: 0), handle: .end, canvas: canvas) else { Issue.record("Expected annotation"); return }
         #expect(moved.x == 0.2 && abs(moved.endX - 0.05) < 0.000_001)
         #expect(moved.y == annotation.y && moved.endY == annotation.endY)
         #expect(moved.isValid(duration: 1))
@@ -77,13 +77,13 @@ struct ScreenRecordingCanvasGeometryTests {
         let element = RecordingCanvasElement.caption(original)
         let before = element.bounds(canvas: canvas)
         guard case let .caption(moved) = RecordingCanvasGeometry.transformed(element,
-            by: CGSize(width: 0, height: -120), handle: nil, canvas: canvas) else { Issue.record("Expected caption"); return }
+                                                                             by: CGSize(width: 0, height: -120), handle: nil, canvas: canvas) else { Issue.record("Expected caption"); return }
         let movedBox = RecordingCanvasElement.caption(moved).bounds(canvas: canvas)
         #expect(abs(movedBox.minY - before.minY + 120) < 0.000_001)
         #expect(abs(movedBox.width - before.width) < 0.000_001 && abs(movedBox.height - before.height) < 0.000_001)
         #expect(moved.fontSize == nil, "Moving a caption must preserve its automatic font size")
         let resized = RecordingCanvasGeometry.transformed(.caption(moved),
-            by: CGSize(width: -before.width / 2, height: -before.height / 2), handle: .bottomRight, canvas: canvas)
+                                                          by: CGSize(width: -before.width / 2, height: -before.height / 2), handle: .bottomRight, canvas: canvas)
         guard case let .caption(value) = resized else { Issue.record("Expected caption"); return }
         #expect(abs((value.fontSize ?? 0) - 0.0175) < 0.000_001)
         #expect(abs(resized.bounds(canvas: canvas).width - before.width / 2) < 0.000_001)
@@ -130,7 +130,7 @@ struct ScreenRecordingCanvasGeometryTests {
         for box in boxes {
             for fontSize in [0.01, 0.3] {
                 let text = RecordingAnnotation(kind: .text, start: 0, end: 1, x: box.x, y: box.y,
-                    endX: box.x + box.width, endY: box.y + box.height, text: "1234", fontSize: fontSize)
+                                               endX: box.x + box.width, endY: box.y + box.height, text: "1234", fontSize: fontSize)
                 let caption = RecordingCaption(start: 0, end: 1, text: "Caption", layout: box, fontSize: fontSize)
                 for element in [RecordingCanvasElement.annotation(text), .caption(caption)] {
                     for handle in [RecordingCanvasHandle.topLeft, .topRight, .bottomLeft, .bottomRight] {

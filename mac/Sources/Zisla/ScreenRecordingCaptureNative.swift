@@ -64,7 +64,7 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
     }
 
     nonisolated static func includesWindow(frame: CGRect, layer: Int, processIdentifier: pid_t?, isRegularApplication: Bool,
-                                          isOnScreen: Bool, isActive: Bool, alpha: Double?) -> Bool {
+                                           isOnScreen: Bool, isActive: Bool, alpha: Double?) -> Bool {
         isRegularApplication && layer == 0 && frame.width > 1 && frame.height > 1 && processIdentifier != getpid()
             && (isOnScreen || isActive) && (alpha ?? 1) > 0.01
     }
@@ -134,7 +134,8 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
                                       rawMicrophoneFile: self.configuration.microphone && self.configuration.voiceEffects.isEnabled ? files.rawMicrophoneName : nil,
                                       portraitEffects: self.configuration.camera && self.configuration.portraitEffects.isEnabled ? self.configuration.portraitEffects : nil,
                                       voiceEffects: self.configuration.microphone && self.configuration.voiceEffects.isEnabled ? self.configuration.voiceEffects : nil),
-                videoURL: files.url(for: files.screenName))
+                videoURL: files.url(for: files.screenName)
+            )
             try self.requireActive()
             var names = [files.screenName]
             if self.configuration.microphone { names.append(files.microphoneName) }
@@ -218,13 +219,13 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
         let files = try ScreenRecordingCaptureFiles(directory: directory)
         self.files = files
         let writer = ScreenRecordingCaptureWriter(files: files, configuration: configuration, width: width, height: height,
-            onFailure: onFailure, onMonitoringFailure: onMonitoringFailure)
+                                                  onFailure: onFailure, onMonitoringFailure: onMonitoringFailure)
         self.writer = writer
         let bridge = ScreenRecordingCaptureBridge(writer: writer, onFailure: onFailure)
         self.bridge = bridge
 
         let streamConfiguration = Self.streamConfiguration(width: width, height: height, frameRate: configuration.frameRate,
-            includeHDR: configuration.preservesHDR)
+                                                           includeHDR: configuration.preservesHDR)
         streamConfiguration.capturesAudio = configuration.systemAudio && systemAudioDisplay == nil
         if let sourceRect { streamConfiguration.sourceRect = sourceRect }
         let stream = SCStream(filter: filter, configuration: streamConfiguration, delegate: bridge)
@@ -257,7 +258,7 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
         let epoch = try await writer.waitForFirstFrame()
         try requireActive()
         let pointer = ScreenRecordingCapturePointer(frame: captureFrame, windowID: configuration.mode == .window ? configuration.sourceID : nil,
-                                                   frameRate: configuration.frameRate)
+                                                    frameRate: configuration.frameRate)
         self.pointer = pointer
         pointer.start(at: epoch)
         return epoch
@@ -569,7 +570,7 @@ nonisolated final class ScreenRecordingCameraCapture: NSObject, ScreenRecordingC
                 let source = CIImage(cvPixelBuffer: buffer)
                 let scale = min(1, 640 / max(source.extent.width, source.extent.height))
                 let image = try portrait.apply(source.transformed(by: .init(scaleX: scale, y: scale)), effects: effects,
-                    sourceTime: sampleBuffer.presentationTimeStamp.seconds)
+                                               sourceTime: sampleBuffer.presentationTimeStamp.seconds)
                 guard let frame = context.createCGImage(image, from: image.extent) else {
                     throw ScreenRecordingCaptureError.writerUnavailable
                 }

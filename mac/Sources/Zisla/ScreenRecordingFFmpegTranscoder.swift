@@ -22,14 +22,14 @@ enum ScreenRecordingFFmpegTranscoder {
         let progressURL = output.deletingLastPathComponent().appendingPathComponent("ffmpeg-progress-\(UUID()).txt")
         defer { try? FileManager.default.removeItem(at: progressURL) }
         let arguments = try arguments(input: input, output: output, format: format, progress: progressURL,
-            inputFormat: inputFormat, preservesHDR: preservesHDR)
+                                      inputFormat: inputFormat, preservesHDR: preservesHDR)
         try Task.checkCancellation()
         try checkpoint(.beforeTranscode)
         let worker = Task {
             try await AIAgentProcessRunner.run(executableURL: executable, arguments: arguments,
-                standardInput: Data(), environment: ProcessInfo.processInfo.environment.filter { !$0.key.hasPrefix("DYLD_") },
-                workingDirectoryURL: output.deletingLastPathComponent(), timeout: nil,
-                maximumOutputBytes: 1_024, maximumErrorBytes: 8_192)
+                                               standardInput: Data(), environment: ProcessInfo.processInfo.environment.filter { !$0.key.hasPrefix("DYLD_") },
+                                               workingDirectoryURL: output.deletingLastPathComponent(), timeout: nil,
+                                               maximumOutputBytes: 1_024, maximumErrorBytes: 8_192)
         }
         let monitor = Task {
             var last = 0.0

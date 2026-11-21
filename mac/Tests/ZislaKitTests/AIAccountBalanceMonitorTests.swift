@@ -8,86 +8,86 @@ import Testing
 @MainActor
 struct AIAccountBalanceMonitorTests {
     #if DEBUG
-    @Test(arguments: [Set<AIProvider>(), [.codex]])
-    func fixtureProvidersOverrideRealSelectionsWithoutChangingUsageHistory(providers: Set<AIProvider>) async throws {
-        let root = directory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let now = Date(timeIntervalSince1970: 1_910_000_000)
-        let environment = ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"]
-        let service = AIAccountBalanceService(credentials: { _, _, _ in
-            Issue.record("The monitor's explicit quota fixture must never read credentials")
-            return nil
-        }, now: { now }, debugBalances: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
-        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: service,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600,
-            environment: environment, now: { now })
-        defer { monitor.stop() }
-        monitor.configureAccountBalanceProviders(providers)
-        monitor.start()
-        try #require(await waitFor { monitor.accountBalances.count == 3 },
-            "The fixture must publish Claude, ChatGPT, and Cursor even when no real providers are selected")
-        #expect(monitor.accountBalances.map(\.providers) == [[.claude], [.gpt], [.cursor]])
-        monitor.configureAccountBalanceProviders([])
-        #expect(monitor.accountBalances.count == 3, "Real account selection changes must not hide the active fixture")
-        #expect(try AIStateRepository(directoryURL: root).load().usageSamples.isEmpty)
-    }
+        @Test(arguments: [Set<AIProvider>(), [.codex]])
+        func fixtureProvidersOverrideRealSelectionsWithoutChangingUsageHistory(providers: Set<AIProvider>) async throws {
+            let root = directory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let now = Date(timeIntervalSince1970: 1_910_000_000)
+            let environment = ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"]
+            let service = AIAccountBalanceService(credentials: { _, _, _ in
+                Issue.record("The monitor's explicit quota fixture must never read credentials")
+                return nil
+            }, now: { now }, debugBalances: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
+            let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: service,
+                                         accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600,
+                                         environment: environment, now: { now })
+            defer { monitor.stop() }
+            monitor.configureAccountBalanceProviders(providers)
+            monitor.start()
+            try #require(await waitFor { monitor.accountBalances.count == 3 },
+                         "The fixture must publish Claude, ChatGPT, and Cursor even when no real providers are selected")
+            #expect(monitor.accountBalances.map(\.providers) == [[.claude], [.gpt], [.cursor]])
+            monitor.configureAccountBalanceProviders([])
+            #expect(monitor.accountBalances.count == 3, "Real account selection changes must not hide the active fixture")
+            #expect(try AIStateRepository(directoryURL: root).load().usageSamples.isEmpty)
+        }
 
-    @Test func qoderDebugFixtureOverridesEmptyRealRegionSelection() async throws {
-        let root = directory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let now = Date(timeIntervalSince1970: 1_910_000_000)
-        let environment = ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "coder:10"]
-        let service = AIAccountBalanceService(credentials: { _, _, _ in
-            Issue.record("An explicit Qoder fixture must not read credentials")
-            return nil
-        }, now: { now }, debugBalances: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
-        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: service,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600,
-            environment: environment, now: { now })
-        defer { monitor.stop() }
-        monitor.configureAccountBalanceProviders([], qoderRegions: [])
-        monitor.start()
-        try #require(await waitFor { monitor.accountBalances.count == 1 })
-        let row = try #require(monitor.accountBalances.first)
-        #expect(row.providers == [.coder] && row.isDebug && row.windows.first?.remainingPercent == 10)
-        monitor.configureAccountBalanceProviders([], qoderRegions: [.china])
-        #expect(monitor.accountBalances == [row], "Real region choices must not hide the explicit fixture")
-    }
+        @Test func qoderDebugFixtureOverridesEmptyRealRegionSelection() async throws {
+            let root = directory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let now = Date(timeIntervalSince1970: 1_910_000_000)
+            let environment = ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "coder:10"]
+            let service = AIAccountBalanceService(credentials: { _, _, _ in
+                Issue.record("An explicit Qoder fixture must not read credentials")
+                return nil
+            }, now: { now }, debugBalances: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
+            let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: service,
+                                         accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600,
+                                         environment: environment, now: { now })
+            defer { monitor.stop() }
+            monitor.configureAccountBalanceProviders([], qoderRegions: [])
+            monitor.start()
+            try #require(await waitFor { monitor.accountBalances.count == 1 })
+            let row = try #require(monitor.accountBalances.first)
+            #expect(row.providers == [.coder] && row.isDebug && row.windows.first?.remainingPercent == 10)
+            monitor.configureAccountBalanceProviders([], qoderRegions: [.china])
+            #expect(monitor.accountBalances == [row], "Real region choices must not hide the explicit fixture")
+        }
 
-    @Test(arguments: ["claude:nan", "cursor:20,", " "])
-    func malformedFixtureDoesNotScheduleLiveAccountRefresh(raw: String) async throws {
-        let root = directory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let detector = ImmediateBalanceDetector()
-        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600,
-            environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw])
-        defer { monitor.stop() }
-        monitor.configureAccountBalanceProviders([.codex])
-        monitor.start()
-        #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
-        #expect(try await !waitFor { await detector.callCount > 0 },
-            "An invalid fixture must leave every real account source untouched")
-    }
+        @Test(arguments: ["claude:nan", "cursor:20,", " "])
+        func malformedFixtureDoesNotScheduleLiveAccountRefresh(raw: String) async throws {
+            let root = directory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let detector = ImmediateBalanceDetector()
+            let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+                                         accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600,
+                                         environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw])
+            defer { monitor.stop() }
+            monitor.configureAccountBalanceProviders([.codex])
+            monitor.start()
+            #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
+            #expect(try await !waitFor { await detector.callCount > 0 },
+                    "An invalid fixture must leave every real account source untouched")
+        }
 
-    @Test(arguments: [[:], ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": ""]])
-    func clearedFixtureRestoresProviderSelection(environment: [String: String]) async throws {
-        let root = directory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let detector = BalanceDetectorGate()
-        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600, environment: environment)
-        defer { monitor.stop() }
-        monitor.configureAccountBalanceProviders([.codex])
-        monitor.start()
-        try #require(await waitFor { await detector.calls.count == 1 })
-        #expect(await detector.calls.first?.providers == [.codex])
-        await detector.release(0, result: .success([]))
-        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
-        monitor.configureAccountBalanceProviders([])
-        #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
-        #expect(await detector.calls.count == 1)
-    }
+        @Test(arguments: [[:], ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": ""]])
+        func clearedFixtureRestoresProviderSelection(environment: [String: String]) async throws {
+            let root = directory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let detector = BalanceDetectorGate()
+            let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+                                         accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600, environment: environment)
+            defer { monitor.stop() }
+            monitor.configureAccountBalanceProviders([.codex])
+            monitor.start()
+            try #require(await waitFor { await detector.calls.count == 1 })
+            #expect(await detector.calls.first?.providers == [.codex])
+            await detector.release(0, result: .success([]))
+            try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+            monitor.configureAccountBalanceProviders([])
+            #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
+            #expect(await detector.calls.count == 1)
+        }
     #endif
 
     /// Cancelling before the main-actor refresh starts must prevent even an uncooperative detector from reading credentials.
@@ -97,7 +97,7 @@ struct AIAccountBalanceMonitorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let detector = ImmediateBalanceDetector()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
         defer { monitor.stop() }
         monitor.configureAccountBalanceProviders([.claude])
         monitor.start()
@@ -109,7 +109,7 @@ struct AIAccountBalanceMonitorTests {
         }
         #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
         #expect(try await !waitFor { await detector.callCount > 0 },
-            "A refresh cancelled before it starts must not invoke the account detector")
+                "A refresh cancelled before it starts must not invoke the account detector")
         #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
     }
 
@@ -120,7 +120,7 @@ struct AIAccountBalanceMonitorTests {
         var now = Date(timeIntervalSince1970: 1_910_000_000)
         let detector = BalanceDetectorGate()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600, usageRefreshInterval: 180, now: { now })
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600, usageRefreshInterval: 180, now: { now })
         defer { monitor.stop() }
         monitor.configureAccountBalanceProviders([.claude])
         monitor.start()
@@ -139,7 +139,7 @@ struct AIAccountBalanceMonitorTests {
         await detector.release(1, result: .success([balance(.claude, percent: 70)]))
         try #require(await waitFor { monitor.accountBalances.first?.severity == .normal })
         #expect(try AIStateRepository(directoryURL: root).load().usageSamples.isEmpty,
-            "Balances and debug readings must never be persisted as Token consumption")
+                "Balances and debug readings must never be persisted as Token consumption")
     }
 
     /// Releasing the old region last proves that cancellation and generation guards prevent stale quota publication.
@@ -148,7 +148,7 @@ struct AIAccountBalanceMonitorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let detector = BalanceDetectorGate()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
         defer { monitor.stop() }
         monitor.configureAccountBalanceProviders([.coder], qoderRegions: [.global])
         monitor.start()
@@ -174,7 +174,7 @@ struct AIAccountBalanceMonitorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let detector = ImmediateBalanceDetector()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
         defer { monitor.stop() }
         if selectQoder { monitor.configureAccountBalanceProviders([.coder], qoderRegions: []) }
         monitor.start()
@@ -188,7 +188,7 @@ struct AIAccountBalanceMonitorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let detector = BalanceDetectorGate()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
         defer { monitor.stop() }
         let providers: Set<AIProvider> = [.coder, .trae, .zed]
         let global = balance(.coder, percent: 10, qoderRegion: .global)
@@ -205,7 +205,7 @@ struct AIAccountBalanceMonitorTests {
         try #require(await waitFor { await detector.calls.count == 2 })
         monitor.configureAccountBalanceProviders(providers, qoderRegions: [.china])
         #expect(monitor.accountBalances == [china] + otherRows,
-            "Only the deselected Qoder region must disappear before the replacement refresh completes")
+                "Only the deselected Qoder region must disappear before the replacement refresh completes")
         try #require(await waitFor { await detector.calls.count == 3 })
         await detector.release(2, result: .success([china] + otherRows))
         try #require(await waitFor { !monitor.isRefreshingAccountBalances })
@@ -227,7 +227,7 @@ struct AIAccountBalanceMonitorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let detector = BalanceDetectorGate()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
         defer { monitor.stop() }
         monitor.configureAccountBalanceProviders([.trae, .zed], qoderRegions: [.global])
         monitor.start()
@@ -240,7 +240,7 @@ struct AIAccountBalanceMonitorTests {
         try #require(await waitFor { monitor.accountBalances == rows })
         #expect(await detector.calls.count == 1)
         #expect(await detector.cancelled.isEmpty,
-            "Qoder region changes must leave an unrelated in-flight refresh running")
+                "Qoder region changes must leave an unrelated in-flight refresh running")
         monitor.configureAccountBalanceProviders([.coder, .trae, .zed], qoderRegions: [.china])
         try #require(await waitFor { await detector.calls.count == 2 })
         #expect(await detector.calls.last?.regions == [.china])
@@ -253,7 +253,7 @@ struct AIAccountBalanceMonitorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let detector = BalanceDetectorGate()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
         defer { monitor.stop() }
         monitor.configureAccountBalanceProviders([.coder, .zed], qoderRegions: [.global, .china])
         monitor.start()
@@ -276,7 +276,7 @@ struct AIAccountBalanceMonitorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let center = NotificationCenter(), detector = BalanceDetectorGate()
         var monitor: AIStateMonitor? = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: center, detectorRefreshInterval: 3_600)
+                                                      accountBalanceNotificationCenter: center, detectorRefreshInterval: 3_600)
         monitor?.configureAccountBalanceProviders([.claude])
         monitor?.start()
         try #require(await waitFor { await detector.calls.count == 1 })
@@ -297,7 +297,7 @@ struct AIAccountBalanceMonitorTests {
         monitor?.refreshAccountBalancesAfterCredentialChange()
         monitor?.refresh()
         #expect(await detector.calls.count == 2 && monitor?.isRefreshingAccountBalances == false,
-            "Changing saved credentials must not restart a stopped monitor")
+                "Changing saved credentials must not restart a stopped monitor")
         weak let retained = monitor
         monitor = nil
         try #require(await waitFor { retained == nil }, "Lifecycle observers must not retain a stopped monitor after pending background work completes")
@@ -309,7 +309,7 @@ struct AIAccountBalanceMonitorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let detector = BalanceDetectorGate()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
         defer { monitor.stop() }
         monitor.configureAccountBalanceProviders([.claude])
         monitor.start()

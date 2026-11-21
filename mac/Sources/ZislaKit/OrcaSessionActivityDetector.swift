@@ -68,8 +68,8 @@ public final class OrcaSessionActivityDetector: AIActivityDetecting, AIUsageDete
 
     private func records(at database: URL) -> [[String: Any]] {
         DesktopAIStorage.rows(at: database, sql: """
-            SELECT record_json FROM agent_session_records
-            """).compactMap { row in
+        SELECT record_json FROM agent_session_records
+        """).compactMap { row in
             guard let json = row["record_json"] as? String, let data = json.data(using: .utf8),
                   let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   record["schemaVersion"] as? Int == 2,
@@ -138,74 +138,74 @@ public final class OrcaSessionActivityDetector: AIActivityDetecting, AIUsageDete
         // context-usage revision of an old completed turn cannot hide the current running turn.
         // Project lifecycle fields in SQLite; no message/tool body reaches this detector.
         DesktopAIStorage.rows(at: database, sql: """
-            WITH epoch_rows AS (
-                SELECT r.session_id, r.seq, r.ts,
-                       CASE WHEN json_valid(r.row_json) THEN r.row_json ELSE '{}' END AS row_json
-                FROM journal_rows r JOIN journal_sessions s
-                  ON s.session_id = r.session_id AND s.epoch = r.epoch
-            ), unreadable AS (
-                SELECT DISTINCT session_id FROM epoch_rows
-                WHERE COALESCE(json_extract(row_json, '$.v'), 0) NOT IN (1, 2, 3)
-                   OR COALESCE(json_extract(row_json, '$.kind'), '') NOT IN
-                      ('epoch', 'item', 'tombstone', 'submission', 'dispatch', 'lifecycle-batch')
-                UNION
-                SELECT DISTINCT r.session_id FROM epoch_rows r, json_each(r.row_json, '$.mutations') m
-                WHERE json_extract(r.row_json, '$.kind') = 'lifecycle-batch'
-                  AND COALESCE(json_extract(m.value, '$.kind'), '') NOT IN ('item', 'tombstone')
-            ), current_rows AS (
-                SELECT * FROM epoch_rows WHERE session_id NOT IN (SELECT session_id FROM unreadable)
-            ), events AS (
-                SELECT session_id, seq, 0 AS position_index, ts,
-                       json_extract(row_json, '$.fence') AS fence,
-                       json_extract(row_json, '$.revision') AS revision,
-                       json_extract(row_json, '$.itemId') AS item,
-                       json_extract(row_json, '$.kind') AS kind,
-                       json_extract(row_json, '$.body') AS body,
-                       json_extract(row_json, '$.agentId') AS agent_id,
-                       json_extract(row_json, '$.producerKind') AS producer_kind
-                FROM current_rows WHERE json_extract(row_json, '$.kind') IN ('item', 'tombstone')
-                  AND json_extract(row_json, '$.stopEvent') IS NULL
-                  AND json_extract(row_json, '$.queueResume') IS NULL
-                  AND json_extract(row_json, '$.queueReopen') IS NULL
-                UNION ALL
-                SELECT r.session_id, r.seq, CAST(m.key AS INTEGER), r.ts,
-                       json_extract(r.row_json, '$.fence'), json_extract(m.value, '$.revision'),
-                       json_extract(m.value, '$.itemId'), json_extract(m.value, '$.kind'),
-                       json_extract(m.value, '$.body'),
-                       COALESCE(json_extract(m.value, '$.agentId'), json_extract(r.row_json, '$.agentId')),
-                       COALESCE(json_extract(m.value, '$.producerKind'), json_extract(r.row_json, '$.producerKind'))
-                FROM current_rows r, json_each(r.row_json, '$.mutations') m
-                WHERE json_extract(r.row_json, '$.kind') = 'lifecycle-batch'
-            ), revisions AS (
-                SELECT *,
-                       ROW_NUMBER() OVER (PARTITION BY session_id, item
-                           ORDER BY revision DESC, seq ASC, position_index ASC) AS revision_rank,
-                       FIRST_VALUE(seq) OVER (PARTITION BY session_id, item
-                           ORDER BY seq ASC, position_index ASC) AS created_seq,
-                       FIRST_VALUE(position_index) OVER (PARTITION BY session_id, item
-                           ORDER BY seq ASC, position_index ASC) AS created_index,
-                       FIRST_VALUE(fence) OVER (PARTITION BY session_id, item
-                           ORDER BY seq ASC, position_index ASC) AS owner_fence
-                FROM events WHERE item IS NOT NULL AND revision IS NOT NULL
-            ), latest_turns AS (
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY session_id
-                    ORDER BY created_seq DESC, created_index DESC) AS turn_rank
-                FROM revisions WHERE revision_rank = 1 AND kind = 'item'
-                  AND agent_id IS NULL AND COALESCE(producer_kind, '') != 'background'
-                  AND (json_extract(body, '$.kind') = 'turn'
-                       OR (json_extract(body, '$.kind') = 'status'
-                           AND json_extract(body, '$.turnLifecycle') IS NOT NULL))
-            )
-            SELECT t.session_id, t.ts, t.owner_fence,
-                   COALESCE(json_extract(t.body, '$.state'), json_extract(t.body, '$.turnLifecycle.state')) AS state,
-                   COALESCE(json_extract(t.body, '$.startedAt'), json_extract(t.body, '$.turnLifecycle.startedAt')) AS started_at,
-                   EXISTS (SELECT 1 FROM revisions p WHERE p.session_id = t.session_id
-                       AND p.revision_rank = 1 AND p.kind = 'item' AND p.agent_id IS NULL
-                       AND p.created_seq >= t.created_seq AND p.owner_fence = t.owner_fence
-                       AND json_extract(p.body, '$.kind') IN ('approval', 'question')
-                       AND json_extract(p.body, '$.resolution.state') = 'pending') AS pending_prompt
-            FROM latest_turns t WHERE t.turn_rank = 1
-            """)
+        WITH epoch_rows AS (
+            SELECT r.session_id, r.seq, r.ts,
+                   CASE WHEN json_valid(r.row_json) THEN r.row_json ELSE '{}' END AS row_json
+            FROM journal_rows r JOIN journal_sessions s
+              ON s.session_id = r.session_id AND s.epoch = r.epoch
+        ), unreadable AS (
+            SELECT DISTINCT session_id FROM epoch_rows
+            WHERE COALESCE(json_extract(row_json, '$.v'), 0) NOT IN (1, 2, 3)
+               OR COALESCE(json_extract(row_json, '$.kind'), '') NOT IN
+                  ('epoch', 'item', 'tombstone', 'submission', 'dispatch', 'lifecycle-batch')
+            UNION
+            SELECT DISTINCT r.session_id FROM epoch_rows r, json_each(r.row_json, '$.mutations') m
+            WHERE json_extract(r.row_json, '$.kind') = 'lifecycle-batch'
+              AND COALESCE(json_extract(m.value, '$.kind'), '') NOT IN ('item', 'tombstone')
+        ), current_rows AS (
+            SELECT * FROM epoch_rows WHERE session_id NOT IN (SELECT session_id FROM unreadable)
+        ), events AS (
+            SELECT session_id, seq, 0 AS position_index, ts,
+                   json_extract(row_json, '$.fence') AS fence,
+                   json_extract(row_json, '$.revision') AS revision,
+                   json_extract(row_json, '$.itemId') AS item,
+                   json_extract(row_json, '$.kind') AS kind,
+                   json_extract(row_json, '$.body') AS body,
+                   json_extract(row_json, '$.agentId') AS agent_id,
+                   json_extract(row_json, '$.producerKind') AS producer_kind
+            FROM current_rows WHERE json_extract(row_json, '$.kind') IN ('item', 'tombstone')
+              AND json_extract(row_json, '$.stopEvent') IS NULL
+              AND json_extract(row_json, '$.queueResume') IS NULL
+              AND json_extract(row_json, '$.queueReopen') IS NULL
+            UNION ALL
+            SELECT r.session_id, r.seq, CAST(m.key AS INTEGER), r.ts,
+                   json_extract(r.row_json, '$.fence'), json_extract(m.value, '$.revision'),
+                   json_extract(m.value, '$.itemId'), json_extract(m.value, '$.kind'),
+                   json_extract(m.value, '$.body'),
+                   COALESCE(json_extract(m.value, '$.agentId'), json_extract(r.row_json, '$.agentId')),
+                   COALESCE(json_extract(m.value, '$.producerKind'), json_extract(r.row_json, '$.producerKind'))
+            FROM current_rows r, json_each(r.row_json, '$.mutations') m
+            WHERE json_extract(r.row_json, '$.kind') = 'lifecycle-batch'
+        ), revisions AS (
+            SELECT *,
+                   ROW_NUMBER() OVER (PARTITION BY session_id, item
+                       ORDER BY revision DESC, seq ASC, position_index ASC) AS revision_rank,
+                   FIRST_VALUE(seq) OVER (PARTITION BY session_id, item
+                       ORDER BY seq ASC, position_index ASC) AS created_seq,
+                   FIRST_VALUE(position_index) OVER (PARTITION BY session_id, item
+                       ORDER BY seq ASC, position_index ASC) AS created_index,
+                   FIRST_VALUE(fence) OVER (PARTITION BY session_id, item
+                       ORDER BY seq ASC, position_index ASC) AS owner_fence
+            FROM events WHERE item IS NOT NULL AND revision IS NOT NULL
+        ), latest_turns AS (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY session_id
+                ORDER BY created_seq DESC, created_index DESC) AS turn_rank
+            FROM revisions WHERE revision_rank = 1 AND kind = 'item'
+              AND agent_id IS NULL AND COALESCE(producer_kind, '') != 'background'
+              AND (json_extract(body, '$.kind') = 'turn'
+                   OR (json_extract(body, '$.kind') = 'status'
+                       AND json_extract(body, '$.turnLifecycle') IS NOT NULL))
+        )
+        SELECT t.session_id, t.ts, t.owner_fence,
+               COALESCE(json_extract(t.body, '$.state'), json_extract(t.body, '$.turnLifecycle.state')) AS state,
+               COALESCE(json_extract(t.body, '$.startedAt'), json_extract(t.body, '$.turnLifecycle.startedAt')) AS started_at,
+               EXISTS (SELECT 1 FROM revisions p WHERE p.session_id = t.session_id
+                   AND p.revision_rank = 1 AND p.kind = 'item' AND p.agent_id IS NULL
+                   AND p.created_seq >= t.created_seq AND p.owner_fence = t.owner_fence
+                   AND json_extract(p.body, '$.kind') IN ('approval', 'question')
+                   AND json_extract(p.body, '$.resolution.state') = 'pending') AS pending_prompt
+        FROM latest_turns t WHERE t.turn_rank = 1
+        """)
     }
 
     static func status(_ state: String?) -> AIProgressStatus? {
@@ -226,7 +226,7 @@ public final class OrcaSessionActivityDetector: AIActivityDetecting, AIUsageDete
                       let path = home["path"] as? String, path.hasPrefix("/"),
                       let provider = AIProvider(token: record["provider"] as? String ?? ""),
                       (provider == .codex && home["variable"] as? String == "CODEX_HOME") ||
-                        (provider == .claude && home["variable"] as? String == "CLAUDE_CONFIG_DIR") else { continue }
+                      (provider == .claude && home["variable"] as? String == "CLAUDE_CONFIG_DIR") else { continue }
                 let url = URL(fileURLWithPath: path).standardizedFileURL
                 bindings["\(provider.rawValue):\(url.path)"] = (provider, url)
             }

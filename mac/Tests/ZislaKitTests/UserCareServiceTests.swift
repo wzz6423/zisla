@@ -269,7 +269,7 @@ struct UserCareServiceTests {
         let (center, began, resumed) = fixture.events(for: reason)
         center.post(name: ended ? resumed : began, object: nil)
         #expect(fixture.clearScopes.contains(false),
-            "A system interruption must clear event care even when the activity sampler cannot read the session")
+                "A system interruption must clear event care even when the activity sampler cannot read the session")
     }
 
     @Test

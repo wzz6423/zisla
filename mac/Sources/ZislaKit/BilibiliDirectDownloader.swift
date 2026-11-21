@@ -53,8 +53,7 @@ public struct BilibiliDirectDownloader: BilibiliDownloading, Sendable {
     }
 
     public func downloadComponents(from urlString: String, to directory: URL) async throws
-        -> [DownloadedMediaComponent]
-    {
+        -> [DownloadedMediaComponent] {
         guard let bvid = Self.bvid(from: urlString) else {
             throw BilibiliDirectDownloaderError.invalidVideoURL
         }
@@ -264,8 +263,7 @@ private struct URLSessionBilibiliHTTPClient: BilibiliHTTPClient, Sendable {
     }
 
     func download(for request: URLRequest, to destinationURL: URL) async throws
-        -> BilibiliHTTPResponse
-    {
+        -> BilibiliHTTPResponse {
         let (temporaryURL, response) = try await session.download(for: request)
         defer { try? FileManager.default.removeItem(at: temporaryURL) }
         guard let response = response as? HTTPURLResponse else {

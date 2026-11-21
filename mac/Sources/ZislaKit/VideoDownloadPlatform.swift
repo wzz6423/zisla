@@ -62,7 +62,7 @@ public enum VideoDownloadPlatformResolver {
     public static func platform(forURLString string: String) -> VideoDownloadPlatform? {
         guard let host = bareHost(ofURLString: string) else { return nil }
         for platform in VideoDownloadPlatform.allCases
-        where platform.hosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
+            where platform.hosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
             return platform
         }
         return nil

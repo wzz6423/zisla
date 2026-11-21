@@ -358,7 +358,7 @@ struct CalendarMeetingServiceTests {
         #expect(current.meetingURL == selected.url)
         #expect(current.startDate == selected.startDate)
         #expect(fixture.store.queries.last == DateInterval(start: snapshot.startDate.addingTimeInterval(-1),
-            end: snapshot.endDate.addingTimeInterval(1)))
+                                                           end: snapshot.endDate.addingTimeInterval(1)))
     }
 
     @Test
@@ -558,12 +558,13 @@ private final class MeetingCalendarFixture {
             }, sleep: { [sleeps] delay in
                 if controlAgendaSleep { await sleeps.sleep(delay) }
                 else { try await Task.sleep(for: delay) }
-            }, authorizationPromptHost: { nil }))
+            }, authorizationPromptHost: { nil }
+        ))
     }
 
     func calendar(identifier: String = "work") throws -> MeetingCalendar {
         let calendar = try #require(MeetingCalendar.perform(NSSelectorFromString("calendarWithEventStore:"),
-            with: store)?.takeUnretainedValue() as? MeetingCalendar)
+                                                            with: store)?.takeUnretainedValue() as? MeetingCalendar)
         calendar.fixtureID = identifier; calendar.title = "Work"
         return calendar
     }

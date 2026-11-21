@@ -210,15 +210,13 @@ public actor WeatherService {
         let cached = metCache.cachedResponse(for: request)
         if let cached,
            let expires = cached.userInfo?["expiresAt"] as? Date,
-           now() < expires
-        {
+           now() < expires {
             return try WeatherForecastDecoder.metNorway(
                 cached.data, coordinate: coordinate, locationName: locationName, now: now()
             )
         }
         if let response = cached?.response as? HTTPURLResponse,
-           let modified = response.value(forHTTPHeaderField: "Last-Modified")
-        {
+           let modified = response.value(forHTTPHeaderField: "Last-Modified") {
             request.setValue(modified, forHTTPHeaderField: "If-Modified-Since")
         }
         let (data, rawResponse) = try await session.data(for: request)

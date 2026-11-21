@@ -70,8 +70,7 @@ final class AIAccountBalanceCookieInputModel: ObservableObject {
                 case .remove: try saveCookie(value, website, true)
                 }
                 return nil
-            }
-            catch let error as AIAccountBalanceBrowserCookieError { return error.statusKey }
+            } catch let error as AIAccountBalanceBrowserCookieError { return error.statusKey }
             catch { return "无法保存额度查询凭据，请检查 Cookie 格式或存储权限" }
         }.value
         isSaving = false

@@ -865,9 +865,9 @@ struct VoiceHistoryStoreTests {
         let database = try VoiceHistoryDatabase(storageURL: fixture.databaseURL, fileManager: .default)
         #expect(try database.load() == nil)
         try fixture.executeSQL("""
-            CREATE TRIGGER fail_voice_migration BEFORE INSERT ON voice_history_state
-            BEGIN SELECT RAISE(ABORT, 'injected migration failure'); END;
-            """)
+        CREATE TRIGGER fail_voice_migration BEFORE INSERT ON voice_history_state
+        BEGIN SELECT RAISE(ABORT, 'injected migration failure'); END;
+        """)
 
         let failed = fixture.makeStore()
 
@@ -967,13 +967,13 @@ struct VoiceHistoryStoreTests {
         let store = fixture.makeStore()
         let changedID = entries[0].id
         try fixture.executeSQL("""
-            CREATE TRIGGER protect_unchanged_update BEFORE UPDATE ON voice_history_entries
-            WHEN OLD.id != '\(changedID.uuidString)'
-            BEGIN SELECT RAISE(ABORT, 'unchanged entry was rewritten'); END;
-            CREATE TRIGGER protect_unchanged_delete BEFORE DELETE ON voice_history_entries
-            WHEN OLD.id != '\(changedID.uuidString)'
-            BEGIN SELECT RAISE(ABORT, 'unchanged entry was removed'); END;
-            """)
+        CREATE TRIGGER protect_unchanged_update BEFORE UPDATE ON voice_history_entries
+        WHEN OLD.id != '\(changedID.uuidString)'
+        BEGIN SELECT RAISE(ABORT, 'unchanged entry was rewritten'); END;
+        CREATE TRIGGER protect_unchanged_delete BEFORE DELETE ON voice_history_entries
+        WHEN OLD.id != '\(changedID.uuidString)'
+        BEGIN SELECT RAISE(ABORT, 'unchanged entry was removed'); END;
+        """)
 
         for index in 0..<16 {
             #expect(store.updateProcessedTranscript(id: changedID, transcript: "edit \(index)"))
@@ -1368,14 +1368,14 @@ struct VoiceHistoryStoreTests {
         )
         if operation != "discard" && operation != "orphan" { #expect(store.record(recording)) }
         try fixture.executeSQL("""
-            CREATE TABLE commit_attempts (count INTEGER NOT NULL);
-            INSERT INTO commit_attempts VALUES(0);
-            CREATE TRIGGER fail_compensation BEFORE UPDATE ON voice_history_state
-            BEGIN
-                UPDATE commit_attempts SET count = count + 1;
-                SELECT RAISE(ABORT, 'injected compensation failure') WHERE (SELECT count FROM commit_attempts) > 1;
-            END;
-            """)
+        CREATE TABLE commit_attempts (count INTEGER NOT NULL);
+        INSERT INTO commit_attempts VALUES(0);
+        CREATE TRIGGER fail_compensation BEFORE UPDATE ON voice_history_state
+        BEGIN
+            UPDATE commit_attempts SET count = count + 1;
+            SELECT RAISE(ABORT, 'injected compensation failure') WHERE (SELECT count FROM commit_attempts) > 1;
+        END;
+        """)
         fileManager.stagedRemovalFailureIndex = 1
 
         switch operation {
@@ -1412,10 +1412,10 @@ struct VoiceHistoryStoreTests {
         #expect(writer.record(.init(id: id, audioFileURL: audioURL, transcript: "retained", duration: 2)))
         let stale = fixture.makeStore()
         try fixture.executeSQL("""
-            CREATE TRIGGER fail_compensation BEFORE UPDATE ON voice_history_state
-            WHEN (SELECT COUNT(*) FROM voice_history_entries) > 0
-            BEGIN SELECT RAISE(ABORT, 'injected compensation failure'); END;
-            """)
+        CREATE TRIGGER fail_compensation BEFORE UPDATE ON voice_history_state
+        WHEN (SELECT COUNT(*) FROM voice_history_entries) > 0
+        BEGIN SELECT RAISE(ABORT, 'injected compensation failure'); END;
+        """)
         fileManager.stagedRemovalFailureIndex = 1
         writer.remove(id: id)
         let stagedURL = try #require(fileManager.stagedRemovalURLs.last)
@@ -1825,9 +1825,9 @@ struct VoiceHistoryStoreTests {
             duration: 6
         )))
         try fixture.executeSQL("""
-            UPDATE voice_history_state
-            SET statistics = CAST('{"totalWordCount":-1,"totalDuration":-10}' AS BLOB);
-            """)
+        UPDATE voice_history_state
+        SET statistics = CAST('{"totalWordCount":-1,"totalDuration":-10}' AS BLOB);
+        """)
 
         let reloaded = fixture.makeStore()
 
@@ -1851,9 +1851,9 @@ struct VoiceHistoryStoreTests {
         )))
 
         try fixture.executeSQL("""
-            UPDATE voice_history_state
-            SET statistics = CAST('{"totalWordCount":\(Int.max),"totalDuration":1}' AS BLOB);
-            """)
+        UPDATE voice_history_state
+        SET statistics = CAST('{"totalWordCount":\(Int.max),"totalDuration":1}' AS BLOB);
+        """)
 
         let store = fixture.makeStore()
         let secondID = UUID()
@@ -1906,9 +1906,9 @@ private struct VoiceHistoryFixture {
 
     func blockMetadataWrites() throws {
         try executeSQL("""
-            CREATE TRIGGER fail_voice_state_update BEFORE UPDATE ON voice_history_state
-            BEGIN SELECT RAISE(ABORT, 'injected metadata write failure'); END;
-            """)
+        CREATE TRIGGER fail_voice_state_update BEFORE UPDATE ON voice_history_state
+        BEGIN SELECT RAISE(ABORT, 'injected metadata write failure'); END;
+        """)
     }
 
     func executeSQL(_ sql: String) throws {

@@ -10,7 +10,7 @@ import ZislaCore
 struct ScreenRecordingMediaRestoreAccessTests {
     @Test(arguments: RecordingMediaKind.allCases, [false, true])
     func removedMediaCanRestoreWithoutAnyClipAfterSavingAndReopening(_ kind: RecordingMediaKind,
-                                                                    hadClip: Bool) async throws {
+                                                                     hadClip: Bool) async throws {
         let fixture = try RecordingMultitrackTestFixture()
         let model = try fixture.model()
         defer { model.shutdown(); fixture.remove() }
@@ -44,7 +44,7 @@ struct ScreenRecordingMediaRestoreAccessTests {
         let restoreID = "screenRecording.libraryRestoreMedia." + asset.id.uuidString
         #expect(host.element(restoreID) == nil, "Removed media must start collapsed")
         let disclosure = try #require(host.disclosure(),
-            "A removed asset without timeline clips needs a library restoration entry after reopen")
+                                      "A removed asset without timeline clips needs a library restoration entry after reopen")
         #expect(host.element("screenRecording.removedMediaLibrary") != nil)
         try host.press(disclosure)
         await host.settle()
@@ -63,7 +63,7 @@ struct ScreenRecordingMediaRestoreAccessTests {
         #expect(model.project == restored && model.mediaAssets == [asset])
         #expect(model.timeline?.clips.isEmpty == true && model.timeline?.tracks == [track])
         #expect(host.element("screenRecording.removedMediaLibrary") == nil,
-            "Restoring the final removed asset must remove the empty restoration entry")
+                "Restoring the final removed asset must remove the empty restoration entry")
         #expect(try fixture.files() == files)
         #expect(try Data(contentsOf: fixture.directory.appendingPathComponent(asset.file)) == originalBytes)
         model.undo()
@@ -74,7 +74,7 @@ struct ScreenRecordingMediaRestoreAccessTests {
         let second = try #require(model.addAssetToTimeline(asset.id, at: asset.duration, trackID: track.id))
         #expect(first != second && model.timeline?.assets.count == 1)
         #expect(model.timeline?.clips.map(\.content.assetID) == [asset.id, asset.id],
-            "Library restoration must allow the same media to be reused in the timeline")
+                "Library restoration must allow the same media to be reused in the timeline")
         #expect(model.canExport && model.timeline?.tracks == [track])
         let added = model.project
         model.undo()
@@ -115,8 +115,8 @@ struct ScreenRecordingMediaRestoreAccessTests {
         defer { fixture.remove() }
         let asset = try await makeAsset(.audio, in: fixture)
         let transcriber = ScreenRecordingTranscriber(dependencies: .init(authorizationStatus: { .authorized },
-            requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { _, _, _ in {} },
-            scheduleDeadline: { _ in {} }))
+                                                                         requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { _, _, _ in {} },
+                                                                         scheduleDeadline: { _ in {} }))
         let model = ScreenRecordingStudioModel(transcriber: transcriber, projectStore: fixture.store)
         defer { model.shutdown() }
         var original = fixture.project()
@@ -156,7 +156,7 @@ struct ScreenRecordingMediaRestoreAccessTests {
         #expect(model.project == removed)
         model.undo()
         #expect(model.project == original && !model.canUndo,
-            "A disabled restoration must not add an undo entry")
+                "A disabled restoration must not add an undo entry")
         #expect(try fixture.files() == files)
     }
 
@@ -197,7 +197,7 @@ struct ScreenRecordingMediaRestoreAccessTests {
         model.install(first, directory: fixture.directory)
         await host.settle()
         #expect(host.disclosure() != nil && host.element(restoreID) == nil,
-            "Visiting a project without removed media must not preserve another project's expanded section")
+                "Visiting a project without removed media must not preserve another project's expanded section")
     }
 
     @Test(arguments: ["missing", "empty", "directory", "symlink"])
@@ -250,7 +250,7 @@ struct ScreenRecordingMediaRestoreAccessTests {
         #expect(model.project == removed)
         model.undo()
         #expect(model.project == original && !model.canUndo,
-            "A failed restoration must leave the removal as the only undoable edit")
+                "A failed restoration must leave the removal as the only undoable edit")
     }
 
     private func makeAsset(_ kind: RecordingMediaKind, in fixture: RecordingMultitrackTestFixture) async throws -> RecordingMediaAsset {
@@ -261,8 +261,8 @@ struct ScreenRecordingMediaRestoreAccessTests {
         case .audio: url = try fixture.createTone("restore-source.wav")
         }
         return .init(name: "Restore source", file: url.lastPathComponent, kind: kind,
-            duration: 2, width: kind == .audio ? 0 : 64, height: kind == .audio ? 0 : 48,
-            hasAudio: kind == .audio)
+                     duration: 2, width: kind == .audio ? 0 : 64, height: kind == .audio ? 0 : 48,
+                     hasAudio: kind == .audio)
     }
 }
 
@@ -276,7 +276,7 @@ private final class RestoreAccessHost {
         hosting.sizingOptions = []
         host = hosting
         window = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 260, height: 800),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = hosting
         window.orderFrontRegardless()

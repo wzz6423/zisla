@@ -15,7 +15,7 @@ struct KeyboardTypingStatsDashboardView: View {
 
     var body: some View {
         compactDashboard
-        .foregroundStyle(.primary)
+            .foregroundStyle(.primary)
     }
 
     private var compactDashboard: some View {

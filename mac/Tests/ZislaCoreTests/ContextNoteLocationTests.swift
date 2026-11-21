@@ -59,7 +59,7 @@ struct ContextNoteLocationTests {
     }
 
     @Test(arguments: [VoiceInputHotkeyPreset.controlSpace,
-                     VoiceInputHotkeyPreset(keyCode: 61, carbonModifiers: 0x0800, keyDisplayName: "R⌥", modifierSides: [.rightOption])])
+                      VoiceInputHotkeyPreset(keyCode: 61, carbonModifiers: 0x0800, keyDisplayName: "R⌥", modifierSides: [.rightOption])])
     func customNoteHotkeysRoundTrip(hotkey: VoiceInputHotkeyPreset) throws {
         var settings = FeatureSettings(contextNoteHoldHotkey: hotkey)
         settings.contextNotesEnabled = true

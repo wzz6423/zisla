@@ -122,7 +122,7 @@ struct AISubscriptionUsageServiceTests {
     @Test func unexpectedResponseURLCannotPublishCredentialedData() async {
         SubscriptionURLProtocol.configure(responses: [
             "/api/dashboard/get-filtered-usage-events": [.init(body: history([event(input: 10, output: 20)], count: 1),
-                responseURL: "https://untrusted.example/api/dashboard/get-filtered-usage-events")],
+                                                               responseURL: "https://untrusted.example/api/dashboard/get-filtered-usage-events")],
         ])
         let result = await makeService().subscriptionUsage()
         #expect(result.failedUsageProviders == [.cursor] && result.usageSamples.isEmpty)
@@ -166,12 +166,12 @@ struct AISubscriptionUsageServiceTests {
         defer { session.invalidateAndCancel() }
         let url = try #require(URL(string: "https://cursor.com/api/dashboard/get-filtered-usage-events"))
         let response = try #require(HTTPURLResponse(url: url, statusCode: 302, httpVersion: nil,
-            headerFields: ["Location": "https://untrusted.example/"]))
+                                                    headerFields: ["Location": "https://untrusted.example/"]))
         let task = session.dataTask(with: url)
         blocker.urlSession(session, task: task, willPerformHTTPRedirection: response,
-            newRequest: URLRequest(url: URL(string: "https://untrusted.example/")!)) { request in
-                #expect(request == nil)
-            }
+                           newRequest: URLRequest(url: URL(string: "https://untrusted.example/")!)) { request in
+            #expect(request == nil)
+        }
     }
 
     @Test func exhaustedHistoryBudgetAndCancelledRefreshDoNotIssueHistoryRequests() async {
@@ -190,16 +190,17 @@ struct AISubscriptionUsageServiceTests {
     }
 
     private func makeService(cursor: @escaping @Sendable () throws -> String? = { "fixture-cookie" },
-        maximumPages: Int = 200, pageSize: Int = 1_000, historyDuration: Duration = .seconds(60)) -> AISubscriptionUsageService {
+                             maximumPages: Int = 200, pageSize: Int = 1_000, historyDuration: Duration = .seconds(60)) -> AISubscriptionUsageService {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [SubscriptionURLProtocol.self]
         return AISubscriptionUsageService(cursorCookie: cursor, configuration: configuration,
-            maximumHistoryPages: maximumPages, pageSize: pageSize, maximumHistoryDuration: historyDuration, now: { now })
+                                          maximumHistoryPages: maximumPages, pageSize: pageSize, maximumHistoryDuration: historyDuration, now: { now })
     }
 
     private func event(input: Int, output: Int, timestamp: Int = 1_909_999_990_000) -> [String: Any] {
         ["timestamp": String(timestamp), "model": "fixture-model", "tokenUsage": [
-            "inputTokens": input, "outputTokens": output, "cacheReadTokens": 3, "cacheWriteTokens": 4]]
+            "inputTokens": input, "outputTokens": output, "cacheReadTokens": 3, "cacheWriteTokens": 4
+        ]]
     }
 
     private func history(_ rows: [[String: Any]], count: Int) -> String {
@@ -249,7 +250,7 @@ private final class SubscriptionURLProtocol: URLProtocol, @unchecked Sendable {
         }
         if let error = value.error { client?.urlProtocol(self, didFailWithError: URLError(error)); return }
         let response = HTTPURLResponse(url: value.responseURL.flatMap(URL.init(string:)) ?? request.url!,
-            statusCode: value.status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                                       statusCode: value.status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(value.body.utf8))
         client?.urlProtocolDidFinishLoading(self)

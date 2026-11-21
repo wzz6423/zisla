@@ -174,11 +174,11 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
         return clips.enumerated().filter {
             order[$0.element.trackID] != nil && $0.element.contains(time) && $0.element.content.trackKind != .audio
         }
-            .sorted {
-                let left = order[$0.element.trackID]!
-                let right = order[$1.element.trackID]!
-                return left == right ? $0.offset < $1.offset : left < right
-            }.map(\.element)
+        .sorted {
+            let left = order[$0.element.trackID]!
+            let right = order[$1.element.trackID]!
+            return left == right ? $0.offset < $1.offset : left < right
+        }.map(\.element)
     }
 
     public func validate(project: ScreenRecordingProject) throws {
@@ -257,22 +257,22 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
         if let timeline = project.timeline { return timeline }
         let videoTrack = RecordingTimelineTrack(id: "recording")
         let source = RecordingMediaAsset(id: project.id, name: project.name, file: project.videoFile,
-            kind: .video, duration: project.duration, width: project.width, height: project.height, hasAudio: true)
+                                         kind: .video, duration: project.duration, width: project.width, height: project.height, hasAudio: true)
         var timeline = Self(assets: [source], tracks: [videoTrack])
         var offset = 0.0
         for segment in project.edits.segments {
             timeline.clips.append(.init(id: segment.id.uuidString, trackID: videoTrack.id,
-                content: .recording(source.id), start: offset, sourceStart: segment.start,
-                sourceEnd: segment.end, speed: segment.speed))
+                                        content: .recording(source.id), start: offset, sourceStart: segment.start,
+                                        sourceEnd: segment.end, speed: segment.speed))
             for annotation in project.edits.annotations ?? [] {
                 timeline.appendLegacyOverlay(id: "annotation.\(annotation.id).\(segment.id)",
-                    content: .annotation(annotation.id), range: annotation.start...annotation.end,
-                    segment: segment, offset: offset, trackID: "annotations")
+                                             content: .annotation(annotation.id), range: annotation.start...annotation.end,
+                                             segment: segment, offset: offset, trackID: "annotations")
             }
             for caption in project.captions {
                 timeline.appendLegacyOverlay(id: "caption.\(caption.id).\(segment.id)",
-                    content: .caption(caption.id), range: caption.start...caption.end,
-                    segment: segment, offset: offset, trackID: "captions")
+                                             content: .caption(caption.id), range: caption.start...caption.end,
+                                             segment: segment, offset: offset, trackID: "captions")
             }
             offset += segment.outputDuration
         }
@@ -289,8 +289,8 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
         let end = min(segment.end, range.upperBound)
         if end > start {
             clips.append(.init(id: id, trackID: trackID, content: content,
-                start: offset + (start - segment.start) / segment.speed,
-                sourceStart: start, sourceEnd: end, speed: segment.speed))
+                               start: offset + (start - segment.start) / segment.speed,
+                               sourceStart: start, sourceEnd: end, speed: segment.speed))
         }
     }
 

@@ -58,8 +58,8 @@ final class RecordingMediaImageStore: @unchecked Sendable {
         let url = try ScreenRecordingProjectStore(root: directory).mediaURL(file, in: directory)
         let version = try Self.version(of: url)
         let key = Key(assetID: assetID,
-            width: Int(min(CGFloat(Self.maximumSourceDimension), maximumSize.width.rounded(.down))),
-            height: Int(min(CGFloat(Self.maximumSourceDimension), maximumSize.height.rounded(.down))))
+                      width: Int(min(CGFloat(Self.maximumSourceDimension), maximumSize.width.rounded(.down))),
+                      height: Int(min(CGFloat(Self.maximumSourceDimension), maximumSize.height.rounded(.down))))
         return try lock.withLock {
             access &+= 1
             if var entry = cache[key], entry.version == version {
@@ -70,7 +70,7 @@ final class RecordingMediaImageStore: @unchecked Sendable {
             if let old = cache.removeValue(forKey: key) { cachedBytes -= old.bytes }
             let (source, size) = try Self.source(at: url)
             let scale = min(1, min(CGFloat(key.width) / size.width, CGFloat(key.height) / size.height),
-                sqrt(CGFloat(Self.maximumDecodedPixels) / (size.width * size.height)))
+                            sqrt(CGFloat(Self.maximumDecodedPixels) / (size.width * size.height)))
             let longestSide = max(1, Int((max(size.width, size.height) * scale).rounded(.down)))
             let options: [CFString: Any] = [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,

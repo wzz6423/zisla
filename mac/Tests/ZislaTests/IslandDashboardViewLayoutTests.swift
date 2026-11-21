@@ -42,11 +42,11 @@ struct IslandDashboardViewLayoutTests {
     @Test(arguments: [CGFloat(24), 32, 48])
     func cameraHeaderClearsTheActualCollapsedRowByTwelvePoints(thickness: CGFloat) {
         let screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 938),
-            safeAreaInsets: ScreenInsets(top: 44),
-            auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 656, height: 44),
-            auxiliaryTopRightArea: CGRect(x: 856, y: 938, width: 656, height: 44))
+                                    frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+                                    visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 938),
+                                    safeAreaInsets: ScreenInsets(top: 44),
+                                    auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 656, height: 44),
+                                    auxiliaryTopRightArea: CGRect(x: 856, y: 938, width: 656, height: 44))
         let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             layoutStyle: .pill, pillSize: CGSize(width: 80, height: thickness)
         )).layout(for: screen)
@@ -63,8 +63,8 @@ struct IslandDashboardViewLayoutTests {
     @Test(arguments: IslandEdge.allCases)
     func unobstructedPillsAndMissingScreenLayoutsUseTheLoweredHeaderInset(edge: IslandEdge) {
         let screen = ScreenSnapshot(displayID: 8,
-            frame: CGRect(x: -1440, y: 100, width: 1440, height: 900),
-            visibleFrame: CGRect(x: -1440, y: 100, width: 1440, height: 876))
+                                    frame: CGRect(x: -1440, y: 100, width: 1440, height: 900),
+                                    visibleFrame: CGRect(x: -1440, y: 100, width: 1440, height: 876))
         let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             layoutStyle: .pill, placement: IslandPlacement(mode: .custom, edge: edge)
         )).layout(for: screen)
@@ -160,8 +160,8 @@ struct IslandDashboardViewLayoutTests {
         let settings = CurrentValueSubject<FeatureSettings, Never>(pillSettings)
         let screen = CurrentValueSubject<ScreenOverlayLayout?, Never>(nil)
         let other = ScreenSnapshot(displayID: 8,
-            frame: CGRect(x: -1440, y: 100, width: 1440, height: 900),
-            visibleFrame: CGRect(x: -1440, y: 100, width: 1440, height: 876))
+                                   frame: CGRect(x: -1440, y: 100, width: 1440, height: 900),
+                                   visibleFrame: CGRect(x: -1440, y: 100, width: 1440, height: 876))
         let coordinator = OverlayCoordinator(contentView: NSView(), layoutEngine: ScreenLayoutEngine(
             configuration: ScreenLayoutConfiguration(expandedSize: IslandModuleLayout.shelf.panelSize, layoutStyle: .pill)
         ))
@@ -243,11 +243,11 @@ struct IslandDashboardViewLayoutTests {
 
     private var cameraScreen: ScreenSnapshot {
         ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 938),
-            safeAreaInsets: ScreenInsets(top: 44),
-            auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 656, height: 44),
-            auxiliaryTopRightArea: CGRect(x: 856, y: 938, width: 656, height: 44))
+                       frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+                       visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 938),
+                       safeAreaInsets: ScreenInsets(top: 44),
+                       auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 656, height: 44),
+                       auxiliaryTopRightArea: CGRect(x: 856, y: 938, width: 656, height: 44))
     }
 
     private func cameraLayout(thickness: CGFloat) -> ScreenOverlayLayout {

@@ -102,7 +102,8 @@ final class ScreenRecordingExporter: ObservableObject {
             videoComposition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_2020
         }
         videoComposition.instructions = [try RecordingPlaybackInstruction(
-            project: project, media: media, cameraTrackID: cameraTrack?.trackID, size: size)]
+            project: project, media: media, cameraTrackID: cameraTrack?.trackID, size: size
+        )]
         item.videoComposition = videoComposition
         if !audioTracks.isEmpty { item.audioMix = media.audioMix(for: audioTracks) }
         item.audioTimePitchAlgorithm = .spectral
@@ -146,7 +147,7 @@ final class ScreenRecordingExporter: ObservableObject {
             generator.requestedTimeToleranceAfter = .zero
             let screen = try await generator.image(at: time).image
             let renderer = try RecordingExportRenderer(project: project, size: size,
-                preservesHDR: ScreenshotImageRendering.isHDR(screen))
+                                                       preservesHDR: ScreenshotImageRendering.isHDR(screen))
             let camera: CGImage?
             if let file = project.editingCameraFile {
                 let cameraAsset = AVURLAsset(url: try store.mediaURL(file, in: directory))
@@ -180,17 +181,17 @@ enum RecordingExportJob {
                     progress: @escaping @Sendable (Double) async -> Void) async throws {
         if configuration.format == .livePhoto {
             try await ScreenRecordingLivePhotoExporter.run(project: project, directory: directory, destination: destination,
-                configuration: configuration, checkpoint: checkpoint, progress: progress)
+                                                           configuration: configuration, checkpoint: checkpoint, progress: progress)
             return
         }
         if configuration.format.isAudioOnly {
             try await ScreenRecordingAudioOnlyExporter.run(project: project, directory: directory, destination: destination,
-                configuration: configuration, checkpoint: checkpoint, resolveFFmpeg: resolveFFmpeg, progress: progress)
+                                                           configuration: configuration, checkpoint: checkpoint, resolveFFmpeg: resolveFFmpeg, progress: progress)
             return
         }
         if project.timeline != nil {
             try await RecordingMultitrackExportJob.run(project: project, directory: directory, destination: destination,
-                configuration: configuration, checkpoint: checkpoint, resolveFFmpeg: resolveFFmpeg, progress: progress)
+                                                       configuration: configuration, checkpoint: checkpoint, resolveFFmpeg: resolveFFmpeg, progress: progress)
             return
         }
         let timeline = try RecordingExportTimeline(project: project)
@@ -201,9 +202,9 @@ enum RecordingExportJob {
         try Task.checkCancellation()
         let media = try await RecordingExportMedia.prepare(project: project, directory: directory, timeline: timeline)
         let size = try RecordingExportRenderer.outputSize(source: media.sourceSize, edits: project.edits,
-                                                         resolution: configuration.resolution)
+                                                          resolution: configuration.resolution)
         let renderer = try RecordingExportRenderer(project: project, size: size,
-            preservesHDR: media.video.preservesHDR && configuration.format.supportsHDR)
+                                                   preservesHDR: media.video.preservesHDR && configuration.format.supportsHDR)
         let staging = target.deletingLastPathComponent()
             .appendingPathComponent(".zisla-recording-export-\(UUID())", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
@@ -215,23 +216,23 @@ enum RecordingExportJob {
             let executable = configuration.format.requiresFFmpeg ? try resolveFFmpeg() : nil
             let rendered = executable == nil ? temporary : staging.appendingPathComponent("rendered.mp4")
             let writer = try RecordingExportMP4Writer(url: rendered, media: media, renderer: renderer,
-                schedule: schedule, fileType: configuration.format.nativeVideoFileType, checkpoint: checkpoint)
+                                                      schedule: schedule, fileType: configuration.format.nativeVideoFileType, checkpoint: checkpoint)
             try await writer.run { await progress($0 * (executable == nil ? 1 : 0.75)) }
             if let executable {
                 try await ScreenRecordingFFmpegTranscoder.run(input: rendered, output: temporary,
-                    format: configuration.format, duration: timeline.duration, executable: executable,
-                    preservesHDR: renderer.preservesHDR, checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
+                                                              format: configuration.format, duration: timeline.duration, executable: executable,
+                                                              preservesHDR: renderer.preservesHDR, checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
             }
         } else if configuration.format == .gif {
             let primary = try RecordingExportFrameReader(media: media.video)
             let camera = try media.camera.map { try RecordingExportFrameReader(media: $0) }
             defer { primary.cancel(); camera?.cancel() }
             let writer = try RecordingExportGIFWriter(url: temporary, size: size, frameRate: schedule.frameRate,
-                                                       duration: timeline.duration,
-                                                       preserveGrayscale: project.edits.showCursor && project.edits.cursorTrail == true
-                                                           && !project.pointers.isEmpty
-                                                           && project.edits.effectiveCursorTrailColor.red == project.edits.effectiveCursorTrailColor.green
-                                                           && project.edits.effectiveCursorTrailColor.green == project.edits.effectiveCursorTrailColor.blue)
+                                                      duration: timeline.duration,
+                                                      preserveGrayscale: project.edits.showCursor && project.edits.cursorTrail == true
+                                                          && !project.pointers.isEmpty
+                                                          && project.edits.effectiveCursorTrailColor.red == project.edits.effectiveCursorTrailColor.green
+                                                          && project.edits.effectiveCursorTrailColor.green == project.edits.effectiveCursorTrailColor.blue)
             for index in 0..<schedule.frameCount {
                 try Task.checkCancellation()
                 try checkpoint(.frame(index))
@@ -368,10 +369,10 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
                      fileType: AVFileType = .mp4,
                      checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void) throws {
         try self.init(url: url, frames: RecordingLegacyExportFrames(media: media, renderer: renderer),
-            audioComposition: media.audioComposition, audioTracks: media.audioTracks,
-            audioMix: media.audioMix(for: media.audioTracks), duration: media.timeline.duration,
-            adjustsSpeed: media.timeline.slices.contains { $0.speed != 1 }, schedule: schedule,
-            fileType: fileType, checkpoint: checkpoint)
+                      audioComposition: media.audioComposition, audioTracks: media.audioTracks,
+                      audioMix: media.audioMix(for: media.audioTracks), duration: media.timeline.duration,
+                      adjustsSpeed: media.timeline.slices.contains { $0.speed != 1 }, schedule: schedule,
+                      fileType: fileType, checkpoint: checkpoint)
     }
 
     init(url: URL, frames: any RecordingExportFrameProviding, audioComposition: AVMutableComposition?,
@@ -430,7 +431,7 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
             guard reader.canAdd(output) else { throw ScreenRecordingExportError.unavailableMedia }
             reader.add(output)
             reader.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: duration,
-                                                                         preferredTimescale: 60_000))
+                                                                          preferredTimescale: 60_000))
             let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: 48_000,
@@ -473,7 +474,7 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
                               let buffer else { throw ScreenRecordingExportError.cannotRender }
                         let image = try frames.render(at: time)
                         frames.context.render(image, to: buffer, bounds: frames.canvas,
-                            colorSpace: preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
+                                              colorSpace: preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
                         guard adaptor.append(buffer, withPresentationTime: time) else {
                             throw ScreenRecordingExportError.encoderFailure
                         }

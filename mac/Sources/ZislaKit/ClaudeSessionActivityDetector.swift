@@ -116,13 +116,13 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
     private func recentTranscripts(liveSessionIDs: Set<String>) -> [Candidate] {
         guard fileManager.fileExists(atPath: projectsDirectory.path),
               let enumerator = fileManager.enumerator(
-                at: projectsDirectory,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
+                  at: projectsDirectory,
+                  includingPropertiesForKeys: [
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
+                  ],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -135,9 +135,9 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             }
             guard url.pathExtension == "jsonl",
                   let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
                   ]),
                   values.isRegularFile == true else {
                 continue
@@ -465,7 +465,7 @@ public final class ClaudeSessionActivityDetector: AIActivityDetecting {
             guard let data = try? Data(contentsOf: url),
                   let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let sessionID = ((root["sessionId"] as? String) ?? (root["session_id"] as? String))?
-                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                      .trimmingCharacters(in: .whitespacesAndNewlines),
                   !sessionID.isEmpty,
                   let processIdentifier = Self.processIdentifier(root["pid"]),
                   url.deletingPathExtension().lastPathComponent == String(processIdentifier),

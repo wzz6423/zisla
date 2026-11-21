@@ -361,11 +361,11 @@ public enum DownloadFormatProbe {
         let trimmedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
         let response = (try? JSONDecoder().decode(Response.self, from: Data(trimmedOutput.utf8)))
             ?? output.split(whereSeparator: \.isNewline)
-                .reversed()
-                .compactMap { line in
-                    try? JSONDecoder().decode(Response.self, from: Data(line.utf8))
-                }
-                .first
+            .reversed()
+            .compactMap { line in
+                try? JSONDecoder().decode(Response.self, from: Data(line.utf8))
+            }
+            .first
         guard let response else {
             throw DownloadFormatProbeError.invalidResponse
         }

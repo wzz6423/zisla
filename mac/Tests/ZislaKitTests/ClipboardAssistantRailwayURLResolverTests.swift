@@ -152,7 +152,7 @@ private final class RailwayURLProtocol: URLProtocol, @unchecked Sendable {
             return
         }
         let response = HTTPURLResponse(url: request.url!, statusCode: Self.status,
-            httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                                       httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(Self.body.utf8))
         client?.urlProtocolDidFinishLoading(self)

@@ -540,8 +540,8 @@ private struct SoundPackInspector: View {
                     L10n.format("未设置处继承 %@", profile.displayName),
                     systemImage: "arrow.triangle.branch"
                 )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(14)

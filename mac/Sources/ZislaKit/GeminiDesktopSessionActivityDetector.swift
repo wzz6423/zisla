@@ -90,21 +90,21 @@ public final class GeminiDesktopSessionActivityDetector: AIActivityDetecting {
     /// Ranks the turns of every chat so only the newest one is examined. `ZMESSAGEINDEX` breaks the
     /// tie for chats synced from the server, whose turns land with near-identical creation times.
     private static let sql = """
-        SELECT chatUuid, createdTime
-        FROM (
-            SELECT ZCHATUUID AS chatUuid,
-                   ZISUSERTURN AS isUserTurn,
-                   ZCREATEDTIME AS createdTime,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY ZCHATUUID
-                       ORDER BY ZCREATEDTIME DESC, ZMESSAGEINDEX DESC
-                   ) AS turnRank
-            FROM ZCHATMESSAGESTOREDMODEL
-        )
-        WHERE turnRank = 1 AND isUserTurn = 1 AND createdTime >= ?
-        ORDER BY createdTime DESC
-        LIMIT ?
-        """
+    SELECT chatUuid, createdTime
+    FROM (
+        SELECT ZCHATUUID AS chatUuid,
+               ZISUSERTURN AS isUserTurn,
+               ZCREATEDTIME AS createdTime,
+               ROW_NUMBER() OVER (
+                   PARTITION BY ZCHATUUID
+                   ORDER BY ZCREATEDTIME DESC, ZMESSAGEINDEX DESC
+               ) AS turnRank
+        FROM ZCHATMESSAGESTOREDMODEL
+    )
+    WHERE turnRank = 1 AND isUserTurn = 1 AND createdTime >= ?
+    ORDER BY createdTime DESC
+    LIMIT ?
+    """
 
     private func activeTasks(inDatabaseAt databaseURL: URL) throws -> [AIProgressTask] {
         var database: OpaquePointer?

@@ -22,7 +22,7 @@ struct DailyBriefingAIAccountBalanceSection: View {
                         }
                         if let updatedAt = balance.updatedAt {
                             Text(AppLocalization.format("采样于 %@", locale: language.locale,
-                                [updatedAt.formatted(.dateTime.year().month().day().hour().minute().locale(language.locale))]))
+                                                        [updatedAt.formatted(.dateTime.year().month().day().hour().minute().locale(language.locale))]))
                                 .font(.system(size: 11)).foregroundStyle(ink.opacity(0.65))
                         }
                     }

@@ -12,7 +12,7 @@ struct DailyBriefingStoreTests {
 
     private func observation(_ date: Date, active: Bool = true) -> DailyBriefingObservation {
         .init(date: date, applicationID: "editor", applicationName: "Editor", category: .work,
-            isActive: active, isListening: false)
+              isActive: active, isListening: false)
     }
 
     private func temporaryDirectory() throws -> URL {

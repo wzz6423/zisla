@@ -77,7 +77,7 @@ enum ScreenRecordingCaptureRetimer {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         var timings = Array(repeating: CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .invalid,
-                                                        decodeTimeStamp: .invalid), count: count)
+                                                          decodeTimeStamp: .invalid), count: count)
         guard CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: count, arrayToFill: &timings,
                                                      entriesNeededOut: &count) == noErr else {
             throw ScreenRecordingCaptureError.writerUnavailable

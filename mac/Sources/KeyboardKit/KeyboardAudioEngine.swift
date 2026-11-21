@@ -58,7 +58,7 @@ enum KeyboardLeadingSilenceTrimmer {
 
         frameSearch: for frame in 0..<scanFrameCount {
             for channel in 0..<channelCount
-            where abs(sourceChannels[channel][frame]) >= silenceThreshold {
+                where abs(sourceChannels[channel][frame]) >= silenceThreshold {
                 firstAudibleFrame = frame
                 break frameSearch
             }
@@ -105,7 +105,7 @@ enum AudioVoiceSelector {
 
         var oldestIndex = 0
         for index in 1..<count
-        where lastScheduledEpoch(index) < lastScheduledEpoch(oldestIndex) {
+            where lastScheduledEpoch(index) < lastScheduledEpoch(oldestIndex) {
             oldestIndex = index
         }
         return oldestIndex

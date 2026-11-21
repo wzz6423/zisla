@@ -141,10 +141,10 @@ struct WiFiNetworkPanelView: View {
                     systemName: network.isPersonalHotspot == true ? "personalhotspot" : "wifi",
                     variableValue: network.isPersonalHotspot == true ? nil : network.signalStrength
                 )
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(network.isConnected ? Color.white : Color.primary)
-                    .frame(width: 24, height: 24)
-                    .background(network.isConnected ? Color.accentColor : Color.primary.opacity(0.07), in: Circle())
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(network.isConnected ? Color.white : Color.primary)
+                .frame(width: 24, height: 24)
+                .background(network.isConnected ? Color.accentColor : Color.primary.opacity(0.07), in: Circle())
                 Text(verbatim: network.name)
                     .font(.system(size: 13, weight: .regular))
                     .lineLimit(1)

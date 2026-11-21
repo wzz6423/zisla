@@ -52,19 +52,19 @@ struct ClipboardHistoryDatabaseDedupTests {
         let complete = legacy[1]
         #expect(try scalar("SELECT instr(text_value, char(0)) FROM clipboard_history WHERE id = '\(complete.id.uuidString)'", at: url) > 0)
         try execute("""
-            CREATE TRIGGER preserve_unaffected_digest
-            BEFORE UPDATE OF content_digest ON clipboard_history
-            WHEN OLD.content_digest IS NOT NULL
-              AND (OLD.content_type <> 0 OR instr(OLD.text_value, char(0)) = 0)
-            BEGIN SELECT RAISE(ABORT, 'unaffected digest was rewritten'); END;
-            CREATE TRIGGER preserve_archived_payload
-            BEFORE UPDATE OF text_value, image_data, is_pinned, last_copied_at ON clipboard_history
-            BEGIN SELECT RAISE(ABORT, 'archived payload was rewritten'); END;
-            CREATE TRIGGER reject_redundant_digest_invalidation
-            BEFORE UPDATE OF content_digest ON clipboard_history
-            WHEN OLD.content_digest IS NULL AND NEW.content_digest IS NULL
-            BEGIN SELECT RAISE(ABORT, 'missing digest was invalidated again'); END;
-            """, at: url)
+        CREATE TRIGGER preserve_unaffected_digest
+        BEFORE UPDATE OF content_digest ON clipboard_history
+        WHEN OLD.content_digest IS NOT NULL
+          AND (OLD.content_type <> 0 OR instr(OLD.text_value, char(0)) = 0)
+        BEGIN SELECT RAISE(ABORT, 'unaffected digest was rewritten'); END;
+        CREATE TRIGGER preserve_archived_payload
+        BEFORE UPDATE OF text_value, image_data, is_pinned, last_copied_at ON clipboard_history
+        BEGIN SELECT RAISE(ABORT, 'archived payload was rewritten'); END;
+        CREATE TRIGGER reject_redundant_digest_invalidation
+        BEFORE UPDATE OF content_digest ON clipboard_history
+        WHEN OLD.content_digest IS NULL AND NEW.content_digest IS NULL
+        BEGIN SELECT RAISE(ABORT, 'missing digest was invalidated again'); END;
+        """, at: url)
         let trace = DedupQueryTrace()
         var database: ClipboardHistoryDatabase? = ClipboardHistoryDatabase(storageURL: url, connectionObserver: { trace.attach(to: $0) })
         let restored = try await loadAll(database!)
@@ -87,11 +87,11 @@ struct ClipboardHistoryDatabaseDedupTests {
         #expect(replaced.items.contains(legacy[2]))
         // Install the fixture trigger before the last connection starts its WAL checkpoint on close.
         try execute("""
-            CREATE TRIGGER reject_repeat_digest_refresh
-            BEFORE UPDATE OF content_digest ON clipboard_history
-            WHEN OLD.content_digest IS NOT NULL
-            BEGIN SELECT RAISE(ABORT, 'completed digest migration repeated'); END;
-            """, at: url)
+        CREATE TRIGGER reject_repeat_digest_refresh
+        BEFORE UPDATE OF content_digest ON clipboard_history
+        WHEN OLD.content_digest IS NOT NULL
+        BEGIN SELECT RAISE(ABORT, 'completed digest migration repeated'); END;
+        """, at: url)
         database = nil
         let reopened = ClipboardHistoryDatabase(storageURL: url)
         #expect(try await loadAll(reopened).items == replaced.items)
@@ -110,11 +110,11 @@ struct ClipboardHistoryDatabaseDedupTests {
             ? "OLD.content_digest IS NULL AND NEW.content_digest IS NOT NULL"
             : "NEW.content_digest IS NULL"
         try execute("""
-            CREATE TRIGGER reject_null_digest_migration
-            BEFORE UPDATE OF content_digest ON clipboard_history
-            WHEN \(rejection)
-            BEGIN SELECT RAISE(ABORT, 'injected null-text migration failure'); END;
-            """, at: url)
+        CREATE TRIGGER reject_null_digest_migration
+        BEFORE UPDATE OF content_digest ON clipboard_history
+        WHEN \(rejection)
+        BEGIN SELECT RAISE(ABORT, 'injected null-text migration failure'); END;
+        """, at: url)
         let database = ClipboardHistoryDatabase(storageURL: url)
 
         await #expect(throws: (any Error).self) { try await loadAll(database) }
@@ -635,15 +635,15 @@ struct ClipboardHistoryDatabaseDedupTests {
         ]
         try insertLegacy(legacy, at: url, hasFileColumns: true)
         try execute("""
-            UPDATE clipboard_history
-            SET text_value = 'prefix' || char(0) || '完整👩🏽‍💻'
-            WHERE id = '\(legacy[1].id.uuidString)';
-            UPDATE clipboard_history
-            SET text_value = 'unused' || char(0) || 'image column'
-            WHERE id = '\(legacy[2].id.uuidString)';
-            ALTER TABLE clipboard_history ADD COLUMN content_digest BLOB;
-            PRAGMA user_version = \(version);
-            """, at: url)
+        UPDATE clipboard_history
+        SET text_value = 'prefix' || char(0) || '完整👩🏽‍💻'
+        WHERE id = '\(legacy[1].id.uuidString)';
+        UPDATE clipboard_history
+        SET text_value = 'unused' || char(0) || 'image column'
+        WHERE id = '\(legacy[2].id.uuidString)';
+        ALTER TABLE clipboard_history ADD COLUMN content_digest BLOB;
+        PRAGMA user_version = \(version);
+        """, at: url)
         if version == 5 {
             try withDatabase(at: url) { database in
                 let statement = try prepare("UPDATE clipboard_history SET content_digest = ? WHERE id = ?", on: database)

@@ -5,8 +5,8 @@ import ZislaKit
 
 struct MeetingLocalizationTests {
     private static let keys = ["会议倒计时", "会议进行中", "加入会议", "加入会议：%@ · %@", "会议便签",
-        "新建会议便签", "关联现有便签", "取消便签关联", "会议已不可加入，请刷新日程", "无法打开会议链接",
-        "无法关联会议便签", "日历"]
+                               "新建会议便签", "关联现有便签", "取消便签关联", "会议已不可加入，请刷新日程", "无法打开会议链接",
+                               "无法关联会议便签", "日历"]
 
     @Test(arguments: AppLanguage.allCases)
     func everyLanguageContainsMeetingCopyAndPreservesFormatArguments(language: AppLanguage) throws {

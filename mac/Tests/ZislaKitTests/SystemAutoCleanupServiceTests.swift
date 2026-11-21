@@ -169,7 +169,7 @@ struct SystemAutoCleanupServiceTests {
         let service = fixture.makeService()
         defer { service.stop() }
         let selected = FeatureSettings(systemCleanupPolicy: .sevenDays,
-            systemCleanupScope: scope, trashCleanupPolicy: .fifteenDays)
+                                       systemCleanupScope: scope, trashCleanupPolicy: .fifteenDays)
         service.apply(settings: selected)
         let deadlines = fixture.timers.map(\.fireDate)
         let originalDate = fixture.date
@@ -195,7 +195,7 @@ struct SystemAutoCleanupServiceTests {
         let service = fixture.makeService()
         defer { service.stop() }
         let selected = FeatureSettings(systemMonitorEnabled: systemEnabled,
-            systemCleanupPolicy: .sevenDays, trashCleanupPolicy: trashEnabled ? .sevenDays : .never)
+                                       systemCleanupPolicy: .sevenDays, trashCleanupPolicy: trashEnabled ? .sevenDays : .never)
         service.apply(settings: selected)
         let result = await service.runNow(settings: selected)
         #expect((result.system != nil) == systemEnabled)
@@ -212,7 +212,7 @@ struct SystemAutoCleanupServiceTests {
         let candidate = fixture.candidate("protected", kind: .appCache)
         fixture.candidates = [candidate]
         fixture.result = DiskCleanupResult(successCount: 0, freedBytes: 0,
-            failures: [DiskCleanupFailure(url: candidate.url, message: "Permission denied")])
+                                           failures: [DiskCleanupFailure(url: candidate.url, message: "Permission denied")])
         fixture.emptyResult = .failure(.failed("Automation permission denied"))
         let service = fixture.makeService()
         defer { service.stop() }
@@ -343,7 +343,7 @@ struct SystemAutoCleanupServiceTests {
         let service = fixture.makeService()
         defer { service.stop() }
         service.apply(settings: FeatureSettings(systemMonitorEnabled: monitorEnabled,
-            systemCleanupPolicy: monitorEnabled ? .never : .sevenDays))
+                                                systemCleanupPolicy: monitorEnabled ? .never : .sevenDays))
         #expect(fixture.timers.isEmpty)
         #expect(service.runIfDue() == nil)
         #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") == nil)
@@ -462,11 +462,11 @@ struct SystemAutoCleanupServiceTests {
         fixture.defaults.set(Date().addingTimeInterval(-8 * 86_400), forKey: "system-cleanup-last-run-v1")
         let completed = XCTestExpectation(description: "Overdue cleanup runs from the main run loop")
         let service = SystemAutoCleanupService(defaults: fixture.defaults,
-            scan: { _, _ in [] },
-            trash: { _ in
-                completed.fulfill()
-                return DiskCleanupResult(successCount: 0, freedBytes: 0, failures: [])
-            })
+                                               scan: { _, _ in [] },
+                                               trash: { _ in
+                                                   completed.fulfill()
+                                                   return DiskCleanupResult(successCount: 0, freedBytes: 0, failures: [])
+                                               })
         defer { service.stop() }
         service.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays))
         #expect(await XCTWaiter.fulfillment(of: [completed], timeout: 2) == .completed)
@@ -583,7 +583,7 @@ struct SystemAutoCleanupServiceTests {
         let candidate = fixture.candidate("protected", kind: .appCache)
         fixture.candidates = [candidate]
         fixture.result = DiskCleanupResult(successCount: 0, freedBytes: 0,
-            failures: [DiskCleanupFailure(url: candidate.url, message: "Permission denied")])
+                                           failures: [DiskCleanupFailure(url: candidate.url, message: "Permission denied")])
         let service = fixture.makeService()
         defer { service.stop() }
         service.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays))
@@ -631,7 +631,7 @@ struct SystemAutoCleanupServiceTests {
         defer { service.stop() }
         let interval = TimeInterval(try #require(policy.daysThreshold) * 86_400)
         var settings = FeatureSettings(systemMonitorEnabled: false,
-            systemCleanupPolicy: .sevenDays, trashCleanupPolicy: policy)
+                                       systemCleanupPolicy: .sevenDays, trashCleanupPolicy: policy)
         settings.clipboardHistoryEnabled = false
         service.apply(settings: settings)
         let timer = try #require(fixture.timers.first)
@@ -980,7 +980,7 @@ struct SystemAutoCleanupServiceTests {
         let service = fixture.makeService()
         defer { service.stop() }
         service.apply(settings: FeatureSettings(systemCleanupPolicy: .thirtyDays,
-            trashCleanupPolicy: disabled ? .never : .sevenDays))
+                                                trashCleanupPolicy: disabled ? .never : .sevenDays))
         #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
         #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date == old)
         if disabled {
@@ -1006,10 +1006,10 @@ struct SystemAutoCleanupServiceTests {
         var emptiedCount = 0
         var failures: [DesktopOrganizerError] = []
         let service = SystemAutoCleanupService(defaults: defaults, now: { date },
-            scan: { _, _ in [] },
-            trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
-            emptyTrash: { emptiedCount += 1; return .success(()) },
-            onTrashReservationFailure: { failures.append($0) })
+                                               scan: { _, _ in [] },
+                                               trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
+                                               emptyTrash: { emptiedCount += 1; return .success(()) },
+                                               onTrashReservationFailure: { failures.append($0) })
         defer { service.stop() }
         let settings = FeatureSettings(trashCleanupPolicy: .sevenDays)
         service.apply(settings: settings)
@@ -1040,12 +1040,12 @@ struct SystemAutoCleanupServiceTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         var date = Date(timeIntervalSince1970: 1_800_000_000)
         let service = SystemAutoCleanupService(defaults: defaults, now: { date },
-            scan: { _, _ in [] },
-            trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
-            emptyTrash: {
-                defaults.synchronizationAllowed = false
-                return .success(())
-            })
+                                               scan: { _, _ in [] },
+                                               trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
+                                               emptyTrash: {
+                                                   defaults.synchronizationAllowed = false
+                                                   return .success(())
+                                               })
         defer { service.stop() }
         let settings = FeatureSettings(trashCleanupPolicy: .sevenDays)
         if completed {
@@ -1118,9 +1118,9 @@ struct SystemAutoCleanupServiceTests {
         fixture.defaults.set(Date().addingTimeInterval(-8 * 86_400), forKey: "trash-cleanup-last-run-v1")
         let completed = XCTestExpectation(description: "Overdue trash emptying runs on the main run loop")
         let service = SystemAutoCleanupService(defaults: fixture.defaults,
-            scan: { _, _ in [] },
-            trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
-            emptyTrash: { completed.fulfill(); return .success(()) })
+                                               scan: { _, _ in [] },
+                                               trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
+                                               emptyTrash: { completed.fulfill(); return .success(()) })
         defer { service.stop() }
         service.apply(settings: FeatureSettings(systemMonitorEnabled: false, trashCleanupPolicy: .sevenDays))
         #expect(await XCTWaiter.fulfillment(of: [completed], timeout: 2) == .completed)
@@ -1156,21 +1156,21 @@ private final class SystemAutoCleanupFixture {
         emptyTrash: (() async -> Result<Void, DesktopOrganizerError>)? = nil
     ) -> SystemAutoCleanupService {
         SystemAutoCleanupService(defaults: defaults, now: { self.date },
-            scan: scan ?? { self.scan($0, options: $1) },
-            trash: trash ?? {
-                self.moved = $0
-                return self.result ?? DiskCleanupResult(successCount: $0.count, freedBytes: 0, failures: [])
-            },
-            emptyTrash: emptyTrash ?? {
-                self.emptiedCount += 1
-                return self.emptyResult
-            },
-            timerFactory: { interval, callback in
-                let timer = Timer(timeInterval: interval, repeats: true, block: callback)
-                self.timers.append(timer)
-                self.callbacks.append(callback)
-                return timer
-            })
+                                 scan: scan ?? { self.scan($0, options: $1) },
+                                 trash: trash ?? {
+                                     self.moved = $0
+                                     return self.result ?? DiskCleanupResult(successCount: $0.count, freedBytes: 0, failures: [])
+                                 },
+                                 emptyTrash: emptyTrash ?? {
+                                     self.emptiedCount += 1
+                                     return self.emptyResult
+                                 },
+                                 timerFactory: { interval, callback in
+                                     let timer = Timer(timeInterval: interval, repeats: true, block: callback)
+                                     self.timers.append(timer)
+                                     self.callbacks.append(callback)
+                                     return timer
+                                 })
     }
 
     func scan(_ kinds: Set<DiskCleanupKind>, options: DiskCleanupScanOptions) -> [DiskCleanupCandidate] {
@@ -1181,7 +1181,7 @@ private final class SystemAutoCleanupFixture {
 
     func candidate(_ name: String, kind: DiskCleanupKind, safetyLevel: DiskCleanupSafetyLevel? = nil) -> DiskCleanupCandidate {
         DiskCleanupCandidate(url: URL(fileURLWithPath: "/Users/test/\(name)"), kind: kind,
-            byteSize: 1_024, displayName: name, safetyLevel: safetyLevel)
+                             byteSize: 1_024, displayName: name, safetyLevel: safetyLevel)
     }
 }
 

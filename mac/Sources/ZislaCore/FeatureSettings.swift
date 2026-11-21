@@ -1194,8 +1194,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         }
         self.clipboardAssistantEnabledKinds =
             enabledKinds.isEmpty
-            ? Set(ClipboardAssistantKind.allCases)
-            : enabledKinds
+                ? Set(ClipboardAssistantKind.allCases)
+                : enabledKinds
         self.clipboardAssistantCurrencyDefaultApplied = true
         self.clipboardAssistantConversionDefaultApplied = true
         self.clipboardAssistantAppDefaultApplied = true
@@ -1663,7 +1663,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantAppDefaultApplied = true
         if !enabledKinds.isEmpty {
             for (version, kinds) in Self.kindsIntroducedByVersion
-            where storedKindSetVersion < version {
+                where storedKindSetVersion < version {
                 enabledKinds.formUnion(kinds)
             }
         }
@@ -1686,7 +1686,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         if !hasAppliedServiceLookupDefault {
             // Migrate only the former defaults; later explicit search priorities must survive restarts.
             for kind in [ClipboardAssistantKind.flight, .train]
-            where actionOrders[kind] == [.search, .openURL, .copyText, .addToQuickNote, .share] {
+                where actionOrders[kind] == [.search, .openURL, .copyText, .addToQuickNote, .share] {
                 actionOrders[kind] = ClipboardAssistantActionOrder.defaults(for: kind)
             }
         }

@@ -25,11 +25,11 @@ struct CompactPillLyricTests {
             var samples: [[UInt8]] = []
             for elapsed in [0.0, 20, 40] {
                 let actual = try await render(CompactPillStatusContent(presentation: presentation,
-                    text: longLyric, edge: edge, visualizationStyle: .waveform, item: item,
-                    date: date.addingTimeInterval(elapsed)), size: size, reduceMotion: reduceMotion, renderScale: renderScale)
+                                                                       text: longLyric, edge: edge, visualizationStyle: .waveform, item: item,
+                                                                       date: date.addingTimeInterval(elapsed)), size: size, reduceMotion: reduceMotion, renderScale: renderScale)
                 let reference = try await render(referenceText(longLyric, edge: edge,
-                    size: viewport.size, progress: elapsed / 40), size: viewport.size,
-                    reduceMotion: reduceMotion, renderScale: renderScale)
+                                                               size: viewport.size, progress: elapsed / 40), size: viewport.size,
+                                                 reduceMotion: reduceMotion, renderScale: renderScale)
                 let samplePixels = try pixels(actual, in: viewport)
                 #expect(differences(samplePixels, try pixels(reference)) == 0,
                         "The lyric at \(elapsed)s must use its timestamp window inside the original \(size) frame")
@@ -41,7 +41,7 @@ struct CompactPillLyricTests {
                         "The first and last text rows must be visible throughout the lyric window")
                 } else {
                     let referencePositions = try inkPositions(reference,
-                        in: CGRect(origin: .zero, size: viewport.size), vertically: false)
+                                                              in: CGRect(origin: .zero, size: viewport.size), vertically: false)
                     #expect(!occupied.isEmpty && occupied.first == referencePositions.first
                         && occupied.last == referencePositions.last,
                         "The complete lyric window must preserve the reference glyph bearings")
@@ -65,16 +65,16 @@ struct CompactPillLyricTests {
         let viewport = textViewport(edge: .top, length: size.width)
         for elapsed in [0.0, 20, 40] {
             let actual = try await render(CompactPillStatusContent(presentation: presentation,
-                text: longLyric, edge: .top, visualizationStyle: .waveform, item: item,
-                date: date.addingTimeInterval(elapsed)), size: size, renderScale: renderScale)
+                                                                   text: longLyric, edge: .top, visualizationStyle: .waveform, item: item,
+                                                                   date: date.addingTimeInterval(elapsed)), size: size, renderScale: renderScale)
             var referenceScale: CGFloat?
             let reference = try await render(HorizontalLyricReference(text: longLyric,
-                size: viewport.size, progress: elapsed / 40, onDisplayScale: { referenceScale = $0 }),
-                size: viewport.size, renderScale: renderScale)
+                                                                      size: viewport.size, progress: elapsed / 40, onDisplayScale: { referenceScale = $0 }),
+                                             size: viewport.size, renderScale: renderScale)
             #expect(referenceScale == renderScale,
-                "The reference must use the scale of its actual hosting window")
+                    "The reference must use the scale of its actual hosting window")
             #expect(differences(try pixels(actual, in: viewport), try pixels(reference)) == 0,
-                "The head, middle and tail must match the reference at \(renderScale)x without fixed pixel rounding")
+                    "The head, middle and tail must match the reference at \(renderScale)x without fixed pixel rounding")
         }
     }
 
@@ -85,8 +85,8 @@ struct CompactPillLyricTests {
         var item = snapshot(text: longLyric)
         item.lyrics = lines
         let presentation = CompactPillStatusPresentation(priority: .media,
-            notice: IslandNotice(id: "media-active-lines", title: "Track"), text: longLyric,
-            showsWaveform: showsWaveform)
+                                                         notice: IslandNotice(id: "media-active-lines", title: "Track"), text: longLyric,
+                                                         showsWaveform: showsWaveform)
         let length = presentation.length(thickness: 32, edge: edge)
         #expect(length == (showsWaveform ? 252 : 222))
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
@@ -99,11 +99,11 @@ struct CompactPillLyricTests {
             let text = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: sampledDate)
             #expect(text == expectedText)
             let actual = try await render(CompactPillStatusContent(presentation: presentation,
-                text: text, edge: edge, visualizationStyle: .waveform, item: item, date: sampledDate), size: size)
+                                                                   text: text, edge: edge, visualizationStyle: .waveform, item: item, date: sampledDate), size: size)
             let reference = try await render(referenceText(expectedText, edge: edge,
-                size: viewport.size, progress: progress), size: viewport.size)
+                                                           size: viewport.size, progress: progress), size: viewport.size)
             #expect(differences(try pixels(actual, in: viewport), try pixels(reference)) == 0,
-                "The next lyric must restart inside the same length budget and follow its own timing window")
+                    "The next lyric must restart inside the same length budget and follow its own timing window")
         }
     }
 
@@ -117,12 +117,12 @@ struct CompactPillLyricTests {
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let viewport = textViewport(edge: edge, length: length)
         let first = try await render(CompactPillStatusContent(presentation: presentation,
-            text: longLyric, edge: edge, visualizationStyle: .waveform, item: item, date: date), size: size)
+                                                              text: longLyric, edge: edge, visualizationStyle: .waveform, item: item, date: date), size: size)
         let later = try await render(CompactPillStatusContent(presentation: presentation,
-            text: longLyric, edge: edge, visualizationStyle: .waveform, item: item,
-            date: date.addingTimeInterval(100)), size: size)
+                                                              text: longLyric, edge: edge, visualizationStyle: .waveform, item: item,
+                                                              date: date.addingTimeInterval(100)), size: size)
         let reference = try await render(referenceText(longLyric, edge: edge,
-            size: viewport.size, progress: 0.5), size: viewport.size)
+                                                       size: viewport.size, progress: 0.5), size: viewport.size)
         #expect(differences(try pixels(first, in: viewport), try pixels(reference)) == 0)
         #expect(differences(try pixels(first, in: viewport), try pixels(later, in: viewport)) == 0,
                 "Paused playback must freeze the current lyric offset on every edge")
@@ -137,10 +137,10 @@ struct CompactPillLyricTests {
         #expect(length < 222)
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let first = try await render(CompactPillStatusContent(presentation: presentation,
-            text: text, edge: edge, visualizationStyle: .waveform, item: item, date: date), size: size)
+                                                              text: text, edge: edge, visualizationStyle: .waveform, item: item, date: date), size: size)
         let later = try await render(CompactPillStatusContent(presentation: presentation,
-            text: text, edge: edge, visualizationStyle: .waveform, item: item,
-            date: date.addingTimeInterval(40)), size: size)
+                                                              text: text, edge: edge, visualizationStyle: .waveform, item: item,
+                                                              date: date.addingTimeInterval(40)), size: size)
         #expect(differences(try pixels(first), try pixels(later)) == 0)
         #expect(try pixels(first, in: textViewport(edge: edge, length: length)).contains { $0 > 128 })
     }
@@ -153,10 +153,10 @@ struct CompactPillLyricTests {
         #expect(length == 48)
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let first = try await render(CompactPillStatusContent(presentation: presentation,
-            text: "", edge: edge, visualizationStyle: .waveform, item: item, date: date), size: size)
+                                                              text: "", edge: edge, visualizationStyle: .waveform, item: item, date: date), size: size)
         let later = try await render(CompactPillStatusContent(presentation: presentation,
-            text: "", edge: edge, visualizationStyle: .waveform, item: item,
-            date: date.addingTimeInterval(20)), size: size)
+                                                              text: "", edge: edge, visualizationStyle: .waveform, item: item,
+                                                              date: date.addingTimeInterval(20)), size: size)
         #expect(try pixels(first).contains { $0 > 128 })
         #expect(differences(try pixels(first), try pixels(later)) == 0,
                 "An empty lyric must not allocate or animate an additional text region")
@@ -169,11 +169,11 @@ struct CompactPillLyricTests {
                     "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
         for progress in [0.0, 0.5, 1] {
             let actual = try await render(VerticalStatusText(text: text, availableWidth: 32,
-                availableHeight: height, scrollProgress: progress).foregroundStyle(.white),
-                size: CGSize(width: 32, height: height))
+                                                             availableHeight: height, scrollProgress: progress).foregroundStyle(.white),
+                                          size: CGSize(width: 32, height: height))
             let reference = try await render(referenceVerticalRows(rows,
-                size: CGSize(width: 32, height: height), progress: progress),
-                size: CGSize(width: 32, height: height))
+                                                                   size: CGSize(width: 32, height: height), progress: progress),
+                                             size: CGSize(width: 32, height: height))
             #expect(differences(try pixels(actual), try pixels(reference)) == 0,
                     "Scrolling must preserve the existing upright graphemes and clockwise standalone brackets")
         }
@@ -183,9 +183,9 @@ struct CompactPillLyricTests {
     func ordinaryVerticalStatusKeepsItsExistingEllipsisUnlessScrollingIsEnabled() async throws {
         let size = CGSize(width: 32, height: 42)
         let actual = try await render(VerticalStatusText(text: "甲乙丙丁戊己", availableWidth: 32,
-            availableHeight: size.height).foregroundStyle(.white), size: size)
+                                                         availableHeight: size.height).foregroundStyle(.white), size: size)
         let reference = try await render(referenceVerticalRows(["甲", "乙", "…"],
-            size: size, progress: 0, scrolling: false), size: size)
+                                                               size: size, progress: 0, scrolling: false), size: size)
         #expect(differences(try pixels(actual), try pixels(reference)) == 0,
                 "Ordinary status callers must retain their existing bounded ellipsis")
     }
@@ -195,10 +195,10 @@ struct CompactPillLyricTests {
         let size = CGSize(width: 32, height: 168)
         var animations: [Animation] = []
         let actual = try await render(VerticalStatusText(text: longLyric, availableWidth: 32,
-            availableHeight: size.height, scrollsAutomatically: true).foregroundStyle(.white),
-            size: size, renderScale: renderScale, animationProgress: progress, onAnimation: { animations.append($0) })
+                                                         availableHeight: size.height, scrollsAutomatically: true).foregroundStyle(.white),
+                                      size: size, renderScale: renderScale, animationProgress: progress, onAnimation: { animations.append($0) })
         let reference = try await render(referenceVerticalRows(longLyric.map(String.init),
-            size: size, progress: progress, animated: true), size: size, renderScale: renderScale)
+                                                               size: size, progress: progress, animated: true), size: size, renderScale: renderScale)
         #expect(differences(try pixels(actual), try pixels(reference)) == 0,
                 "Automatic vertical text must show its known head, middle and tail windows")
         let occupied = try inkPositions(actual, in: CGRect(origin: .zero, size: size), vertically: true)
@@ -215,10 +215,10 @@ struct CompactPillLyricTests {
         let size = CGSize(width: 32, height: 42)
         var animations: [Animation] = []
         let actual = try await render(VerticalStatusText(text: text, availableWidth: 32,
-            availableHeight: size.height, scrollsAutomatically: true).foregroundStyle(.white),
-            size: size, onAnimation: { animations.append($0) })
+                                                         availableHeight: size.height, scrollsAutomatically: true).foregroundStyle(.white),
+                                      size: size, onAnimation: { animations.append($0) })
         let reference = try await render(referenceVerticalRows(text.filter { !$0.isWhitespace }.map(String.init),
-            size: size, progress: 0), size: size)
+                                                               size: size, progress: 0), size: size)
         #expect(differences(try pixels(actual), try pixels(reference)) == 0)
         #expect(animations.isEmpty, "Short or empty vertical content must not start a scrolling task")
     }
@@ -230,12 +230,12 @@ struct CompactPillLyricTests {
         let size = CGSize(width: 32, height: 168)
         var animations: [Animation] = []
         let actual = try await render(VerticalStatusText(text: longLyric, availableWidth: 32,
-            availableHeight: size.height, scrollProgress: progress, scrollsAutomatically: true)
-            .foregroundStyle(.white), size: size, reduceMotion: reduceMotion,
+                                                         availableHeight: size.height, scrollProgress: progress, scrollsAutomatically: true)
+                .foregroundStyle(.white), size: size, reduceMotion: reduceMotion,
             onAnimation: { animations.append($0) })
         let expectedProgress = progress < 0 ? 0 : progress > 1 ? 1 : progress
         let reference = try await render(referenceVerticalRows(longLyric.map(String.init),
-            size: size, progress: expectedProgress), size: size)
+                                                               size: size, progress: expectedProgress), size: size)
         #expect(differences(try pixels(actual), try pixels(reference)) == 0,
                 "External progress must override automatic scrolling, including Reduce Motion")
         #expect(animations.isEmpty, "Externally driven progress must not also launch an automatic animation")
@@ -245,13 +245,13 @@ struct CompactPillLyricTests {
     func reduceMotionKeepsTheFullAutomaticVerticalFirstViewportStationary() async throws {
         let size = CGSize(width: 32, height: 168)
         let reference = try await render(referenceVerticalRows(longLyric.map(String.init),
-            size: size, progress: 0), size: size)
+                                                               size: size, progress: 0), size: size)
         var animations: [Animation] = []
         for progress in [0.0, 0.5, 1] {
             let actual = try await render(VerticalStatusText(text: longLyric, availableWidth: 32,
-                availableHeight: size.height, scrollsAutomatically: true).foregroundStyle(.white),
-                size: size, reduceMotion: true, animationProgress: progress,
-                onAnimation: { animations.append($0) })
+                                                             availableHeight: size.height, scrollsAutomatically: true).foregroundStyle(.white),
+                                          size: size, reduceMotion: true, animationProgress: progress,
+                                          onAnimation: { animations.append($0) })
             #expect(differences(try pixels(actual), try pixels(reference)) == 0,
                     "Reduce Motion keeps the full first viewport readable without automatic movement")
         }
@@ -262,9 +262,9 @@ struct CompactPillLyricTests {
     func verticalScrollResetsForChangedContentAndViewportAndCancelsWhenDisabled(renderScale: CGFloat) async throws {
         let size = CGSize(width: 32, height: 168)
         func content(_ text: String, width: CGFloat = 32, height: CGFloat = 168, automatic: Bool = true,
-            reduceMotion: Bool = false, progress: Double? = nil, sample: Double = 0.5) -> some View {
+                     reduceMotion: Bool = false, progress: Double? = nil, sample: Double = 0.5) -> some View {
             VerticalStatusText(text: text, availableWidth: width, availableHeight: height,
-                scrollProgress: progress, scrollsAutomatically: automatic)
+                               scrollProgress: progress, scrollsAutomatically: automatic)
                 .foregroundStyle(.white)
                 .frame(width: size.width, height: size.height, alignment: .top)
                 .background(.black)
@@ -278,16 +278,16 @@ struct CompactPillLyricTests {
         let host = NSHostingView(rootView: content(longLyric))
         host.sizingOptions = []
         let window = RasterPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                                 styleMask: .borderless, backing: .buffered, defer: false)
         window.renderScale = renderScale
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
         func assertVisibleRows(_ rows: [String], width: CGFloat = 32, height: CGFloat = 168, progress: Double,
-            animated: Bool = true, message: String) async throws {
+                               animated: Bool = true, message: String) async throws {
             let reference = try await render(referenceVerticalRows(rows,
-                size: CGSize(width: width, height: height), progress: progress, animated: animated)
-                .frame(width: size.width, height: size.height, alignment: .top), size: size, renderScale: renderScale)
+                                                                   size: CGSize(width: width, height: height), progress: progress, animated: animated)
+                    .frame(width: size.width, height: size.height, alignment: .top), size: size, renderScale: renderScale)
             let actual = try await sample(host, size: size)
             #expect(differences(try pixels(actual), try pixels(reference)) == 0, "\(message)")
             #expect(host.bounds.size == size && window.frame.size == size && !window.isVisible)
@@ -296,38 +296,38 @@ struct CompactPillLyricTests {
         let replacement = "春江潮水连海平海上明月共潮生滟滟随波远处何处春江无月明"
         host.rootView = content(replacement, sample: 0)
         try await assertVisibleRows(replacement.map(String.init), progress: 0,
-            message: "Changing text restarts from its full first viewport")
+                                    message: "Changing text restarts from its full first viewport")
         host.rootView = content(replacement, height: 84, sample: 0.5)
         try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0.5,
-            message: "Changing the viewport starts a fresh pass for the new travel")
+                                    message: "Changing the viewport starts a fresh pass for the new travel")
         host.rootView = content(replacement, height: 84, progress: 0.75)
         try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0.75, animated: false,
-            message: "External progress cancels the automatic position")
+                                    message: "External progress cancels the automatic position")
         host.rootView = content(replacement, height: 84, sample: 0)
         try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0,
-            message: "Removing external progress starts a fresh automatic pass")
+                                    message: "Removing external progress starts a fresh automatic pass")
         host.rootView = content(replacement, height: 84, reduceMotion: true)
         try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0,
-            message: "Reduce Motion cancels and resets an already running automatic pass")
+                                    message: "Reduce Motion cancels and resets an already running automatic pass")
         host.rootView = content(replacement, height: 84, sample: 0.5)
         try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0.5,
-            message: "Disabling Reduce Motion restarts the pass instead of keeping stale progress")
+                                    message: "Disabling Reduce Motion restarts the pass instead of keeping stale progress")
         host.rootView = content(replacement, height: 84, automatic: false)
         try await assertVisibleRows(Array(replacement.prefix(5)).map(String.init) + ["…"], height: 84, progress: 0,
-            message: "Removing the opt-in cancels automatic scrolling and restores ordinary ellipsis")
+                                    message: "Removing the opt-in cancels automatic scrolling and restores ordinary ellipsis")
         host.rootView = content(replacement, height: 84, sample: 0.5)
         try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0.5,
-            message: "Re-enabling the same text after the opt-in is disabled starts a fresh pass")
+                                    message: "Re-enabling the same text after the opt-in is disabled starts a fresh pass")
         let numeric = "12345678901234567890123456789012345678901234567890"
         host.rootView = content(numeric, height: 42, sample: 0.5)
         try await assertVisibleRows(["1234", "5678", "9012", "3456", "7890", "1234", "5678", "9012", "3456", "7890", "1234", "5678", "90"],
-            height: 42, progress: 0.5, message: "Numeric runs preserve their four-digit rows at 32pt")
+                                    height: 42, progress: 0.5, message: "Numeric runs preserve their four-digit rows at 32pt")
         host.rootView = content(numeric, width: 24, height: 42, sample: 0)
         try await assertVisibleRows(["123", "456", "789", "012", "345", "678", "901", "234", "567", "890", "123", "456", "789", "012", "345", "678", "90"],
-            width: 24, height: 42, progress: 0, message: "Changing only width reflows numeric runs and restarts at the head")
+                                    width: 24, height: 42, progress: 0, message: "Changing only width reflows numeric runs and restarts at the head")
         host.rootView = content("短", height: 84)
         try await assertVisibleRows(["短"], height: 84, progress: 0,
-            message: "Replacing a long line with a short line removes the old scroll")
+                                    message: "Replacing a long line with a short line removes the old scroll")
     }
 
     @Test(arguments: IslandEdge.allCases, [Double?.none, 0])
@@ -339,10 +339,10 @@ struct CompactPillLyricTests {
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let viewport = textViewport(edge: edge, length: length)
         let actual = try await render(CompactPillStatusContent(presentation: presentation,
-            text: longLyric, edge: edge, visualizationStyle: .waveform, item: item,
-            date: date.addingTimeInterval(20)), size: size)
+                                                               text: longLyric, edge: edge, visualizationStyle: .waveform, item: item,
+                                                               date: date.addingTimeInterval(20)), size: size)
         let reference = try await render(referenceText(longLyric, edge: edge,
-            size: viewport.size, progress: 0), size: viewport.size)
+                                                       size: viewport.size, progress: 0), size: viewport.size)
         #expect(differences(try pixels(actual, in: viewport), try pixels(reference)) == 0,
                 "A missing lyric timing window must not start an unrelated automatic scroll")
     }
@@ -358,22 +358,22 @@ struct CompactPillLyricTests {
         unsynced.lyrics = nil
         let media = presentation(text: longLyric)
         let ordinary = CompactPillStatusPresentation(priority: .transient,
-            notice: IslandNotice(id: "focus-transition-test", title: "Status"), text: longLyric)
+                                                     notice: IslandNotice(id: "focus-transition-test", title: "Status"), text: longLyric)
         for (presentation, item) in [(media, Optional(video)), (media, unsynced), (media, nil),
                                      (ordinary, snapshot(text: longLyric))] {
             let length = presentation.length(thickness: 32, edge: edge)
             let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
             let viewport = textViewport(edge: edge, length: length)
             let actual = try await render(CompactPillStatusContent(presentation: presentation,
-                text: longLyric, edge: edge, visualizationStyle: .waveform, item: item, date: date),
-                size: size, reduceMotion: reduceMotion)
+                                                                   text: longLyric, edge: edge, visualizationStyle: .waveform, item: item, date: date),
+                                          size: size, reduceMotion: reduceMotion)
             let reference = try await render(Group {
                 if edge.isVertical {
                     VerticalStatusText(text: longLyric, availableWidth: 32, availableHeight: viewport.height)
                         .frame(width: 32, height: viewport.height, alignment: .top)
                 } else {
                     MarqueeText(longLyric, font: .system(size: 11, weight: .medium), textColor: .white,
-                        repeats: false)
+                                repeats: false)
                 }
             }.foregroundStyle(.white), size: viewport.size, reduceMotion: reduceMotion)
             #expect(differences(try pixels(actual, in: viewport), try pixels(reference)) == 0,
@@ -411,14 +411,15 @@ struct CompactPillLyricTests {
         state.islandEdge = edge
         state.compactWingHeight = 32
         let view = CompactStatusBarView(queue: queue, displayState: state, media: media,
-            browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
-            resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
+                                        browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
+                                        resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         let presentation = try #require(SideNoticeLayoutEngine().compactBarSizing(
-            for: [notice], settings: settings.settings)?.customPillPresentation)
+            for: [notice], settings: settings.settings
+        )?.customPillPresentation)
         let length = presentation.length(thickness: 32, edge: edge, text: longLyric, item: item)
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let identityLength = presentation.mediaIdentityLength(thickness: 32, edge: edge,
-            text: longLyric, item: item)
+                                                              text: longLyric, item: item)
         var viewport = textViewport(edge: edge, length: length)
         if edge.isVertical {
             viewport.origin.y += identityLength + 6
@@ -430,20 +431,20 @@ struct CompactPillLyricTests {
         let sampledDate = date.addingTimeInterval(20)
         let actual = try await render(view.statusBarContent(at: sampledDate), size: size, reduceMotion: true)
         let reference = try await render(referenceText(longLyric, edge: edge,
-            size: viewport.size, progress: 0.5), size: viewport.size)
+                                                       size: viewport.size, progress: 0.5), size: viewport.size)
         #expect(differences(try pixels(actual, in: viewport), try pixels(reference)) == 0,
                 "The custom status must pass its sampled date through instead of reading wall-clock time")
     }
 
     private func presentation(text: String) -> CompactPillStatusPresentation {
         CompactPillStatusPresentation(priority: .media,
-            notice: IslandNotice(id: "media-active-fixture", title: "Track"), text: text)
+                                      notice: IslandNotice(id: "media-active-fixture", title: "Track"), text: text)
     }
 
     private func snapshot(text: String) -> NowPlayingSnapshot {
         NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
-            duration: 40, elapsedTime: 0, timestamp: date, isPlaying: true,
-            lyrics: SyncedLyrics(lines: [.init(time: 0, text: text)]))
+                           duration: 40, elapsedTime: 0, timestamp: date, isPlaying: true,
+                           lyrics: SyncedLyrics(lines: [.init(time: 0, text: text)]))
     }
 
     private func textViewport(edge: IslandEdge, length: CGFloat, showsWaveform: Bool = false) -> CGRect {
@@ -462,7 +463,7 @@ struct CompactPillLyricTests {
     }
 
     private func referenceVerticalRows(_ rows: [String], size: CGSize, progress: Double,
-        scrolling: Bool = true, animated: Bool = false) -> some View {
+                                       scrolling: Bool = true, animated: Bool = false) -> some View {
         VerticalTextReference(rows: rows, size: size, progress: progress, scrolling: scrolling, animated: animated)
     }
 
@@ -499,7 +500,7 @@ struct CompactPillLyricTests {
     }
 
     private func render(_ content: some View, size: CGSize, reduceMotion: Bool = false,
-        renderScale: CGFloat? = nil, animationProgress: Double = 0.5, onAnimation: ((Animation) -> Void)? = nil) async throws -> NSBitmapImageRep {
+                        renderScale: CGFloat? = nil, animationProgress: Double = 0.5, onAnimation: ((Animation) -> Void)? = nil) async throws -> NSBitmapImageRep {
         let host = NSHostingView(rootView: content.frame(width: size.width, height: size.height)
             .background(.black)
             .environment(\._accessibilityReduceMotion, reduceMotion)
@@ -511,7 +512,7 @@ struct CompactPillLyricTests {
             })
         host.sizingOptions = []
         let window = RasterPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                                 styleMask: .borderless, backing: .buffered, defer: false)
         window.renderScale = renderScale
         window.isReleasedWhenClosed = false
         window.contentView = host

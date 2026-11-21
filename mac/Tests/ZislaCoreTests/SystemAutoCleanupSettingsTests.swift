@@ -59,7 +59,7 @@ struct SystemAutoCleanupSettingsTests {
     @Test(arguments: VoiceRecordingCleanupPolicy.allCases)
     func trashCleanupChoicesRoundTripIndependently(policy: VoiceRecordingCleanupPolicy) throws {
         var settings = FeatureSettings(systemMonitorEnabled: false,
-            systemCleanupPolicy: .sevenDays, systemCleanupScope: .all, trashCleanupPolicy: policy)
+                                       systemCleanupPolicy: .sevenDays, systemCleanupScope: .all, trashCleanupPolicy: policy)
         settings.clipboardHistoryCleanupPolicy = .fifteenDays
         settings.voiceRecordingCleanupPolicy = .thirtyDays
         let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))

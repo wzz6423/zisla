@@ -22,11 +22,11 @@ struct CompactLowBatteryBarTests {
         let renderer = ImageRenderer(content: CompactLowBatteryBar(
             notice: notice, height: 34, centerInset: centerInset
         )
-            .frame(width: width, height: 34)
-            .background(.black)
-            .clipped()
-            .environment(\.locale, Locale(identifier: "ar"))
-            .environment(\.layoutDirection, .rightToLeft))
+        .frame(width: width, height: 34)
+        .background(.black)
+        .clipped()
+        .environment(\.locale, Locale(identifier: "ar"))
+        .environment(\.layoutDirection, .rightToLeft))
         renderer.scale = scale
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         let leftEdge = (width - centerInset) / 2 * scale

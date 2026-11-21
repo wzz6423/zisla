@@ -341,10 +341,10 @@ enum StoredZIPArchive {
             let checksum = crc32(payload)
             let offset = UInt32(archive.count)
 
-            archive.appendUInt32(0x0403_4B50)          // local file header
-            archive.appendUInt16(20)                   // version needed
-            archive.appendUInt16(0x0800)               // UTF-8 file names
-            archive.appendUInt16(0)                    // stored
+            archive.appendUInt32(0x0403_4B50) // local file header
+            archive.appendUInt16(20) // version needed
+            archive.appendUInt16(0x0800) // UTF-8 file names
+            archive.appendUInt16(0) // stored
             archive.appendUInt16(dosTime)
             archive.appendUInt16(dosDate)
             archive.appendUInt32(checksum)
@@ -355,9 +355,9 @@ enum StoredZIPArchive {
             archive.append(nameData)
             archive.append(payload)
 
-            directory.appendUInt32(0x0201_4B50)        // central directory header
-            directory.appendUInt16(20)                 // version made by
-            directory.appendUInt16(20)                 // version needed
+            directory.appendUInt32(0x0201_4B50) // central directory header
+            directory.appendUInt16(20) // version made by
+            directory.appendUInt16(20) // version needed
             directory.appendUInt16(0x0800)
             directory.appendUInt16(0)
             directory.appendUInt16(dosTime)
@@ -377,7 +377,7 @@ enum StoredZIPArchive {
 
         let directoryOffset = UInt32(archive.count)
         archive.append(directory)
-        archive.appendUInt32(0x0605_4B50)              // end of central directory
+        archive.appendUInt32(0x0605_4B50) // end of central directory
         archive.appendUInt16(0)
         archive.appendUInt16(0)
         archive.appendUInt16(UInt16(entryCount))

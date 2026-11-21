@@ -415,9 +415,9 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
             return name == "yt-dlp_macos"
         case .quietMD:
             #if arch(arm64)
-            return name.hasPrefix("quiet-md-") && name.hasSuffix("-macos-arm64.zip")
+                return name.hasPrefix("quiet-md-") && name.hasSuffix("-macos-arm64.zip")
             #else
-            return false
+                return false
             #endif
         default: return false
         }

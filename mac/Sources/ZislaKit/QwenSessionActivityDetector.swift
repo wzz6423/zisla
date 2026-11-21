@@ -145,13 +145,13 @@ public final class QwenSessionActivityDetector: AIActivityDetecting {
     private func recentRuntimes() -> [Candidate] {
         guard fileManager.fileExists(atPath: projectsDirectory.path),
               let enumerator = fileManager.enumerator(
-                at: projectsDirectory,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
+                  at: projectsDirectory,
+                  includingPropertiesForKeys: [
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
+                  ],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -159,13 +159,13 @@ public final class QwenSessionActivityDetector: AIActivityDetecting {
         var candidates: [Candidate] = []
         for case let url as URL in enumerator {
             guard url.lastPathComponent.hasSuffix(".runtime.json") ||
-                    (url.pathExtension == "json" && url.deletingPathExtension().pathExtension == "runtime"),
-                  let values = try? url.resourceValues(forKeys: [
+                (url.pathExtension == "json" && url.deletingPathExtension().pathExtension == "runtime"),
+                let values = try? url.resourceValues(forKeys: [
                     .isRegularFileKey,
                     .contentModificationDateKey,
                     .fileSizeKey,
-                  ]),
-                  values.isRegularFile == true else {
+                ]),
+                values.isRegularFile == true else {
                 continue
             }
             let transcriptURL = Self.transcriptURL(for: url)

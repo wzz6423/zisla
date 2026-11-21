@@ -128,13 +128,13 @@ public final class KimiSessionActivityDetector: AIActivityDetecting {
         let sessionsDirectory = homeDirectory.appendingPathComponent("sessions", isDirectory: true)
         guard fileManager.fileExists(atPath: sessionsDirectory.path),
               let enumerator = fileManager.enumerator(
-                at: sessionsDirectory,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
+                  at: sessionsDirectory,
+                  includingPropertiesForKeys: [
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
+                  ],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -143,15 +143,15 @@ public final class KimiSessionActivityDetector: AIActivityDetecting {
         for case let wireURL as URL in enumerator {
             guard wireURL.lastPathComponent == "wire.jsonl",
                   let values = try? wireURL.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
                   ]),
                   values.isRegularFile == true,
                   let sessionDirectory = Self.sessionDirectory(for: wireURL),
                   let relativePathComponents = Self.relativePathComponents(
-                    of: sessionDirectory,
-                    below: sessionsDirectory
+                      of: sessionDirectory,
+                      below: sessionsDirectory
                   ),
                   relativePathComponents.count == 2 else {
                 continue

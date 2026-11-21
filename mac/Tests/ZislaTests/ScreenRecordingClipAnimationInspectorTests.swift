@@ -30,7 +30,7 @@ struct ScreenRecordingClipAnimationInspectorTests {
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 280, height: 600),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.contentView = host
         panel.orderFrontRegardless()
@@ -51,14 +51,14 @@ struct ScreenRecordingClipAnimationInspectorTests {
         #expect(model.selectedTimelineClip?.exitAnimation == nil && model.selectedTimelineClip?.transition == nil)
         #expect(element("screenRecording.entranceAnimation.duration", in: host) != nil && model.canUndo && model.isDirty)
         let duration = inspector.animationDuration(\.entranceAnimation,
-            current: try #require(model.selectedTimelineClip?.entranceAnimation))
+                                                   current: try #require(model.selectedTimelineClip?.entranceAnimation))
         duration.wrappedValue = 1.25
         #expect(duration.wrappedValue == 1.25)
         await settle(host)
         entrance.wrappedValue = .slideLeft
         await settle(host)
         #expect(model.selectedTimelineClip?.entranceAnimation == .init(kind: .slideLeft, duration: 1.25),
-            "Changing the effect kind must keep the selected clip's saved duration")
+                "Changing the effect kind must keep the selected clip's saved duration")
         model.undo()
         #expect(model.selectedTimelineClip?.entranceAnimation == .init(kind: .typewriter, duration: 1.25))
         model.redo()
@@ -72,14 +72,14 @@ struct ScreenRecordingClipAnimationInspectorTests {
         #expect(model.selectedTimelineClip?.exitAnimation == .init(kind: .fade, duration: 0.5))
         #expect(element("screenRecording.exitAnimation.duration", in: host) != nil)
         let exitDuration = inspector.animationDuration(\.exitAnimation,
-            current: try #require(model.selectedTimelineClip?.exitAnimation))
+                                                       current: try #require(model.selectedTimelineClip?.exitAnimation))
         exitDuration.wrappedValue = 0.75
         exit.wrappedValue = .scale
         #expect(model.selectedTimelineClip?.exitAnimation == .init(kind: .scale, duration: 0.75))
         let valid = try #require(model.project)
         exitDuration.wrappedValue = -1
         #expect(model.project == valid && model.errorMessage != nil,
-            "Invalid numeric animation input must preserve the last valid project")
+                "Invalid numeric animation input must preserve the last valid project")
         exit.wrappedValue = nil
         #expect(model.selectedTimelineClip?.exitAnimation == nil)
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) } && !panel.isKeyWindow)
@@ -103,7 +103,7 @@ struct ScreenRecordingClipAnimationInspectorTests {
         let host = NSHostingView(rootView: inspector)
         host.sizingOptions = []
         let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 280, height: 600),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.contentView = host
         panel.orderFrontRegardless()
@@ -123,7 +123,7 @@ struct ScreenRecordingClipAnimationInspectorTests {
         await settle(host)
         #expect(element("screenRecording.transitionOverlapNotice", in: host) != nil)
         #expect(try #require(element("screenRecording.clipTransition", in: host)?.value(forKey: "isAccessibilityEnabled") as? Bool),
-            "A persisted effect must remain removable when it no longer overlaps a preceding clip")
+                "A persisted effect must remain removable when it no longer overlaps a preceding clip")
         inspector.transitionKind.wrappedValue = nil
         await settle(host)
         #expect(model.selectedTimelineClip?.transition == nil)

@@ -60,7 +60,7 @@ struct AutomaticPowerModeSettingsTests {
         }
         for mode in BatteryPowerMode.allCases {
             let matches = SettingsSearchIndex.results(for: AppLocalization.string(mode.menuTitle, locale: language.locale),
-                settings: settings, locale: language.locale)
+                                                      settings: settings, locale: language.locale)
             #expect(matches.contains { $0.section == .scheduledCleanup && $0.anchor == .row("插电默认模式") } == controlsVisible)
             #expect(matches.contains { $0.section == .scheduledCleanup && $0.anchor == .row("脱电默认模式") } == controlsVisible)
         }

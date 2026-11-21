@@ -393,8 +393,7 @@ struct WindowPreviewWindowMatchTests {
             frame: target.frame, isOnlyPreview: false, screenFrames: [screen], companionFrames: target.companionFrames
         ))
         #expect(WindowPreviewWindowMatch.index(title: "", frame: target.frame, candidates: [(nil, nil)],
-            screenFrames: [screen], isOnlyPreview: true, companionFrames: target.companionFrames
-        ) == (metadata == "matching" ? 0 : nil))
+                                               screenFrames: [screen], isOnlyPreview: true, companionFrames: target.companionFrames) == (metadata == "matching" ? 0 : nil))
     }
 
     @Test
@@ -489,7 +488,7 @@ struct WindowPreviewWindowMatchTests {
             title: "Player", frame: frame, candidates: [("Player", frame)],
             windowID: 12, candidateWindowIDs: [candidateWindowID]
         ) == (candidateWindowID == nil ? 0 : nil),
-                "A known different ID must not become the clicked preview's geometry fallback")
+        "A known different ID must not become the clicked preview's geometry fallback")
 
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
         #expect(WindowPreviewWindowMatch.index(
@@ -497,7 +496,7 @@ struct WindowPreviewWindowMatchTests {
             screenFrames: [screen], isOnlyPreview: true,
             windowID: 12, candidateWindowIDs: [candidateWindowID]
         ) == (candidateWindowID == nil ? 0 : nil),
-                "Fullscreen fallback must not activate a known different window either")
+        "Fullscreen fallback must not activate a known different window either")
     }
 
     @Test

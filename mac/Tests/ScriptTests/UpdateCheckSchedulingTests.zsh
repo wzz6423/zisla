@@ -10,8 +10,8 @@ trap 'find "$TEST_ROOT" -depth -delete' EXIT
 ruby - "$ROOT" "$TEST_ROOT" <<'RUBY'
 root, temporary_root = ARGV
 source = File.read(File.join(root, 'Sources/Zisla/AppModel.swift'))
-check = source[/^  func checkForUpdates\(manual:.*?(?=^  func selectSystemMonitor)/m]
-polling = source[/^  private func configureUpdatePolling\(enabled:.*?(?=^    guard isUpdatePollingEnabled)/m]
+check = source[/^[ \t]*func checkForUpdates\(manual:.*?(?=^[ \t]*func selectSystemMonitor)/m]
+polling = source[/^[ \t]*private func configureUpdatePolling\(enabled:.*?(?=^[ \t]*guard isUpdatePollingEnabled)/m]
 abort 'Missing production update entry points' unless check && polling
 resolver = File.read(File.join(root, 'Sources/Zisla/UpdateFeedResolver.swift')).sub("import ZislaCore\n", '')
 

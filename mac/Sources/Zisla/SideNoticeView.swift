@@ -117,7 +117,7 @@ struct SideNoticeRootView: View {
                     side: side,
                     height: presentation.compactWingHeight
                 )
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.82)))
             } else if let backgroundSoundNotice = presentation.activeBackgroundSoundNotice {
                 CompactBackgroundSoundWing(
                     notice: backgroundSoundNotice,
@@ -179,7 +179,7 @@ struct SideNoticeRootView: View {
                     reduceMotion
                         ? .opacity
                         : .move(edge: side == .left ? .leading : .trailing)
-                            .combined(with: .opacity)
+                        .combined(with: .opacity)
                 )
             }
         }
@@ -268,8 +268,8 @@ struct CompactStatusBarView: View {
         return ZStack {
             if let information {
                 FloatingIslandInformationView(layout: information,
-                    visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: media.snapshot, date: date,
-                    animatesLogo: animatesLogo, onJoinMeeting: onJoinMeeting)
+                                              visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: media.snapshot, date: date,
+                                              animatesLogo: animatesLogo, onJoinMeeting: onJoinMeeting)
                     .onChange(of: information.size, initial: true) { _, size in
                         onCompactLengthChanged(displayState.islandEdge.isVertical ? size.height : size.width)
                     }
@@ -421,9 +421,9 @@ struct CompactStatusBarView: View {
                 ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(spacing: 6))
             layout {
                 CompactScreenRecordingOperationWing(notice: notice, side: .left, height: height,
-                    usesTransparentBackground: true, usesCustomPillSlot: true)
+                                                    usesTransparentBackground: true, usesCustomPillSlot: true)
                 CompactScreenRecordingOperationWing(notice: notice, side: .right, height: height,
-                    usesTransparentBackground: true, usesCustomPillSlot: true)
+                                                    usesTransparentBackground: true, usesCustomPillSlot: true)
             }
             .padding(displayState.islandEdge.isVertical ? .vertical : .horizontal,
                      CompactPillStatusPresentation.trailingInset)
@@ -580,10 +580,10 @@ struct CompactStatusBarView: View {
         } else if let recordingOperationNotice {
             HStack(spacing: 0) {
                 CompactScreenRecordingOperationWing(notice: recordingOperationNotice, side: .left,
-                    height: height, usesTransparentBackground: compactWingsUseTransparentBackground)
+                                                    height: height, usesTransparentBackground: compactWingsUseTransparentBackground)
                 Spacer(minLength: 0)
                 CompactScreenRecordingOperationWing(notice: recordingOperationNotice, side: .right,
-                    height: height, usesTransparentBackground: compactWingsUseTransparentBackground)
+                                                    height: height, usesTransparentBackground: compactWingsUseTransparentBackground)
             }
         } else {
             configuredCompactStatusContent
@@ -603,7 +603,7 @@ struct CompactStatusBarView: View {
                     )
                 } else if AIAccountBalance.isLowBalanceNotice(transientNotice) {
                     CompactAIAccountBalanceBar(notice: transientNotice, height: height,
-                        centerInset: displayState.compactBarCenterInset, edge: displayState.islandEdge)
+                                               centerInset: displayState.compactBarCenterInset, edge: displayState.islandEdge)
                 } else if transientNotice.style == .headphone {
                     CompactHeadphoneConnectionBar(
                         notice: transientNotice,
@@ -703,12 +703,12 @@ struct CompactStatusBarView: View {
         case .focusCountdown:
             if let focusCountdownNotice {
                 CompactFocusCountdownBar(notice: focusCountdownNotice, height: height,
-                    centerInset: displayState.compactBarCenterInset)
+                                         centerInset: displayState.compactBarCenterInset)
             }
         case .meeting:
             if let meetingNotice {
                 CompactMeetingCountdownBar(notice: meetingNotice, height: height,
-                    centerWidth: displayState.compactBarCenterInset) {
+                                           centerWidth: displayState.compactBarCenterInset) {
                     if let id = meetingNotice.metadata?["eventID"] { onJoinMeeting(id) }
                 }
             }
@@ -1009,7 +1009,7 @@ private struct HeadphoneConnectionNotice: View {
                 isSingleUnit: isSingleUnit,
                 reduceMotion: reduceMotion
             )
-                .frame(width: 42, height: 34)
+            .frame(width: 42, height: 34)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(notice.title)
@@ -1115,12 +1115,12 @@ struct HeadphoneSystemAssetLocator: Sendable {
             && url.pathExtension == "plist" {
             guard let data = try? Data(contentsOf: url),
                   let propertyList = try? PropertyListSerialization.propertyList(
-                    from: data,
-                    format: nil
+                      from: data,
+                      format: nil
                   ),
                   let paths = propertyList as? [String: [String: Any]],
                   let entry = paths.first(where: {
-                    Self.productID(from: $0.key) == productID
+                      Self.productID(from: $0.key) == productID
                   })?.value,
                   let imageName = entry["ImageName"] as? String,
                   !imageName.isEmpty
@@ -1322,8 +1322,8 @@ struct CompactHeadphoneConnectionBar: View {
                         levels: notice.batteryLevels ?? [],
                         isSingleUnit: isSingleUnit
                     )
-                        .padding(.trailing, CompactHeadphoneConnectionLayout.outerInset)
-                        .frame(width: sideWidth, height: height, alignment: .trailing)
+                    .padding(.trailing, CompactHeadphoneConnectionLayout.outerInset)
+                    .frame(width: sideWidth, height: height, alignment: .trailing)
                 }
             } else {
                 HStack(spacing: CompactHeadphoneConnectionLayout.identitySpacing) {
@@ -1354,7 +1354,7 @@ struct CompactHeadphoneConnectionBar: View {
                 isSingleUnit: isSingleUnit,
                 reduceMotion: reduceMotion
             )
-                .frame(width: CompactHeadphoneConnectionLayout.glyphWidth, height: height)
+            .frame(width: CompactHeadphoneConnectionLayout.glyphWidth, height: height)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(notice.title)
@@ -1605,7 +1605,7 @@ struct CompactUpdateWing: View {
                         .frame(width: min(19, height * 0.58), height: min(19, height * 0.58))
                 }
             } else {
-                    Image(systemName: "arrow.up.circle")
+                Image(systemName: "arrow.up.circle")
                     .font(.system(size: min(14, height * 0.46), weight: .semibold))
                     .foregroundStyle(.cyan)
             }
@@ -2493,8 +2493,7 @@ private struct CompactVideoDownloadWing: View {
     /// Bundled offline logos take priority; sites without one use favicon bytes pre-fetched by AppModel.
     private var resolvedIcon: NSImage? {
         if let platform = VideoDownloadPlatform(rawValue: notice.appBundleIdentifier ?? ""),
-            let url = platform.bundledIconURL
-        {
+           let url = platform.bundledIconURL {
             return VideoDownloadIconCache.shared.image(
                 for: "platform|\(platform.rawValue)",
                 url: url

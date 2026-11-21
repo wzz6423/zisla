@@ -182,9 +182,9 @@ struct CoreAudioApplicationVolumeBackendTests {
         fixture.apply([Self.request(pids: [102, 103])])
         #expect(fixture.properties.active[processKey] == nil)
         #expect(fixture.properties.active[.init(object: 102, selector: kAudioProcessPropertyDevices,
-                                             scope: kAudioObjectPropertyScopeOutput)] != nil)
+                                                scope: kAudioObjectPropertyScopeOutput)] != nil)
         #expect(fixture.properties.active[.init(object: 103, selector: kAudioProcessPropertyDevices,
-                                             scope: kAudioObjectPropertyScopeOutput)] != nil)
+                                                scope: kAudioObjectPropertyScopeOutput)] != nil)
     }
 
     @Test(arguments: [kAudioDevicePropertyPreferredChannelsForStereo, kAudioDevicePropertyStreamConfiguration])

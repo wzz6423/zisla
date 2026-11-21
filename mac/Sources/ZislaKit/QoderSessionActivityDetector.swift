@@ -348,7 +348,7 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
                 .contentModificationDateKey,
                 .fileSizeKey,
             ]),
-            values.isRegularFile == true else {
+                values.isRegularFile == true else {
                 return nil
             }
             return Candidate(
@@ -369,13 +369,13 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
         let sessions = root.appendingPathComponent("logs/sessions", isDirectory: true)
         guard fileManager.fileExists(atPath: sessions.path),
               let enumerator = fileManager.enumerator(
-                at: sessions,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
+                  at: sessions,
+                  includingPropertiesForKeys: [
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
+                  ],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -386,9 +386,9 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
             guard url.pathExtension == "jsonl",
                   url.path.contains("/segments/") || url.path.contains("/logs/sessions/"),
                   let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
                   ]),
                   values.isRegularFile == true else {
                 continue
@@ -406,13 +406,13 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
     private func textCandidates(under root: URL) -> [Candidate] {
         guard fileManager.fileExists(atPath: root.path),
               let enumerator = fileManager.enumerator(
-                at: root,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
+                  at: root,
+                  includingPropertiesForKeys: [
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
+                  ],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -424,9 +424,9 @@ public final class QoderSessionActivityDetector: AIActivityDetecting {
                 || (name.contains("qoder") && (name.hasSuffix(".log") || name.hasSuffix(".txt")))
             guard isQoderLog,
                   let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
                   ]),
                   values.isRegularFile == true else {
                 continue

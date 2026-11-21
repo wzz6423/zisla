@@ -9,8 +9,8 @@ struct IslandPillAnimationTests {
     @Test(arguments: IslandEdge.allCases, [Double(0), 0.27, 0.5, 1])
     func theRevealAndRecycleUseTheActualPillFrameOnEveryEdge(edge: IslandEdge, offset: Double) {
         let screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: -1800, y: -240, width: 1800, height: 1100),
-            visibleFrame: CGRect(x: -1800, y: -240, width: 1800, height: 1076))
+                                    frame: CGRect(x: -1800, y: -240, width: 1800, height: 1100),
+                                    visibleFrame: CGRect(x: -1800, y: -240, width: 1800, height: 1076))
         let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             expandedSize: CGSize(width: 776, height: 340), layoutStyle: .pill,
             placement: IslandPlacement(mode: .custom, edge: edge, offset: offset),
@@ -19,13 +19,13 @@ struct IslandPillAnimationTests {
         let canvas = CGRect(origin: CGPoint(x: 11, y: 23), size: layout.expandedFrame.size)
         let start = layout.collapsedFrameInExpandedTopLeading.offsetBy(dx: canvas.minX, dy: canvas.minY)
         var mask = IslandRevealMask(collapsedSize: layout.collapsedFrame.size,
-            expandedSize: canvas.size, isCollapsed: true, layoutStyle: .pill, collapsedFrame: start)
+                                    expandedSize: canvas.size, isCollapsed: true, layoutStyle: .pill, collapsedFrame: start)
         #expect(equal(mask.path(in: canvas).boundingRect, start))
         mask.animatableData = 0.5
         let middle = mask.path(in: canvas).boundingRect
         #expect(equal(middle, CGRect(x: (start.minX + canvas.minX) / 2,
-            y: (start.minY + canvas.minY) / 2,
-            width: (start.width + canvas.width) / 2, height: (start.height + canvas.height) / 2)))
+                                     y: (start.minY + canvas.minY) / 2,
+                                     width: (start.width + canvas.width) / 2, height: (start.height + canvas.height) / 2)))
         #expect(canvas.contains(middle))
         mask.animatableData = 1
         #expect(equal(mask.path(in: canvas).boundingRect, canvas))
@@ -39,17 +39,17 @@ struct IslandPillAnimationTests {
         let panel = CGSize(width: 900, height: 600)
         let surface = CGSize(width: 776, height: 340)
         let origin = CGPoint(x: edge == .right ? panel.width - surface.width : edge == .left ? 0 : (panel.width - surface.width) / 2,
-            y: edge == .bottom || (edge.isVertical && !sideAnchorsAtTop) ? panel.height - surface.height : 0)
+                             y: edge == .bottom || (edge.isVertical && !sideAnchorsAtTop) ? panel.height - surface.height : 0)
         let anchor = CGRect(x: edge == .right ? 858 : edge == .left ? 0 : 405,
-            y: edge == .bottom ? 568 : edge.isVertical && !sideAnchorsAtTop ? 530 : 0,
-            width: edge.isVertical ? 32 : 70, height: edge.isVertical ? 70 : 32)
+                            y: edge == .bottom ? 568 : edge.isVertical && !sideAnchorsAtTop ? 530 : 0,
+                            width: edge.isVertical ? 32 : 70, height: edge.isVertical ? 70 : 32)
         let expanded = CGRect(x: 50, y: -90, width: panel.width, height: panel.height)
         let collapsed = CGRect(x: expanded.minX + anchor.minX,
-            y: expanded.maxY - anchor.maxY, width: anchor.width, height: anchor.height)
+                               y: expanded.maxY - anchor.maxY, width: anchor.width, height: anchor.height)
         let layout = ScreenOverlayLayout(displayID: 7, screenFrame: expanded, topBarHeight: 24,
-            topology: .simulated(frame: collapsed), triggerFrame: collapsed,
-            transferDragTriggerFrame: collapsed, expandedFrame: expanded,
-            style: .pill, edge: edge, placementMode: .custom)
+                                         topology: .simulated(frame: collapsed), triggerFrame: collapsed,
+                                         transferDragTriggerFrame: collapsed, expandedFrame: expanded,
+                                         style: .pill, edge: edge, placementMode: .custom)
         let local = IslandRootView.pillCollapsedFrame(for: layout, in: surface, panelSize: panel, direction: .leftToRight)
         #expect(equal(local.offsetBy(dx: origin.x, dy: origin.y), anchor))
     }
@@ -58,8 +58,8 @@ struct IslandPillAnimationTests {
     @MainActor
     func aShrinkingSideSurfaceKeepsItsRenderedPillAtThePhysicalAnchor(edge: IslandEdge, offset: Double) throws {
         let screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: -1600, y: 880, width: 1600, height: 900),
-            visibleFrame: CGRect(x: -1600, y: 880, width: 1600, height: 876))
+                                    frame: CGRect(x: -1600, y: 880, width: 1600, height: 900),
+                                    visibleFrame: CGRect(x: -1600, y: 880, width: 1600, height: 876))
         let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             expandedSize: CGSize(width: 900, height: 600), layoutStyle: .pill,
             placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
@@ -70,15 +70,14 @@ struct IslandPillAnimationTests {
         let anchor = layout.collapsedFrameInExpandedTopLeading
         for direction in [LayoutDirection.leftToRight, .rightToLeft] {
             let alignment = IslandRootView.pillAlignment(edge: edge, direction: direction,
-                sideAnchorsAtTop: layout.collapsedFrame.midY >= screen.frame.midY)
+                                                         sideAnchorsAtTop: layout.collapsedFrame.midY >= screen.frame.midY)
             let renderer = ImageRenderer(content: IslandSurface(isCollapsed: true,
-                collapsedSize: local.size, expandedSize: surface, notchBackground: .black,
-                layoutStyle: .pill, collapsedFrame: local, edge: edge
-            ) { Color.clear }
-                .transaction { $0.disablesAnimations = true }
-                .frame(width: surface.width, height: surface.height)
-                .frame(width: panel.width, height: panel.height, alignment: alignment)
-                .environment(\.layoutDirection, direction))
+                                                                collapsedSize: local.size, expandedSize: surface, notchBackground: .black,
+                                                                layoutStyle: .pill, collapsedFrame: local, edge: edge) { Color.clear }
+                    .transaction { $0.disablesAnimations = true }
+                    .frame(width: surface.width, height: surface.height)
+                    .frame(width: panel.width, height: panel.height, alignment: alignment)
+                    .environment(\.layoutDirection, direction))
             renderer.scale = 1
             let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
             #expect(try #require(bitmap.colorAt(x: Int(anchor.midX), y: Int(anchor.midY))).alphaComponent > 0.95,
@@ -100,9 +99,9 @@ struct IslandPillAnimationTests {
                     Color(.sRGB, red: 0, green: 0, blue: 1, opacity: 1).frame(width: 20)
                 }
             }
-                .transaction { $0.disablesAnimations = true }
-                .frame(width: size.width, height: size.height)
-                .environment(\.layoutDirection, direction))
+            .transaction { $0.disablesAnimations = true }
+            .frame(width: size.width, height: size.height)
+            .environment(\.layoutDirection, direction))
             renderer.scale = 1
             let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
             let firstX = direction == .leftToRight ? 10 : 110
@@ -119,8 +118,8 @@ struct IslandPillAnimationTests {
     @MainActor
     func transientContentKeepsTheOriginalPillPositionInEitherInterfaceDirection(edge: IslandEdge, offset: Double) throws {
         let screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: -1600, y: 880, width: 1600, height: 900),
-            visibleFrame: CGRect(x: -1600, y: 880, width: 1600, height: 876))
+                                    frame: CGRect(x: -1600, y: 880, width: 1600, height: 900),
+                                    visibleFrame: CGRect(x: -1600, y: 880, width: 1600, height: 876))
         let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             expandedSize: CGSize(width: 900, height: 600), layoutStyle: .pill,
             placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
@@ -133,16 +132,15 @@ struct IslandPillAnimationTests {
         for direction in [LayoutDirection.leftToRight, .rightToLeft] {
             let frame = IslandRootView.pillCollapsedFrame(for: layout, in: surface, panelSize: panel, direction: direction)
             let alignment = IslandRootView.pillAlignment(edge: edge, direction: direction,
-                sideAnchorsAtTop: layout.collapsedFrame.midY >= screen.frame.midY)
+                                                         sideAnchorsAtTop: layout.collapsedFrame.midY >= screen.frame.midY)
             let renderer = ImageRenderer(content: IslandSurface(isCollapsed: true,
-                collapsedSize: physical.size, expandedSize: surface, notchBackground: .black,
-                layoutStyle: .pill, collapsedFrame: physical, edge: edge
-            ) {
-                CompactPillStatusContent(presentation: presentation, text: presentation.text,
-                    edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
-                    .frame(width: frame.width, height: frame.height)
-                    .position(x: frame.midX, y: frame.midY)
-            }
+                                                                collapsedSize: physical.size, expandedSize: surface, notchBackground: .black,
+                                                                layoutStyle: .pill, collapsedFrame: physical, edge: edge) {
+                    CompactPillStatusContent(presentation: presentation, text: presentation.text,
+                                             edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
+                }
                 .transaction { $0.disablesAnimations = true }
                 .frame(width: surface.width, height: surface.height)
                 .frame(width: panel.width, height: panel.height, alignment: alignment)
@@ -164,12 +162,11 @@ struct IslandPillAnimationTests {
     func theNotchKeepsItsExistingRTLRenderingForAnOffsetPetSlot() throws {
         let size = CGSize(width: 240, height: 80)
         let renderer = ImageRenderer(content: IslandSurface(isCollapsed: true,
-            collapsedSize: CGSize(width: 60, height: 24), expandedSize: size,
-            notchBackground: .black, collapsedCenterOffsetX: 36
-        ) { Color.clear }
-            .transaction { $0.disablesAnimations = true }
-            .frame(width: size.width, height: size.height)
-            .environment(\.layoutDirection, .rightToLeft))
+                                                            collapsedSize: CGSize(width: 60, height: 24), expandedSize: size,
+                                                            notchBackground: .black, collapsedCenterOffsetX: 36) { Color.clear }
+                .transaction { $0.disablesAnimations = true }
+                .frame(width: size.width, height: size.height)
+                .environment(\.layoutDirection, .rightToLeft))
         renderer.scale = 1
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         #expect(try #require(bitmap.colorAt(x: 100, y: 12)).alphaComponent > 0.95)
@@ -196,7 +193,7 @@ struct IslandPillAnimationTests {
         let canvas = CGRect(x: 0, y: 0, width: 776, height: 340)
         let expanded = canvas.size
         var mask = IslandRevealMask(collapsedSize: CGSize(width: 240, height: 34),
-            expandedSize: expanded, isCollapsed: true, collapsedCenterOffsetX: 22)
+                                    expandedSize: expanded, isCollapsed: true, collapsedCenterOffsetX: 22)
         #expect(equal(mask.path(in: canvas).boundingRect, CGRect(x: 290, y: 0, width: 240, height: 34)))
         mask.animatableData = 1
         #expect(equal(mask.path(in: canvas).boundingRect, canvas))
@@ -207,7 +204,7 @@ struct IslandPillAnimationTests {
         let canvas = CGRect(x: 0, y: 0, width: 776, height: 340)
         let start = CGRect(x: 0, y: 140, width: 32, height: 70)
         var mask = IslandRevealMask(collapsedSize: start.size, expandedSize: canvas.size,
-            isCollapsed: true, layoutStyle: .pill, collapsedFrame: start)
+                                    isCollapsed: true, layoutStyle: .pill, collapsedFrame: start)
         mask.animatableData = -0.2
         #expect(equal(mask.path(in: canvas).boundingRect, start))
         mask.animatableData = 1.2
@@ -220,13 +217,12 @@ struct IslandPillAnimationTests {
         let canvas = CGSize(width: 240, height: 180)
         let size = edge.isVertical ? CGSize(width: 32, height: 70) : CGSize(width: 70, height: 32)
         let anchor = CGRect(x: edge == .right ? canvas.width - size.width : edge == .left ? 0 : 18,
-            y: edge == .bottom ? canvas.height - size.height : edge.isVertical ? 23 : 0,
-            width: size.width, height: size.height)
+                            y: edge == .bottom ? canvas.height - size.height : edge.isVertical ? 23 : 0,
+                            width: size.width, height: size.height)
         let renderer = ImageRenderer(content: IslandSurface(isCollapsed: true,
-            collapsedSize: size, expandedSize: canvas, layoutStyle: .pill, collapsedFrame: anchor, edge: edge
-        ) { Color.clear }
-            .transaction { $0.disablesAnimations = true }
-            .frame(width: canvas.width, height: canvas.height))
+                                                            collapsedSize: size, expandedSize: canvas, layoutStyle: .pill, collapsedFrame: anchor, edge: edge) { Color.clear }
+                .transaction { $0.disablesAnimations = true }
+                .frame(width: canvas.width, height: canvas.height))
         renderer.scale = 1
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         #expect(try #require(bitmap.colorAt(x: Int(anchor.midX), y: Int(anchor.midY))).alphaComponent > 0.95)

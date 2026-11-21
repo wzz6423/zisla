@@ -516,8 +516,8 @@ struct AgentSkillPackageInstallation: Equatable, Sendable {
 
         guard let nodeModulesIndex = components.lastIndex(of: "node_modules"),
               let packageName = packageName(
-                in: components,
-                after: nodeModulesIndex
+                  in: components,
+                  after: nodeModulesIndex
               ) else {
             return nil
         }
@@ -527,8 +527,8 @@ struct AgentSkillPackageInstallation: Equatable, Sendable {
         if path.contains("/.bun/install/global/") {
             manager = .bun
         } else if path.contains("/Library/pnpm/global/")
-                    || path.contains("/.local/share/pnpm/global/")
-                    || path.contains("/pnpm/global/") {
+            || path.contains("/.local/share/pnpm/global/")
+            || path.contains("/pnpm/global/") {
             manager = .pnpm
         } else if path.contains("/.config/yarn/global/") {
             manager = .yarn

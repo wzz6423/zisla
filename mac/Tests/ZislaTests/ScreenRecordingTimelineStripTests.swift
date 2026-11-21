@@ -69,7 +69,8 @@ struct ScreenRecordingTimelineStripTests {
     @Test
     func rulerWorkStaysBoundedForLongHighlyZoomedProjects() throws {
         let geometry = try #require(ScreenRecordingTimelineStripGeometry(
-            segments: [.init(start: 0, end: 604_800, speed: 0.1)], viewportWidth: 1_920, zoom: 16))
+            segments: [.init(start: 0, end: 604_800, speed: 0.1)], viewportWidth: 1_920, zoom: 16
+        ))
         #expect(geometry.ticks.first == 0)
         #expect(geometry.ticks.count <= 241)
         #expect(geometry.ticks.allSatisfy { $0.isFinite && $0 >= 0 && $0 <= geometry.duration })

@@ -23,7 +23,7 @@ struct FloatingIslandInformationTests {
         settings.mediaCompactStyle = style
         settings.compactStatusPriority = CompactStatusPriority.normalized([.toolboxReminder, .media, .aiActivity])
         let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons(),
-            settings: settings, item: nil, at: date))
+                                                                  settings: settings, item: nil, at: date))
         #expect(layout.icons.map(\.id) == ["combined", "cpu"])
         #expect(layout.primary.first?.presentation.priority == .aiActivity)
         #expect(layout.primary.first?.presentation.aiCount == 2)
@@ -47,7 +47,7 @@ struct FloatingIslandInformationTests {
         for id in ["voice-processing-left", "screen-recording-operation-left"] {
             let takeover = IslandNotice(id: id, title: "Processing")
             #expect(FloatingIslandInformationLayout(notices: notices + [takeover], icons: icons(),
-                settings: settings, item: nil, at: date) == nil)
+                                                    settings: settings, item: nil, at: date) == nil)
         }
     }
 
@@ -56,14 +56,14 @@ struct FloatingIslandInformationTests {
         var settings = settings()
         settings.islandShowMoreInformation = false
         #expect(FloatingIslandInformationLayout(notices: notices, icons: icons(),
-            settings: settings, item: nil, at: date) == nil)
+                                                settings: settings, item: nil, at: date) == nil)
         settings.islandShowMoreInformation = true
         for style in IslandLayoutStyle.allCases {
             for mode in IslandPlacementMode.allCases {
                 settings.islandLayoutStyle = style
                 settings.islandPlacement.mode = mode
                 let layout = FloatingIslandInformationLayout(notices: notices, icons: icons(),
-                    settings: settings, item: nil, at: date)
+                                                             settings: settings, item: nil, at: date)
                 #expect((layout != nil) == (style == .pill && mode == .custom))
                 #expect(settings.islandShowMoreInformation)
             }
@@ -75,16 +75,16 @@ struct FloatingIslandInformationTests {
         var settings = settings()
         settings.sideNoticesEnabled = false
         var layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons(),
-            settings: settings, item: nil, at: date))
+                                                                  settings: settings, item: nil, at: date))
         #expect(layout.primary.isEmpty && layout.secondary == nil)
         settings.systemMonitorEnabled = false
         #expect(FloatingIslandInformationLayout(notices: notices, icons: icons(),
-            settings: settings, item: nil, at: date) == nil)
+                                                settings: settings, item: nil, at: date) == nil)
         settings.sideNoticesEnabled = true
         settings.systemMonitorEnabled = true
         settings.statusIconDestination = .menuBar
         layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons(),
-            settings: settings, item: nil, at: date))
+                                                              settings: settings, item: nil, at: date))
         #expect(layout.icons.isEmpty && layout.iconSize == nil)
         #expect(layout.primary.first?.presentation.priority == .aiActivity)
     }
@@ -94,7 +94,7 @@ struct FloatingIslandInformationTests {
         var settings = settings(edge: edge)
         settings.mediaCompactStyle = .detailed
         let layout = try #require(FloatingIslandInformationLayout(notices: [notices[2]], icons: [],
-            settings: settings, item: nil, at: date))
+                                                                  settings: settings, item: nil, at: date))
         #expect(layout.primary.count == 1 && layout.primary.first?.presentation.isMedia == true)
         #expect(layout.secondary == nil)
         #expect((edge.isVertical ? layout.size.width : layout.size.height) == 32)
@@ -105,29 +105,29 @@ struct FloatingIslandInformationTests {
         var settings = settings()
         settings.mediaCompactStyle = .detailed
         let item = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil, artworkData: nil,
-            duration: 60, elapsedTime: 0, timestamp: date, isPlaying: true,
-            lyrics: SyncedLyrics(lines: [.init(time: 0, text: "Hi"),
-                                       .init(time: 10, text: "A much longer lyric line that needs more room")]))
+                                      duration: 60, elapsedTime: 0, timestamp: date, isPlaying: true,
+                                      lyrics: SyncedLyrics(lines: [.init(time: 0, text: "Hi"),
+                                                                   .init(time: 10, text: "A much longer lyric line that needs more room")]))
         let first = try #require(FloatingIslandInformationLayout(notices: notices, icons: [],
-            settings: settings, item: item, at: date))
+                                                                 settings: settings, item: item, at: date))
         let next = try #require(FloatingIslandInformationLayout(notices: notices, icons: [],
-            settings: settings, item: item, at: date.addingTimeInterval(11)))
+                                                                settings: settings, item: item, at: date.addingTimeInterval(11)))
         #expect(first.secondary?.text == "Hi")
         #expect(next.secondary?.text == "A much longer lyric line that needs more room")
         #expect(try #require(next.secondary?.length) > #require(first.secondary?.length))
         #expect(first.primary.map(\.text) == next.primary.map(\.text))
         settings.mediaShowLyricsAndInfo = false
         let hidden = try #require(FloatingIslandInformationLayout(notices: notices, icons: [],
-            settings: settings, item: item, at: date.addingTimeInterval(11)))
+                                                                  settings: settings, item: item, at: date.addingTimeInterval(11)))
         #expect(hidden.secondary?.text == "")
     }
 
     @Test(arguments: IslandEdge.allCases)
     func oversizedInformationFitsWithinTheExistingLengthBudget(edge: IslandEdge) throws {
         let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu,
-            text: String(repeating: "9", count: 1000), image: nil, style: .detailed), tooltip: "CPU")]
+                                                                  text: String(repeating: "9", count: 1000), image: nil, style: .detailed), tooltip: "CPU")]
         let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
-            settings: settings(edge: edge), item: nil, at: date))
+                                                                  settings: settings(edge: edge), item: nil, at: date))
         #expect((edge.isVertical ? layout.size.height : layout.size.width) == ScreenLayoutConfiguration.quickActionRowWidth)
         #expect(layout.primaryLength > ScreenLayoutConfiguration.quickActionRowWidth)
         #expect(layout.primary.count == 3)
@@ -137,28 +137,29 @@ struct FloatingIslandInformationTests {
     func verticalMonitorReadingsDoNotEnlargeTheAIIconOrItsSlot(edge: IslandEdge) throws {
         let monitor = NSImage(size: CGSize(width: 36, height: 36))
         let rows = try #require(SystemMonitorMenuBarImageRenderer.stacked(
-            rows: ["CPU 100%", "GPU 32%"], style: .detailed))
+            rows: ["CPU 100%", "GPU 32%"], style: .detailed
+        ))
         let icons = [
             IslandStatusIcon(id: "app", content: .application, tooltip: "zisla"),
             IslandStatusIcon(id: "combined", content: .combined(monitor), tooltip: "Monitor"),
             IslandStatusIcon(id: "stacked", content: .stacked(image: rows,
-                readings: [.init(metric: .cpu, text: "100%"), .init(metric: .gpu, text: "32%")]),
-                tooltip: "CPU 100%, GPU 32%"),
+                                                              readings: [.init(metric: .cpu, text: "100%"), .init(metric: .gpu, text: "32%")]),
+                             tooltip: "CPU 100%, GPU 32%"),
         ]
         let notices = (1...4).map { IslandNotice(id: "ai-active-openai-\($0)", title: "AI") }
         let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
-            settings: settings(edge: edge), item: nil, at: date))
+                                                                  settings: settings(edge: edge), item: nil, at: date))
         let status = try #require(layout.primary.first)
         #expect(layout.size.width <= 48, "Vertical readings must fit the compact 40pt content width and side insets")
         #expect(status.length == 56, "The AI icon needs its 24pt slot, one 14pt count row, and normal insets")
         #expect(status.text == "4")
 
         let renderer = ImageRenderer(content: FloatingIslandInformationView(layout: layout,
-            visualizationStyle: .waveform, item: nil, date: date)
-            .frame(width: layout.size.width, height: layout.size.height)
-            .environment(\._accessibilityReduceMotion, true)
-            .environment(\.colorScheme, .dark)
-            .background(.black))
+                                                                            visualizationStyle: .waveform, item: nil, date: date)
+                .frame(width: layout.size.width, height: layout.size.height)
+                .environment(\._accessibilityReduceMotion, true)
+                .environment(\.colorScheme, .dark)
+                .background(.black))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         let iconStart = try #require(layout.iconSize).height
@@ -186,22 +187,22 @@ struct FloatingIslandInformationTests {
         var settings = settings(edge: edge)
         settings.mediaCompactStyle = .detailed
         let item = NowPlayingSnapshot(title: "A long song title", artist: "Artist", album: nil, artworkData: nil,
-            duration: 60, elapsedTime: 0, timestamp: date, isPlaying: false,
-            lyrics: SyncedLyrics(lines: [.init(time: 0, text: "A long lyric line that fills the available row")]))
+                                      duration: 60, elapsedTime: 0, timestamp: date, isPlaying: false,
+                                      lyrics: SyncedLyrics(lines: [.init(time: 0, text: "A long lyric line that fills the available row")]))
         let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons(),
-            settings: settings, item: item, at: date))
+                                                                  settings: settings, item: item, at: date))
         let viewportLength = 96
         let viewport = edge.isVertical ? CGSize(width: layout.size.width, height: CGFloat(viewportLength))
             : CGSize(width: CGFloat(viewportLength), height: layout.size.height)
         let canvas = edge.isVertical ? CGSize(width: viewport.width, height: 300)
             : CGSize(width: 300, height: viewport.height)
         let renderer = ImageRenderer(content: FloatingIslandInformationView(layout: layout,
-            visualizationStyle: .waveform, item: item, date: date)
-            .frame(width: viewport.width, height: viewport.height)
-            .frame(width: canvas.width, height: canvas.height, alignment: .topLeading)
-            .environment(\._accessibilityReduceMotion, true)
-            .environment(\.layoutDirection, .leftToRight)
-            .background(.black))
+                                                                            visualizationStyle: .waveform, item: item, date: date)
+                .frame(width: viewport.width, height: viewport.height)
+                .frame(width: canvas.width, height: canvas.height, alignment: .topLeading)
+                .environment(\._accessibilityReduceMotion, true)
+                .environment(\.layoutDirection, .leftToRight)
+                .background(.black))
         renderer.scale = 1
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         var insidePixels = 0
@@ -235,7 +236,8 @@ struct FloatingIslandInformationTests {
         }
         #expect(keys == ["展示更多信息", "同时展示监控、AI、音乐与状态提示，详细音乐另起一行"])
         let table = try #require(NSDictionary(contentsOf: root.appendingPathComponent(
-            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
+            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
+        )) as? [String: String])
         for key in keys {
             let value = try #require(table[key])
             #expect(!value.isEmpty && !value.contains("%"))
@@ -243,7 +245,7 @@ struct FloatingIslandInformationTests {
             if language != .simplifiedChinese { #expect(value != key) }
         }
         #expect(SettingsSearchIndex.results(for: AppLocalization.string(keys[0], language: language),
-            settings: settings(), locale: language.locale).contains { $0.section == .info && $0.anchor == .row(keys[0]) })
+                                            settings: settings(), locale: language.locale).contains { $0.section == .info && $0.anchor == .row(keys[0]) })
         var unsupported = settings()
         unsupported.islandPlacement.mode = .camera
         #expect(!SettingsSearchIndex.items(settings: unsupported).contains { $0.title == keys[0] })
@@ -275,7 +277,7 @@ struct FloatingIslandInformationTests {
 
     private func settings(edge: IslandEdge = .top) -> FeatureSettings {
         FeatureSettings(statusIconDestination: .island, islandShowMoreInformation: true,
-            islandLayoutStyle: .pill, islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                        islandLayoutStyle: .pill, islandPlacement: IslandPlacement(mode: .custom, edge: edge))
     }
 
     private func icons() -> [IslandStatusIcon] {

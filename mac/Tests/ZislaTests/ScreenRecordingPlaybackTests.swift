@@ -40,11 +40,11 @@ struct ScreenRecordingPlaybackTests {
 
             #expect(model.isShowingTimelinePlayback && !model.isShowingSourcePlayback && !model.isBusy)
             #expect(try await playbackSources(#require(model.activePlayer?.currentItem)) == sources,
-                "Resuming an unchanged timeline must reuse its PCM and playback clock instead of processing the whole recording again")
+                    "Resuming an unchanged timeline must reuse its PCM and playback clock instead of processing the whole recording again")
             #expect(abs(position - start) < 0.05,
-                "Reused playback must seek to the edited output position")
+                    "Reused playback must seek to the edited output position")
             #expect(temporary.allSatisfy { FileManager.default.fileExists(atPath: $0.path) },
-                "Prepared audio must remain available while the timeline can resume")
+                    "Prepared audio must remain available while the timeline can resume")
             model.playTimeline()
         }
         #expect(model.project == source && !model.isDirty && !model.canUndo)
@@ -100,11 +100,11 @@ struct ScreenRecordingPlaybackTests {
         let subscription = model.$isShowingTimelinePlayback.dropFirst().filter { !$0 }.prefix(1).sink { _ in stopped.fulfill() }
         defer { subscription.cancel() }
         await player.seek(to: .init(seconds: source.outputDuration - 0.125, preferredTimescale: 600),
-            toleranceBefore: .zero, toleranceAfter: .zero)
+                          toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
         let completion = await XCTWaiter.fulfillment(of: [ended, stopped], timeout: 5)
         try #require(completion == .completed,
-            "The fixture must reach the actual AVPlayer item end: player \(player.currentTime().seconds), item \(item.duration.seconds), output \(source.outputDuration), playing \(model.isShowingTimelinePlayback), rate \(player.rate)")
+                     "The fixture must reach the actual AVPlayer item end: player \(player.currentTime().seconds), item \(item.duration.seconds), output \(source.outputDuration), playing \(model.isShowingTimelinePlayback), rate \(player.rate)")
 
         #expect(!model.isShowingTimelinePlayback, "Natural completion must leave the transport ready to play again")
         #expect(model.playbackTime == source.outputDuration, "The playhead must stay on the last frame until Play is clicked")
@@ -113,9 +113,9 @@ struct ScreenRecordingPlaybackTests {
         #expect(model.playbackTime == 0 && model.currentTime == (multitrack ? 0 : 1))
         await model.operationTask?.value
         #expect(model.isShowingTimelinePlayback && model.activePlayer?.rate == 1,
-            "One click after completion must restart, rather than only clear a stale playing state")
+                "One click after completion must restart, rather than only clear a stale playing state")
         #expect(try await playbackSources(#require(model.activePlayer?.currentItem)) == sources,
-            "Natural completion must not require reprocessing unchanged voice audio")
+                "Natural completion must not require reprocessing unchanged voice audio")
     }
 
     @Test(arguments: [false, true])
@@ -154,10 +154,10 @@ struct ScreenRecordingPlaybackTests {
         model.seekSource(to: model.sourceDuration)
         let player = try #require(model.player)
         let seeked = await player.seek(to: .init(seconds: model.sourceDuration, preferredTimescale: 600),
-            toleranceBefore: .zero, toleranceAfter: .zero)
+                                       toleranceBefore: .zero, toleranceAfter: .zero)
         #expect(seeked)
         #expect(player.currentTime().seconds == model.sourceDuration,
-            "Source-end fixture: model \(model.currentTime), player \(player.currentTime().seconds), duration \(player.currentItem?.duration.seconds ?? -1), source \(model.sourceDuration)")
+                "Source-end fixture: model \(model.currentTime), player \(player.currentTime().seconds), duration \(player.currentItem?.duration.seconds ?? -1), source \(model.sourceDuration)")
         let firstFrame = XCTestExpectation(description: "Source playback returned to its first frame")
         let observer = player.addPeriodicTimeObserver(forInterval: .init(value: 1, timescale: 100), queue: .main) { time in
             if time.seconds >= 0 && time.seconds < 0.5 { firstFrame.fulfill() }
@@ -221,7 +221,7 @@ struct ScreenRecordingPlaybackTests {
 
         #expect(released == nil, "Playback must release its previous item and end observer")
         #expect(temporary.allSatisfy { !FileManager.default.fileExists(atPath: $0.deletingLastPathComponent().path) },
-            "A replaced or closed project must release its processed PCM and playback clock")
+                "A replaced or closed project must release its processed PCM and playback clock")
         #expect(!model.isShowingTimelinePlayback)
     }
 
@@ -284,8 +284,8 @@ struct ScreenRecordingPlaybackTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let destination = fixture.root.appendingPathComponent("copy.zisla-recording", isDirectory: true)
         let model = ScreenRecordingStudioModel(projectStore: fixture.store,
-            outputDirectoryStore: .init(defaults: defaults),
-            presentExportPanel: { _, completion in completion(destination) })
+                                               outputDirectoryStore: .init(defaults: defaults),
+                                               presentExportPanel: { _, completion in completion(destination) })
         defer { model.shutdown() }
         model.install(source, directory: fixture.directory)
         await model.previewTask?.value
@@ -305,7 +305,7 @@ struct ScreenRecordingPlaybackTests {
         let copiedSources = try await playbackSources(#require(model.activePlayer?.currentItem))
         #expect(copiedSources.contains(destination.appendingPathComponent("screen.mp4")))
         #expect(!copiedSources.contains(fixture.directory.appendingPathComponent("screen.mp4")),
-            "The copy must own its playback after the original directory changes")
+                "The copy must own its playback after the original directory changes")
         #expect(model.isShowingTimelinePlayback && !model.isDirty && model.errorMessage == nil)
     }
 
@@ -416,7 +416,7 @@ struct ScreenRecordingPlaybackTests {
             #expect(!model.isShowingTimelinePlayback && !model.isShowingSourcePlayback && !model.isBusy)
             #expect(model.project == source && !model.isDirty && model.selectedTimelineClipID == selection)
             #expect(model.playbackTime == position && model.currentTime == sourcePosition,
-                "Closing must preserve the playhead, and queued callbacks must not move it afterwards")
+                    "Closing must preserve the playhead, and queued callbacks must not move it afterwards")
             #expect(await releasedMedia(temporary), "Closing must release prepared voice audio and the playback clock")
             #expect(preparedItem == nil)
 
@@ -434,7 +434,7 @@ struct ScreenRecordingPlaybackTests {
             model.playSource()
             model.playSource()
             #expect(try #require(model.playerObserver) as AnyObject === observer,
-                "Repeated playback must reuse its observer until the next close")
+                    "Repeated playback must reuse its observer until the next close")
             model.playSource()
         }
         #expect(try fixture.files() == ["screen.mp4", "tone.wav"])
@@ -514,7 +514,7 @@ struct ScreenRecordingPlaybackTests {
         let url = try #require(sources.first { $0.pathExtension == "mov" })
         let file = try AVAudioFile(forReading: url)
         let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat,
-            frameCapacity: AVAudioFrameCount(file.length)))
+                                                   frameCapacity: AVAudioFrameCount(file.length)))
         try file.read(into: buffer)
         let channel = try #require(buffer.floatChannelData?[0])
         return (0..<Int(buffer.frameLength)).reduce(0) { $0 + abs(Double(channel[$1])) } / Double(buffer.frameLength)

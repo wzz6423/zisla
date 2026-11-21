@@ -5,7 +5,7 @@ import Testing
 struct ScreenRecordingPostProductionModelsTests {
     private func project() -> ScreenRecordingProject {
         ScreenRecordingProject(name: "Demo", videoFile: "screen.mp4", cameraFile: "camera.mp4",
-            microphoneFile: "microphone.wav", duration: 1, width: 64, height: 48)
+                               microphoneFile: "microphone.wav", duration: 1, width: 64, height: 48)
     }
 
     @Test func legacyProjectsKeepBothAudioSourcesAndCameraVisible() throws {
@@ -19,7 +19,7 @@ struct ScreenRecordingPostProductionModelsTests {
         object["edits"] = edits
 
         let decoded = try JSONDecoder().decode(ScreenRecordingProject.self,
-            from: JSONSerialization.data(withJSONObject: object))
+                                               from: JSONSerialization.data(withJSONObject: object))
 
         try decoded.validate()
         #expect(decoded.version == ScreenRecordingProject.currentVersion)

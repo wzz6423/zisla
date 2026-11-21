@@ -59,7 +59,8 @@ struct ScreenLayoutTests {
             layout.topology
                 == .physicalNotch(
                     frame: CGRect(x: 716, y: 950, width: 80, height: 32)
-                ))
+                )
+        )
         #expect(layout.topology.anchorFrame.height == 32)
         #expect(layout.topology.anchorFrame.maxY == screen.frame.maxY)
         #expect(layout.topology.anchorFrame.minY == 950)
@@ -138,7 +139,8 @@ struct ScreenLayoutTests {
             layout.topology
                 == .simulated(
                     frame: CGRect(x: 600, y: 875, width: 240, height: 25)
-                ))
+                )
+        )
         #expect(layout.triggerFrame == CGRect(x: 600, y: 875, width: 240, height: 25))
     }
 
@@ -177,7 +179,8 @@ struct ScreenLayoutTests {
             layout.topology
                 == .simulated(
                     frame: CGRect(x: 630, y: 868, width: 180, height: 32)
-                ))
+                )
+        )
     }
 
     @Test
@@ -211,7 +214,8 @@ struct ScreenLayoutTests {
             layout.topology
                 == .simulated(
                     frame: CGRect(x: 630, y: 875, width: 180, height: 25)
-                ))
+                )
+        )
         #expect(layout.triggerFrame == CGRect(x: 630, y: 875, width: 180, height: 25))
         #expect(layout.expandedFrame == CGRect(x: 510, y: 720, width: 420, height: 180))
     }
@@ -286,7 +290,8 @@ struct ScreenLayoutTests {
             engine.screenLayout(containing: CGPoint(x: -1_000, y: 300), in: layouts)?.displayID == 2
         )
         #expect(
-            engine.screenLayout(containing: CGPoint(x: 800, y: 300), in: layouts)?.displayID == 1)
+            engine.screenLayout(containing: CGPoint(x: 800, y: 300), in: layouts)?.displayID == 1
+        )
         #expect(engine.screenLayout(containing: CGPoint(x: 2_000, y: 300), in: layouts) == nil)
     }
 

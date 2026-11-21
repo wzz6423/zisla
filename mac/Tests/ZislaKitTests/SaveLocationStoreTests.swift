@@ -61,7 +61,7 @@ struct SaveLocationStoreTests {
         try ScreenRecordingOutputDirectoryStore(defaults: fixture.defaults).setDirectory(legacy)
         let legacyPreferences = (fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:])
         let downloadStore = ScreenRecordingOutputDirectoryStore(defaults: fixture.defaults,
-            bookmarkKey: "download-directory-bookmark", pathKey: nil)
+                                                                bookmarkKey: "download-directory-bookmark", pathKey: nil)
         try downloadStore.setDirectory(shared)
         let locations = SaveLocationStore(defaults: fixture.defaults)
         for location in SaveLocation.allCases { #expect(locations[location].path == shared.path) }
@@ -83,7 +83,7 @@ struct SaveLocationStoreTests {
         defer { fixture.close() }
         let original = try fixture.makeDirectory("Original shared folder")
         let downloads = ScreenRecordingOutputDirectoryStore(defaults: fixture.defaults,
-            bookmarkKey: "download-directory-bookmark", pathKey: nil)
+                                                            bookmarkKey: "download-directory-bookmark", pathKey: nil)
         try downloads.setDirectory(original)
         _ = SaveLocationStore(defaults: fixture.defaults)
         let renamed = fixture.root.appendingPathComponent("Renamed shared folder", isDirectory: true)
@@ -103,14 +103,14 @@ struct SaveLocationStoreTests {
         defer { fixture.close() }
         let shared = try fixture.makeDirectory("Current downloads")
         let downloads = ScreenRecordingOutputDirectoryStore(defaults: fixture.defaults,
-            bookmarkKey: SaveLocation.download.bookmarkKey, pathKey: nil)
+                                                            bookmarkKey: SaveLocation.download.bookmarkKey, pathKey: nil)
         try downloads.setDirectory(shared)
         let existingLocations: [SaveLocation] = [.screenshot, .recording, .quickActions, .dailyBriefing]
         var existingPaths: [SaveLocation: URL] = [:]
         for location in existingLocations {
             let path = try fixture.makeDirectory(location.rawValue)
             let directory = ScreenRecordingOutputDirectoryStore(defaults: fixture.defaults,
-                bookmarkKey: location.bookmarkKey, pathKey: location.pathKey)
+                                                                bookmarkKey: location.bookmarkKey, pathKey: location.pathKey)
             try directory.setDirectory(path)
             existingPaths[location] = path
         }
@@ -298,7 +298,7 @@ struct SaveLocationStoreTests {
         defer { fixture.close() }
         let custom = try fixture.makeDirectory("Independent folder")
         let directory = ScreenRecordingOutputDirectoryStore(defaults: fixture.defaults,
-            bookmarkKey: location.bookmarkKey, pathKey: location.pathKey)
+                                                            bookmarkKey: location.bookmarkKey, pathKey: location.pathKey)
         try directory.setDirectory(custom)
         fixture.defaults.removeObject(forKey: fields == "bookmark only" ? location.pathKey! : location.bookmarkKey)
         let bookmark = fixture.defaults.data(forKey: location.bookmarkKey)

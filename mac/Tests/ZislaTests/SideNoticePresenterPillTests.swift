@@ -18,9 +18,9 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.islandShowMoreInformation = true
         fixture.settings.settings.mediaCompactStyle = .detailed
         let task = AIProgressTask(id: "floating-result", provider: .codex, title: "Task",
-            progress: nil, status: status, updatedAt: fixture.date)
+                                  progress: nil, status: status, updatedAt: fixture.date)
         fixture.queue.enqueue(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title),
-            expiresAfter: nil)
+                              expiresAfter: nil)
         fixture.queue.enqueue(IslandNotice(id: "media-active-fixture", title: "Music"), expiresAfter: nil)
         let icons = [
             IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU"),
@@ -32,14 +32,14 @@ struct SideNoticePresenterPillTests {
         fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
         let sweep = try #require(fixture.sweep.current)
         let sweeping = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date))
+                                                                   notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date))
 
         let expected = edge.isVertical ? CGSize(width: 32, height: 68) : CGSize(width: 60, height: 32)
         #expect(sweeping.size == expected, "A result sweep must fit the visible AI icon and count without reserving hidden information")
         #expect((edge.isVertical ? sweeping.height : sweeping.width) < (edge.isVertical ? initial.height : initial.width))
         fixture.presenter.setStatusIcons(icons)
         #expect(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date) == sweeping)
+                                               notices: fixture.sweep.presentationNotices(from: notices), at: fixture.date) == sweeping)
         var publishedConfiguration = fixture.settings.settings.islandScreenConfiguration
         fixture.presenter.onCompactLayoutChanged = { _, detailed, length, sideWidth, size in
             publishedConfiguration.expandsForDetailedStatus = detailed
@@ -62,13 +62,13 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.islandShowMoreInformation = true
         fixture.settings.settings.mediaCompactStyle = .detailed
         let firstTask = AIProgressTask(id: "finished", provider: .gpt, title: "Task",
-            progress: nil, status: .succeeded, updatedAt: fixture.date)
+                                       progress: nil, status: .succeeded, updatedAt: fixture.date)
         fixture.queue.enqueue(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: firstTask), title: firstTask.title),
-            expiresAfter: nil)
+                              expiresAfter: nil)
         fixture.queue.enqueue(IslandNotice(id: "media-active-fixture", title: "Music"), expiresAfter: nil)
         fixture.presenter.setStatusIcons([])
         let initial = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.queue.left + fixture.queue.right, at: fixture.date))
+                                                                  notices: fixture.queue.left + fixture.queue.right, at: fixture.date))
 
         fixture.queue.remove(id: AIMascotLibrary.activeNoticeID(for: firstTask))
         fixture.sweep.receive(previous: .running, task: firstTask, observedSince: .distantPast, settings: fixture.settings.settings)
@@ -76,19 +76,19 @@ struct SideNoticePresenterPillTests {
         fixture.queue.removeAll()
         fixture.presenter.setStatusIcons([])
         let sweeping = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
+                                                                   notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
         let expected = edge.isVertical ? CGSize(width: 32, height: 68) : CGSize(width: 60, height: 32)
         #expect(sweeping.size == expected)
         #expect(sweeping != initial, "A vanished information row must not leave empty space during a result sweep")
 
         let secondTask = AIProgressTask(id: "failed", provider: .codex, title: "Task",
-            progress: nil, status: .failed, updatedAt: fixture.date)
+                                        progress: nil, status: .failed, updatedAt: fixture.date)
         fixture.sweep.receive(previous: .running, task: secondTask, observedSince: .distantPast, settings: fixture.settings.settings)
         fixture.sweep.finish(id: first.id)
         let second = try #require(fixture.sweep.current)
         fixture.presenter.setStatusIcons([])
         #expect(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date) == sweeping)
+                                               notices: fixture.sweep.presentationNotices(from: []), at: fixture.date) == sweeping)
 
         fixture.sweep.cancel()
         fixture.sweep.finish(id: second.id)
@@ -98,7 +98,7 @@ struct SideNoticePresenterPillTests {
         fixture.sweep.receive(previous: .running, task: secondTask, observedSince: .distantPast, settings: fixture.settings.settings)
         fixture.presenter.setStatusIcons([])
         let next = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
+                                                               notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
         #expect(next.size == expected, "A fresh sweep must fit only its current AI icon and task count")
     }
 
@@ -109,13 +109,13 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.islandShowMoreInformation = true
         fixture.settings.settings.activityNoticeDisplayDuration = .threeSeconds
         let task = AIProgressTask(id: "hidden-result", provider: .codex, title: "Task",
-            progress: nil, status: .succeeded, updatedAt: fixture.date)
+                                  progress: nil, status: .succeeded, updatedAt: fixture.date)
         let notice = IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title)
         let state = SideNoticeDisplayState()
         _ = SideNoticePresenter.updateCompactVisibility(notices: [notice], settings: fixture.settings.settings, displayState: state)
         state.compactStatusHidden = true
         let hidden = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: [notice], at: fixture.date, statusHidden: state.compactStatusHidden))
+                                                                 notices: [notice], at: fixture.date, statusHidden: state.compactStatusHidden))
         #expect(hidden.size == CGSize(width: 24, height: 24))
 
         fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
@@ -124,17 +124,17 @@ struct SideNoticePresenterPillTests {
         #expect(!SideNoticePresenter.updateCompactVisibility(notices: notices, settings: fixture.settings.settings, displayState: state))
         #expect(state.compactStatusHidden)
         let sweeping = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: notices, at: fixture.date, statusHidden: state.compactStatusHidden))
+                                                                   notices: notices, at: fixture.date, statusHidden: state.compactStatusHidden))
         #expect(sweeping.size == (edge.isVertical ? CGSize(width: 32, height: 68) : CGSize(width: 60, height: 32)),
                 "A result sweep must fit its visible AI content even when the same activity was hidden")
         #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: notices, at: fixture.date) == sweeping)
         #expect(fixture.presenter.compactConfiguration(for: notices, at: fixture.date,
-            statusHidden: state.compactStatusHidden).statusIconSize == nil)
+                                                       statusHidden: state.compactStatusHidden).statusIconSize == nil)
 
         fixture.sweep.finish(id: sweep.id)
         #expect(state.compactStatusHidden)
         #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice],
-            at: fixture.date, statusHidden: state.compactStatusHidden) == hidden,
+                                               at: fixture.date, statusHidden: state.compactStatusHidden) == hidden,
                 "Finishing a result sweep must restore the activity's hidden frame")
     }
 
@@ -143,10 +143,10 @@ struct SideNoticePresenterPillTests {
         let fixture = try Fixture(edge: edge)
         defer { fixture.close() }
         let task = AIProgressTask(id: "first-result", provider: .codex, title: "Task",
-            progress: nil, status: .succeeded, updatedAt: fixture.date)
+                                  progress: nil, status: .succeeded, updatedAt: fixture.date)
         fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
         let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
+                                                                notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
         #expect((edge.isVertical ? frame.width : frame.height) == 32)
         #expect((edge.isVertical ? frame.height : frame.width) == (edge.isVertical ? 68 : 60))
     }
@@ -160,14 +160,14 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.mediaShowLyricsAndInfo = true
         fixture.queue.enqueue(IslandNotice(id: "media-active-fixture", title: "Music"), expiresAfter: nil)
         fixture.media.publishSnapshot(NowPlayingSnapshot(title: String(repeating: "Long title ", count: 8), artist: "Artist", album: nil,
-            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: false))
+                                                         artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: false))
         fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu",
-            content: .metric(.cpu, text: String(repeating: "1234567890", count: 8), image: nil, style: .detailed), tooltip: "CPU")])
+                                                           content: .metric(.cpu, text: String(repeating: "1234567890", count: 8), image: nil, style: .detailed), tooltip: "CPU")])
         let initial = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.queue.left + fixture.queue.right, at: fixture.date))
+                                                                  notices: fixture.queue.left + fixture.queue.right, at: fixture.date))
         #expect(initial.width > ScreenLayoutConfiguration.cameraPillMaximumWidth)
         let task = AIProgressTask(id: "switched-result", provider: .codex, title: "Task",
-            progress: nil, status: .succeeded, updatedAt: fixture.date)
+                                  progress: nil, status: .succeeded, updatedAt: fixture.date)
         fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
         fixture.settings.settings.islandLayoutStyle = style
         fixture.settings.settings.islandPlacement = IslandPlacement(mode: style == .pill ? .camera : .custom)
@@ -187,13 +187,13 @@ struct SideNoticePresenterPillTests {
         defer { fixture.close() }
         fixture.settings.settings.islandShowMoreInformation = true
         fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu",
-            content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")])
+                                                           content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")])
         let task = AIProgressTask(id: "edge-change", provider: .codex, title: "Task",
-            progress: nil, status: .succeeded, updatedAt: fixture.date)
+                                  progress: nil, status: .succeeded, updatedAt: fixture.date)
         fixture.sweep.receive(previous: .running, task: task, observedSince: .distantPast, settings: fixture.settings.settings)
         fixture.settings.settings.islandPlacement.edge = .top
         let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
+                                                                notices: fixture.sweep.presentationNotices(from: []), at: fixture.date))
         #expect(frame.size == CGSize(width: 60, height: 32))
     }
 
@@ -205,7 +205,7 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.islandLayoutStyle = style
         fixture.settings.settings.islandPlacement = IslandPlacement()
         let task = AIProgressTask(id: "placement-change", provider: .codex, title: "Task",
-            progress: nil, status: .succeeded, updatedAt: fixture.date)
+                                  progress: nil, status: .succeeded, updatedAt: fixture.date)
         let notice = IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title)
         fixture.queue.enqueue(notice, expiresAfter: nil)
         fixture.presenter.setStatusIcons([])
@@ -213,7 +213,7 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.islandLayoutStyle = .pill
         fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom)
         let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: fixture.sweep.presentationNotices(from: [notice]), at: fixture.date))
+                                                                notices: fixture.sweep.presentationNotices(from: [notice]), at: fixture.date))
         #expect(frame.size == CGSize(width: 60, height: 32))
     }
 
@@ -230,11 +230,11 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.mediaCompactStyle = .detailed
         let host = try activeHost(fixture)
         let icons = [IslandStatusIcon(id: "cpu",
-            content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
+                                      content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
         let task = AIProgressTask(id: "rendered-result", provider: .gpt, title: "Task",
-            progress: nil, status: .succeeded, updatedAt: fixture.date)
+                                  progress: nil, status: .succeeded, updatedAt: fixture.date)
         fixture.queue.enqueue(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title),
-            expiresAfter: nil)
+                              expiresAfter: nil)
         fixture.queue.enqueue(IslandNotice(id: "media-active-fixture", title: "Music"), expiresAfter: nil)
         fixture.presenter.setStatusIcons(icons)
         let initial = try #require(host.rootView.content.displayState.compactLayout).frame
@@ -249,10 +249,11 @@ struct SideNoticePresenterPillTests {
         #expect(view.selectedCompactStatusPriority == .aiActivity)
         let presentation = try #require(SideNoticeLayoutEngine().compactPillPresentations(
             for: fixture.sweep.presentationNotices(from: fixture.queue.left + fixture.queue.right),
-            settings: fixture.settings.settings).first)
+            settings: fixture.settings.settings
+        ).first)
         let thickness = CompactPillStatusPresentation.minimumThickness
         let expected = CompactPillStatusContent(presentation: presentation, text: presentation.text, edge: edge,
-            visualizationStyle: fixture.settings.settings.mediaVisualizationStyle, item: nil, date: fixture.date)
+                                                visualizationStyle: fixture.settings.settings.mediaVisualizationStyle, item: nil, date: fixture.date)
             .frame(width: edge.isVertical ? thickness : nil, height: edge.isVertical ? nil : thickness)
             .frame(width: sweeping.width, height: sweeping.height)
             .environment(\.colorScheme, .dark)
@@ -291,8 +292,8 @@ struct SideNoticePresenterPillTests {
         state.compactWingHeight = 32
         state.compactBarCenterInset = 185
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let size = CGSize(width: 265, height: 32)
         let reference = try await renderOffscreen(view.statusBarContent(at: fixture.date), size: size)
         let referenceBounds = try foregroundBounds(reference, scale: CGFloat(reference.pixelsWide) / size.width)
@@ -322,8 +323,8 @@ struct SideNoticePresenterPillTests {
         let title = String(repeating: "Long title ", count: 30)
         let notice = IslandNotice(id: "media-active-camera", title: title, side: .left)
         fixture.media.publishSnapshot(NowPlayingSnapshot(title: title, artist: "Artist", album: nil,
-            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true,
-            lyrics: SyncedLyrics(lines: [.init(time: 0, text: String(repeating: "Lyrics ", count: 30))])))
+                                                         artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true,
+                                                         lyrics: SyncedLyrics(lines: [.init(time: 0, text: String(repeating: "Lyrics ", count: 30))])))
         fixture.queue.enqueue(notice, expiresAfter: nil)
         let state = SideNoticeDisplayState()
         state.placementMode = .camera
@@ -331,8 +332,8 @@ struct SideNoticePresenterPillTests {
         state.compactWingHeight = 32
         state.compactBarCenterInset = centerWidth
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let width = max(240, centerWidth + 80)
         let sideWidth = (width - centerWidth) / 2
         let bitmap = try await renderOffscreen(view.statusBarContent(at: fixture.date), size: CGSize(width: width, height: 32))
@@ -358,9 +359,9 @@ struct SideNoticePresenterPillTests {
             let frame = fixture.screen.frame
             fixture.screen.safeAreaInsets = ScreenInsets(top: 44)
             fixture.screen.auxiliaryTopLeftArea = CGRect(x: frame.minX, y: frame.maxY - 44,
-                width: frame.width / 2 - reservedWidth / 2, height: 44)
+                                                         width: frame.width / 2 - reservedWidth / 2, height: 44)
             fixture.screen.auxiliaryTopRightArea = CGRect(x: frame.midX + reservedWidth / 2, y: frame.maxY - 44,
-                width: frame.width / 2 - reservedWidth / 2, height: 44)
+                                                          width: frame.width / 2 - reservedWidth / 2, height: 44)
         }
         fixture.presenter.setScreenLocked(false)
         let host = try #require(NSApp.windows.compactMap {
@@ -380,7 +381,7 @@ struct SideNoticePresenterPillTests {
             #expect(state.compactBarCenterInset == centerWidth)
             #expect(host.window?.frame.size == CGSize(width: centerWidth + 80, height: 32))
             let bitmap = try await renderOffscreen(host.rootView.content.statusBarContent(at: fixture.date),
-                size: CGSize(width: centerWidth + 80, height: 32))
+                                                   size: CGSize(width: centerWidth + 80, height: 32))
             let wingWidth = Int(40 * CGFloat(bitmap.pixelsWide) / (centerWidth + 80))
             var wingPixels = [0, 0]
             var centerPixels = 0
@@ -422,16 +423,16 @@ struct SideNoticePresenterPillTests {
                         IslandNotice(id: "screen-recording-operation-camera", title: "Recording", progress: 0.4)]
         for notices in [Array(ai.prefix(1)), Array(ai.prefix(2)), ai] + ordinary.map({ [$0] }) {
             #expect(try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: notices,
-                at: fixture.date)) == idle)
+                                                                at: fixture.date)) == idle)
         }
         fixture.settings.settings.mediaCompactStyle = .detailed
         let long = try #require(fixture.presenter.compactFrame(for: fixture.screen,
-            notices: [ordinary[0]], at: fixture.date))
+                                                               notices: [ordinary[0]], at: fixture.date))
         #expect(long.size == CGSize(width: 240, height: 32))
         #expect(long.midX == idle.midX && long.midY == idle.midY)
         #expect(try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [], at: fixture.date)) == idle)
         #expect(try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [ordinary[0]],
-            at: fixture.date, statusHidden: true)) == idle)
+                                                            at: fixture.date, statusHidden: true)) == idle)
     }
 
     @Test(arguments: IslandEdge.allCases)
@@ -439,12 +440,12 @@ struct SideNoticePresenterPillTests {
         let fixture = try Fixture(edge: edge)
         defer { fixture.close() }
         let notice = IslandNotice(id: "media-active-left", title: "Music", side: .left,
-            metadata: ["compactLyric": "旧内容"])
+                                  metadata: ["compactLyric": "旧内容"])
         let base = fixture.date
         var snapshot = NowPlayingSnapshot(title: "fixture", artist: "artist", album: nil, artworkData: nil,
-            duration: 60, elapsedTime: 0, timestamp: base, isPlaying: true,
-            lyrics: SyncedLyrics(lines: [.init(time: 0, text: "短"), .init(time: 10, text: "长一些的歌词"),
-                                        .init(time: 20, text: "短")]))
+                                          duration: 60, elapsedTime: 0, timestamp: base, isPlaying: true,
+                                          lyrics: SyncedLyrics(lines: [.init(time: 0, text: "短"), .init(time: 10, text: "长一些的歌词"),
+                                                                       .init(time: 20, text: "短")]))
         fixture.media.publishSnapshot(snapshot)
         fixture.settings.settings.mediaCompactStyle = .detailed
         let first = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: base))
@@ -475,16 +476,16 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.mediaShowLyricsAndInfo = true
         fixture.settings.settings.mediaVisualizationStyle = visualizationStyle
         let notice = IslandNotice(id: "media-active-progress", title: "Music",
-            metadata: ["compactLyric": "旧内容"])
+                                  metadata: ["compactLyric": "旧内容"])
         let lyrics = SyncedLyrics(lines: [.init(time: 0, text: "短"),
-            .init(time: 10, text: String(repeating: "长", count: 100)),
-            .init(time: 20, text: String(repeating: "长", count: 1000)), .init(time: 30, text: "短")])
+                                          .init(time: 10, text: String(repeating: "长", count: 100)),
+                                          .init(time: 20, text: String(repeating: "长", count: 1000)), .init(time: 30, text: "短")])
         let snapshot = NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
-            duration: 40, elapsedTime: 0, timestamp: fixture.date, isPlaying: true, lyrics: lyrics)
+                                          duration: 40, elapsedTime: 0, timestamp: fixture.date, isPlaying: true, lyrics: lyrics)
         fixture.media.publishSnapshot(snapshot)
         let short = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date))
         let long = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice],
-            at: fixture.date.addingTimeInterval(10)))
+                                                               at: fixture.date.addingTimeInterval(10)))
         let maximumLength: CGFloat = visualizationStyle == .waveform ? 252 : 222
         #expect((edge.isVertical ? long.height : long.width) == maximumLength)
         #expect(maximumLength <= ScreenLayoutConfiguration.quickActionRowWidth)
@@ -492,8 +493,8 @@ struct SideNoticePresenterPillTests {
         #expect(short.midX == long.midX && short.midY == long.midY)
         for elapsed in [0.0, 2.5, 5, 7.5, 9.999] {
             #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice],
-                at: fixture.date.addingTimeInterval(elapsed)) == short,
-                "A short lyric's playback progress cannot resize the island")
+                                                   at: fixture.date.addingTimeInterval(elapsed)) == short,
+                    "A short lyric's playback progress cannot resize the island")
         }
         for elapsed in [10.0, 12.5, 15, 17.5, 19.999, 20, 25, 29.999] {
             let sampledDate = fixture.date.addingTimeInterval(elapsed)
@@ -502,8 +503,8 @@ struct SideNoticePresenterPillTests {
             #expect(fixture.presenter.compactConfiguration(for: [notice], at: sampledDate).compactStatusLength == maximumLength)
         }
         #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice],
-            at: fixture.date.addingTimeInterval(30)) == short,
-            "Switching back to a short line restores its natural length")
+                                               at: fixture.date.addingTimeInterval(30)) == short,
+                "Switching back to a short line restores its natural length")
     }
 
     @Test
@@ -528,11 +529,11 @@ struct SideNoticePresenterPillTests {
         defer { fixture.close() }
         fixture.settings.settings.islandPlacement = IslandPlacement()
         let snapshot = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 938),
-            safeAreaInsets: ScreenInsets(top: 44),
-            auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 656, height: 44),
-            auxiliaryTopRightArea: CGRect(x: 856, y: 938, width: 656, height: 44))
+                                      frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+                                      visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 938),
+                                      safeAreaInsets: ScreenInsets(top: 44),
+                                      auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 656, height: 44),
+                                      auxiliaryTopRightArea: CGRect(x: 856, y: 938, width: 656, height: 44))
         let idleConfiguration = fixture.presenter.compactConfiguration(for: [], at: fixture.date)
         #expect(idleConfiguration.compactStatusLength == nil)
         let idle = try #require(fixture.presenter.compactFrame(for: snapshot, notices: [], at: fixture.date))
@@ -629,10 +630,10 @@ struct SideNoticePresenterPillTests {
         let fixture = try Fixture(edge: edge)
         defer { fixture.close() }
         let other = ScreenSnapshot(displayID: 8,
-            frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 876))
+                                   frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+                                   visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 876))
         let coordinator = OverlayCoordinator(contentView: NSView(),
-            layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration))
+                                             layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration))
         coordinator.screenSnapshotProvider = { [fixture.screen, other] }
         defer { coordinator.stop() }
         coordinator.updateScreens([fixture.screen, other])
@@ -651,7 +652,7 @@ struct SideNoticePresenterPillTests {
         coordinator.selectActiveDisplay(at: CGPoint(x: fixture.screen.frame.midX, y: fixture.screen.frame.midY))
         let recordingLayout = try #require(coordinator.activeLayout)
         #expect(recordingLayout.collapsedFrame.size == (edge.isVertical
-            ? CGSize(width: 32, height: 110) : CGSize(width: 98, height: 32)))
+                ? CGSize(width: 32, height: 110) : CGSize(width: 98, height: 32)))
         #expect(published <= 2, "Reentrant layout callbacks must converge without repeatedly resizing")
         coordinator.selectActiveDisplay(at: CGPoint(x: other.frame.midX, y: other.frame.midY))
         #expect(coordinator.activeLayout?.displayID == 8)
@@ -672,10 +673,10 @@ struct SideNoticePresenterPillTests {
         fixture.screen.auxiliaryTopRightArea?.origin.x = 20_980
         fixture.screen.auxiliaryTopRightArea?.size.width = 820
         let other = ScreenSnapshot(displayID: 8,
-            frame: CGRect(x: 22_000, y: 0, width: 1440, height: 900),
-            visibleFrame: CGRect(x: 22_000, y: 0, width: 1440, height: 876))
+                                   frame: CGRect(x: 22_000, y: 0, width: 1440, height: 900),
+                                   visibleFrame: CGRect(x: 22_000, y: 0, width: 1440, height: 876))
         let coordinator = OverlayCoordinator(contentView: NSView(),
-            layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration))
+                                             layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration))
         coordinator.screenSnapshotProvider = { [fixture.screen, other] }
         defer { coordinator.stop() }
         coordinator.updateScreens([fixture.screen, other])
@@ -690,7 +691,7 @@ struct SideNoticePresenterPillTests {
                                             compactStatusSideWidth: sideWidth, statusIconSize: iconSize)
         }
         var notice = IslandNotice(id: "headphone-connection-camera", title: "AirPods Pro", createdAt: fixture.date,
-            style: .headphone, batteryLevels: [NoticeBatteryLevel(label: "耳机", level: 100)])
+                                  style: .headphone, batteryLevels: [NoticeBatteryLevel(label: "耳机", level: 100)])
         fixture.queue.enqueue(notice, expiresAfter: nil)
         let configuration = fixture.presenter.compactConfiguration(for: [notice], at: fixture.date)
         #expect(configuration.compactStatusSideWidth != nil)
@@ -698,23 +699,23 @@ struct SideNoticePresenterPillTests {
         coordinator.selectActiveDisplay(at: CGPoint(x: fixture.screen.frame.midX, y: fixture.screen.frame.midY))
         let expected = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date))
         #expect(coordinator.activeLayout?.collapsedFrame == expected,
-            "The pet and hover anchor must use the same earphone content width as its overlay")
+                "The pet and hover anchor must use the same earphone content width as its overlay")
         let sizing = try #require(SideNoticeLayoutEngine().compactBarSizing(for: [notice], settings: fixture.settings.settings))
         #expect(configuration.compactStatusSideWidth == sizing.compactStatusSideWidth)
         let shortWidth = expected.width
         let activeLayoutChanged = coordinator.onActiveLayoutChanged
         coordinator.onActiveLayoutChanged = nil
         coordinator.updateCompactStatus(expandsForDetailedStatus: configuration.expandsForDetailedStatus,
-            compactStatusLength: configuration.compactStatusLength,
-            compactStatusSideWidth: try #require(configuration.compactStatusSideWidth) + 8)
+                                        compactStatusLength: configuration.compactStatusLength,
+                                        compactStatusSideWidth: try #require(configuration.compactStatusSideWidth) + 8)
         #expect(coordinator.activeLayout?.collapsedFrame.width == shortWidth + 16,
-            "A changed side budget must invalidate the coordinator's layout even when its text length is unchanged")
+                "A changed side budget must invalidate the coordinator's layout even when its text length is unchanged")
         fixture.presenter.setStatusIcons([])
         #expect(coordinator.activeLayout?.collapsedFrame == expected,
-            "Publishing a panel update must restore the notice's measured side budget")
+                "Publishing a panel update must restore the notice's measured side budget")
         coordinator.updateCompactStatus(expandsForDetailedStatus: configuration.expandsForDetailedStatus,
-            compactStatusLength: configuration.compactStatusLength,
-            compactStatusSideWidth: try #require(configuration.compactStatusSideWidth) + 8)
+                                        compactStatusLength: configuration.compactStatusLength,
+                                        compactStatusSideWidth: try #require(configuration.compactStatusSideWidth) + 8)
         fixture.presenter.publishCompactLayout(on: fixture.screen.displayID)
         #expect(coordinator.activeLayout?.collapsedFrame == expected)
         coordinator.onActiveLayoutChanged = activeLayoutChanged
@@ -722,7 +723,7 @@ struct SideNoticePresenterPillTests {
         let external = try #require(fixture.presenter.compactFrame(for: other, notices: [notice], at: fixture.date))
         #expect(coordinator.activeLayout?.collapsedFrame == external)
         #expect(shortWidth - external.width == 40,
-            "Each screen must supply its own measured camera clearance")
+                "Each screen must supply its own measured camera clearance")
         fixture.queue.removeAll()
         notice.title = "三年后的 AirPods Pro 第二代"
         fixture.queue.enqueue(notice, expiresAfter: nil)
@@ -747,7 +748,7 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.collapsedProgressGlowEnabled = false
         if physical { fixture.screen = Self.notchedScreen }
         let notice = IslandNotice(id: "headphone-connection-camera", title: "AirPods Pro", detail: "已连接",
-            createdAt: fixture.date, style: .headphone, batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
+                                  createdAt: fixture.date, style: .headphone, batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
         fixture.queue.enqueue(notice, expiresAfter: nil)
         let configuration = fixture.presenter.compactConfiguration(for: [notice], at: fixture.date)
         let layout = ScreenLayoutEngine(configuration: configuration).layout(for: fixture.screen)
@@ -757,19 +758,19 @@ struct SideNoticePresenterPillTests {
         state.compactWingHeight = layout.collapsedFrame.height
         state.compactBarCenterInset = centerInset
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let actual = try await renderOffscreen(AppLanguageEnvironment(languageStore: fixture.language,
-            content: view.statusBarContent(at: fixture.date))
-            .environment(\.locale, Locale(identifier: "en-US"))
-            .environment(\._accessibilityReduceMotion, true).transaction { $0.disablesAnimations = true },
+                                                                      content: view.statusBarContent(at: fixture.date))
+                .environment(\.locale, Locale(identifier: "en-US"))
+                .environment(\._accessibilityReduceMotion, true).transaction { $0.disablesAnimations = true },
             size: layout.collapsedFrame.size)
         let expected = try await renderOffscreen(CompactHeadphoneConnectionBar(notice: notice,
-            height: layout.collapsedFrame.height, centerInset: centerInset)
-            .background(.black)
-            .clipShape(CompactIslandShape(layoutStyle: .pill))
-            .environment(\.colorScheme, .dark).environment(\.locale, fixture.language.language.locale)
-            .environment(\._accessibilityReduceMotion, true).transaction { $0.disablesAnimations = true },
+                                                                               height: layout.collapsedFrame.height, centerInset: centerInset)
+                .background(.black)
+                .clipShape(CompactIslandShape(layoutStyle: .pill))
+                .environment(\.colorScheme, .dark).environment(\.locale, fixture.language.language.locale)
+                .environment(\._accessibilityReduceMotion, true).transaction { $0.disablesAnimations = true },
             size: layout.collapsedFrame.size)
         var differences = 0
         for y in 0..<actual.pixelsHigh {
@@ -819,8 +820,8 @@ struct SideNoticePresenterPillTests {
         let host = try activeHost(fixture)
         let panel = try #require(host.window)
         let notice = IslandNotice(id: "headphone-connection-fill", title: String(repeating: "█", count: 100),
-            createdAt: fixture.date, style: .headphone,
-            batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
+                                  createdAt: fixture.date, style: .headphone,
+                                  batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
         fixture.queue.enqueue(notice, expiresAfter: nil)
         fixture.presenter.setStatusIcons([])
         var samples: [String] = []
@@ -858,7 +859,7 @@ struct SideNoticePresenterPillTests {
             }
         }
         #expect(!samples.isEmpty && incomplete == 0,
-            "Every revealed headphone viewport must begin filled; width:head-gap,tail-gap samples: \(samples)")
+                "Every revealed headphone viewport must begin filled; width:head-gap,tail-gap samples: \(samples)")
         #expect(panel.alphaValue == 0 && NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
     }
 
@@ -874,22 +875,22 @@ struct SideNoticePresenterPillTests {
         let panel = try #require(originalHost.window)
         let clock = ReadingClock()
         let host = NSHostingView(rootView: ReadingAnimationClock(clock: clock,
-            content: originalHost.rootView.environment(\._accessibilityReduceMotion, false)))
+                                                                 content: originalHost.rootView.environment(\._accessibilityReduceMotion, false)))
         host.sizingOptions = []
         panel.contentView = host
         host.layoutSubtreeIfNeeded()
         let notice = IslandNotice(id: "headphone-connection-speed", title: String(repeating: "█    ", count: 20),
-            createdAt: fixture.date, style: .headphone,
-            batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
+                                  createdAt: fixture.date, style: .headphone,
+                                  batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
         fixture.queue.enqueue(notice, expiresAfter: nil)
         fixture.presenter.setStatusIcons([])
         let result = try await readingSpeeds(host) { clock.progress = $0 }
         let speeds = result.speeds
         #expect(speeds.count >= 6, "The real panel must provide at least six independent velocity windows")
         #expect(speeds.allSatisfy { abs($0 - 32) <= 8 },
-            "Each 250ms window must move at 32pt/s relative to the expanding text viewport; observed speeds: \(speeds)")
+                "Each 250ms window must move at 32pt/s relative to the expanding text viewport; observed speeds: \(speeds)")
         #expect(abs(result.slope - 32) <= 1 && result.residual <= 1.5,
-            "The complete trajectory must be linear at 32pt/s; slope \(result.slope), residual \(result.residual)")
+                "The complete trajectory must be linear at 32pt/s; slope \(result.slope), residual \(result.residual)")
         #expect(panel.alphaValue == 0 && NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
     }
 
@@ -900,7 +901,7 @@ struct SideNoticePresenterPillTests {
         let host = NSHostingView(rootView: ReadingClockText(clock: clock, text: text))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: 20_000, y: 0, width: 222, height: 32),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -916,12 +917,12 @@ struct SideNoticePresenterPillTests {
         #expect(speeds.count >= 6)
         if varies {
             #expect(speeds.contains { abs($0 - 32) > 8 },
-                "The pixel sampler must detect an intentionally nonuniform driver: \(speeds)")
+                    "The pixel sampler must detect an intentionally nonuniform driver: \(speeds)")
         } else {
             #expect(speeds.allSatisfy { abs($0 - 32) <= 8 },
-                "The same offscreen sampler must read a known 32pt/s external driver: \(speeds)")
+                    "The same offscreen sampler must read a known 32pt/s external driver: \(speeds)")
             #expect(abs(result.slope - 32) <= 1 && result.residual <= 1.5,
-                "Linear calibration slope \(result.slope), residual \(result.residual)")
+                    "Linear calibration slope \(result.slope), residual \(result.residual)")
         }
         #expect(!window.isVisible)
     }
@@ -935,10 +936,10 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.collapsedProgressGlowEnabled = false
         fixture.settings.settings.mediaCompactStyle = .detailed
         fixture.screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
-            visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1076))
+                                        frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
+                                        visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1076))
         fixture.media.publishSnapshot(NowPlayingSnapshot(title: "A longer media title", artist: "Artist", album: nil,
-            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
+                                                         artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
         let notice = IslandNotice(id: "media-active-resize", title: "Music", side: .left)
         fixture.queue.enqueue(notice, expiresAfter: nil)
         fixture.presenter.setScreenLocked(false)
@@ -965,14 +966,14 @@ struct SideNoticePresenterPillTests {
         let fixture = try Fixture(edge: edge)
         defer { fixture.close() }
         fixture.screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
-            visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1076))
+                                        frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
+                                        visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1076))
         fixture.settings.settings.islandPlacement.offset = 0.537
         fixture.settings.settings.mediaCompactStyle = .detailed
         fixture.settings.settings.mediaVisualizationStyle = .glow
         var item = NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
-            duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true,
-            lyrics: SyncedLyrics(lines: []))
+                                      duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true,
+                                      lyrics: SyncedLyrics(lines: []))
         fixture.media.publishSnapshot(item)
         fixture.queue.enqueue(IslandNotice(id: "media-active-canvas", title: "Music"), expiresAfter: nil)
         fixture.presenter.setScreenLocked(false)
@@ -1038,7 +1039,7 @@ struct SideNoticePresenterPillTests {
         fixture.queue.removeAll()
         fixture.queue.enqueue(IslandNotice(id: "media-active-resize", title: "Music"), expiresAfter: nil)
         fixture.media.publishSnapshot(NowPlayingSnapshot(title: "A longer media title", artist: "Artist", album: nil,
-            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
+                                                         artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
         fixture.presenter.setStatusIcons([])
         let long = try #require(state.compactLayout).frame
         #expect(long.width > short.width)
@@ -1111,7 +1112,7 @@ struct SideNoticePresenterPillTests {
         fixture.queue.enqueue(IslandNotice(id: "media-active-resize", title: "Music"), expiresAfter: nil)
         fixture.settings.settings.mediaCompactStyle = .detailed
         fixture.media.publishSnapshot(NowPlayingSnapshot(title: "A longer media title", artist: "Artist", album: nil,
-            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
+                                                         artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
         fixture.presenter.setStatusIcons([])
         fixture.reducesMotion = true
         fixture.settings.settings.mediaCompactStyle = .compact
@@ -1153,7 +1154,7 @@ struct SideNoticePresenterPillTests {
         fixture.queue.enqueue(IslandNotice(id: "media-active-resize", title: "Music"), expiresAfter: nil)
         fixture.settings.settings.mediaCompactStyle = .detailed
         fixture.media.publishSnapshot(NowPlayingSnapshot(title: "A longer media title", artist: "Artist", album: nil,
-            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
+                                                         artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
         fixture.presenter.setStatusIcons([])
         fixture.settings.settings.mediaCompactStyle = .compact
         fixture.presenter.setStatusIcons([])
@@ -1283,7 +1284,7 @@ struct SideNoticePresenterPillTests {
 
         var body: some View {
             MarqueeText(text, font: .system(size: 11, weight: .medium), textColor: .white,
-                repeats: false, scrollProgress: clock.progress)
+                        repeats: false, scrollProgress: clock.progress)
                 .frame(width: 168, height: 32)
                 .padding(.leading, 42)
                 .padding(.trailing, 12)
@@ -1292,11 +1293,11 @@ struct SideNoticePresenterPillTests {
     }
 
     private static let notchedScreen = ScreenSnapshot(displayID: 7,
-        frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
-        visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1056),
-        safeAreaInsets: ScreenInsets(top: 44),
-        auxiliaryTopLeftArea: CGRect(x: 20_000, y: 1056, width: 840, height: 44),
-        auxiliaryTopRightArea: CGRect(x: 20_960, y: 1056, width: 840, height: 44))
+                                                      frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
+                                                      visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1056),
+                                                      safeAreaInsets: ScreenInsets(top: 44),
+                                                      auxiliaryTopLeftArea: CGRect(x: 20_000, y: 1056, width: 840, height: 44),
+                                                      auxiliaryTopRightArea: CGRect(x: 20_960, y: 1056, width: 840, height: 44))
 
     private func activeHost(_ fixture: Fixture) throws -> NSHostingView<AppLanguageEnvironment<CompactStatusBarView>> {
         fixture.queue.enqueue(IslandNotice(id: "ai-active-initial", title: "Codex"), expiresAfter: nil)
@@ -1324,14 +1325,14 @@ struct SideNoticePresenterPillTests {
         var reducesMotion = false
         let resizeClock = ResizeClock()
         var screen = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: -1800, y: -240, width: 1800, height: 1100),
-            visibleFrame: CGRect(x: -1800, y: -240, width: 1800, height: 1076))
+                                    frame: CGRect(x: -1800, y: -240, width: 1800, height: 1100),
+                                    visibleFrame: CGRect(x: -1800, y: -240, width: 1800, height: 1076))
         lazy var presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
-            browserDownloads: downloads, settingsStore: settings, languageStore: language,
-            isScreenLocked: true, now: { [unowned self] in date }, reduceMotion: { [unowned self] in reducesMotion },
-            waitForCompactResize: { [resizeClock] in try await resizeClock.wait(for: $0) },
-            screenSnapshotProvider: { [unowned self] in [screen] })
+                                                 pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
+                                                 browserDownloads: downloads, settingsStore: settings, languageStore: language,
+                                                 isScreenLocked: true, now: { [unowned self] in date }, reduceMotion: { [unowned self] in reducesMotion },
+                                                 waitForCompactResize: { [resizeClock] in try await resizeClock.wait(for: $0) },
+                                                 screenSnapshotProvider: { [unowned self] in [screen] })
 
         init(edge: IslandEdge) throws {
             defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -1389,7 +1390,7 @@ struct SideNoticePresenterPillTests {
                 if min(color.redComponent, color.greenComponent, color.blueComponent) > 0.5 {
                     let side = x < bitmap.pixelsWide / 2 ? 0 : 1
                     bounds[side] = bounds[side].union(CGRect(x: CGFloat(x) / scale, y: CGFloat(y) / scale,
-                        width: 1 / scale, height: 1 / scale))
+                                                             width: 1 / scale, height: 1 / scale))
                 }
             }
         }
@@ -1402,7 +1403,7 @@ struct SideNoticePresenterPillTests {
             .background(.black))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.alphaValue = 0
         window.contentView = host

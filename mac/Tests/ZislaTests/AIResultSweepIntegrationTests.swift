@@ -12,7 +12,7 @@ struct AIResultSweepIntegrationTests {
         for provider in [AIProvider.workbuddy, .workbuddyAI] {
             let now = Date()
             let task = AIProgressTask(id: "ai-job", provider: provider, title: "task",
-                progress: nil, status: .succeeded, updatedAt: now)
+                                      progress: nil, status: .succeeded, updatedAt: now)
             let sweep = AIResultSweepController()
             defer { sweep.cancel() }
             sweep.receive(previous: .running, task: task, observedSince: now, settings: .default)

@@ -511,7 +511,7 @@ struct BatteryPowerModeControllerTests {
     func automaticPreflightRejectsStateChangedSinceTheReadOnlyCheck(change: String) async {
         let commands = Commands()
         commands.appendRead(source: change == "source" ? .battery : .powerAdapter,
-            preferences: Self.preferences(adapter: change == "mode" ? 1 : 0))
+                            preferences: Self.preferences(adapter: change == "mode" ? 1 : 0))
         let controller = BatteryPowerModeController(runCommand: commands.run)
         #expect(!(await controller.setMode(.highPower, expectedState: (.powerAdapter, .automatic))))
         #expect(commands.requests.filter(Self.isChangeRequest).isEmpty)
@@ -547,8 +547,8 @@ struct BatteryPowerModeControllerTests {
         let commands = Commands()
         commands.appendRead()
         commands.appendRead(source: change == "source" ? .battery : .powerAdapter,
-            highPower: change != "capability",
-            preferences: Self.preferences(adapter: change == "mode" ? 1 : 0))
+                            highPower: change != "capability",
+                            preferences: Self.preferences(adapter: change == "mode" ? 1 : 0))
         let (started, signal) = AsyncStream<Void>.makeStream()
         var resume: CheckedContinuation<Int32, Never>?
         let controller = BatteryPowerModeController(runCommand: commands.run, prepareAuthorization: {

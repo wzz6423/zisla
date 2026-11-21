@@ -31,25 +31,27 @@ enum ScreenRecordingCaptureBarGeometry {
         let size = CGSize(width: min(size.width, visibleFrame.width), height: min(size.height, visibleFrame.height))
         let center = ScreenshotToolbarLayout.clampedCenter(
             center ?? CGPoint(x: visibleFrame.midX, y: visibleFrame.minY + 80 + size.height / 2),
-            toolbarSize: size, in: visibleFrame)
+            toolbarSize: size, in: visibleFrame
+        )
         return CGRect(x: center.x - size.width / 2, y: center.y - size.height / 2,
-            width: size.width, height: size.height)
+                      width: size.width, height: size.height)
     }
 
     static func targetFrame(configuration: RecordingCaptureConfiguration, sources: [RecordingCaptureSource],
                             screenFrames: [UInt32: CGRect], primaryScreenFrame: CGRect) -> CGRect? {
         guard let source = sources.first(where: { $0.id == configuration.sourceID
-            && $0.mode == (configuration.mode == .region ? .display : configuration.mode) }) else { return nil }
+                && $0.mode == (configuration.mode == .region ? .display : configuration.mode)
+        }) else { return nil }
         if configuration.mode == .window {
             guard source.frame.isValid else { return nil }
             return CGRect(x: source.frame.x, y: primaryScreenFrame.maxY - source.frame.y - source.frame.height,
-                width: source.frame.width, height: source.frame.height)
+                          width: source.frame.width, height: source.frame.height)
         }
         guard let screen = screenFrames[source.id] else { return nil }
         if configuration.mode == .display { return screen }
         guard let region = configuration.region, region.isValid else { return nil }
         return CGRect(x: screen.minX + region.x, y: screen.maxY - region.y - region.height,
-            width: region.width, height: region.height).intersection(screen)
+                      width: region.width, height: region.height).intersection(screen)
     }
 }
 
@@ -71,12 +73,12 @@ final class ScreenRecordingCaptureBarController {
         self.model = model
         self.presentPanel = presentPanel
         panel = ScreenRecordingCapturePanel(contentRect: .zero,
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         outline = NSPanel(contentRect: .zero,
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                          styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         hostingView = NSHostingView(rootView: ScreenRecordingCaptureBar(model: model,
-            languageStore: languageStore, selectRegion: selectRegion, start: start,
-            openStudio: openStudio, cancel: cancel))
+                                                                        languageStore: languageStore, selectRegion: selectRegion, start: start,
+                                                                        openStudio: openStudio, cancel: cancel))
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -115,7 +117,7 @@ final class ScreenRecordingCaptureBarController {
         let target = screen ?? panel.screen ?? NSScreen.main
         if let target {
             panel.setFrame(ScreenRecordingCaptureBarGeometry.panelFrame(size: preferredSize,
-                in: target.visibleFrame.insetBy(dx: 12, dy: 12)), display: false)
+                                                                        in: target.visibleFrame.insetBy(dx: 12, dy: 12)), display: false)
         }
         refreshTargetOutline()
         presentPanel(panel)
@@ -143,8 +145,8 @@ final class ScreenRecordingCaptureBarController {
             ScreenshotCaptureService.displayID(for: screen).map { ($0, screen.frame) }
         })
         guard let frame = ScreenRecordingCaptureBarGeometry.targetFrame(configuration: model.configuration,
-            sources: model.capture.sources, screenFrames: screens, primaryScreenFrame: primary.frame),
-              !frame.isNull, !frame.isEmpty else {
+                                                                        sources: model.capture.sources, screenFrames: screens, primaryScreenFrame: primary.frame),
+            !frame.isNull, !frame.isEmpty else {
             outline.orderOut(nil)
             return
         }
@@ -166,8 +168,8 @@ final class ScreenRecordingCaptureBarController {
         guard isPresented else { return }
         if let screen = panel.screen ?? NSScreen.main {
             let frame = ScreenRecordingCaptureBarGeometry.panelFrame(size: preferredSize,
-                in: screen.visibleFrame.insetBy(dx: 12, dy: 12),
-                center: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
+                                                                     in: screen.visibleFrame.insetBy(dx: 12, dy: 12),
+                                                                     center: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
             if frame != panel.frame { panel.setFrame(frame, display: true) }
         }
         refreshTargetOutline()
@@ -205,7 +207,8 @@ struct ScreenRecordingCaptureBar: View {
         }
         .frame(height: ScreenshotToolbarLayout.height)
         .background(.ultraThinMaterial, in: RoundedRectangle(
-            cornerRadius: ScreenshotToolbarLayout.cornerRadius, style: .continuous))
+            cornerRadius: ScreenshotToolbarLayout.cornerRadius, style: .continuous
+        ))
         .overlay(RoundedRectangle(cornerRadius: ScreenshotToolbarLayout.cornerRadius, style: .continuous)
             .stroke(.white.opacity(ScreenshotToolbarLayout.borderOpacity), lineWidth: 1))
         .shadow(color: .black.opacity(0.12), radius: 4, y: 1)
@@ -219,7 +222,7 @@ struct ScreenRecordingCaptureBar: View {
                 dragHandle
                 Button(action: cancel) { Image(systemName: "xmark") }
                     .buttonStyle(.plain).frame(width: ScreenRecordingCaptureBarGeometry.closeButtonWidth,
-                        height: ScreenshotToolbarLayout.controlHeight)
+                                               height: ScreenshotToolbarLayout.controlHeight)
                     .help(AppLocalization.text("关闭"))
                     .accessibilityLabel(AppLocalization.text("关闭"))
                     .accessibilityIdentifier("screenRecording.closeCaptureBar")
@@ -235,7 +238,8 @@ struct ScreenRecordingCaptureBar: View {
                     .disabled(!canSelectRegion)
                 }
                 sourcePicker(width: ScreenRecordingCaptureBarGeometry.sourceWidth(
-                    availableWidth: ScreenRecordingCaptureBarGeometry.setupWidth))
+                    availableWidth: ScreenRecordingCaptureBarGeometry.setupWidth
+                ))
                 separator
                 inputButton(title: "系统音频", value: $model.configuration.systemAudio, identifier: "systemAudio") {
                     Image(systemName: model.configuration.systemAudio ? "speaker.wave.2" : "speaker.slash")
@@ -264,7 +268,7 @@ struct ScreenRecordingCaptureBar: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(AppLocalization.text("人像效果")).font(.headline)
                             ScreenRecordingPortraitControls(model: model, target: .capture,
-                                showsPortrait: model.configuration.camera, showsVoice: model.configuration.microphone)
+                                                            showsPortrait: model.configuration.camera, showsVoice: model.configuration.microphone)
                         }
                         .padding(16).frame(width: 280)
                     }
@@ -299,7 +303,7 @@ struct ScreenRecordingCaptureBar: View {
                 .font(.system(size: 14, weight: .semibold)).frame(width: 34, height: ScreenshotToolbarLayout.controlHeight)
                 .foregroundStyle(model.configuration.mode == mode ? Color.accentColor : Color.primary)
                 .background(model.configuration.mode == mode ? Color.accentColor.opacity(0.16) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 6))
+                            in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain).help(AppLocalization.text(mode.title))
         .accessibilityLabel(AppLocalization.text(mode.title))
@@ -349,13 +353,13 @@ struct ScreenRecordingCaptureBar: View {
     }
 
     private func inputButton<Content: View>(title: String, value: Binding<Bool>, identifier: String,
-                                          @ViewBuilder label: () -> Content) -> some View {
+                                            @ViewBuilder label: () -> Content) -> some View {
         Button { value.wrappedValue.toggle() } label: {
             label()
                 .font(.system(size: 13, weight: .semibold)).frame(width: 32, height: ScreenshotToolbarLayout.controlHeight)
                 .foregroundStyle(value.wrappedValue ? Color.accentColor : Color.secondary)
                 .background(value.wrappedValue ? Color.accentColor.opacity(0.12) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 5))
+                            in: RoundedRectangle(cornerRadius: 5))
         }
         .buttonStyle(.plain).help(AppLocalization.text(title))
         .accessibilityLabel(AppLocalization.text(title))
@@ -462,10 +466,10 @@ struct ScreenRecordingCaptureBar: View {
                     Button(action: model.cancelOperation) {
                         Image(systemName: "xmark").frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
                     }
-                        .buttonStyle(.plain)
-                        .help(AppLocalization.text("取消"))
-                        .accessibilityLabel(AppLocalization.text("取消"))
-                        .accessibilityIdentifier("screenRecording.cancelCapture")
+                    .buttonStyle(.plain)
+                    .help(AppLocalization.text("取消"))
+                    .accessibilityLabel(AppLocalization.text("取消"))
+                    .accessibilityIdentifier("screenRecording.cancelCapture")
                 }
             }
         }.padding(.horizontal, ScreenshotToolbarLayout.horizontalPadding).frame(height: ScreenshotToolbarLayout.height)
@@ -482,7 +486,7 @@ struct ScreenRecordingCaptureBar: View {
 
     private var dragHandle: some View {
         ScreenRecordingCaptureBarDragHandle().frame(width: ScreenRecordingCaptureBarGeometry.dragHandleWidth,
-            height: ScreenshotToolbarLayout.controlHeight)
+                                                    height: ScreenshotToolbarLayout.controlHeight)
             .help(AppLocalization.text("拖动工具栏"))
             .accessibilityLabel(AppLocalization.text("拖动工具栏"))
             .accessibilityIdentifier("screenRecording.captureBarDragHandle")
@@ -495,9 +499,8 @@ struct ScreenRecordingCaptureBar: View {
 
     private var canSelectRegion: Bool {
         ScreenRecordingCaptureBarGeometry.canSelectRegion(configuration: model.configuration,
-            sources: model.capture.sources,
-            displayIDs: NSScreen.screens.compactMap { ScreenshotCaptureService.displayID(for: $0) }
-        )
+                                                          sources: model.capture.sources,
+                                                          displayIDs: NSScreen.screens.compactMap { ScreenshotCaptureService.displayID(for: $0) })
     }
 
     private func symbol(for mode: RecordingCaptureMode) -> String {

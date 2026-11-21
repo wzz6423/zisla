@@ -63,14 +63,14 @@ struct DailyBriefingReport: Sendable {
             return DailyBriefingPowerSample(date: sampleDate, averageWatts: watts)
         }
         let accountBalance = AIAccountBalance(id: "example:claude", providers: [.claude], status: .available,
-            windows: [.init(id: "five_hour", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 82, durationSeconds: 604_800)], updatedAt: day.lastActivity)
+                                              windows: [.init(id: "five_hour", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                                                        .init(id: "weekly", kind: .weekly, remainingPercent: 82, durationSeconds: 604_800)], updatedAt: day.lastActivity)
         var report = Self(day: day, generatedAt: day.lastActivity!, typing: .init(characters: 12846, topApplication: "Xcode", peakHour: 14),
-            allDeviceSeconds: 31500, notificationCount: 87,
-            aiUsage: AIDailyModelUsage(date: start, inputTokens: 180_000, outputTokens: 32_000, models: [
-                AIModelUsage(provider: .codex, model: "gpt-6.1-sol", inputTokens: 120_000, outputTokens: 20_000),
-                AIModelUsage(provider: .claude, model: "claude-sonnet-4-5", inputTokens: 60_000, outputTokens: 12_000),
-            ]), selectedContent: selectedContent)
+                          allDeviceSeconds: 31500, notificationCount: 87,
+                          aiUsage: AIDailyModelUsage(date: start, inputTokens: 180_000, outputTokens: 32_000, models: [
+                              AIModelUsage(provider: .codex, model: "gpt-6.1-sol", inputTokens: 120_000, outputTokens: 20_000),
+                              AIModelUsage(provider: .claude, model: "claude-sonnet-4-5", inputTokens: 60_000, outputTokens: 12_000),
+                          ]), selectedContent: selectedContent)
         report.aiAccountBalances = [accountBalance]
         return report
     }
@@ -143,7 +143,7 @@ struct DailyBriefingPoster: View {
     }
     private var powerChart: DailyBriefingPowerChart {
         DailyBriefingPowerChart(samples: report.day.powerSamples, day: report.day.date, calendar: report.calendar,
-            language: language, accent: accent, ink: ink)
+                                language: language, accent: accent, ink: ink)
     }
 
     /// Suppresses empty sections so selecting a metric does not reserve blank poster space.
@@ -209,7 +209,7 @@ struct DailyBriefingPoster: View {
             }
             if displayedContent.contains(.applicationUsage) {
                 DailyBriefingApplicationChart(applications: report.day.applications, language: language,
-                    accent: accent, ink: ink, formatDuration: duration)
+                                              accent: accent, ink: ink, formatDuration: duration)
             }
             if displayedContent.contains(.aiModelUsage), let usage = report.aiUsage {
                 VStack(alignment: .leading, spacing: 18) {
@@ -402,7 +402,7 @@ struct DailyBriefingPoster: View {
             ForEach([DailyBriefingContent.workTime, .leisureTime, .otherTime].filter(displayedContent.contains)) { content in
                 if let category = content.category, let value = value(for: content) {
                     categoryRow(content.title, value: value, seconds: report.day.seconds(in: category),
-                        opacity: category == .work ? 1 : category == .leisure ? 0.65 : 0.35)
+                                opacity: category == .work ? 1 : category == .leisure ? 0.65 : 0.35)
                 }
             }
         }

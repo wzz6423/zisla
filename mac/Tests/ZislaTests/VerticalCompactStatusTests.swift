@@ -20,19 +20,20 @@ struct VerticalCompactStatusTests {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let table = try #require(NSDictionary(contentsOf: root.appendingPathComponent(
-            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
+            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
+        )) as? [String: String])
         let translation = try #require(table[key])
         #expect(translation.contains("%@"))
         #expect(AppLocalization.string(key, language: language) == translation)
         let expected = String(format: translation, locale: language.locale, "Codex")
         let presentation = CompactPillStatusPresentation(priority: .updateAvailable,
-            notice: IslandNotice(id: "update-available-cli-codex-left", title: "Codex", symbolName: "sparkles"), text: "")
+                                                         notice: IslandNotice(id: "update-available-cli-codex-left", title: "Codex", symbolName: "sparkles"), text: "")
         let host = NSHostingView(rootView: CompactPillStatusContent(presentation: presentation,
-            text: "", edge: .top, visualizationStyle: .waveform, item: nil, date: .distantPast)
-            .frame(width: 78, height: 32).background(.black).environment(\.colorScheme, .dark))
+                                                                    text: "", edge: .top, visualizationStyle: .waveform, item: nil, date: .distantPast)
+                .frame(width: 78, height: 32).background(.black).environment(\.colorScheme, .dark))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: 20000, y: 0, width: 78, height: 32),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.alphaValue = 0
         window.contentView = host
@@ -59,11 +60,11 @@ struct VerticalCompactStatusTests {
     func shortNumbersUseOneLineOfTheNaturalVerticalLength() {
         for text in ["20%", "25:00", "(1)", "[]", "12.5", "？，"] {
             let presentation = CompactPillStatusPresentation(priority: .transient,
-                notice: IslandNotice(id: "fixture", title: "fixture"), text: text)
+                                                             notice: IslandNotice(id: "fixture", title: "fixture"), text: text)
             #expect(presentation.length(thickness: 32, edge: .left) == 68,
                     "\(text) fits one 14pt row between the icon and two 12pt outer insets")
             #expect(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 32,
-                availableHeight: 14).map(\.text) == [text])
+                                                                   availableHeight: 14).map(\.text) == [text])
         }
     }
 
@@ -78,7 +79,7 @@ struct VerticalCompactStatusTests {
             #expect(!row.rotatesClockwise)
         }
         let presentation = CompactPillStatusPresentation(priority: .transient,
-            notice: IslandNotice(id: "fixture", title: "fixture"), text: "12.34567890%")
+                                                         notice: IslandNotice(id: "fixture", title: "fixture"), text: "12.34567890%")
         #expect(presentation.length(thickness: 24, edge: .left) == 46 + CGFloat(rows.count) * 14)
     }
 
@@ -173,7 +174,7 @@ struct VerticalCompactStatusTests {
                 .foregroundStyle(.white).background(.black))
             host.sizingOptions = []
             let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 20000, y: 0), size: renderSize),
-                styleMask: .borderless, backing: .buffered, defer: false)
+                                  styleMask: .borderless, backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.alphaValue = 0
             window.contentView = host
@@ -227,16 +228,17 @@ struct VerticalCompactStatusTests {
     @Test
     func liveLyricTextUsesTheSameClockForContentAndNaturalLength() throws {
         let notice = IslandNotice(id: "media-active-left", title: "Music", side: .left,
-            metadata: ["compactLyric": "旧歌词"])
+                                  metadata: ["compactLyric": "旧歌词"])
         var settings = FeatureSettings(islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom, edge: .left))
+                                       islandPlacement: IslandPlacement(mode: .custom, edge: .left))
         settings.mediaCompactStyle = .detailed
         let presentation = try #require(SideNoticeLayoutEngine().compactBarSizing(
-            for: [notice], settings: settings)?.customPillPresentation)
+            for: [notice], settings: settings
+        )?.customPillPresentation)
         let date = Date(timeIntervalSince1970: 100)
         let item = NowPlayingSnapshot(title: "fixture", artist: "artist", album: nil, artworkData: nil,
-            duration: 60, elapsedTime: 0, timestamp: date, isPlaying: true,
-            lyrics: SyncedLyrics(lines: [.init(time: 0, text: "短"), .init(time: 10, text: "长一些的歌词")]))
+                                      duration: 60, elapsedTime: 0, timestamp: date, isPlaying: true,
+                                      lyrics: SyncedLyrics(lines: [.init(time: 0, text: "短"), .init(time: 10, text: "长一些的歌词")]))
         let first = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date)
         let next = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date.addingTimeInterval(10))
         #expect(first == "短" && next == "长一些的歌词")
@@ -246,7 +248,7 @@ struct VerticalCompactStatusTests {
         var paused = item
         paused.isPlaying = false
         #expect(CompactPillStatusContent.displayText(for: presentation, settings: settings, item: paused,
-            at: date.addingTimeInterval(20)) == "短")
+                                                     at: date.addingTimeInterval(20)) == "短")
         settings.mediaShowLyricsAndInfo = false
         #expect(CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date) == "旧歌词")
         #expect(CompactPillStatusContent.displayText(for: presentation, settings: settings, item: nil, at: date) == "旧歌词")
@@ -264,7 +266,7 @@ struct VerticalCompactStatusTests {
             IslandNotice(id: "focus-transition-left", title: "状态", detail: "已保存", symbolName: "exclamationmark.triangle.fill"),
         ]
         var settings = FeatureSettings(islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                                       islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         settings.mailCompactStyle = .detailed
         let suiteName = "CompactStatusControls.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -272,14 +274,15 @@ struct VerticalCompactStatusTests {
         let pomodoro = PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults)
         for notice in symbolNotices {
             let presentation = try #require(SideNoticeLayoutEngine().compactBarSizing(
-                for: [notice], settings: settings)?.customPillPresentation)
+                for: [notice], settings: settings
+            )?.customPillPresentation)
             let length = presentation.length(thickness: 32, edge: edge)
             let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
             let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-                text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
-                .environmentObject(pomodoro)
-                .frame(width: size.width, height: size.height)
-                .background(.black))
+                                                                           text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
+                    .environmentObject(pomodoro)
+                    .frame(width: size.width, height: size.height)
+                    .background(.black))
             renderer.scale = 2
             let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
             #expect(bitmap.pixelsWide == Int(size.width * 2) && bitmap.pixelsHigh == Int(size.height * 2))
@@ -316,22 +319,22 @@ struct VerticalCompactStatusTests {
     func aiCountsAndMediaContentLeaveClearSpaceAtTheEnd(edge: IslandEdge) throws {
         let presentations = [
             CompactPillStatusPresentation(priority: .aiActivity,
-                notice: IslandNotice(id: "ai-active-openai", title: "AI"), text: "2"),
+                                          notice: IslandNotice(id: "ai-active-openai", title: "AI"), text: "2"),
             CompactPillStatusPresentation(priority: .aiActivity,
-                notice: IslandNotice(id: "ai-active-openai", title: "AI"), text: "999+"),
+                                          notice: IslandNotice(id: "ai-active-openai", title: "AI"), text: "999+"),
             CompactPillStatusPresentation(priority: .media,
-                notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "爱的期限"),
+                                          notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "爱的期限"),
             CompactPillStatusPresentation(priority: .media,
-                notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "爱的期限", showsWaveform: true),
+                                          notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "爱的期限", showsWaveform: true),
             CompactPillStatusPresentation(priority: .media,
-                notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "", showsWaveform: true),
+                                          notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "", showsWaveform: true),
         ]
         for presentation in presentations {
             let length = presentation.length(thickness: 32, edge: edge)
             let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
             let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-                text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
-                .frame(width: size.width, height: size.height).background(.black))
+                                                                           text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
+                    .frame(width: size.width, height: size.height).background(.black))
             renderer.scale = 2
             let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
             let axisLength = edge.isVertical ? bitmap.pixelsHigh : bitmap.pixelsWide
@@ -365,11 +368,11 @@ struct VerticalCompactStatusTests {
         let notice = IslandNotice(id: "media-active-insets", title: "Music", artworkData: data)
         let presentation = CompactPillStatusPresentation(priority: .media, notice: notice, text: "", showsWaveform: true)
         let item = NowPlayingSnapshot(title: "fixture", artist: "fixture", album: nil, artworkData: data,
-            duration: 60, elapsedTime: 0, timestamp: .distantPast, isPlaying: false)
+                                      duration: 60, elapsedTime: 0, timestamp: .distantPast, isPlaying: false)
         let length = presentation.length(thickness: 32, edge: edge)
         let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-            text: "", edge: edge, visualizationStyle: .waveform, item: item, date: .now)
-            .frame(width: length, height: 32).background(.black))
+                                                                       text: "", edge: edge, visualizationStyle: .waveform, item: item, date: .now)
+                .frame(width: length, height: 32).background(.black))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         var occupiedColumns: [Int] = []
@@ -399,13 +402,13 @@ struct VerticalCompactStatusTests {
         }
         let data = try #require(icon.tiffRepresentation)
         let presentation = CompactPillStatusPresentation(priority: .mail,
-            notice: IslandNotice(id: "mail-fixture", title: "fixture", artworkData: data), text: "字字字字")
+                                                         notice: IslandNotice(id: "mail-fixture", title: "fixture", artworkData: data), text: "字字字字")
         let length = presentation.length(thickness: 32, edge: edge)
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-            text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
-            .environment(\.layoutDirection, .leftToRight)
-            .frame(width: size.width, height: size.height).background(.black))
+                                                                       text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
+                .environment(\.layoutDirection, .leftToRight)
+                .frame(width: size.width, height: size.height).background(.black))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         var iconBounds = CGRect.null
@@ -446,14 +449,14 @@ struct VerticalCompactStatusTests {
             return true
         }
         let presentation = CompactPillStatusPresentation(priority: .mail,
-            notice: IslandNotice(id: "mail-insets", title: "fixture", artworkData: try #require(icon.tiffRepresentation)),
-            text: "")
+                                                         notice: IslandNotice(id: "mail-insets", title: "fixture", artworkData: try #require(icon.tiffRepresentation)),
+                                                         text: "")
         let length = presentation.length(thickness: thickness, edge: edge)
         #expect(length == thickness - 8 + 24, "An empty status reserves its actual icon and two 12pt insets")
         let size = edge.isVertical ? CGSize(width: thickness, height: length) : CGSize(width: length, height: thickness)
         let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-            text: "", edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
-            .frame(width: size.width, height: size.height).background(.black))
+                                                                       text: "", edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
+                .frame(width: size.width, height: size.height).background(.black))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         var bounds = CGRect.null

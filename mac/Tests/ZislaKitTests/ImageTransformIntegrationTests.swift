@@ -8,11 +8,11 @@ import UniformTypeIdentifiers
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_IMAGE_TOOLS_INTEGRATION"] == "1"))
 struct ImageTransformIntegrationTests {
     #if arch(arm64)
-    private let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/opt/homebrew/bin/vips"),
-                                                avifExecutableURL: URL(fileURLWithPath: "/opt/homebrew/bin/avifenc"))
+        private let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/opt/homebrew/bin/vips"),
+                                                     avifExecutableURL: URL(fileURLWithPath: "/opt/homebrew/bin/avifenc"))
     #else
-    private let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/usr/local/bin/vips"),
-                                                avifExecutableURL: URL(fileURLWithPath: "/usr/local/bin/avifenc"))
+        private let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/usr/local/bin/vips"),
+                                                     avifExecutableURL: URL(fileURLWithPath: "/usr/local/bin/avifenc"))
     #endif
 
     @Test(arguments: Array(0..<16))
@@ -110,13 +110,13 @@ struct ImageTransformIntegrationTests {
         defer { fixture.remove() }
         let source = try fixture.png(width: 40, height: 20, delays: [0.08, 0.25])
         let batch = try await service.process([source], options: .init(formats: [format], quality: 100,
-            transform: .init(rotation: .clockwise270, flipVertical: true)))
+                                                                       transform: .init(rotation: .clockwise270, flipVertical: true)))
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.failures.isEmpty, "\(batch.failures)")
         let output = try #require(batch.items.first?.outputs.first)
         #expect(output.summary.width == 20 && output.summary.height == 40 && output.summary.frameCount == 2)
         let restored = try await service.process([output.url], options: .init(formats: [.png], quality: 100,
-            transform: .init(rotation: .halfTurn, flipHorizontal: true)))
+                                                                              transform: .init(rotation: .halfTurn, flipHorizontal: true)))
         defer { try? FileManager.default.removeItem(at: restored.directoryURL) }
         #expect(restored.failures.isEmpty, "\(restored.failures)")
         let restoredOutput = try #require(restored.items.first?.outputs.first)
@@ -173,7 +173,7 @@ struct ImageTransformIntegrationTests {
     }
 
     @Test(arguments: [[ImageOutputFormat](), [.jpeg], [.png, .jpeg, .png, .webp], ImageOutputFormat.conversionFormats],
-        [ImageTransformOptions.identity, .init(rotation: .clockwise90, flipHorizontal: true)])
+          [ImageTransformOptions.identity, .init(rotation: .clockwise90, flipHorizontal: true)])
     func rasterEditsHonorExplicitFormatsAndPreserveTransparencyOrJPEGBackground(formats: [ImageOutputFormat], transformation: ImageTransformOptions) async throws {
         let fixture = try ImageProcessingServiceTests.Fixture()
         defer { fixture.remove() }
@@ -183,7 +183,7 @@ struct ImageTransformIntegrationTests {
         let replacement = try await service.loadRasterImage(fixture.png(name: "replacement.png", width: 80, height: 40))
         let expected = try transformed(replacement, options: transformation)
         let batch = try await service.process([source], options: .init(formats: formats, quality: 100,
-            background: "#FF0000", transform: transformation), rasterTransform: { _, url in
+                                                                       background: "#FF0000", transform: transformation), rasterTransform: { _, url in
                 #expect(url == source)
                 return replacement
             })
@@ -203,7 +203,7 @@ struct ImageTransformIntegrationTests {
             let bytes = try ImageTransformTests.Pixels.bytes(loaded)
             if output.format == .jpeg {
                 #expect(bytes[0] > 220 && bytes[1] < 40 && bytes[2] < 40 && bytes[3] == 255,
-                    "JPEG must composite edited transparency against the selected red background")
+                        "JPEG must composite edited transparency against the selected red background")
             } else {
                 #expect(bytes[3] == 0, "\(output.format.displayName) must retain the transparent edited border")
                 if output.format == .png { try expectPixels(loaded, expected: expected) }
@@ -221,7 +221,7 @@ struct ImageTransformIntegrationTests {
         let svg = "<svg xmlns='http://www.w3.org/2000/svg' width='30' height='20'><rect x='1' y='2' width='8' height='9' fill='red'/></svg>"
         try Data(svg.utf8).write(to: source)
         let batch = try await service.process([source], options: .init(formats: formats, quality: 100),
-            rasterTransform: { image, _ in image })
+                                              rasterTransform: { image, _ in image })
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         let targets = formats.isEmpty ? [ImageOutputFormat.png] : Array(Set(formats)).filter { $0 != .svg }.sorted { $0.rawValue < $1.rawValue }
         #expect((batch.items.first?.outputs.map(\.format) ?? []) == targets)

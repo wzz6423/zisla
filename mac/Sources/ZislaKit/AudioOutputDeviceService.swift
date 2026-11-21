@@ -344,10 +344,10 @@ public final class AudioOutputDeviceService: ObservableObject {
 
         if publishConnection,
            let connectionDevice = Self.connectionCandidate(
-                previousDevice: previousDevice,
-                currentDevice: currentDevice,
-                previousHeadphoneDeviceIDs: previousHeadphoneDeviceIDs,
-                updatedDevices: updatedDevices
+               previousDevice: previousDevice,
+               currentDevice: currentDevice,
+               previousHeadphoneDeviceIDs: previousHeadphoneDeviceIDs,
+               updatedDevices: updatedDevices
            ) {
             connectionGeneration &+= 1
             pendingConnectionDevice = connectionDevice

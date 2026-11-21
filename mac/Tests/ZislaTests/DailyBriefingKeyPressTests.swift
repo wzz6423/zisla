@@ -8,10 +8,10 @@ struct DailyBriefingKeyPressTests {
         defaults.set(false, forKey: "enabled")
         defaults.set(false, forKey: "typingStatsEnabled")
         return KeyboardAppModel(settings: AppSettings(defaults: defaults),
-            permission: InputMonitoringPermissionManager(defaults: defaults),
-            soundPackLibrary: SoundPackLibrary(rootURL: directory.appendingPathComponent("packs"), bundledPackRootURL: nil),
-            typingStats: TypingStatsModel(persistence: TypingStatsStore(databaseURL: directory.appendingPathComponent("stats.sqlite3"))),
-            startsServices: false)
+                                permission: InputMonitoringPermissionManager(defaults: defaults),
+                                soundPackLibrary: SoundPackLibrary(rootURL: directory.appendingPathComponent("packs"), bundledPackRootURL: nil),
+                                typingStats: TypingStatsModel(persistence: TypingStatsStore(databaseURL: directory.appendingPathComponent("stats.sqlite3"))),
+                                startsServices: false)
     }
 
     @Test

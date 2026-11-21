@@ -22,7 +22,7 @@ final class RecordingPlaybackInstruction: NSObject, AVVideoCompositionInstructio
         timeline = media.timeline
         voiceMedia = media.voiceMedia
         timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: timeline.duration,
-                                                            preferredTimescale: 60_000))
+                                                               preferredTimescale: 60_000))
         screenTrackID = media.video.track.trackID
         self.cameraTrackID = cameraTrackID
         requiredSourceTrackIDs = ([screenTrackID] + [cameraTrackID].compactMap { $0 }).map { NSNumber(value: $0) }
@@ -64,9 +64,10 @@ final class RecordingPlaybackCompositor: NSObject, AVVideoCompositing, @unchecke
                 let renderer = instruction.renderer
                 let image = try renderer.render(
                     screen: CIImage(cvPixelBuffer: screen).transformed(by: instruction.screenTransform),
-                    camera: camera, sourceTime: slice.sourceTime(at: request.compositionTime.seconds), slice: slice)
+                    camera: camera, sourceTime: slice.sourceTime(at: request.compositionTime.seconds), slice: slice
+                )
                 renderer.context.render(image, to: output, bounds: renderer.canvas,
-                    colorSpace: renderer.preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
+                                        colorSpace: renderer.preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
                 request.finish(withComposedVideoFrame: output)
             } catch { request.finish(with: error) }
         }
@@ -88,7 +89,7 @@ final class RecordingMultitrackPlaybackInstruction: NSObject, AVVideoComposition
         requiredSourceTrackIDs = (media.videoTracks.map(\.trackID) + [media.playbackClockTrackID].compactMap { $0 })
             .map { NSNumber(value: $0) }
         renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size,
-            preservesHDR: media.preservesHDR)
+                                                   preservesHDR: media.preservesHDR)
     }
 }
 
@@ -123,7 +124,7 @@ final class RecordingMultitrackPlaybackCompositor: NSObject, AVVideoCompositing,
                 let renderer = instruction.renderer
                 let image = try renderer.render(frames: frames, at: time.seconds)
                 renderer.context.render(image, to: output, bounds: renderer.canvas,
-                    colorSpace: renderer.preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
+                                        colorSpace: renderer.preservesHDR ? RecordingHDR.colorSpace : CGColorSpace(name: CGColorSpace.sRGB))
                 request.finish(withComposedVideoFrame: output)
             } catch { request.finish(with: error) }
         }

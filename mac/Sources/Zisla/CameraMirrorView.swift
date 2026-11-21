@@ -129,8 +129,8 @@ private final class CameraPreviewNSView: NSView {
 @MainActor
 private final class CameraMirrorController: ObservableObject {
     enum FailureReason: Equatable {
-        case denied      // user denied, or previously denied
-        case restricted  // parental controls / MDM policy
+        case denied // user denied, or previously denied
+        case restricted // parental controls / MDM policy
         case unavailable // no camera found
         case configuration // failed to open device or configure session
 

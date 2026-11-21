@@ -48,6 +48,24 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         run: ruby .github/scripts/validate-skills.rb
 
+      - name: Check Swift formatting
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          SWIFTFORMAT_VERSION: 0.64.7
+          SWIFTFORMAT_SHA256: 819aea026e1c630f46b234ed84481e56d9eb3cfe7024cd51b1af55169c8e13bb
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/swiftformat.zip"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --output "$archive" \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat_linux.zip"
+          printf '%s  %s\n' "$SWIFTFORMAT_SHA256" "$archive" | sha256sum --check -
+          unzip -q "$archive" -d "$RUNNER_TEMP" swiftformat_linux
+          "$RUNNER_TEMP/swiftformat_linux" mac --config .swiftformat --cache ignore --lint
+      - name: Remove SwiftFormat artifacts
+        if: always()
+        run: rm -f "$RUNNER_TEMP/swiftformat_linux" "$RUNNER_TEMP/swiftformat.zip"
+
       - name: Run actionlint
         if: steps.gate.outputs.skip != 'true'
         env:

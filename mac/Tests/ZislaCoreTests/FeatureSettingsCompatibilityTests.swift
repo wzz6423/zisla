@@ -37,7 +37,7 @@ struct FeatureSettingsCompatibilityTests {
     func combinedMonitorRejectsInvalidSystemToggleValues(value: String) {
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(FeatureSettings.self,
-                from: Data("{\"systemMonitorEnabled\":\(value)}".utf8))
+                                     from: Data("{\"systemMonitorEnabled\":\(value)}".utf8))
         }
     }
 
@@ -811,7 +811,6 @@ struct FeatureSettingsCompatibilityTests {
         )
         #expect(decoded.quickNotesEnabled == false)
     }
-
 
     @Test
     func voiceRecordingRetentionDefaultsAndRoundTrips() throws {
@@ -1737,146 +1736,146 @@ struct FeatureSettingsCompatibilityTests {
     }
 }
 
-    @Test
-    func voiceLexiconClassicalPoetryTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.classicalPoetry]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconClassicalPoetryTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.classicalPoetry]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("唐诗"))
-        #expect(terms.contains("李白"))
-        #expect(contextualTerms.contains("唐诗"))
-        #expect(contextualTerms.contains("李白"))
-    }
+    #expect(terms.contains("唐诗"))
+    #expect(terms.contains("李白"))
+    #expect(contextualTerms.contains("唐诗"))
+    #expect(contextualTerms.contains("李白"))
+}
 
-    @Test
-    func voiceLexiconInternetBuzzwordsTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.internetBuzzwords]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconInternetBuzzwordsTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.internetBuzzwords]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("YYDS"))
-        #expect(terms.contains("破防"))
-        #expect(contextualTerms.contains("YYDS"))
-        #expect(contextualTerms.contains("破防"))
-    }
+    #expect(terms.contains("YYDS"))
+    #expect(terms.contains("破防"))
+    #expect(contextualTerms.contains("YYDS"))
+    #expect(contextualTerms.contains("破防"))
+}
 
-    @Test
-    func voiceLexiconPeopleAndPlacesTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.peopleAndPlaces]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconPeopleAndPlacesTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.peopleAndPlaces]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("北京"))
-        #expect(terms.contains("马云"))
-        #expect(contextualTerms.contains("北京"))
-        #expect(contextualTerms.contains("马云"))
-    }
+    #expect(terms.contains("北京"))
+    #expect(terms.contains("马云"))
+    #expect(contextualTerms.contains("北京"))
+    #expect(contextualTerms.contains("马云"))
+}
 
-    @Test
-    func voiceLexiconBrandsAndProductsTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.brandsAndProducts]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconBrandsAndProductsTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.brandsAndProducts]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("iPhone"))
-        #expect(terms.contains("ChatGPT"))
-        #expect(contextualTerms.contains("iPhone"))
-        #expect(contextualTerms.contains("ChatGPT"))
-    }
+    #expect(terms.contains("iPhone"))
+    #expect(terms.contains("ChatGPT"))
+    #expect(contextualTerms.contains("iPhone"))
+    #expect(contextualTerms.contains("ChatGPT"))
+}
 
-    @Test
-    func voiceLexiconMedicineAndHealthTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.medicineAndHealth]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconMedicineAndHealthTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.medicineAndHealth]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("新冠"))
-        #expect(terms.contains("布洛芬"))
-        #expect(contextualTerms.contains("新冠"))
-        #expect(contextualTerms.contains("布洛芬"))
-    }
+    #expect(terms.contains("新冠"))
+    #expect(terms.contains("布洛芬"))
+    #expect(contextualTerms.contains("新冠"))
+    #expect(contextualTerms.contains("布洛芬"))
+}
 
-    @Test
-    func voiceLexiconLawAndGovernmentTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.lawAndGovernment]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconLawAndGovernmentTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.lawAndGovernment]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("民法典"))
-        #expect(terms.contains("知识产权"))
-        #expect(contextualTerms.contains("民法典"))
-        #expect(contextualTerms.contains("知识产权"))
-    }
+    #expect(terms.contains("民法典"))
+    #expect(terms.contains("知识产权"))
+    #expect(contextualTerms.contains("民法典"))
+    #expect(contextualTerms.contains("知识产权"))
+}
 
-    @Test
-    func voiceLexiconFinanceAndBusinessTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.financeAndBusiness]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconFinanceAndBusinessTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.financeAndBusiness]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("股票"))
-        #expect(terms.contains("市盈率"))
-        #expect(contextualTerms.contains("股票"))
-        #expect(contextualTerms.contains("市盈率"))
-    }
+    #expect(terms.contains("股票"))
+    #expect(terms.contains("市盈率"))
+    #expect(contextualTerms.contains("股票"))
+    #expect(contextualTerms.contains("市盈率"))
+}
 
-    @Test
-    func voiceLexiconEducationAndResearchTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.educationAndResearch]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconEducationAndResearchTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.educationAndResearch]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("论文"))
-        #expect(terms.contains("自然语言处理"))
-        #expect(contextualTerms.contains("论文"))
-        #expect(contextualTerms.contains("自然语言处理"))
-    }
+    #expect(terms.contains("论文"))
+    #expect(terms.contains("自然语言处理"))
+    #expect(contextualTerms.contains("论文"))
+    #expect(contextualTerms.contains("自然语言处理"))
+}
 
-    @Test
-    func voiceLexiconFilmAndMusicTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.filmAndMusic]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconFilmAndMusicTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.filmAndMusic]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("周杰伦"))
-        #expect(terms.contains("三体"))
-        #expect(contextualTerms.contains("周杰伦"))
-        #expect(contextualTerms.contains("三体"))
-    }
+    #expect(terms.contains("周杰伦"))
+    #expect(terms.contains("三体"))
+    #expect(contextualTerms.contains("周杰伦"))
+    #expect(contextualTerms.contains("三体"))
+}
 
-    @Test
-    func voiceLexiconGamesAndAnimeTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.gamesAndAnime]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconGamesAndAnimeTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.gamesAndAnime]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("原神"))
-        #expect(terms.contains("黑神话：悟空"))
-        #expect(contextualTerms.contains("原神"))
-        #expect(contextualTerms.contains("黑神话：悟空"))
-    }
+    #expect(terms.contains("原神"))
+    #expect(terms.contains("黑神话：悟空"))
+    #expect(contextualTerms.contains("原神"))
+    #expect(contextualTerms.contains("黑神话：悟空"))
+}
 
-    @Test
-    func voiceLexiconTravelAndTransportTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.travelAndTransport]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconTravelAndTransportTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.travelAndTransport]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("高铁"))
-        #expect(terms.contains("高德地图"))
-        #expect(contextualTerms.contains("高铁"))
-        #expect(contextualTerms.contains("高德地图"))
-    }
+    #expect(terms.contains("高铁"))
+    #expect(terms.contains("高德地图"))
+    #expect(contextualTerms.contains("高铁"))
+    #expect(contextualTerms.contains("高德地图"))
+}
 
-    @Test
-    func voiceLexiconDailyLifeTermsAppearWhenEnabled() {
-        let enabled: Set<VoiceLexicon> = [.dailyLife]
-        let terms = VoiceLexicon.terms(for: enabled)
-        let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
+@Test
+func voiceLexiconDailyLifeTermsAppearWhenEnabled() {
+    let enabled: Set<VoiceLexicon> = [.dailyLife]
+    let terms = VoiceLexicon.terms(for: enabled)
+    let contextualTerms = VoiceLexicon.contextualTerms(for: enabled)
 
-        #expect(terms.contains("外卖"))
-        #expect(terms.contains("奶茶"))
-        #expect(contextualTerms.contains("外卖"))
-        #expect(contextualTerms.contains("奶茶"))
-    }
+    #expect(terms.contains("外卖"))
+    #expect(terms.contains("奶茶"))
+    #expect(contextualTerms.contains("外卖"))
+    #expect(contextualTerms.contains("奶茶"))
+}

@@ -301,8 +301,8 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
                                                                    width: width, height: height, systemAudio: configuration.systemAudio,
                                                                    frameRate: configuration.frameRate, finishQueue: queue,
                                                                    finishTimeout: finishTimeout, onFailure: { [weak self] error in
-                    self?.fail(error)
-                })
+                                                                       self?.fail(error)
+                                                                   })
             }
         }
         let retimed = try ScreenRecordingCaptureRetimer.copy(sample.buffer, presentationTime: presentationTime)
@@ -326,9 +326,9 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
                 if let factory { rawAssets[key] = try factory(files.url(for: name), key, retimed) }
                 else {
                     rawAssets[key] = try ScreenRecordingNativeAssetWriter(url: files.url(for: name), kind: key,
-                        firstSample: retimed, width: width, height: height, systemAudio: false,
-                        frameRate: configuration.frameRate, finishQueue: queue, finishTimeout: finishTimeout,
-                        onFailure: { [weak self] in self?.fail($0) })
+                                                                          firstSample: retimed, width: width, height: height, systemAudio: false,
+                                                                          frameRate: configuration.frameRate, finishQueue: queue, finishTimeout: finishTimeout,
+                                                                          onFailure: { [weak self] in self?.fail($0) })
                 }
             }
             guard try rawAssets[key]!.append(retimed, kind: sample.kind) else {
@@ -376,18 +376,18 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         let image = try portrait.apply(CIImage(cvPixelBuffer: source), effects: configuration.portraitEffects,
-            sourceTime: sample.presentationTimeStamp.seconds)
+                                       sourceTime: sample.presentationTimeStamp.seconds)
         imageContext.render(image, to: output, bounds: .init(x: 0, y: 0, width: width, height: height),
-            colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                            colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
         CVBufferPropagateAttachments(source, output)
         var format: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: output,
-            formatDescriptionOut: &format) == noErr, let format else { throw ScreenRecordingCaptureError.writerUnavailable }
+                                                           formatDescriptionOut: &format) == noErr, let format else { throw ScreenRecordingCaptureError.writerUnavailable }
         var timing = CMSampleTimingInfo(duration: sample.duration, presentationTimeStamp: sample.presentationTimeStamp,
-            decodeTimeStamp: sample.decodeTimeStamp)
+                                        decodeTimeStamp: sample.decodeTimeStamp)
         var result: CMSampleBuffer?
         guard CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: output,
-            formatDescription: format, sampleTiming: &timing, sampleBufferOut: &result) == noErr, let result else {
+                                                       formatDescription: format, sampleTiming: &timing, sampleBufferOut: &result) == noErr, let result else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         CMPropagateAttachments(sample, destination: result)
@@ -486,7 +486,7 @@ final class ScreenRecordingNativeAssetWriter: ScreenRecordingCaptureAssetWriter,
             ]
             if preservesHDR { settings[AVVideoColorPropertiesKey] = RecordingHDR.colorProperties }
             let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings,
-                sourceFormatHint: CMSampleBufferGetFormatDescription(firstSample))
+                                           sourceFormatHint: CMSampleBufferGetFormatDescription(firstSample))
             input.expectsMediaDataInRealTime = true
             guard asset.canAdd(input) else { throw ScreenRecordingCaptureError.writerUnavailable }
             asset.add(input)
@@ -667,9 +667,9 @@ final class ScreenRecordingCaptureAudioMixer {
         source.frameLength = frames
         output.frameLength = frames
         guard CMSampleBufferCopyPCMDataIntoAudioBufferList(sample, at: 0, frameCount: Int32(frames),
-                                                          into: source.mutableAudioBufferList) == noErr,
-              AudioConverterConvertComplexBuffer(converter, frames, source.audioBufferList,
-                                                  output.mutableAudioBufferList) == noErr else {
+                                                           into: source.mutableAudioBufferList) == noErr,
+            AudioConverterConvertComplexBuffer(converter, frames, source.audioBufferList,
+                                               output.mutableAudioBufferList) == noErr else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         var timing = CMSampleTimingInfo()
@@ -682,8 +682,8 @@ final class ScreenRecordingCaptureAudioMixer {
                                         sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &result) == noErr,
               let result,
               CMSampleBufferSetDataBufferFromAudioBufferList(result, blockBufferAllocator: kCFAllocatorDefault,
-                                                            blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0,
-                                                            bufferList: output.audioBufferList) == noErr else {
+                                                             blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0,
+                                                             bufferList: output.audioBufferList) == noErr else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         return result

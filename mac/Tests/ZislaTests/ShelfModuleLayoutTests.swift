@@ -174,7 +174,7 @@ struct ShelfItemInteractionTests {
             }
             let dragging = try #require(draggingView(in: host))
             let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
-                timestamp: 0, windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+                                                        timestamp: 0, windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
             let menu = try #require(dragging.menu(for: event))
             let index = try #require(menu.items.firstIndex { $0.title == AppLocalization.text("移除") })
             menu.performActionForItem(at: index)

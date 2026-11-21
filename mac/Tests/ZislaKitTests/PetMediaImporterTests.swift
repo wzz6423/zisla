@@ -94,7 +94,7 @@ struct PetMediaImporterTests {
         let entry = try await PetMediaImporter.importPet(from: fixture.image(), name: "Linked", directory: owned)
         try FileManager.default.createDirectory(at: fixture.pets, withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(at: fixture.pets.appendingPathComponent(entry.id),
-            withDestinationURL: owned.appendingPathComponent(entry.id))
+                                                   withDestinationURL: owned.appendingPathComponent(entry.id))
         #expect(PetLibrary.entry(for: entry.id, userPetsDirectory: fixture.pets) == nil)
         #expect(PetLibrary.loadSprite(for: entry.id, userPetsDirectory: fixture.pets) == nil)
     }
@@ -302,7 +302,7 @@ struct PetMediaImporterTests {
             let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, count, nil))
             for index in 0..<count {
                 let context = try #require(CGContext(data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
-                    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                     space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
                 context.setFillColor(index == 0 ? NSColor.red.cgColor : NSColor.blue.cgColor)
                 context.fill(CGRect(x: 4, y: 4, width: 248, height: 120))
                 let properties: [CFString: Any] = delays.isEmpty ? [:] : [

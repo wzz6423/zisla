@@ -25,7 +25,7 @@ struct RecordingExportEffectTrack {
             for click in clicks where automatic.last.map({ click.time >= $0.time + $0.duration }) ?? true {
                 let start = max(0, click.time - 0.4)
                 automatic.append(RecordingZoom(time: start, duration: min(2.4, project.duration - start),
-                                                scale: 1.8, x: click.x, y: click.y))
+                                               scale: 1.8, x: click.x, y: click.y))
             }
         }
         automaticZooms = automatic
@@ -110,7 +110,7 @@ final class RecordingExportRenderer {
         effects = RecordingExportEffectTrack(project: project)
         canvas = CGRect(origin: .zero, size: size)
         self.context = context ?? CIContext(options: [.cacheIntermediates: false, .workingColorSpace:
-            CGColorSpace(name: preservesHDR ? CGColorSpace.extendedLinearSRGB : CGColorSpace.sRGB)!])
+                CGColorSpace(name: preservesHDR ? CGColorSpace.extendedLinearSRGB : CGColorSpace.sRGB)!])
         sourceCrop = project.edits.crop ?? RecordingRect(x: 0, y: 0, width: 1, height: 1)
         let shortSide = min(size.width, size.height)
         let padding = project.edits.background == .none && project.edits.backgroundColor == nil ? 0 : shortSide * project.edits.padding
@@ -158,8 +158,8 @@ final class RecordingExportRenderer {
         if project.edits.effectiveCameraBorder {
             let width = min(side, cameraHeight) * 0.01
             let inner = try Self.mask(rect: cameraRect.insetBy(dx: width, dy: width),
-                radius: max(0, min(side, cameraHeight) * project.edits.effectiveCameraCornerRadius - width),
-                canvas: canvas)
+                                      radius: max(0, min(side, cameraHeight) * project.edits.effectiveCameraCornerRadius - width),
+                                      canvas: canvas)
             cameraBorder = cameraMask.applyingFilter("CISourceOutCompositing", parameters: [kCIInputBackgroundImageKey: inner])
                 .applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.8)])
         } else { cameraBorder = nil }
@@ -205,8 +205,8 @@ final class RecordingExportRenderer {
         var visible = normalized.cropped(to: viewport)
         if project.edits.showCursor, project.edits.cursorTrail == true,
            let trail = try Self.trailImage(effects.trail(at: sourceTime, slice: slice), sourceTime: sourceTime,
-                source: normalized.extent.size, viewport: viewport, screen: screenRect, fill: screenRect == canvas,
-                lineWidth: cursor.extent.height * 0.08, color: project.edits.effectiveCursorTrailColor) {
+                                           source: normalized.extent.size, viewport: viewport, screen: screenRect, fill: screenRect == canvas,
+                                           lineWidth: cursor.extent.height * 0.08, color: project.edits.effectiveCursorTrailColor) {
             visible = trail.composited(over: visible).cropped(to: viewport)
         }
         if project.edits.clickEffects {
@@ -282,8 +282,8 @@ final class RecordingExportRenderer {
         let scale = fill ? max(scaleX, scaleY) : min(scaleX, scaleY)
         // Keep the fractional viewport in one transform because Core Image rounds intermediate extents outward.
         return CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
-                                          tx: rect.midX - source.midX * scale,
-                                          ty: rect.midY - source.midY * scale)
+                                 tx: rect.midX - source.midX * scale,
+                                 ty: rect.midY - source.midY * scale)
     }
 
     private static func masked(_ image: CIImage, mask: CIImage, canvas: CGRect) -> CIImage {
@@ -344,15 +344,15 @@ final class RecordingExportRenderer {
     }
 
     private static func clickImage(center: CGPoint, radius: Double, opacity: Double,
-                                    rightClick: Bool) throws -> CIImage {
+                                   rightClick: Bool) throws -> CIImage {
         let side = ceil(radius * 2 + 4)
         let context = try bitmap(size: CGSize(width: side, height: side))
         context.setStrokeColor(CGColor(red: rightClick ? 1 : 0.2, green: rightClick ? 0.7 : 0.75,
-                                      blue: rightClick ? 0.2 : 1, alpha: opacity))
+                                       blue: rightClick ? 0.2 : 1, alpha: opacity))
         context.setLineWidth(max(1.5, radius * 0.08))
         context.strokeEllipse(in: CGRect(x: 2, y: 2, width: side - 4, height: side - 4))
         return try bitmapImage(context).transformed(by: CGAffineTransform(translationX: center.x - side / 2,
-                                                                         y: center.y - side / 2))
+                                                                          y: center.y - side / 2))
     }
 
     private static func trailImage(_ samples: [RecordingPointer], sourceTime: Double, source: CGSize,
@@ -384,10 +384,10 @@ final class RecordingExportRenderer {
                 let fraction = Double(step) / 2
                 let inverse = 1 - fraction
                 let to = CGPoint(x: inverse * inverse * start.x + 2 * inverse * fraction * point.x + fraction * fraction * end.x,
-                    y: inverse * inverse * start.y + 2 * inverse * fraction * point.y + fraction * fraction * end.y)
+                                 y: inverse * inverse * start.y + 2 * inverse * fraction * point.y + fraction * fraction * end.y)
                 let previousFraction = Double(step - 1) / 2
                 let control = CGPoint(x: from.x + ((1 - previousFraction) * (point.x - start.x) + previousFraction * (end.x - point.x)) / 2,
-                    y: from.y + ((1 - previousFraction) * (point.y - start.y) + previousFraction * (end.y - point.y)) / 2)
+                                      y: from.y + ((1 - previousFraction) * (point.y - start.y) + previousFraction * (end.y - point.y)) / 2)
                 let time = startTime + (endTime - startTime) * fraction
                 let opacity = 1 - (sourceTime - time) / RecordingExportEffectTrack.trailDuration
                 context.setLineWidth(lineWidth * opacity)
@@ -413,7 +413,7 @@ final class RecordingExportRenderer {
         let bounds = annotation.bounds
         let textLayout = annotation.kind == .text ? RecordingAnnotationTextLayout(annotation, canvas: canvas.size) : nil
         let topLeft = textLayout?.bounds ?? CGRect(x: bounds.x * canvas.width, y: bounds.y * canvas.height,
-            width: bounds.width * canvas.width, height: bounds.height * canvas.height)
+                                                   width: bounds.width * canvas.width, height: bounds.height * canvas.height)
         let rect = CGRect(x: topLeft.minX, y: canvas.height - topLeft.maxY, width: topLeft.width, height: topLeft.height)
         let shortSide = min(canvas.width, canvas.height)
         let lineWidth = shortSide * annotation.lineWidth

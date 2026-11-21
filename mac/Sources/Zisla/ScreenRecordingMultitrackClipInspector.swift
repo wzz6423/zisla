@@ -18,7 +18,7 @@ struct ScreenRecordingMultitrackClipInspector: View {
                         Text(AppLocalization.text("文件名：%@", URL(fileURLWithPath: asset.file).lastPathComponent))
                             .accessibilityIdentifier("screenRecording.removedMediaName")
                         Text(AppLocalization.text("文件路径：%@",
-                            directory.appendingPathComponent(asset.file).path))
+                                                  directory.appendingPathComponent(asset.file).path))
                             .textSelection(.enabled)
                             .accessibilityIdentifier("screenRecording.removedMediaPath")
                         Button(AppLocalization.text("重新导入")) { model.restoreMediaAsset(asset.id) }
@@ -33,11 +33,11 @@ struct ScreenRecordingMultitrackClipInspector: View {
                 }
                 Text(model.timelineClipTitle(clip)).font(.system(size: 12, weight: .medium)).lineLimit(3)
                 ScreenRecordingNumberField(title: AppLocalization.text("片段位置"), value: number(clip, \.start),
-                    identifier: "screenRecording.clipStart")
+                                           identifier: "screenRecording.clipStart")
                 ScreenRecordingNumberField(title: AppLocalization.text("起点（秒）"), value: number(clip, \.sourceStart),
-                    identifier: "screenRecording.clipSourceStart")
+                                           identifier: "screenRecording.clipSourceStart")
                 ScreenRecordingNumberField(title: AppLocalization.text("终点（秒）"), value: number(clip, \.sourceEnd),
-                    identifier: "screenRecording.clipSourceEnd")
+                                           identifier: "screenRecording.clipSourceEnd")
                 Text(AppLocalization.text("片段时长") + ": " + ScreenRecordingStudioView.clock(clip.duration))
                     .font(.caption).foregroundStyle(.secondary)
                 if clip.content.trackKind == .video || clip.content.trackKind == .audio {
@@ -48,9 +48,9 @@ struct ScreenRecordingMultitrackClipInspector: View {
                     }
                     .controlSize(.regular)
                     Toggle(AppLocalization.text("音频"), isOn: Binding(get: { model.selectedTimelineClip?.audioEnabled ?? clip.audioEnabled },
-                        set: { enabled in model.updateTimelineClip(clip.id) { $0.audioEnabled = enabled } }))
+                                                                     set: { enabled in model.updateTimelineClip(clip.id) { $0.audioEnabled = enabled } }))
                     ScreenRecordingParameterRow(title: AppLocalization.text("音量"), value: number(clip, \.volume),
-                        range: 0...1, identifier: "screenRecording.clipVolume")
+                                                range: 0...1, identifier: "screenRecording.clipVolume")
                     if clip.content.trackKind == .video {
                         Button(AppLocalization.text("分离音频")) { model.detachTimelineAudio(clip.id) }
                             .disabled(!clip.audioEnabled)
@@ -58,7 +58,7 @@ struct ScreenRecordingMultitrackClipInspector: View {
                     }
                 }
                 Picker(AppLocalization.text("轨道"), selection: Binding(get: { clip.trackID },
-                    set: { trackID in model.updateTimelineClip(clip.id) { $0.trackID = trackID } })) {
+                                                                      set: { trackID in model.updateTimelineClip(clip.id) { $0.trackID = trackID } })) {
                     ForEach(Array((model.timeline?.tracks ?? []).enumerated()), id: \.element.id) { index, track in
                         Text(track.title(at: index)).tag(track.id)
                     }
@@ -96,8 +96,8 @@ struct ScreenRecordingMultitrackClipInspector: View {
                     model.selectTimelineClip(clip.id)
                     model.playTimeline()
                 }
-                    .font(.caption)
-                    .accessibilityIdentifier("screenRecording.previewClipStart")
+                .font(.caption)
+                .accessibilityIdentifier("screenRecording.previewClipStart")
             }
             if clip.content.trackKind != .audio {
                 ScreenRecordingClipAnimationInspector(model: model, clip: clip)
@@ -107,6 +107,6 @@ struct ScreenRecordingMultitrackClipInspector: View {
 
     private func number(_ clip: RecordingTimelineClip, _ keyPath: WritableKeyPath<RecordingTimelineClip, Double>) -> Binding<Double> {
         Binding(get: { model.timeline?.clips.first { $0.id == clip.id }?[keyPath: keyPath] ?? clip[keyPath: keyPath] },
-            set: { value in model.updateTimelineClip(clip.id) { $0[keyPath: keyPath] = value } })
+                set: { value in model.updateTimelineClip(clip.id) { $0[keyPath: keyPath] = value } })
     }
 }

@@ -154,13 +154,13 @@ struct AIModelDailyUsageTests {
         let repository = AIStateRepository(directoryURL: root, maximumUsageSamples: 1)
         _ = try repository.load()
         try sql(repository.databaseURL, """
-            DROP TABLE model_usage_samples;
-            DROP TABLE detected_usage_daily;
-            PRAGMA user_version = 2;
-            INSERT INTO usage_samples(source_id,provider,timestamp,input_tokens,output_tokens) VALUES
-            ('legacy-one','codex',\(day.timeIntervalSinceReferenceDate),10,2),
-            ('legacy-two','claude',\(day.addingTimeInterval(86_400).timeIntervalSinceReferenceDate),20,3);
-            """)
+        DROP TABLE model_usage_samples;
+        DROP TABLE detected_usage_daily;
+        PRAGMA user_version = 2;
+        INSERT INTO usage_samples(source_id,provider,timestamp,input_tokens,output_tokens) VALUES
+        ('legacy-one','codex',\(day.timeIntervalSinceReferenceDate),10,2),
+        ('legacy-two','claude',\(day.addingTimeInterval(86_400).timeIntervalSinceReferenceDate),20,3);
+        """)
         let history = try repository.loadUsageHistory()
         #expect(history.usageSamples.count == 1)
         #expect(history.usageSamples.first?.totalTokens == 23)
@@ -192,7 +192,7 @@ struct AIModelDailyUsageTests {
             try repository.recordDetectedUsage([value])
         }
         let history = try repository.loadUsageHistory(startingAt: day.addingTimeInterval(86_400),
-            endingBefore: day.addingTimeInterval(172_800))
+                                                      endingBefore: day.addingTimeInterval(172_800))
         #expect(history.usageSamples.count == 1)
         #expect(history.modelUsageSamples.count == 1)
         #expect(try repository.load().modelUsageSamples.count == 2)
@@ -215,11 +215,11 @@ struct AIModelDailyUsageTests {
         current.timestamp = old.timestamp.addingTimeInterval(86_400)
         try repository.recordDetectedUsage([current])
         try sql(repository.databaseURL, """
-            INSERT OR REPLACE INTO detected_usage_daily(source_id,provider,timestamp,model,input_tokens,output_tokens)
-            VALUES('orphaned','codex',\(day.timeIntervalSinceReferenceDate),'old-model',100,20);
-            INSERT INTO detected_usage_baselines(timestamp,input_tokens,output_tokens)
-            VALUES(\(day.timeIntervalSinceReferenceDate),100,20);
-            """)
+        INSERT OR REPLACE INTO detected_usage_daily(source_id,provider,timestamp,model,input_tokens,output_tokens)
+        VALUES('orphaned','codex',\(day.timeIntervalSinceReferenceDate),'old-model',100,20);
+        INSERT INTO detected_usage_baselines(timestamp,input_tokens,output_tokens)
+        VALUES(\(day.timeIntervalSinceReferenceDate),100,20);
+        """)
         let restarted = AIStateRepository(directoryURL: root, maximumUsageSamples: 1)
         if includeHistory { _ = try restarted.loadUsageHistory() }
         else { _ = try restarted.load(includeUsageSamples: false) }
@@ -276,9 +276,9 @@ struct AIModelDailyUsageTests {
         let first = sample("retention-transaction", .codex, "old-model", 100, 20)
         try repository.recordDetectedUsage([first])
         try sql(repository.databaseURL, """
-            CREATE TRIGGER fail_daily_pruning BEFORE DELETE ON detected_usage_daily
-            BEGIN SELECT RAISE(ABORT, 'fixture pruning failure'); END;
-            """)
+        CREATE TRIGGER fail_daily_pruning BEFORE DELETE ON detected_usage_daily
+        BEGIN SELECT RAISE(ABORT, 'fixture pruning failure'); END;
+        """)
         var second = first
         second.timestamp = first.timestamp.addingTimeInterval(86_400)
         second.inputTokens = 150
@@ -309,9 +309,9 @@ struct AIModelDailyUsageTests {
         try repository.recordDetectedUsage([detected])
         try repository.recordUsage(sample("manual-clear", .claude, "manual", 5, 2))
         try sql(repository.databaseURL, """
-            INSERT INTO detected_usage_baselines VALUES(\(day.timeIntervalSinceReferenceDate), 999999, 999999);
-            INSERT INTO detected_usage_cursor VALUES(1, \(day.addingTimeInterval(864000).timeIntervalSinceReferenceDate));
-            """)
+        INSERT INTO detected_usage_baselines VALUES(\(day.timeIntervalSinceReferenceDate), 999999, 999999);
+        INSERT INTO detected_usage_cursor VALUES(1, \(day.addingTimeInterval(864000).timeIntervalSinceReferenceDate));
+        """)
         try repository.clearUsageHistory()
         for table in ["usage_samples", "model_usage_samples", "detected_usage_daily", "detected_usage_baselines", "detected_usage_cursor"] {
             #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM \(table)") == 0)
@@ -348,9 +348,9 @@ struct AIModelDailyUsageTests {
         try repository.recordDetectedUsage([detected])
         let original = try repository.loadUsageHistory()
         try sql(repository.databaseURL, """
-            CREATE TRIGGER fail_history_clear BEFORE DELETE ON detected_usage_daily
-            BEGIN SELECT RAISE(ABORT, 'fixture clear failure'); END;
-            """)
+        CREATE TRIGGER fail_history_clear BEFORE DELETE ON detected_usage_daily
+        BEGIN SELECT RAISE(ABORT, 'fixture clear failure'); END;
+        """)
         #expect(throws: (any Error).self) { try repository.clearUsageHistory() }
         #expect(try repository.loadUsageHistory() == original)
         #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily") == 1)
@@ -394,9 +394,9 @@ struct AIModelDailyUsageTests {
         let repository = AIStateRepository(directoryURL: root)
         _ = try repository.load()
         try sql(repository.databaseURL, """
-            CREATE TRIGGER fail_model_usage BEFORE INSERT ON model_usage_samples
-            BEGIN SELECT RAISE(ABORT, 'fixture disk failure'); END
-            """)
+        CREATE TRIGGER fail_model_usage BEFORE INSERT ON model_usage_samples
+        BEGIN SELECT RAISE(ABORT, 'fixture disk failure'); END
+        """)
         let value = sample("transaction", .codex, "gpt", 10, 2)
         #expect(throws: (any Error).self) { try repository.recordDetectedUsage([value]) }
         #expect(try repository.loadUsageHistory().usageSamples.isEmpty)
@@ -408,7 +408,7 @@ struct AIModelDailyUsageTests {
     @Test
     func aggregationNormalizesMissingModelsSeparatesProvidersAndSaturatesCounts() {
         let samples = [sample("a", .codex, "  ", -10, 5), sample("b", .codex, nil, Int.max, 2),
-            sample("c", .claude, "gpt", 7, 3), sample("d", .codex, "gpt", 8, 4)]
+                       sample("c", .claude, "gpt", 7, 3), sample("d", .codex, "gpt", 8, 4)]
         let models = AIUsageAnalytics.dailyModelUsageSamples(samples: samples)
         #expect(models.count == 3)
         #expect(models.filter { $0.model == nil }.first?.totalTokens == Int.max)
@@ -431,12 +431,12 @@ struct AIModelDailyUsageTests {
         try repository.recordUsage(sample("manual", .claude, "manual-model", 40, 10))
         try repository.recordDetectedUsage([historical])
         try sql(repository.databaseURL, """
-            DELETE FROM detected_usage_events;
-            DELETE FROM detected_usage_daily;
-            DELETE FROM model_usage_samples WHERE origin = 'detected';
-            INSERT INTO detected_usage_baselines(timestamp,input_tokens,output_tokens)
-            VALUES(\(day.timeIntervalSinceReferenceDate),100,20);
-            """)
+        DELETE FROM detected_usage_events;
+        DELETE FROM detected_usage_daily;
+        DELETE FROM model_usage_samples WHERE origin = 'detected';
+        INSERT INTO detected_usage_baselines(timestamp,input_tokens,output_tokens)
+        VALUES(\(day.timeIntervalSinceReferenceDate),100,20);
+        """)
         #expect(try repository.recordDetectedUsage([historical]) == 0)
         let new = sample("new", .codex, "new-model", 30, 5)
         try repository.recordDetectedUsage([new])
@@ -525,7 +525,7 @@ struct AIModelDailyUsageTests {
         let digest = AIUsageLogIdentity.digest(canonical)
         try repository.recordDetectedUsage(["a", "b"].map { file in
             AIUsageSample(sourceID: "gemini-\(file)-entry-\(digest)-usage-0", provider: .gemini,
-                timestamp: timestamp, inputTokens: 100, outputTokens: 20)
+                          timestamp: timestamp, inputTokens: 100, outputTokens: 20)
         })
         let failedMessages = (0..<priorCandidates).map { index in
             ["id": "unrelated-\(index)", "usage": ["input_tokens": 150, "output_tokens": 20]] as [String: Any]
@@ -534,16 +534,16 @@ struct AIModelDailyUsageTests {
             ["timestamp": "2026-11-08T00:00:00Z", "messages": failedMessages], options: [.sortedKeys])
         var current = (0..<priorCandidates).map { index -> AIUsageSample in
             var value = AIUsageSample(sourceID: "gemini-a-usage-v2-\(index)", provider: .gemini,
-                timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "unrelated",
-                legacySourceID: "gemini-a-entry-current-usage-")
+                                      timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "unrelated",
+                                      legacySourceID: "gemini-a-entry-current-usage-")
             value.genericContext = .init(document: firstDocument, path: [.key("messages"), .index(index), .key("usage")])
             return value
         }
         let secondDocument = Data(#"{"messages":[{"id":"old","usage":{"input_tokens":150,"output_tokens":20}},{"id":"new","usage":{"input_tokens":30,"output_tokens":5}}],"timestamp":"2026-11-08T00:00:00Z"}"#.utf8)
         for index in 0..<2 {
             var value = AIUsageSample(sourceID: "gemini-b-usage-v2-\(index)", provider: .gemini,
-                timestamp: timestamp, inputTokens: index == 0 ? 150 : 30, outputTokens: index == 0 ? 20 : 5,
-                model: index == 0 ? "current" : "fresh", legacySourceID: "gemini-b-entry-current-usage-")
+                                      timestamp: timestamp, inputTokens: index == 0 ? 150 : 30, outputTokens: index == 0 ? 20 : 5,
+                                      model: index == 0 ? "current" : "fresh", legacySourceID: "gemini-b-entry-current-usage-")
             value.genericContext = .init(document: secondDocument, path: [.key("messages"), .index(index), .key("usage")])
             current.append(value)
         }
@@ -569,14 +569,14 @@ struct AIModelDailyUsageTests {
         }
         let history = documents.enumerated().map { index, document in
             AIUsageSample(sourceID: "gemini-conflict-entry-\(AIUsageLogIdentity.digest(document))-usage-0",
-                provider: .gemini, timestamp: timestamp, inputTokens: index == 0 ? 100 : 110, outputTokens: 20)
+                          provider: .gemini, timestamp: timestamp, inputTokens: index == 0 ? 100 : 110, outputTokens: 20)
         }
         try repository.recordDetectedUsage(reverse ? Array(history.reversed()) : history)
         var value = AIUsageSample(sourceID: "gemini-conflict-usage-v2-old", provider: .gemini,
-            timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
-            legacySourceID: "gemini-conflict-entry-current-usage-")
+                                  timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
+                                  legacySourceID: "gemini-conflict-entry-current-usage-")
         value.genericContext = .init(document: Data(#"{"messages":[{"id":"old","usage":{"input_tokens":150,"output_tokens":20}}],"timestamp":"2026-11-08T00:00:00Z"}"#.utf8),
-            path: [.key("messages"), .index(0), .key("usage")])
+                                     path: [.key("messages"), .index(0), .key("usage")])
         #expect(try repository.recordDetectedUsage([value]) == 0)
         #expect(try repository.loadUsageSamples().first?.totalTokens == 250)
         #expect(try repository.loadUsageHistory().modelUsageSamples.allSatisfy { $0.model == nil })
@@ -632,12 +632,13 @@ struct AIModelDailyUsageTests {
             ["timestamp": date, "messages": [["id": "old", "usage": ["input_tokens": 100, "output_tokens": 20]]]], options: [.sortedKeys])
         try repository.recordDetectedUsage([AIUsageSample(
             sourceID: "gemini-time-entry-\(AIUsageLogIdentity.digest(oldDocument))-usage-0", provider: .gemini,
-            timestamp: timestamp, inputTokens: 100, outputTokens: 20, model: "unreliable-old-model")])
+            timestamp: timestamp, inputTokens: 100, outputTokens: 20, model: "unreliable-old-model"
+        )])
         var current = AIUsageSample(sourceID: "gemini-time-usage-v2-old", provider: .gemini,
-            timestamp: timestamp.addingTimeInterval(172_800), inputTokens: 150, outputTokens: 20,
-            model: "current", legacySourceID: "gemini-time-entry-current-usage-")
+                                    timestamp: timestamp.addingTimeInterval(172_800), inputTokens: 150, outputTokens: 20,
+                                    model: "current", legacySourceID: "gemini-time-entry-current-usage-")
         current.genericContext = .init(document: Data(#"{"messages":[{"id":"old","model":"current","timestamp":"2026-11-10T00:00:00Z","usage":{"input_tokens":150,"output_tokens":20}}],"timestamp":"2026-11-10T00:00:00Z"}"#.utf8),
-            path: [.key("messages"), .index(0), .key("usage")])
+                                       path: [.key("messages"), .index(0), .key("usage")])
         #expect(try repository.recordDetectedUsage([current]) == 1)
         let history = try repository.loadUsageHistory()
         #expect(history.usageSamples.map(\.totalTokens) == [120, 50])
@@ -654,14 +655,14 @@ struct AIModelDailyUsageTests {
         let timestamp = try Date.ISO8601FormatStyle().parse("2026-11-08T00:00:00Z")
         let oldDocument = Data(#"{"id":"old","timestamp":"2026-11-08T00:00:00Z","usage":{"input_tokens":100,"output_tokens":20}}"#.utf8)
         try repository.recordDetectedUsage([AIUsageSample(sourceID: "gemini-noise-entry-\(AIUsageLogIdentity.digest(oldDocument))-usage-0",
-            provider: .gemini, timestamp: timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          provider: .gemini, timestamp: timestamp, inputTokens: 100, outputTokens: 20)])
         var current = AIUsageSample(sourceID: "gemini-noise-usage-v2-old", provider: .gemini,
-            timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
-            legacySourceID: "gemini-noise-entry-current-usage-")
+                                    timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
+                                    legacySourceID: "gemini-noise-entry-current-usage-")
         current.genericContext = .init(document: Data(#"{"id":"old","timestamp":"2026-11-08T00:00:00Z","usage":{"input_tokens":150,"output_tokens":20}}"#.utf8), path: [.key("usage")])
         let damaged = (1..<candidateCount).map { index -> AIUsageSample in
             var value = AIUsageSample(sourceID: "gemini-noise-usage-v2-invalid-\(index)", provider: .gemini,
-                timestamp: timestamp, inputTokens: 1, outputTokens: 0, model: "noise", legacySourceID: current.legacySourceID)
+                                      timestamp: timestamp, inputTokens: 1, outputTokens: 0, model: "noise", legacySourceID: current.legacySourceID)
             value.genericContext = .init(document: Data("{truncated-\(index)".utf8), path: [.key("usage")])
             return value
         }
@@ -680,17 +681,17 @@ struct AIModelDailyUsageTests {
         let repository = AIStateRepository(directoryURL: root)
         let timestamp = try Date.ISO8601FormatStyle().parse("2026-11-08T00:00:00Z")
         var document: [String: Any] = ["id": "old", "timestamp": "2026-11-08T00:00:00Z", "padding": "",
-            "usage": ["input_tokens": 100, "output_tokens": 20]]
+                                       "usage": ["input_tokens": 100, "output_tokens": 20]]
         let empty = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
         document["padding"] = String(repeating: "p", count: byteCount - empty.count)
         let oldDocument = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
         #expect(oldDocument.count == byteCount)
         try repository.recordDetectedUsage([AIUsageSample(sourceID: "gemini-bytes-entry-\(AIUsageLogIdentity.digest(oldDocument))-usage-0",
-            provider: .gemini, timestamp: timestamp, inputTokens: 100, outputTokens: 20)])
+                                                          provider: .gemini, timestamp: timestamp, inputTokens: 100, outputTokens: 20)])
         document["usage"] = ["input_tokens": 150, "output_tokens": 20]
         var current = AIUsageSample(sourceID: "gemini-bytes-usage-v2-old", provider: .gemini,
-            timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
-            legacySourceID: "gemini-bytes-entry-current-usage-")
+                                    timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
+                                    legacySourceID: "gemini-bytes-entry-current-usage-")
         current.genericContext = .init(document: try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]), path: [.key("usage")])
         #expect(try repository.recordDetectedUsage([current]) == (byteCount == 65_536 ? 1 : 0))
         #expect(try repository.loadUsageSamples().first?.totalTokens == (byteCount == 65_536 ? 170 : 120))
@@ -725,7 +726,7 @@ struct AIModelDailyUsageTests {
     @Test
     func modelHistoryRejectsInvalidDataExceedingThePreservedDailyTotal() {
         let history = AIUsageHistory(usageSamples: [sample("total", .claude, "wrong-first-model", 10, 2)],
-            modelUsageSamples: [sample("oversized", .codex, "untrusted-model", 100, 20)])
+                                     modelUsageSamples: [sample("oversized", .codex, "untrusted-model", 100, 20)])
         let rows = AIUsageAnalytics.dailyModelUsage(history: history, endingAt: day.addingTimeInterval(100))
         #expect(rows.first?.models == [AIModelUsage(provider: nil, model: nil, inputTokens: 10, outputTokens: 2)])
         #expect(rows.first?.totalTokens == 12)
@@ -734,7 +735,7 @@ struct AIModelDailyUsageTests {
     /// Places fixtures inside a fixed calendar day so token assertions do not depend on the wall clock.
     private func sample(_ id: String, _ provider: AIProvider, _ model: String?, _ input: Int, _ output: Int) -> AIUsageSample {
         AIUsageSample(sourceID: id, provider: provider, timestamp: day.addingTimeInterval(10),
-            inputTokens: input, outputTokens: output, model: model)
+                      inputTokens: input, outputTokens: output, model: model)
     }
 
     /// Gives each parallel test its own disposable database path, leaving the user's persisted history untouched.

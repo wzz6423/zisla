@@ -129,9 +129,9 @@ public final class CopilotSessionActivityDetector: AIActivityDetecting {
                 guard url.pathExtension == "jsonl",
                       url.deletingLastPathComponent().lastPathComponent == "chatSessions",
                       let values = try? url.resourceValues(forKeys: [
-                        .isRegularFileKey,
-                        .contentModificationDateKey,
-                        .fileSizeKey,
+                          .isRegularFileKey,
+                          .contentModificationDateKey,
+                          .fileSizeKey,
                       ]),
                       values.isRegularFile == true else {
                     continue
@@ -249,9 +249,9 @@ public final class CopilotSessionActivityDetector: AIActivityDetecting {
     private func activeCLITasks() -> [AIProgressTask] {
         guard fileManager.fileExists(atPath: cliSessionStateDirectory.path),
               let directories = try? fileManager.contentsOfDirectory(
-                at: cliSessionStateDirectory,
-                includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
-                options: [.skipsHiddenFiles]
+                  at: cliSessionStateDirectory,
+                  includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }

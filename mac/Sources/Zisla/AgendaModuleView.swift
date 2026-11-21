@@ -262,9 +262,9 @@ struct AgendaModuleView: View {
                 AppLocalization.text(hasExpiredWeather ? "无法获取天气" : "等待刷新"),
                 systemImage: hasExpiredWeather ? "cloud.slash" : "cloud.sun"
             )
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

@@ -485,18 +485,18 @@ struct NotesAppBridgeTests {
     func doesNotFilterRegularOrHistoricalFolderNames() {
         // Regular and historical/compat folder names must not be filtered by mistake
         let safe: [String] = [
-            "Notes",       // default Notes folder (English)
-            "备忘录",        // default Notes folder (Chinese)
+            "Notes", // default Notes folder (English)
+            "备忘录", // default Notes folder (Chinese)
             "随记",
             "工作",
             "Reading",
             "Todo",
             "Journal",
-            "Zisla",       // historical compatibility
+            "Zisla", // historical compatibility
             "随记笔记",
             "Zisla",
-            "",            // empty string (no container)
-            "Recently",    // approximate but incomplete match
+            "", // empty string (no container)
+            "Recently", // approximate but incomplete match
             "Deleted",
             "最近",
             "删除",
@@ -514,8 +514,8 @@ struct NotesAppBridgeTests {
         // System folder names have fixed casing; leading/trailing spaces or case changes must not match
         #expect(!NotesAppBridge.isInRecentlyDeletedFolder("recently deleted"))
         #expect(!NotesAppBridge.isInRecentlyDeletedFolder("RECENTLY DELETED"))
-        #expect(!NotesAppBridge.isInRecentlyDeletedFolder("最近删除 "))   // trailing space
-        #expect(!NotesAppBridge.isInRecentlyDeletedFolder(" 最近删除"))   // leading space
+        #expect(!NotesAppBridge.isInRecentlyDeletedFolder("最近删除 ")) // trailing space
+        #expect(!NotesAppBridge.isInRecentlyDeletedFolder(" 最近删除")) // leading space
     }
 }
 

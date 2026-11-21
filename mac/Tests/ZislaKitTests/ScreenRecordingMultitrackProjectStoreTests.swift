@@ -9,11 +9,11 @@ struct ScreenRecordingMultitrackProjectStoreTests {
         let store = ScreenRecordingProjectStore(root: root)
         let folder = try store.createDirectory()
         var project = ScreenRecordingProject(name: "Multitrack", videoFile: "screen.mp4", cameraFile: "camera.mp4",
-            microphoneFile: "microphone.wav", duration: 2, width: 64, height: 48)
+                                             microphoneFile: "microphone.wav", duration: 2, width: 64, height: 48)
         var timeline = RecordingMultitrackTimeline.migrating(project)
         timeline.assets += [.init(name: "Second video", file: "second.mp4", kind: .video, duration: 2, width: 48, height: 64),
-            .init(name: "Unused image", file: "unused.png", kind: .image, duration: 5, width: 32, height: 32),
-            .init(name: "Unused sound", file: "sound.wav", kind: .audio, duration: 2)]
+                            .init(name: "Unused image", file: "unused.png", kind: .image, duration: 5, width: 32, height: 32),
+                            .init(name: "Unused sound", file: "sound.wav", kind: .audio, duration: 2)]
         _ = timeline.addAssetClip(timeline.assets[1].id, at: 1)
         project.timeline = timeline
         for (index, file) in project.mediaFiles.enumerated() { try Data([UInt8(index + 1)]).write(to: folder.appendingPathComponent(file)) }
@@ -67,7 +67,7 @@ struct ScreenRecordingMultitrackProjectStoreTests {
         project.edits.annotations = [annotation]
         project.timeline?.tracks.append(.init(id: "text", kind: .text))
         project.timeline?.clips.append(.init(trackID: "text", content: .annotation(annotation.id), start: 0, sourceEnd: 2,
-            entranceAnimation: .init(kind: .typewriter, duration: 1)))
+                                             entranceAnimation: .init(kind: .typewriter, duration: 1)))
         try store.save(project, in: folder)
         #expect(try store.load(from: folder) == project)
         let copy = root.appendingPathComponent("animated-copy.zisla-recording")

@@ -168,8 +168,7 @@ struct MailPaginationViewTests {
                 Button("Fixture message") { selections += 1 }
                     .buttonStyle(.plain)
                     .frame(width: 240, height: 160)
-            }.frame(width: 240, height: 160)
-        )
+            }.frame(width: 240, height: 160))
         let window = NSPanel(
             contentRect: NSRect(x: -100_000, y: -100_000, width: 240, height: 160),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false
@@ -210,8 +209,7 @@ struct MailPaginationViewTests {
             MailRefreshScrollView(isEnabled: true, onRefresh: {}) {
                 Color.clear.frame(height: height)
             }
-            .frame(width: 240, height: 160)
-        )
+            .frame(width: 240, height: 160))
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 240, height: 160),
             styleMask: .borderless, backing: .buffered, defer: false
@@ -570,8 +568,7 @@ struct MailPaginationViewTests {
 
     private func host(_ mail: MailService, controls: MailPaginationTestControls) -> NSWindow {
         let hosting = NSHostingView(rootView:
-            MailPaginationTestHost(mail: mail, controls: controls).frame(width: 240, height: 160)
-        )
+            MailPaginationTestHost(mail: mail, controls: controls).frame(width: 240, height: 160))
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 240, height: 160),
             styleMask: [.borderless], backing: .buffered, defer: false

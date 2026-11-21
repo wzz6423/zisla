@@ -114,18 +114,18 @@ public enum NotesAppBridge {
     /// Known localized names of the "Recently Deleted" folder across system languages.
     /// Notes has no public API to identify this system folder directly; name matching is the most reliable cross-language approach.
     public static let recentlyDeletedFolderNames: Set<String> = [
-        "Recently Deleted",          // en
-        "最近删除",                    // Simplified Chinese
-        "最近刪除",                    // Traditional Chinese
-        "Kürzlich gelöscht",         // de
-        "Supprimés récemment",       // fr
-        "Eliminados recientemente",  // es
-        "Eliminati di recente",      // it
-        "Recentelijk verwijderd",    // nl
-        "Nyligen raderade",          // sv
-        "Недавно удалённые",         // ru
-        "最近削除した項目",              // Japanese
-        "최근 삭제된 항목",              // ko
+        "Recently Deleted", // en
+        "最近删除", // Simplified Chinese
+        "最近刪除", // Traditional Chinese
+        "Kürzlich gelöscht", // de
+        "Supprimés récemment", // fr
+        "Eliminados recientemente", // es
+        "Eliminati di recente", // it
+        "Recentelijk verwijderd", // nl
+        "Nyligen raderade", // sv
+        "Недавно удалённые", // ru
+        "最近削除した項目", // Japanese
+        "최근 삭제된 항목", // ko
     ]
 
     /// Returns whether a note's container folder name is the system "Recently Deleted" folder, supporting multilingual systems.

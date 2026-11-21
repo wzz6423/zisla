@@ -13,12 +13,12 @@ struct AIMascotLibraryTests {
         let contents = application.appendingPathComponent("Contents", isDirectory: true)
         try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
         let info = ["CFBundleIdentifier": "com.openai.codex", "CFBundleDisplayName": brand,
-            "CFBundleName": "Codex", "CFBundlePackageType": "APPL"]
+                    "CFBundleName": "Codex", "CFBundlePackageType": "APPL"]
         try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
             .write(to: contents.appendingPathComponent("Info.plist"))
         let resolve: (String) -> URL? = { $0 == "com.openai.codex" ? application : nil }
         let actual = AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: resolve,
-            applicationDirectories: [], fileExists: { _ in false })
+                                                                applicationDirectories: [], fileExists: { _ in false })
         #expect(actual?.provider == provider && actual?.url == (provider == nil ? nil : application))
     }
 
@@ -27,13 +27,13 @@ struct AIMascotLibraryTests {
         let directory = URL(fileURLWithPath: "/fixture/Applications", isDirectory: true)
         let application = directory.appendingPathComponent("\(brand).app", isDirectory: true)
         let actual = AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: { _ in nil },
-            applicationDirectories: [directory], fileExists: { $0 == application })
+                                                                applicationDirectories: [directory], fileExists: { $0 == application })
         #expect(actual?.provider == provider && actual?.url == application)
     }
 
     @Test func missingOrUnrecognizedOpenAIApplicationsHaveNoInstalledBrand() {
         #expect(AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: { _ in nil },
-            applicationDirectories: [], fileExists: { _ in false }) == nil)
+                                                           applicationDirectories: [], fileExists: { _ in false }) == nil)
         #expect(AIMascotLibrary.installedOpenAIApplication(resolveBundleIdentifier: { _ in
             URL(fileURLWithPath: "/fixture/Unknown.app", isDirectory: true)
         }, applicationDirectories: [], fileExists: { _ in false }) == nil)
@@ -54,11 +54,11 @@ struct AIMascotLibraryTests {
         for (provider, identifier, name, asset) in examples {
             let url = applications.appendingPathComponent("\(name).app", isDirectory: true)
             #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider,
-                resolveBundleIdentifier: { $0 == identifier ? url : nil },
-                applicationDirectories: [], fileExists: { _ in false }) == url)
+                                                                        resolveBundleIdentifier: { $0 == identifier ? url : nil },
+                                                                        applicationDirectories: [], fileExists: { _ in false }) == url)
             #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider,
-                resolveBundleIdentifier: { _ in nil },
-                applicationDirectories: [applications], fileExists: { $0 == url }) == url)
+                                                                        resolveBundleIdentifier: { _ in nil },
+                                                                        applicationDirectories: [applications], fileExists: { $0 == url }) == url)
             #expect(AIMascotLibrary.providerAssetName(for: provider) == asset)
         }
     }
@@ -79,20 +79,20 @@ struct AIMascotLibraryTests {
         let onlyWorkBuddy = directory.appendingPathComponent("WorkBuddy.app", isDirectory: true)
         let onlyAI = directory.appendingPathComponent("WorkBuddy AI.app", isDirectory: true)
         #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: .workbuddyAI,
-            resolveBundleIdentifier: { _ in nil }, applicationDirectories: [directory],
-            fileExists: { $0 == onlyWorkBuddy }) == nil)
+                                                                    resolveBundleIdentifier: { _ in nil }, applicationDirectories: [directory],
+                                                                    fileExists: { $0 == onlyWorkBuddy }) == nil)
         #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: .workbuddy,
-            resolveBundleIdentifier: { _ in nil }, applicationDirectories: [directory],
-            fileExists: { $0 == onlyAI }) == nil)
+                                                                    resolveBundleIdentifier: { _ in nil }, applicationDirectories: [directory],
+                                                                    fileExists: { $0 == onlyAI }) == nil)
     }
 
     @Test
     func workBuddyNoticeBoundaryDoesNotConfuseManualTaskIDs() {
         for id in ["ai-job", "workbuddy-ai-session-example", "example:with:colon"] {
             let workBuddy = AIProgressTask(id: id, provider: .workbuddy, title: "task",
-                progress: nil, updatedAt: .distantPast)
+                                           progress: nil, updatedAt: .distantPast)
             let ai = AIProgressTask(id: id, provider: .workbuddyAI, title: "task",
-                progress: nil, updatedAt: .distantPast)
+                                    progress: nil, updatedAt: .distantPast)
             let workBuddyID = AIMascotLibrary.activeNoticeID(for: workBuddy)
             let aiID = AIMascotLibrary.activeNoticeID(for: ai)
             #expect(workBuddyID != aiID)

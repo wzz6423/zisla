@@ -17,7 +17,7 @@ struct ScreenRecordingVisualEditingTests {
             #expect(abs(size.width / size.height - expected) < 0.003)
             #expect(Int(size.width).isMultiple(of: 2) && Int(size.height).isMultiple(of: 2))
             #expect(max(size.width, size.height) == (resolution == .source || resolution == .fullHD ? 1920
-                                                     : resolution == .quadHD ? 2560 : 3840))
+                    : resolution == .quadHD ? 2560 : 3840))
         }
     }
 
@@ -125,9 +125,9 @@ struct ScreenRecordingVisualEditingTests {
         var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try pixels.withUnsafeMutableBytes { pointer in
             let context = try #require(CGContext(data: pointer.baseAddress, width: image.width, height: image.height,
-                                                bitsPerComponent: 8, bytesPerRow: image.width * 4,
-                                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         return pixels

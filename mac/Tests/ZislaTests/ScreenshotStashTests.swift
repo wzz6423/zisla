@@ -25,15 +25,15 @@ struct ScreenshotStashTests {
         let image = try makeImage()
         let pixels = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
         let source = ScreenshotSourceSnapshot(applicationName: "Capture source", bundleIdentifier: "test.capture",
-            processIdentifier: 456, capturedAt: Date(timeIntervalSince1970: 42))
+                                              processIdentifier: 456, capturedAt: Date(timeIntervalSince1970: 42))
         var closeCount = 0
         var copyCount = 0
         let controller = ScreenshotEditorWindowController(image: image, screenImage: image, screenCGImage: pixels,
-            screen: nil, captureRect: CGRect(x: 20, y: 30, width: 160, height: 80),
-            capturedApplication: nil, settingsStore: settingsStore, sourceSnapshot: source,
-            onStash: { data, metadata in try store.stashScreenshot(png: data, metadata: metadata) },
-            writeImageToPasteboard: { _ in copyCount += 1; return true },
-            onClose: { closeCount += 1 })
+                                                          screen: nil, captureRect: CGRect(x: 20, y: 30, width: 160, height: 80),
+                                                          capturedApplication: nil, settingsStore: settingsStore, sourceSnapshot: source,
+                                                          onStash: { data, metadata in try store.stashScreenshot(png: data, metadata: metadata) },
+                                                          writeImageToPasteboard: { _ in copyCount += 1; return true },
+                                                          onClose: { closeCount += 1 })
         defer { controller.close() }
         let window = try #require(controller.window)
         window.alphaValue = 0
@@ -81,14 +81,14 @@ struct ScreenshotStashTests {
         var copyCount = 0
         var stashedData: Data?
         let controller = ScreenshotEditorWindowController(image: image, screenImage: image, screenCGImage: pixels,
-            screen: nil, captureRect: CGRect(x: 0, y: 0, width: 160, height: 80), capturedApplication: nil,
-            settingsStore: settingsStore,
-            onStash: { data, _ in
-                if fails { throw TestStashError() }
-                stashedData = data
-            },
-            writeImageToPasteboard: { _ in copyCount += 1; return true },
-            onClose: { closeCount += 1 })
+                                                          screen: nil, captureRect: CGRect(x: 0, y: 0, width: 160, height: 80), capturedApplication: nil,
+                                                          settingsStore: settingsStore,
+                                                          onStash: { data, _ in
+                                                              if fails { throw TestStashError() }
+                                                              stashedData = data
+                                                          },
+                                                          writeImageToPasteboard: { _ in copyCount += 1; return true },
+                                                          onClose: { closeCount += 1 })
         defer { controller.close() }
         let window = try #require(controller.window)
         window.alphaValue = 0
@@ -115,13 +115,13 @@ struct ScreenshotStashTests {
     @Test
     func screenshotCardsSpanTwoColumnsWithoutChangingRegularCards() throws {
         let metadata = ShelfScreenshotMetadata(source: ScreenshotSourceSnapshot(applicationName: nil,
-            bundleIdentifier: nil, processIdentifier: nil), isLongScreenshot: false,
-            initialCaptureRect: .zero, captureRect: .zero, screenFrame: nil, displayIdentifier: nil,
-            pixelWidth: 320, pixelHeight: 160)
+                                                                                bundleIdentifier: nil, processIdentifier: nil), isLongScreenshot: false,
+                                               initialCaptureRect: .zero, captureRect: .zero, screenFrame: nil, displayIdentifier: nil,
+                                               pixelWidth: 320, pixelHeight: 160)
         let item = FileShelfItem(id: UUID(), url: URL(fileURLWithPath: "/nonexistent.png"),
-            addedAt: Date(), bookmarkData: Data(), screenshotMetadata: metadata)
+                                 addedAt: Date(), bookmarkData: Data(), screenshotMetadata: metadata)
         let host = NSHostingView(rootView: ShelfItemView(item: item, onOpen: {}, onCopy: {},
-            onSave: {}, onSendToQuickNote: {}, onRemove: { _ in }))
+                                                         onSave: {}, onSendToQuickNote: {}, onRemove: { _ in }))
         #expect(host.fittingSize == CGSize(width: 140, height: 84))
         let frames = ShelfGridLayout.frames(columnSpans: [1, 2, 1, 2], width: 288)
         #expect(frames.map(\.width) == [66, 140, 66, 140])
@@ -140,7 +140,7 @@ struct ScreenshotStashTests {
         view.onSave = { actions.append("save") }
         view.onRemove = { actions.append("delete") }
         let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
-            timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+                                                    timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
         let menu = try #require(view.menu(for: event))
         #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title) ==
             ["预览", "复制", "保存", "移除"].map { AppLocalization.text($0) })
@@ -167,15 +167,15 @@ struct ScreenshotStashTests {
     @Test
     func categoryCountsAndMetadataSearchKeepScreenshotsSeparateFromOrdinaryImagesAndNotes() {
         let metadata = ShelfScreenshotMetadata(source: ScreenshotSourceSnapshot(applicationName: "Original App",
-            bundleIdentifier: "test.original", processIdentifier: 654, capturedAt: Date(timeIntervalSince1970: 42)),
-            isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero,
-            screenFrame: nil, displayIdentifier: nil, pixelWidth: 320, pixelHeight: 160)
+                                                                                bundleIdentifier: "test.original", processIdentifier: 654, capturedAt: Date(timeIntervalSince1970: 42)),
+                                               isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero,
+                                               screenFrame: nil, displayIdentifier: nil, pixelWidth: 320, pixelHeight: 160)
         let screenshot = FileShelfItem(id: UUID(), url: URL(fileURLWithPath: "/missing-cache.png"),
-            addedAt: Date(), bookmarkData: Data(), screenshotMetadata: metadata)
+                                       addedAt: Date(), bookmarkData: Data(), screenshotMetadata: metadata)
         let text = FileShelfItem(id: UUID(), url: URL(fileURLWithPath: "/text.txt"),
-            addedAt: Date(), bookmarkData: Data(), text: "ordinary")
+                                 addedAt: Date(), bookmarkData: Data(), text: "ordinary")
         let note = FileShelfItem(id: UUID(), url: URL(fileURLWithPath: "/note.txt"),
-            addedAt: Date(), bookmarkData: Data(), text: "note", noteLocation: .desktop(displayID: "test", displayName: "Test"))
+                                 addedAt: Date(), bookmarkData: Data(), text: "note", noteLocation: .desktop(displayID: "test", displayName: "Test"))
         let items = [text, screenshot, note]
         #expect(FileShelfCategory.fileShelfCases.contains(.screenshot))
         #expect(!FileShelfCategory.clipboardCases.contains(.screenshot))
@@ -202,7 +202,8 @@ struct ScreenshotStashTests {
         let item = try store.stashScreenshot(png: png, metadata: ShelfScreenshotMetadata(
             source: ScreenshotSourceSnapshot(applicationName: nil, bundleIdentifier: nil, processIdentifier: nil),
             isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero, screenFrame: nil,
-            displayIdentifier: nil, pixelWidth: 320, pixelHeight: 160))
+            displayIdentifier: nil, pixelWidth: 320, pixelHeight: 160
+        ))
         try FileManager.default.removeItem(at: item.url)
         let destination = directory.appendingPathComponent("chosen.png")
         try ScreenshotImageExport.writePNG(store.screenshotData(id: item.id), to: destination)
@@ -215,8 +216,8 @@ struct ScreenshotStashTests {
 
     private func makeImage() throws -> NSImage {
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 320, pixelsHigh: 160,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         for y in 0..<160 {
             for x in 0..<320 { bitmap.setColor(NSColor(calibratedRed: CGFloat(x) / 320, green: CGFloat(y) / 160, blue: 0.3, alpha: 1), atX: x, y: y) }
         }

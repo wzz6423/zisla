@@ -39,7 +39,7 @@ struct ScreenRecordingMediaLibraryView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
                     ForEach(RecordingMediaLibraryGrouping.groups(assets: model.mediaAssets,
-                        grouping: grouping, granularity: timeGranularity)) { group in
+                                                                 grouping: grouping, granularity: timeGranularity)) { group in
                         if let date = group.date {
                             Text(dateTitle(date)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                                 .padding(.top, 4)
