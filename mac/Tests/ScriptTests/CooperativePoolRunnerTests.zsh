@@ -45,6 +45,17 @@ compiler = [str(swift.parent / "swiftc"), "-swift-version", "6", "-parse-as-libr
     str(swift.parent.parent / "lib/swift/host/plugins/testing/libTestingMacros.dylib")]
 for module in ("ZislaKitTests", "UnrelatedTests"):
     subprocess.run(compiler + ["-module-name", module, "-o", str(temporary / (module + ".dylib"))], check=True)
+fixture.write_text('''import Foundation
+import Testing
+
+struct AIAccountBalanceCookieInputTests {
+    @Test func cookieMutationUsesTheIsolatedHost() async {
+        #expect(ProcessInfo.processInfo.environment["DYLD_INSERT_LIBRARIES"]?.hasSuffix("/LimitedPool.dylib") == true)
+        #expect(ProcessInfo.processInfo.environment["COOPERATIVE_FIXTURE_FAIL"] != "2")
+    }
+}
+''')
+subprocess.run(compiler + ["-module-name", "ZislaTests", "-o", str(temporary / "ZislaTests.dylib")], check=True)
 (tools / "swift").write_text("#!" + sys.executable + "\nprint(" + repr(str(build)) + ")\n")
 (tools / "swift").chmod(0o755)
 
@@ -73,20 +84,39 @@ for name in ("ZislaKitTests", "zislaPackageTests"):
     binary = build / (name + ".xctest") / "Contents/MacOS" / name
     binary.parent.mkdir(parents=True)
     shutil.copyfile(temporary / "ZislaKitTests.dylib", binary)
-    for fail in (False, True):
+    cookie_binary = build / "ZislaTests.xctest/Contents/MacOS/ZislaTests"
+    if name == "zislaPackageTests":
+        subprocess.run([str(swift.parent / "clang"), "-dynamiclib", "-isysroot", sdk,
+            "-Wl,-reexport_library," + str(temporary / "ZislaKitTests.dylib"),
+            "-Wl,-reexport_library," + str(temporary / "ZislaTests.dylib"), "-o", str(binary)], check=True)
+    else:
+        cookie_binary.parent.mkdir(parents=True)
+        shutil.copyfile(temporary / "ZislaTests.dylib", cookie_binary)
+    for fail in (0, 1, 2):
         result = subprocess.run(["/bin/zsh", str(root / "Tests/CooperativePoolTests.zsh")],
             env=dict(environment, COOPERATIVE_FIXTURE_FAIL=str(int(fail))),
             capture_output=True, text=True, timeout=30)
         output = result.stdout + result.stderr
-        assert (result.returncode != 0) == fail, output
+        assert (result.returncode != 0) == bool(fail), output
         assert "Host dylib leaked into launcher" not in output, output
         assert "Zisla regression: two cooperative workers" in output, output
         if fail:
             assert "Expectation failed" in output, output
         else:
-            assert "PASS: hardware lifecycle, shared sampling, and simultaneous downloads" in output, output
+            assert "PASS: hardware lifecycle, shared sampling, simultaneous downloads, and Cookie persistence" in output, output
         assert not list(temporary.glob("zisla-cooperative-pool.*")), "The runner left temporary artifacts"
     shutil.rmtree(binary.parents[2])
+    if name == "ZislaKitTests":
+        shutil.rmtree(cookie_binary.parents[2])
+binary = build / "ZislaKitTests.xctest/Contents/MacOS/ZislaKitTests"
+binary.parent.mkdir(parents=True)
+shutil.copyfile(temporary / "ZislaKitTests.dylib", binary)
+result = subprocess.run(["/bin/zsh", str(root / "Tests/CooperativePoolTests.zsh")],
+    env=environment, capture_output=True, text=True, timeout=30)
+output = result.stdout + result.stderr
+assert result.returncode != 0 and "No ZislaTests test bundle found" in output, output
+assert not list(temporary.glob("zisla-cooperative-pool.*")), "The runner left temporary artifacts"
+shutil.rmtree(binary.parents[2])
 for empty in (False, True):
     if empty:
         shutil.rmtree(unrelated.parents[2])
@@ -95,5 +125,5 @@ for empty in (False, True):
     output = result.stdout + result.stderr
     assert result.returncode != 0 and "No ZislaKitTests test bundle found" in output, output
     assert not list(temporary.glob("zisla-cooperative-pool.*")), "The runner left temporary artifacts"
-print("PASS: 6 cooperative-pool runner cases cover split/combined bundles, missing targets, dylib isolation, failures, and cleanup")
+print("PASS: 9 cooperative-pool runner cases cover split/combined bundles, missing targets, dylib isolation, both target failures, and cleanup")
 PYTHON

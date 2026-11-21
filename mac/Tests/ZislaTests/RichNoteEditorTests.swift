@@ -467,7 +467,12 @@ struct RichNoteEditorTests {
                 (() => {
                   const field = document.querySelectorAll('[data-zisla-native-text]')[1];
                   field.innerHTML = \(markup);
+                  // Hidden WebKit pages can suspend timers; DOM parsing does not need a wall-clock delay.
+                  const schedule = window.setTimeout;
+                  window.setTimeout = (callback, delay, ...args) => delay === 80
+                    ? queueMicrotask(() => callback(...args)) : schedule(callback, delay, ...args);
                   field.dispatchEvent(new Event('input', { bubbles: true }));
+                  window.setTimeout = schedule;
                 })()
                 """)
                 #expect(try #require(await iterator.next()).suffix == expected, "Editable DOM line boundaries must preserve plain text: \(html)")
