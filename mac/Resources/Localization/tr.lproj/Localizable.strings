@@ -3401,6 +3401,7 @@
 "输入 %@ · 输出 %@" = "Girdi %@ · Çıktı %@";
 "AI 模型用量" = "Yapay Zekâ Model Kullanımı";
 
+"用量历史" = "Kullanım geçmişi";
 "AI 用量历史" = "Yapay zekâ kullanım geçmişi";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Tüm yapay zekâ kullanım geçmişini xlsx elektronik tablosu olarak dışa aktar";
 "已清空 AI 用量历史" = "Yapay zekâ kullanım geçmişi temizlendi";

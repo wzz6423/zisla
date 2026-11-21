@@ -13,10 +13,13 @@ struct AIAccountBalanceCookieInput: View {
                     .frame(width: 100, alignment: .leading)
                 SecureField(AppLocalization.text("粘贴网站 Cookie"), text: $input.cookie).textFieldStyle(.roundedBorder)
                     .disabled(input.isSaving)
+                Button(AppLocalization.text("从默认浏览器导入")) { perform(.importBrowser) }.disabled(input.isSaving)
+                    .keepsIntrinsicWidth()
                 Button(AppLocalization.text("保存")) { perform(.save) }.disabled(input.cookie.isEmpty || input.isSaving)
+                    .keepsIntrinsicWidth()
                 Button(AppLocalization.text("清除")) { perform(.remove) }.disabled(input.isSaving)
+                    .keepsIntrinsicWidth()
             }
-            Button(AppLocalization.text("从默认浏览器导入")) { perform(.importBrowser) }.disabled(input.isSaving)
             if let statusKey = input.statusKey { AppLocalizedText(statusKey).foregroundStyle(.secondary) }
         }
         .font(.system(size: 11)).padding(.vertical, 6)

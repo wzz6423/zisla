@@ -3402,6 +3402,7 @@
 "输入 %@ · 输出 %@" = "Eingabe %@ · Ausgabe %@";
 "AI 模型用量" = "KI-Modellnutzung";
 
+"用量历史" = "Nutzungsverlauf";
 "AI 用量历史" = "KI-Nutzungsverlauf";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Den gesamten KI-Nutzungsverlauf als xlsx-Tabelle exportieren";
 "已清空 AI 用量历史" = "KI-Nutzungsverlauf gelöscht";

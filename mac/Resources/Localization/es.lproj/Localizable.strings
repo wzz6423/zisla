@@ -3401,6 +3401,7 @@
 "输入 %@ · 输出 %@" = "Entrada %@ · Salida %@";
 "AI 模型用量" = "Uso de modelos de IA";
 
+"用量历史" = "Historial de uso";
 "AI 用量历史" = "Historial de uso de IA";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Exportar todo el historial de uso de IA como una hoja de cálculo xlsx";
 "已清空 AI 用量历史" = "Historial de uso de IA borrado";

@@ -1707,11 +1707,11 @@ struct SettingsView: View {
         let websites = AIAccountBalanceWebsite.selected(for: settingsStore.settings.aiAccountBalanceMonitoredProviders,
             qoderRegions: settingsStore.settings.aiAccountBalanceQoderRegions)
         return settingsGroup("AI 进度与用量") {
-            featureToggle("低额度提醒", detail: "剩余额度不高于 20% 时提醒，耗尽后也会提醒", symbol: "gauge.with.dots.needle.67percent", keyPath: \.aiAccountBalanceNoticeEnabled)
+            featureToggle("低额度提醒", detail: "", symbol: "gauge.with.dots.needle.67percent", keyPath: \.aiAccountBalanceNoticeEnabled)
                 .disabled(!model.settingsStore.settings.aiProgressEnabled
                     || !model.settingsStore.settings.sideNoticesEnabled)
             rowDivider
-            settingRow(symbol: "rectangle.topthird.inset.filled", title: "收起态额度样式", detail: "完整样式最多显示两行真实额度") {
+            settingRow(symbol: "rectangle.topthird.inset.filled", title: "收起态额度样式", detail: "") {
                 Picker("", selection: Binding(
                     get: { model.settingsStore.settings.aiAccountBalanceCompactStyle },
                     set: { model.settingsStore.settings.aiAccountBalanceCompactStyle = $0 }
@@ -1759,7 +1759,7 @@ struct SettingsView: View {
                     .font(.system(size: 11)).padding(.vertical, 4)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
+            .padding(.leading, 30).padding(.trailing, 4).padding(.vertical, 10)
             .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string("各供应商额度", locale: locale)))
             .disabled(!model.settingsStore.settings.aiProgressEnabled)
             if !websites.isEmpty {
@@ -1767,29 +1767,37 @@ struct SettingsView: View {
                 DisclosureGroup(AppLocalization.text("网站额度凭据")) {
                     AppLocalizedText("打开账户页，在开发者工具的 Network 中复制额度请求的 Cookie 请求头")
                         .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     ForEach(websites) { website in
                         AIAccountBalanceCookieInput(input: model.aiAccountBalanceCookieInputs[website]!, didChange: {
                             model.aiMonitor.refreshAccountBalancesAfterCredentialChange()
                         })
                     }
                 }
-                .padding(.horizontal, 16).padding(.vertical, 10)
+                .padding(.leading, 30).padding(.trailing, 4).padding(.vertical, 10)
                 .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string("网站额度凭据", locale: locale)))
                 .disabled(!model.settingsStore.settings.aiProgressEnabled)
             }
             rowDivider
             featureToggle("AI 任务结果扫光", detail: "任务成功时绿色、失败时红色渐变光带从左向右扫过一次", symbol: "arrow.right", keyPath: \.aiTaskResultSweepEnabled)
                 .disabled(!model.settingsStore.settings.aiProgressEnabled)
+            rowDivider
+            VStack(alignment: .leading, spacing: 8) {
+                AppLocalizedText("用量历史")
+                    .font(.system(size: 13, weight: .medium))
+                AIUsageHistorySettingsActions(controller: aiUsageHistory, showHistory: aiUsageHistoryPresentation.present)
+                    .padding(.leading, 20)
+            }
+            .padding(.leading, 46).padding(.trailing, 4).padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string("用量历史", locale: locale)))
         }
     }
 
-    /// AI reporting actions precede tools without retaining history in the island's task state.
     private var aiContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             aiAccountBalanceSettings
-            settingsGroup("AI 用量历史") {
-                AIUsageHistorySettingsActions(controller: aiUsageHistory, showHistory: aiUsageHistoryPresentation.present)
-            }
             settingsGroup("CLI 与 Skills") {
                 AIAgentModuleView(model: model, configurationScope: .tools)
                     .task {

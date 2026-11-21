@@ -432,7 +432,7 @@ struct AIUsageHistoryPresentationTests {
     @Test
     func allHistoryControlsHaveRuntimeTranslationsAndSearchableAnchors() throws {
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let keys = ["AI 用量历史", "把全部 AI 用量历史导出为 xlsx 表格", "已清空 AI 用量历史", "清空失败：%@",
+        let keys = ["用量历史", "AI 用量历史", "把全部 AI 用量历史导出为 xlsx 表格", "已清空 AI 用量历史", "清空失败：%@",
             "清空 AI 用量历史？", "删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。",
             "上一年", "下一年", "AI token 用量热力图", "查看历史记录", "导出", "清空", "取消", "重试", "刷新",
             "时间范围", "正在读取历史记录", "已保存到 %@", "导出失败：%@", "Token 消耗趋势", "日期"]
@@ -445,15 +445,25 @@ struct AIUsageHistoryPresentationTests {
                 #expect(!value.isEmpty && AppLocalization.string(key, language: language) == value)
                 #expect(value.components(separatedBy: "%@").count == key.components(separatedBy: "%@").count)
             }
-            let query = AppLocalization.string("AI 用量历史", language: language)
-            #expect(SettingsSearchIndex.results(for: query, settings: .default, locale: language.locale).contains {
-                $0.section == .ai && $0.anchor == .group("AI 用量历史")
-            })
+            let heading = AppLocalization.string("用量历史", language: language)
+            if language != .english {
+                #expect(heading != "Usage History", "The usage history heading must be translated in \(language.rawValue)")
+            }
+            if language != .simplifiedChinese {
+                #expect(heading != "用量历史", "The usage history heading must not fall back to its source key in \(language.rawValue)")
+            }
+            #expect(SettingsSearchAnchor.group("用量历史").localized(locale: language.locale) == .group(heading))
+            for key in ["用量历史", "AI 用量历史"] {
+                let query = AppLocalization.string(key, language: language)
+                let matches = SettingsSearchIndex.results(for: query, settings: .default, locale: language.locale, displayCount: 1)
+                    .filter { $0.section == .ai && $0.anchor == .group("用量历史") }
+                #expect(matches.count == 1 && matches.first?.title == "用量历史",
+                    "Current and previous history headings must resolve to the renamed setting in \(language.rawValue)")
+            }
         }
-        let settings = try String(contentsOf: package.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
-        let history = try #require(settings.range(of: "settingsGroup(\"AI 用量历史\")"))
-        let cli = try #require(settings.range(of: "settingsGroup(\"CLI 与 Skills\")"))
-        #expect(history.lowerBound < cli.lowerBound)
+        #expect(AppLocalization.string("用量历史", language: .english) == "Usage History")
+        #expect(AppLocalization.string("用量历史", language: .traditionalChinese) == "用量歷史")
+        #expect(AppLocalization.string("用量历史", language: .arabic) == "سجل الاستخدام")
         let source = try String(contentsOf: package.appendingPathComponent("Sources/Zisla/AIUsageHistoryView.swift"), encoding: .utf8)
         let settingsStart = try #require(source.range(of: "struct AIUsageHistorySettingsActions"))
         let contentStart = try #require(source.range(of: "struct AIUsageHistoryContent"))

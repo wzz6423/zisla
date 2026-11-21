@@ -207,7 +207,7 @@ enum SettingsSearchIndex {
             entry(.ai, "网站额度凭据", anchor: .group("网站额度凭据"),
                   keywords: ["粘贴网站 Cookie", "从默认浏览器导入"] + websites.map(\.title))
         }
-        entry(.ai, "AI 用量历史", anchor: .group("AI 用量历史"), keywords: ["Token 消耗趋势", "每日模型用量", "查看历史记录", "导出", "清空"])
+        entry(.ai, "用量历史", anchor: .group("用量历史"), keywords: ["AI 用量历史", "Token 消耗趋势", "每日模型用量", "查看历史记录", "导出", "清空"])
         entry(.ai, "CLI 与 Skills", anchor: .group("CLI 与 Skills"), keywords: ["自动更新 CLI", "下载命令", "更新命令"])
         rows(.voice, ["录音模式", "使用模型", "格式化整理", "保留原始录音", "记录目录", "自定义热词"])
         entry(.voice, "快捷键", anchor: .row("快捷键"), keywords: ["输入监控"])

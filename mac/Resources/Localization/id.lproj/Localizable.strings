@@ -3401,6 +3401,7 @@
 "输入 %@ · 输出 %@" = "Masukan %@ · Keluaran %@";
 "AI 模型用量" = "Penggunaan Model AI";
 
+"用量历史" = "Riwayat penggunaan";
 "AI 用量历史" = "Riwayat penggunaan AI";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Ekspor seluruh riwayat penggunaan AI sebagai lembar kerja xlsx";
 "已清空 AI 用量历史" = "Riwayat penggunaan AI dihapus";
