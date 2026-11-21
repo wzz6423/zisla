@@ -15,6 +15,7 @@
 "低额度提醒" = "Warnung bei niedrigem Kontingent";
 "供应商未提供已验证的本地额度查询接口" = "Der Anbieter stellt keine bestätigte lokale Kontingent-API bereit";
 "其他位置常驻额度" = "Kontingent an anderen Positionen anheften";
+"常驻额度信息" = "Dauerhafte Kontingentinformationen";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Bei 20% oder weniger Restkontingent sowie bei Erschöpfung benachrichtigen";
 "可用预算" = "Verfügbares Budget";
 "可用额度" = "Verfügbares Kontingent";
@@ -92,6 +93,7 @@
 "设置" = "Einstellungen";
 "通用" = "Allgemein";
 "工作流" = "Workflow";
+"系统信息" = "Systeminformationen";
 "信息" = "Info";
 "模型" = "Modelle";
 "宠物" = "Haustier";

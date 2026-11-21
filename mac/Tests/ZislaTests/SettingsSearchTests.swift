@@ -73,15 +73,17 @@ struct SettingsSearchTests {
         settings.islandLayoutStyle = style
         settings.islandPlacement = IslandPlacement(mode: mode, edge: .left)
         let saved = settings
-        let matches = results("其他位置常驻额度", settings: settings)
         let visible = style == .pill && mode == .custom
-        #expect(matches.count == (visible ? 1 : 0), "Persistent quota settings require the selected custom pill placement")
-        #expect(matches.allSatisfy { $0.section == .workflow && $0.anchor == .row("其他位置常驻额度") })
+        for key in ["常驻额度信息", "其他位置常驻额度"] {
+            let matches = results(key, settings: settings)
+            #expect(matches.count == (visible ? 1 : 0), "Persistent quota settings require the selected custom pill placement")
+            #expect(matches.allSatisfy { $0.section == .ai && $0.anchor == .row("常驻额度信息") })
+        }
         #expect(settings == saved)
     }
 
     @Test(arguments: AppLanguage.allCases) @MainActor
-    func pinnedQuotaSearchNavigatesToWorkflowInTheRequestedLanguage(language: AppLanguage) throws {
+    func pinnedQuotaSearchNavigatesToAIInTheRequestedLanguage(language: AppLanguage) throws {
         var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true,
             aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
         settings.islandLayoutStyle = .pill
@@ -89,23 +91,24 @@ struct SettingsSearchTests {
         let saved = settings
         let input = SettingsInput()
         input.weatherQuery = "synthetic location"
-        for key in ["其他位置常驻额度", "选择灵动岛其他位置时显示额度，多个账户自动轮播"] {
+        for key in ["常驻额度信息", "其他位置常驻额度"] {
             let query = AppLocalization.string(key, language: language)
             let matches = results(query, settings: settings, locale: language.locale)
             let result = try #require(matches.first, "Missing persistent quota control: \(language.rawValue)/\(key)")
-            #expect(matches.count == 1 && result.section == .workflow && result.anchor == .row("其他位置常驻额度"))
+            #expect(matches.count == 1 && result.section == .ai && result.title == "常驻额度信息"
+                && result.anchor == .row("常驻额度信息"))
             #expect(result.anchor.localized(locale: language.locale)
-                == .row(AppLocalization.string("其他位置常驻额度", language: language)))
+                == .row(AppLocalization.string("常驻额度信息", language: language)))
             input.settingsQuery = query
             input.select(result.section, searchTarget: result.anchor)
-            #expect(input.selection == .workflow && input.searchTarget == result.anchor && !input.isSearching)
+            #expect(input.selection == .ai && input.searchTarget == result.anchor && !input.isSearching)
         }
         #expect(input.weatherQuery == "synthetic location")
         #expect(settings == saved)
     }
 
     @Test(arguments: [false, true], [false, true])
-    func pinnedQuotaSearchKeepsTheControlReachableForEveryCustomEdge(aiEnabled: Bool, noticesEnabled: Bool) {
+    func pinnedQuotaSearchFollowsAIVisibilityForEveryCustomEdge(aiEnabled: Bool, noticesEnabled: Bool) {
         var settings = FeatureSettings(aiProgressEnabled: aiEnabled, systemMonitorEnabled: false,
             sideNoticesEnabled: noticesEnabled, aiAccountBalanceMonitoredProviders: [], aiAccountBalanceDisplayedProviders: [])
         settings.mediaEnabled = false
@@ -113,11 +116,12 @@ struct SettingsSearchTests {
         for edge in IslandEdge.allCases {
             settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
             let saved = settings
-            let matches = results("其他位置常驻额度", settings: settings)
-            #expect(matches.count == 1 && matches.first?.section == .workflow
-                && matches.first?.anchor == .row("其他位置常驻额度"),
-                "Disabled AI, notifications, and empty provider selections must keep the visible workflow control reachable")
-            #expect(SettingsSection.workflow.isVisible(settings: settings))
+            for key in ["常驻额度信息", "其他位置常驻额度"] {
+                let matches = results(key, settings: settings)
+                #expect(matches.count == (aiEnabled ? 1 : 0),
+                    "The quota setting follows the AI page visibility, regardless of notifications and provider selections")
+                #expect(matches.allSatisfy { $0.section == .ai && $0.anchor == .row("常驻额度信息") })
+            }
             #expect(settings == saved)
         }
     }
@@ -324,6 +328,10 @@ struct SettingsSearchTests {
     func findsSettingInTheRequestedLanguage(language: AppLanguage) {
         let title = AppLocalization.string("界面语言", language: language)
         #expect(results(title, locale: language.locale).contains { $0.section == .general && $0.title == "界面语言" })
+        let systemTitle = AppLocalization.string("系统信息", language: language)
+        let systemMatches = results(systemTitle, locale: language.locale).filter { $0.section == .workflow }
+        #expect(systemMatches.contains { $0.title == "播放来源" && $0.anchor == .row("播放来源") })
+        #expect(systemMatches.contains { $0.title == "记录历史" && $0.anchor == .row("记录历史") })
         let dependencyTitle = AppLocalization.string("依赖组件", language: language)
         let matches = results(dependencyTitle, locale: language.locale)
         let dependencies = matches.filter { $0.section == .download }

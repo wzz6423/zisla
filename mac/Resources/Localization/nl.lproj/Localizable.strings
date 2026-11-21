@@ -15,6 +15,7 @@
 "低额度提醒" = "Waarschuwingen bij laag quotum";
 "供应商未提供已验证的本地额度查询接口" = "De aanbieder heeft geen geverifieerde lokale quotum-API";
 "其他位置常驻额度" = "Quotum vastzetten op andere posities";
+"常驻额度信息" = "Permanente quotuminformatie";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Waarschuwen bij 20% of minder resterend quotum, ook wanneer het op is";
 "可用预算" = "Beschikbaar budget";
 "可用额度" = "Beschikbaar quotum";
@@ -92,6 +93,7 @@
 "设置" = "Instellingen";
 "通用" = "Algemeen";
 "工作流" = "Workflow";
+"系统信息" = "Systeeminformatie";
 "信息" = "Info";
 "模型" = "Modellen";
 "宠物" = "Huisdier";

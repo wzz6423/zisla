@@ -15,6 +15,7 @@
 "低额度提醒" = "Alertas de cota baixa";
 "供应商未提供已验证的本地额度查询接口" = "O provedor não oferece uma API local de cota verificada";
 "其他位置常驻额度" = "Fixar cota em outras posições";
+"常驻额度信息" = "Informações permanentes de cota";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Alertar quando restarem 20% ou menos, inclusive ao esgotar";
 "可用预算" = "Orçamento disponível";
 "可用额度" = "Cota disponível";
@@ -92,6 +93,7 @@
 "设置" = "Ajustes";
 "通用" = "Geral";
 "工作流" = "Fluxo de Trabalho";
+"系统信息" = "Informações do sistema";
 "信息" = "Informações";
 "模型" = "Modelos";
 "宠物" = "Pet";

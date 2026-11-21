@@ -15,6 +15,7 @@
 "低额度提醒" = "Peringatan kuota rendah";
 "供应商未提供已验证的本地额度查询接口" = "Penyedia belum menawarkan API kuota lokal yang terverifikasi";
 "其他位置常驻额度" = "Sematkan kuota di posisi lain";
+"常驻额度信息" = "Informasi kuota yang selalu tampil";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Beri peringatan saat sisa kuota 20% atau kurang, termasuk saat habis";
 "可用预算" = "Anggaran tersedia";
 "可用额度" = "Kuota tersedia";
@@ -92,6 +93,7 @@
 "设置" = "Pengaturan";
 "通用" = "Umum";
 "工作流" = "Alur Kerja";
+"系统信息" = "Informasi Sistem";
 "信息" = "Info";
 "模型" = "Model";
 "宠物" = "Pet";

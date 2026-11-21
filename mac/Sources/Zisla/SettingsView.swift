@@ -465,7 +465,7 @@ struct SettingsView: View {
 
     private var workflowContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("工作流模块") {
+            settingsGroup("系统信息") {
                 settingRow(
                     symbol: "music.note.list",
                     title: "播放来源",
@@ -541,10 +541,6 @@ struct SettingsView: View {
                     .disabled(!settingsStore.settings.mediaEnabled)
                 }
                 if settingsStore.settings.supportsStatusIconsInIsland {
-                    rowDivider
-                    featureToggle("其他位置常驻额度", detail: "选择灵动岛其他位置时显示额度，多个账户自动轮播", symbol: "pin", keyPath: \.aiAccountBalancePinnedInCustomIsland)
-                        .disabled(!model.settingsStore.settings.aiProgressEnabled
-                            || !model.settingsStore.settings.sideNoticesEnabled)
                     rowDivider
                     settingRow(symbol: "menubar.rectangle", title: "机器监控状态显示位置", detail: "") {
                         IslandOutlinedPicker(
@@ -1720,6 +1716,12 @@ struct SettingsView: View {
                 }
                 .labelsHidden().pickerStyle(.menu).keepsIntrinsicWidth()
             }
+            if settingsStore.settings.supportsStatusIconsInIsland {
+                rowDivider
+                featureToggle("常驻额度信息", detail: "", symbol: "pin", keyPath: \.aiAccountBalancePinnedInCustomIsland)
+                    .disabled(!model.settingsStore.settings.aiProgressEnabled
+                        || !model.settingsStore.settings.sideNoticesEnabled)
+            }
             rowDivider
             DisclosureGroup(AppLocalization.text("各供应商额度")) {
                 ForEach(AIProvider.allCases, id: \.self) { provider in
@@ -1783,13 +1785,13 @@ struct SettingsView: View {
             featureToggle("AI 任务结果扫光", detail: "任务成功时绿色、失败时红色渐变光带从左向右扫过一次", symbol: "arrow.right", keyPath: \.aiTaskResultSweepEnabled)
                 .disabled(!model.settingsStore.settings.aiProgressEnabled)
             rowDivider
-            VStack(alignment: .leading, spacing: 8) {
-                AppLocalizedText("用量历史")
-                    .font(.system(size: 13, weight: .medium))
+            VStack(alignment: .leading, spacing: 0) {
+                settingRow(symbol: "chart.xyaxis.line", title: "用量历史", detail: "") {
+                    EmptyView()
+                }
                 AIUsageHistorySettingsActions(controller: aiUsageHistory, showHistory: aiUsageHistoryPresentation.present)
-                    .padding(.leading, 20)
+                    .padding(.leading, 46).padding(.trailing, 4).padding(.bottom, 10)
             }
-            .padding(.leading, 46).padding(.trailing, 4).padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string("用量历史", locale: locale)))
         }
@@ -4916,7 +4918,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .info: "灵动岛布局"
         case .dailyBriefing: "每日简报"
         case .notifications: "通知与关怀"
-        case .workflow: "工作流"
+        case .workflow: "系统信息"
         case .mail: "邮件"
         case .ai: "AI"
         case .voice: "语音"

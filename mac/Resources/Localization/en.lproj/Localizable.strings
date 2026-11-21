@@ -15,6 +15,7 @@
 "低额度提醒" = "Low quota alerts";
 "供应商未提供已验证的本地额度查询接口" = "The provider has no verified local quota API";
 "其他位置常驻额度" = "Pin quota at other positions";
+"常驻额度信息" = "Persistent quota information";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Alert when remaining quota is at or below 20%, including exhaustion";
 "可用预算" = "Available budget";
 "可用额度" = "Available quota";
@@ -96,6 +97,7 @@
 "设置" = "Settings";
 "通用" = "General";
 "工作流" = "Workflow";
+"系统信息" = "System Information";
 "信息" = "Info";
 "模型" = "Models";
 "宠物" = "Pet";

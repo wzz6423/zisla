@@ -15,6 +15,7 @@
 "低额度提醒" = "Avvisi di quota bassa";
 "供应商未提供已验证的本地额度查询接口" = "Il fornitore non offre un’API locale di quota verificata";
 "其他位置常驻额度" = "Fissa la quota in altre posizioni";
+"常驻额度信息" = "Informazioni permanenti sulla quota";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Avvisa quando resta il 20% o meno, anche all’esaurimento";
 "可用预算" = "Budget disponibile";
 "可用额度" = "Quota disponibile";
@@ -92,6 +93,7 @@
 "设置" = "Impostazioni";
 "通用" = "Generale";
 "工作流" = "Workflow";
+"系统信息" = "Informazioni di sistema";
 "信息" = "Info";
 "模型" = "Modelli";
 "宠物" = "Pet";

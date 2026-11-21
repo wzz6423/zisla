@@ -15,6 +15,7 @@
 "低额度提醒" = "Alertas de cuota baja";
 "供应商未提供已验证的本地额度查询接口" = "El proveedor no ofrece una API local de cuota verificada";
 "其他位置常驻额度" = "Fijar cuota en otras posiciones";
+"常驻额度信息" = "Información permanente de cuota";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Avisar cuando quede un 20% o menos, incluso al agotarse";
 "可用预算" = "Presupuesto disponible";
 "可用额度" = "Cuota disponible";
@@ -92,6 +93,7 @@
 "设置" = "Ajustes";
 "通用" = "General";
 "工作流" = "Flujo de Trabajo";
+"系统信息" = "Información del sistema";
 "信息" = "Información";
 "模型" = "Modelos";
 "宠物" = "Mascota";

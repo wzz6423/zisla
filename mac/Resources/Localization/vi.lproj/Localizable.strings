@@ -15,6 +15,7 @@
 "低额度提醒" = "Cảnh báo hạn mức thấp";
 "供应商未提供已验证的本地额度查询接口" = "Nhà cung cấp chưa có API hạn mức cục bộ đã được xác minh";
 "其他位置常驻额度" = "Ghim hạn mức ở vị trí khác";
+"常驻额度信息" = "Thông tin hạn mức luôn hiển thị";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Cảnh báo khi còn 20% hoặc thấp hơn, kể cả khi hết";
 "可用预算" = "Ngân sách khả dụng";
 "可用额度" = "Hạn mức khả dụng";
@@ -92,6 +93,7 @@
 "设置" = "Cài đặt";
 "通用" = "Chung";
 "工作流" = "Quy trình";
+"系统信息" = "Thông tin hệ thống";
 "信息" = "Thông tin";
 "模型" = "Mô hình";
 "宠物" = "Thú cưng";

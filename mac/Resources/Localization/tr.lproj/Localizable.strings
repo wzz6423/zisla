@@ -15,6 +15,7 @@
 "低额度提醒" = "Düşük kota uyarıları";
 "供应商未提供已验证的本地额度查询接口" = "Sağlayıcı doğrulanmış bir yerel kota API’si sunmuyor";
 "其他位置常驻额度" = "Diğer konumlarda kotayı sabitle";
+"常驻额度信息" = "Kalıcı kota bilgisi";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Kalan kota 20% veya altına düştüğünde, tükendiğinde de uyar";
 "可用预算" = "Kullanılabilir bütçe";
 "可用额度" = "Kullanılabilir kota";
@@ -92,6 +93,7 @@
 "设置" = "Ayarlar";
 "通用" = "Genel";
 "工作流" = "İş Akışı";
+"系统信息" = "Sistem Bilgileri";
 "信息" = "Bilgi";
 "模型" = "Modeller";
 "宠物" = "Evcil Hayvan";

@@ -143,8 +143,6 @@ enum SettingsSearchIndex {
             rows(.info, ["显示应用标识"])
             entry(.info, "展示更多信息", anchor: .row("展示更多信息"),
                   keywords: ["同时展示监控、AI、音乐与状态提示，详细音乐另起一行"])
-            entry(.workflow, "其他位置常驻额度", anchor: .row("其他位置常驻额度"),
-                  keywords: ["选择灵动岛其他位置时显示额度，多个账户自动轮播"])
             entry(.workflow, "机器监控状态显示位置", anchor: .row("机器监控状态显示位置"), keywords: ["状态栏", "灵动岛"])
         }
         if settings.systemMonitorEnabled {
@@ -198,6 +196,9 @@ enum SettingsSearchIndex {
         rows(.recording, ["恢复默认快捷键"])
 
         rows(.ai, ["低额度提醒", "收起态额度样式", "AI 任务结果扫光"])
+        if settings.supportsStatusIconsInIsland {
+            entry(.ai, "常驻额度信息", anchor: .row("常驻额度信息"), keywords: ["其他位置常驻额度"])
+        }
         entry(.ai, "各供应商额度", anchor: .group("各供应商额度"),
               keywords: ["监控额度", "展示额度", "Qoder 监控地区"] + AIAccountBalanceQoderRegion.allCases.map(\.title)
                 + AIProvider.allCases.map(AIAccountBalanceCatalog.providerName))
