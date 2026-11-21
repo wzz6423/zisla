@@ -166,6 +166,65 @@ struct ClipboardAssistantShellCommandTests {
         #expect(detection.detail == .codeLines(command.split(separator: "\n").count))
     }
 
+    @Test
+    func copiedHereDocumentWithEscapedLinesKeepsItsExactContents() throws {
+        let command = #"""
+        cat > verify.py <<'VERIFY_REVIEW'\\\
+        from pathlib import Path\\\
+        import re\\\
+        from PIL import Image, ImageOps, ImageDraw\\\
+        \\\
+        stage = Path('visual')\\\
+        pages = sorted(stage.glob('page-\\\*.png'))\\\
+        pdf_text = Path('review\\.txt').read_text()\\\
+        segments = [page for page in pdf_text.split('\f') if page.strip()]\\\
+        assert len(pages) == len(segments) > 0\\\
+        assert not re.search(r'\\\\\\\\(?:frac|mathbf|mathrm)|\\\\$\\\\$|�|file:///|https?://', pdf_text)\\\
+        \\\
+        for index, page in enumerate(segments, 1):\\\
+        &#x20;   lines = [line.strip() for line in page.splitlines() if line.strip()]\\\
+        &#x20;   if len(lines) < 15:\\\
+        &#x20;       raise ValueError(f'Page {index} has only {len(lines)} lines: {lines}')\\\
+        &#x20;   print(f'{index}: {len(lines)} 行  {lines[0][:66]}')\\\
+        compact = re.sub(r'\s+','"''"',pdf_text)\\\
+        for s in ['第12题','五段指令流水线','最低位密度','根','491520','97.5','3.75','75%',\\\
+        &#x20;         'S1关中断','S2设备服务','S3开中断','T1中断周期','T2中断服务']:\\\
+        &#x20;   assert s in compact, s\\\
+        \\\
+        for start in range(0,len(pages),5):\\\
+        &#x20;   sheet=Image.new('RGB',(1458,1440),'#ededed')\\\
+        &#x20;   draw=ImageDraw\\.Draw(sheet)\\\
+        &#x20;   for index,page in enumerate(pages[start:start+5]):\\\
+        &#x20;       im=ImageOps.contain(Image.open(page),(464,656))\\\
+        &#x20;       x=(index%3)\\\*486+11\\\
+        &#x20;       y=(index//3)\\\*705+14\\\
+        &#x20;       draw\\.text((x,y),str(start+index+1),fill='#333333')\\\
+        &#x20;       sheet.paste(im,(x,y+19))\\\
+        &#x20;   sheet.save(stage/f'overview-{start//5+1}.jpg',quality=93)\\\
+        VERIFY_REVIEW\\\
+        stat -f '%N %z' noto-\\\*.otf\
+        """#
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: command, enabledKinds: allKinds, shellCommandExists: commandExists
+        ))
+        #expect(detection.kind == .shellCommand)
+        #expect(detection.fullContent == command)
+        #expect(detection.actions == [
+            .runShellCommand(command), .runShellCommandInBackground(command), .search(command), .saveText(command),
+        ])
+    }
+
+    @Test(arguments: [1, 2, 3])
+    func copiedLineEscapesDoNotReplaceCommandEvidence(backslashes: Int) {
+        let suffix = String(repeating: "\\", count: backslashes)
+        let command = ["cat <<'PY'", "from pathlib import Path", "&#x20;   print('hello')", "PY", "stat -f '%N %z' noto-*.otf"]
+            .map { $0 + suffix }.joined(separator: "\n")
+        #expect(shellCommand(from: command) == command)
+        #expect(shellCommand(from: command.replacingOccurrences(of: "cat <<", with: "missing-command <<")) == nil)
+        #expect(shellCommand(from: command.replacingOccurrences(of: "\nPY" + suffix, with: "\nWRONG" + suffix)) == nil)
+        #expect(shellCommand(from: command + "\nmissing-command" + suffix) == nil)
+    }
+
     @Test(arguments: [
         ("<<EOF", "EOF"), ("<< 'EOF'", "EOF"), ("<<\"EOF\"", "EOF"),
         ("<<\\EOF", "EOF"), ("<<E\"OF\"", "EOF"), ("<<'END OF SCRIPT'", "END OF SCRIPT"),
@@ -195,6 +254,8 @@ struct ClipboardAssistantShellCommandTests {
         "cat <<'EOF'\nprint('hello')\nEOF\n", "cat <<EOF\nEO\\\nF\npwd",
         "cat <<EOF\npayload\\\\\nEOF\npwd",
         "cat <<-EOF\nEO\\\n\tF\nEOF\npwd",
+        "cat <<EO\\\nF\npayload\nEOF\npwd", "cat <<EOF\\ \npayload\nEOF \npwd",
+        "echo ${value:-{} <<'EOF'\nnot-a-command\nEOF\npwd",
     ])
     func hereDocumentEndingsKeepSignificantWhitespaceAndUnquotedContinuations(command: String) {
         #expect(shellCommand(from: command) == command)

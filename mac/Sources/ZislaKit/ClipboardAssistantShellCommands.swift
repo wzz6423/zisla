@@ -41,12 +41,19 @@ extension ClipboardAssistantDetector {
         }
         let hasPrompt = command.hasPrefix("$ ") || command.hasPrefix("% ")
         if hasPrompt { command.removeFirst(2) }
-        let lines = command.components(separatedBy: "\n")
+        var lines = command.components(separatedBy: "\n")
         if explicitlyShell {
             return lines.contains(where: {
                 let line = $0.trimmingCharacters(in: .whitespaces)
                 return !line.isEmpty && !line.hasPrefix("#")
             }) ? command.trimmingCharacters(in: .whitespacesAndNewlines) : nil
+        }
+        // Some copied shell blocks escape every physical line. Ignore that copy formatting
+        // for recognition while execution and save actions retain the original text.
+        if lines.count > 1, lines[0].contains("<<"), lines.dropLast().allSatisfy({ $0.hasSuffix("\\") }) {
+            lines = lines.map { line in
+                String(line.dropLast(line.reversed().prefix(while: { $0 == "\\" }).count))
+            }
         }
         var hereDocuments: [(delimiter: String, stripsTabs: Bool, isQuoted: Bool)] = []
         var invocation = ""
@@ -68,10 +75,9 @@ extension ClipboardAssistantDetector {
             invocation += line
             if index < lines.count - 1, line.hasSuffix("\\") {
                 invocation.removeLast()
-                invocation += " "
                 continue
             }
-            let logicalLine = invocation.trimmingCharacters(in: .whitespaces)
+            let logicalLine = String(invocation.drop(while: \.isWhitespace))
             invocation = ""
             if logicalLine.isEmpty || logicalLine.hasPrefix("#") { continue }
             guard let name = shellCommandName(logicalLine), commandExists(name) else { return nil }
@@ -165,8 +171,6 @@ extension ClipboardAssistantDetector {
                     endings.append(96)
                 } else if next == 40, ending == 41 {
                     endings.append(41)
-                } else if next == 123, ending == 125 {
-                    endings.append(125)
                 }
             }
             // Keep UTF-16 offsets so token ranges still reference the original clipboard words.
