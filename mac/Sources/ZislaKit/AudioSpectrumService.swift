@@ -152,6 +152,10 @@ final class AudioFrequencyAnalyzer {
 
 @MainActor
 public final class AudioSpectrumService: ObservableObject {
+    typealias AudibilityCheckScheduling = @MainActor (
+        @escaping @MainActor @Sendable () -> Void
+    ) -> @MainActor () -> Void
+
     public static let shared = AudioSpectrumService()
     public static let bandCount = AudioFrequencyAnalyzer.bandCount
 
@@ -162,14 +166,31 @@ public final class AudioSpectrumService: ObservableObject {
     @Published public private(set) var isAudible = false
 
     private let capture: any AudioSpectrumCapturing
+    private let now: @MainActor () -> TimeInterval
+    private let scheduleAudibilityCheck: AudibilityCheckScheduling
     private var isRequested = false
     private var analysisMode = AudioSpectrumAnalysisMode.visualization
     private var generation: UInt64 = 0
     private var lastAudibleTime: TimeInterval?
+    private var cancelAudibilityCheck: (@MainActor () -> Void)?
 
-    init(capture: any AudioSpectrumCapturing = SystemAudioSpectrumCapture()) {
+    init(
+        capture: any AudioSpectrumCapturing = SystemAudioSpectrumCapture(),
+        now: @escaping @MainActor () -> TimeInterval = { Date.timeIntervalSinceReferenceDate },
+        scheduleAudibilityCheck: @escaping AudibilityCheckScheduling = { check in
+            let timer = Timer(timeInterval: AudioSpectrumAnalysisMode.audibilityOnly.minimumInterval, repeats: true) { _ in
+                MainActor.assumeIsolated { check() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            return { timer.invalidate() }
+        }
+    ) {
         self.capture = capture
+        self.now = now
+        self.scheduleAudibilityCheck = scheduleAudibilityCheck
     }
+
+    isolated deinit { stop() }
 
     public func startMonitoring(hasActivePlayback: Bool) {
         guard hasActivePlayback else {
@@ -182,6 +203,11 @@ public final class AudioSpectrumService: ObservableObject {
         generation &+= 1
         let currentGeneration = generation
         levels = Self.silentLevels
+        // A process can keep output I/O running after its tap stops delivering samples.
+        cancelAudibilityCheck = scheduleAudibilityCheck { [weak self] in
+            guard let self, self.generation == currentGeneration else { return }
+            self.refreshAudibility()
+        }
 
         capture.setAnalysisMode(analysisMode)
         capture.start(
@@ -200,6 +226,8 @@ public final class AudioSpectrumService: ObservableObject {
                           self.generation == currentGeneration
                     else { return }
                     self.isRequested = false
+                    self.cancelAudibilityCheck?()
+                    self.cancelAudibilityCheck = nil
                     self.levels = Self.silentLevels
                     if self.isAudible { self.isAudible = false }
                     self.lastAudibleTime = nil
@@ -222,6 +250,8 @@ public final class AudioSpectrumService: ObservableObject {
         guard isRequested || levels.contains(where: { $0 > 0 }) else { return }
         isRequested = false
         generation &+= 1
+        cancelAudibilityCheck?()
+        cancelAudibilityCheck = nil
         capture.stop()
         levels = Self.silentLevels
         if isAudible { isAudible = false }
@@ -232,12 +262,19 @@ public final class AudioSpectrumService: ObservableObject {
         if analysisMode == .visualization, let frequencyLevels = frame.levels {
             levels = Self.smoothed(previous: levels, target: frequencyLevels)
         }
-        let now = Date.timeIntervalSinceReferenceDate
         if frame.rootMeanSquare >= 0.004 {
-            lastAudibleTime = now
+            lastAudibleTime = now()
             if !isAudible { isAudible = true }
-        } else if isAudible, now - (lastAudibleTime ?? now) >= 0.45 {
+        } else {
+            refreshAudibility()
+        }
+    }
+
+    private func refreshAudibility() {
+        let now = now()
+        if isAudible, now - (lastAudibleTime ?? now) >= 0.45 {
             isAudible = false
+            levels = Self.silentLevels
         }
     }
 
