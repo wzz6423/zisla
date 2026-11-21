@@ -60,20 +60,20 @@ struct FileShelfShakeView: View {
 
     private func dropCard<Content: View>(isTargeted: Bool, tint: Color, @ViewBuilder content: () -> Content) -> some View {
         content()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .islandGlassSurface(.card, cornerRadius: 18)
-        .background {
-            Self.standaloneBacking(style: settingsStore.settings.islandVisualStyle, reduceTransparency: reduceTransparency)
-        }
-        .overlay {
-            if isTargeted {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(tint.opacity(0.8), lineWidth: 2)
-                    .allowsHitTesting(false)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .islandGlassSurface(.card, cornerRadius: 18)
+            .background {
+                Self.standaloneBacking(style: settingsStore.settings.islandVisualStyle, reduceTransparency: reduceTransparency)
             }
-        }
-        .animation(reduceMotion ? nil : ZislaMotion.hover, value: isTargeted)
-        .accessibilityElement(children: .combine)
+            .overlay {
+                if isTargeted {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(tint.opacity(0.8), lineWidth: 2)
+                        .allowsHitTesting(false)
+                }
+            }
+            .animation(reduceMotion ? nil : ZislaMotion.hover, value: isTargeted)
+            .accessibilityElement(children: .combine)
     }
 
     static func standaloneBacking(style: IslandVisualStyle, reduceTransparency: Bool) -> some View {

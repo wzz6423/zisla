@@ -154,7 +154,7 @@ struct PermissionsSettingsViewTests {
             let actionKey = permission.requiresManualSetup ? "onboarding.open_settings" : "onboarding.grant"
             #expect(button.value(forKey: "accessibilityLabel") as? String
                 == AppLocalization.string(actionKey, language: language) + " · "
-                    + AppLocalization.string(permission.titleKey, language: language))
+                + AppLocalization.string(permission.titleKey, language: language))
         }
     }
 

@@ -17,7 +17,7 @@ struct ScreenRecordingTextLayoutTests {
         #expect(bounds.width < 200 && bounds.height < 100,
                 "Short text must not retain the default 400 × 120 empty selection rectangle")
         #expect(!RecordingCanvasGeometry.hit(.annotation(annotation), at: CGPoint(x: 550, y: 230),
-            canvas: canvas, tolerance: 4), "The former blank area must not intercept other canvas elements")
+                                             canvas: canvas, tolerance: 4), "The former blank area must not intercept other canvas elements")
     }
 
     @Test
@@ -42,10 +42,10 @@ struct ScreenRecordingTextLayoutTests {
     @Test
     func textSelectionStaysInsideTheCanvasWhenSavedNearTheBottom() {
         let annotation = RecordingAnnotation(kind: .text, start: 0, end: 1,
-            y: 0.97, endY: 0.99, text: "Line\nLine\nLine")
+                                             y: 0.97, endY: 0.99, text: "Line\nLine\nLine")
         let bounds = RecordingCanvasElement.annotation(annotation).bounds(canvas: canvas)
         #expect(CGRect(origin: .zero, size: canvas).contains(bounds),
-            "Saved text near the edge must not place selection handles outside the canvas")
+                "Saved text near the edge must not place selection handles outside the canvas")
         #expect(bounds.height > 0)
     }
 
@@ -73,8 +73,8 @@ struct ScreenRecordingTextLayoutTests {
         var pixels = [UInt8](repeating: 0, count: 800 * 600 * 4)
         try pixels.withUnsafeMutableBytes { pointer in
             let context = try #require(CGContext(data: pointer.baseAddress, width: 800, height: 600,
-                bitsPerComponent: 8, bytesPerRow: 800 * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: 800 * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(raster, in: frame)
         }
         let occupied = stride(from: 0, to: pixels.count, by: 4).filter { pixels[$0 + 3] > 64 }
@@ -110,8 +110,8 @@ struct ScreenRecordingTextLayoutTests {
         view.configure(project: project, sourceTime: 0, baseImage: base, selection: .annotation(annotation.id), editable: true)
         let box = RecordingCanvasElement.annotation(annotation).bounds(canvas: canvas)
         let event = try #require(NSEvent.mouseEvent(with: .leftMouseDown,
-            location: view.convert(CGPoint(x: box.midX, y: box.midY), to: nil), modifierFlags: [], timestamp: 0,
-            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 2, pressure: 1))
+                                                    location: view.convert(CGPoint(x: box.midX, y: box.midY), to: nil), modifierFlags: [], timestamp: 0,
+                                                    windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 2, pressure: 1))
         view.mouseDown(with: event)
         let editor = try #require(view.textEditor)
         let initial = editor.frame

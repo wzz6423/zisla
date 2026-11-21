@@ -34,7 +34,7 @@ struct ScreenshotToolAttributesLayoutTests {
             .environment(\.locale, language.locale)
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         let window = NSWindow(contentRect: CGRect(origin: .zero, size: host.fittingSize),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -69,9 +69,9 @@ struct ScreenshotToolAttributesLayoutTests {
             let font = NSFont.systemFont(ofSize: 12, weight: key == "保留左右标记" ? .regular : .semibold)
             let naturalWidth = (text as NSString).size(withAttributes: [.font: font]).width
             #expect(frame.width + 1 >= naturalWidth,
-                "\(tool.rawValue) \(language.rawValue) \(text) requires \(naturalWidth)pt but receives \(frame.width)pt")
+                    "\(tool.rawValue) \(language.rawValue) \(text) requires \(naturalWidth)pt but receives \(frame.width)pt")
             #expect(host.bounds.insetBy(dx: -1, dy: -1).contains(frame),
-                "\(tool.rawValue) \(language.rawValue) \(text) must remain inside the 38pt toolbar")
+                    "\(tool.rawValue) \(language.rawValue) \(text) must remain inside the 38pt toolbar")
         }
         #expect(model.image === image && model.annotations.isEmpty && !model.canUndo)
         #expect(model.highlighterShowsMarkers)

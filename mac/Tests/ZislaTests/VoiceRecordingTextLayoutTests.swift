@@ -18,19 +18,19 @@ struct VoiceRecordingTextLayoutTests {
         for edge in [IslandEdge.top, .bottom] {
             let geometry = recordingGeometry(edge: edge, language: language)
             #expect(geometry.transcriptRowFrame.width - 24 >= naturalWidth,
-                "The 32pt idle circle must reserve every glyph of the localized listening prompt")
+                    "The 32pt idle circle must reserve every glyph of the localized listening prompt")
             #expect(geometry.surfaceSize.height == 52,
-                "The listening prompt must keep the existing single 20pt transcript row")
+                    "The listening prompt must keep the existing single 20pt transcript row")
             for scale in [CGFloat(1), 2] {
                 let actual = try await render(VoiceTranscriptionView(isRecording: true, transcript: " \n ",
-                    errorDescription: nil, geometry: geometry, keepsIconsAdjacent: true)
-                    .mask(recordingMask(geometry)), geometry: geometry, language: language,
+                                                                     errorDescription: nil, geometry: geometry, keepsIconsAdjacent: true)
+                        .mask(recordingMask(geometry)), geometry: geometry, language: language,
                     reduceMotion: true, scale: scale)
                 let expected = try await render(referenceRow(text, geometry: geometry,
-                    direction: language.isRightToLeft ? .rightToLeft : .leftToRight),
-                    geometry: geometry, language: language, reduceMotion: true, scale: scale)
+                                                             direction: language.isRightToLeft ? .rightToLeft : .leftToRight),
+                                                geometry: geometry, language: language, reduceMotion: true, scale: scale)
                 #expect(try differences(actual, expected, in: geometry.transcriptRowFrame) == 0,
-                    "The complete \(language.rawValue) listening prompt must survive the rounded island mask")
+                        "The complete \(language.rawValue) listening prompt must survive the rounded island mask")
             }
         }
     }
@@ -46,14 +46,14 @@ struct VoiceRecordingTextLayoutTests {
             : "开头 " + String(repeating: "实时识别内容需要继续更新 ", count: 10) + "录音结尾"
         for reduceMotion in [false, true] {
             let actual = try await render(VoiceTranscriptionView(isRecording: true, transcript: " \n\(text)\n ",
-                errorDescription: nil, geometry: geometry, keepsIconsAdjacent: true)
-                .mask(recordingMask(geometry)), geometry: geometry, language: language,
+                                                                 errorDescription: nil, geometry: geometry, keepsIconsAdjacent: true)
+                    .mask(recordingMask(geometry)), geometry: geometry, language: language,
                 reduceMotion: reduceMotion)
             let expected = try await render(referenceRow(text, geometry: geometry, alignment: .trailing,
-                direction: direction),
-                geometry: geometry, language: language, reduceMotion: reduceMotion)
+                                                         direction: direction),
+                                            geometry: geometry, language: language, reduceMotion: reduceMotion)
             #expect(try differences(actual, expected, in: geometry.transcriptRowFrame) == 0,
-                "Live transcription must retain its logical ending in \(direction), including with Reduce Motion")
+                    "Live transcription must retain its logical ending in \(direction), including with Reduce Motion")
         }
     }
 
@@ -63,13 +63,13 @@ struct VoiceRecordingTextLayoutTests {
         let direction: LayoutDirection = language.isRightToLeft ? .rightToLeft : .leftToRight
         let text = language == .arabic ? "جارٍ" : "lắng"
         let actual = try await render(VoiceTranscriptionView(isRecording: true, transcript: text,
-            errorDescription: nil, geometry: geometry, keepsIconsAdjacent: true)
-            .mask(recordingMask(geometry)), geometry: geometry, language: language,
+                                                             errorDescription: nil, geometry: geometry, keepsIconsAdjacent: true)
+                .mask(recordingMask(geometry)), geometry: geometry, language: language,
             reduceMotion: true, scale: scale)
         let expected = try await render(referenceRow(text, geometry: geometry, direction: direction),
-            geometry: geometry, language: language, reduceMotion: true, scale: scale)
+                                        geometry: geometry, language: language, reduceMotion: true, scale: scale)
         #expect(try differences(actual, expected, in: geometry.transcriptRowFrame) == 0,
-            "A short live transcript must retain every diacritic inside the static clipping window")
+                "A short live transcript must retain every diacritic inside the static clipping window")
     }
 
     @Test(arguments: [IslandEdge.top, .right], [LayoutDirection.leftToRight, .rightToLeft])
@@ -83,13 +83,13 @@ struct VoiceRecordingTextLayoutTests {
             : "录音失败 " + String(repeating: "请检查麦克风权限和输入设备 ", count: 8) + "然后重新尝试"
         for progress in [0.0, 1] {
             let actual = try await render(VoiceTranscriptionView(isRecording: true, transcript: "stale transcript",
-                errorDescription: message, geometry: geometry, keepsIconsAdjacent: true),
-                geometry: geometry, language: language, progress: progress)
+                                                                 errorDescription: message, geometry: geometry, keepsIconsAdjacent: true),
+                                          geometry: geometry, language: language, progress: progress)
             let expected = try await render(referenceRow(message, geometry: geometry,
-                alignment: progress == 0 ? .leading : .trailing, direction: direction), geometry: geometry,
-                language: language, progress: progress)
+                                                         alignment: progress == 0 ? .leading : .trailing, direction: direction), geometry: geometry,
+                                            language: language, progress: progress)
             #expect(try differences(actual, expected, in: geometry.transcriptRowFrame) == 0,
-                "A recording error must be readable from its beginning and finish its existing single scroll pass")
+                    "A recording error must be readable from its beginning and finish its existing single scroll pass")
         }
     }
 
@@ -97,17 +97,17 @@ struct VoiceRecordingTextLayoutTests {
     func aScreenConstrainedListeningPromptStartsAtItsHead(direction: LayoutDirection) async throws {
         let language: AppLanguage = direction == .rightToLeft ? .arabic : .dutch
         let geometry = VoiceRecordingIslandGeometry(collapsedSize: CGSize(width: 32, height: 32),
-            availableSize: CGSize(width: 70, height: 52))
+                                                    availableSize: CGSize(width: 70, height: 52))
         let text = AppLocalization.string("正在聆听…", language: language)
         for progress in [0.0, 1] {
             let actual = try await render(VoiceTranscriptionView(isRecording: true, transcript: "",
-                errorDescription: nil, geometry: geometry, keepsIconsAdjacent: true),
-                geometry: geometry, language: language, progress: progress)
+                                                                 errorDescription: nil, geometry: geometry, keepsIconsAdjacent: true),
+                                          geometry: geometry, language: language, progress: progress)
             let expected = try await render(referenceRow(text, geometry: geometry,
-                alignment: progress == 0 ? .leading : .trailing, direction: direction), geometry: geometry,
-                language: language, progress: progress)
+                                                         alignment: progress == 0 ? .leading : .trailing, direction: direction), geometry: geometry,
+                                            language: language, progress: progress)
             #expect(try differences(actual, expected, in: geometry.transcriptRowFrame) == 0,
-                "When screen space constrains a localized status, its scroll must include both its beginning and ending")
+                    "When screen space constrains a localized status, its scroll must include both its beginning and ending")
         }
     }
 
@@ -116,12 +116,12 @@ struct VoiceRecordingTextLayoutTests {
         let geometry = recordingGeometry(edge: .top, language: .simplifiedChinese)
         for error in [String?.none, ""] {
             let actual = try await render(VoiceTranscriptionView(isRecording: false, transcript: "previous take",
-                errorDescription: error, geometry: geometry, keepsIconsAdjacent: true),
-                geometry: geometry, language: .simplifiedChinese, reduceMotion: true)
+                                                                 errorDescription: error, geometry: geometry, keepsIconsAdjacent: true),
+                                          geometry: geometry, language: .simplifiedChinese, reduceMotion: true)
             let expected = try await render(referenceRow(error ?? "…", geometry: geometry),
-                geometry: geometry, language: .simplifiedChinese, reduceMotion: true)
+                                            geometry: geometry, language: .simplifiedChinese, reduceMotion: true)
             #expect(try differences(actual, expected, in: geometry.transcriptRowFrame, requiresText: error == nil) == 0,
-                "Preparation must not expose a prior take, and an empty error must not claim the microphone is listening")
+                    "Preparation must not expose a prior take, and an empty error must not claim the microphone is listening")
         }
     }
 
@@ -138,10 +138,10 @@ struct VoiceRecordingTextLayoutTests {
             let actual = try await render(TransientNoticeView(message: message, geometry: geometry)
                 .mask(recordingMask(geometry)), geometry: geometry, language: language, progress: progress)
             let expected = try await render(referenceRow(message, geometry: geometry,
-                alignment: progress == 0 ? .leading : .trailing, direction: direction, opacity: 0.82),
-                geometry: geometry, language: language, progress: progress)
+                                                         alignment: progress == 0 ? .leading : .trailing, direction: direction, opacity: 0.82),
+                                            geometry: geometry, language: language, progress: progress)
             #expect(try differences(actual, expected, in: geometry.transcriptRowFrame) == 0,
-                "Transient errors must read from head to tail inside the same physical row in every placement")
+                    "Transient errors must read from head to tail inside the same physical row in every placement")
         }
     }
 
@@ -156,35 +156,35 @@ struct VoiceRecordingTextLayoutTests {
             ? "بداية " + String(repeating: "هذا نص للاختبار ", count: 10) + "النهاية"
             : "开头 " + String(repeating: "保持原有滚动方向 ", count: 10) + "结尾"
         let actual = try await render(MarqueeText(text, font: .system(size: 10.5),
-            textColor: .white.opacity(0.72), fontWeight: .medium, repeats: false,
-            scrollProgress: progress, viewportHeight: row.height)
-            .environment(\.layoutDirection, direction)
-            .padding(.horizontal, 12).frame(width: row.width, height: row.height)
-            .position(x: row.midX, y: row.midY).environment(\.layoutDirection, .leftToRight),
+                                                  textColor: .white.opacity(0.72), fontWeight: .medium, repeats: false,
+                                                  scrollProgress: progress, viewportHeight: row.height)
+                .environment(\.layoutDirection, direction)
+                .padding(.horizontal, 12).frame(width: row.width, height: row.height)
+                .position(x: row.midX, y: row.midY).environment(\.layoutDirection, .leftToRight),
             geometry: geometry, language: language)
         let expected = try await render(referenceRow(text, geometry: geometry,
-            alignment: progress == 0 ? .leading : .trailing, direction: direction),
-            geometry: geometry, language: language)
+                                                     alignment: progress == 0 ? .leading : .trailing, direction: direction),
+                                        geometry: geometry, language: language)
         #expect(try differences(actual, expected, in: row) == 0,
-            "Default marquees must preserve their existing logical head-to-tail direction in RTL interfaces")
+                "Default marquees must preserve their existing logical head-to-tail direction in RTL interfaces")
     }
 
     private func recordingGeometry(edge: IslandEdge, language: AppLanguage) -> VoiceRecordingIslandGeometry {
         let collapsed = CGSize(width: 32, height: 32)
         let layout = IslandModuleLayout.compactSurface(collapsedSize: collapsed, overflowWidth: 32,
-            edge: edge, locale: language.locale)
+                                                       edge: edge, locale: language.locale)
         return VoiceRecordingIslandGeometry(collapsedSize: collapsed, availableSize: layout.islandSize, edge: edge)
     }
 
     private func recordingMask(_ geometry: VoiceRecordingIslandGeometry) -> IslandRevealMask {
         IslandRevealMask(collapsedSize: geometry.collapsedSize, expandedSize: geometry.surfaceSize,
-            isCollapsed: false, expandedBottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius,
-            layoutStyle: .pill)
+                         isCollapsed: false, expandedBottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius,
+                         layoutStyle: .pill)
     }
 
     private func referenceRow(_ text: String, geometry: VoiceRecordingIslandGeometry,
-        alignment: Alignment = .leading, direction: LayoutDirection = .leftToRight,
-        opacity: Double = 0.72) -> some View {
+                              alignment: Alignment = .leading, direction: LayoutDirection = .leftToRight,
+                              opacity: Double = 0.72) -> some View {
         let row = geometry.transcriptRowFrame
         return Text(text)
             .font(.system(size: 10.5)).fontWeight(.medium)
@@ -199,7 +199,7 @@ struct VoiceRecordingTextLayoutTests {
     }
 
     private func render(_ content: some View, geometry: VoiceRecordingIslandGeometry, language: AppLanguage,
-        progress: Double = 0, reduceMotion: Bool = false, scale: CGFloat = 2) async throws -> NSBitmapImageRep {
+                        progress: Double = 0, reduceMotion: Bool = false, scale: CGFloat = 2) async throws -> NSBitmapImageRep {
         let size = geometry.surfaceSize
         let host = NSHostingView(rootView: content.frame(width: size.width, height: size.height)
             .background(.black).environment(\.locale, language.locale)
@@ -210,7 +210,7 @@ struct VoiceRecordingTextLayoutTests {
             })
         host.sizingOptions = []
         let window = RasterPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                                 styleMask: .borderless, backing: .buffered, defer: false)
         window.renderScale = scale
         window.isReleasedWhenClosed = false
         window.contentView = host
@@ -231,7 +231,7 @@ struct VoiceRecordingTextLayoutTests {
     }
 
     private func differences(_ actual: NSBitmapImageRep, _ expected: NSBitmapImageRep, in rect: CGRect,
-        requiresText: Bool = true) throws -> Int {
+                             requiresText: Bool = true) throws -> Int {
         #expect(actual.pixelsWide == expected.pixelsWide && actual.pixelsHigh == expected.pixelsHigh)
         let scale = CGFloat(actual.pixelsWide) / actual.size.width
         var count = 0

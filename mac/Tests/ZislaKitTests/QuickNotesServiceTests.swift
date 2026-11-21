@@ -17,16 +17,16 @@ struct QuickNotesServiceTests {
         var originals: [String] = []
         var htmlWrites = 0
         let service = QuickNotesService(welcomeDismissalDefaults: defaults,
-            operations: .init(listNotes: { .success([]) }, readNote: { _ in .success(.init(plainText: savedText,
-                bodyHTML: "<img src='drawing'>", requiresNativeTextEditing: true)) },
-                writeNote: { _, _ in htmlWrites += 1; return .success(()) },
-                createNote: { _, _ in .success("created") }, deleteNote: { _ in .success(()) },
-                writeNativeText: { _, edit in
-                    originals.append(edit.originalPlainText)
-                    #expect(edit.originalPlainText == savedText)
-                    savedText = edit.updatedPlainText
-                    return .success(())
-                }), saveDelay: .zero)
+                                        operations: .init(listNotes: { .success([]) }, readNote: { _ in .success(.init(plainText: savedText,
+                                                                                                                       bodyHTML: "<img src='drawing'>", requiresNativeTextEditing: true)) },
+                                        writeNote: { _, _ in htmlWrites += 1; return .success(()) },
+                                        createNote: { _, _ in .success("created") }, deleteNote: { _ in .success(()) },
+                                        writeNativeText: { _, edit in
+                                            originals.append(edit.originalPlainText)
+                                            #expect(edit.originalPlainText == savedText)
+                                            savedText = edit.updatedPlainText
+                                            return .success(())
+                                        }), saveDelay: .zero)
         service.applyFetchedNotes([.init(id: "note", title: "手写", modifiedAt: .now)])
         service.select(id: "note")
         let content = try #require(await service.loadNote())
@@ -60,13 +60,13 @@ struct QuickNotesServiceTests {
         var originals: [String] = []
         var shouldFail = true
         let service = QuickNotesService(welcomeDismissalDefaults: defaults,
-            operations: .init(listNotes: { .success([]) }, readNote: { _ in .success(.init(plainText: "\u{FFFC}", bodyHTML: "<img src='drawing'>", requiresNativeTextEditing: true)) },
-                writeNote: { _, _ in Issue.record("Native save must not write HTML"); return .success(()) },
-                createNote: { _, _ in .success("created") }, deleteNote: { _ in .success(()) },
-                writeNativeText: { _, edit in
-                    originals.append(edit.originalPlainText)
-                    return shouldFail ? .failure(.failed("injected permission failure")) : .success(())
-                }), saveDelay: .zero)
+                                        operations: .init(listNotes: { .success([]) }, readNote: { _ in .success(.init(plainText: "\u{FFFC}", bodyHTML: "<img src='drawing'>", requiresNativeTextEditing: true)) },
+                                                          writeNote: { _, _ in Issue.record("Native save must not write HTML"); return .success(()) },
+                                                          createNote: { _, _ in .success("created") }, deleteNote: { _ in .success(()) },
+                                                          writeNativeText: { _, edit in
+                                                              originals.append(edit.originalPlainText)
+                                                              return shouldFail ? .failure(.failed("injected permission failure")) : .success(())
+                                                          }), saveDelay: .zero)
         service.applyFetchedNotes([.init(id: "note", title: "手写", modifiedAt: .now)])
         service.select(id: "note")
         _ = await service.loadNote()

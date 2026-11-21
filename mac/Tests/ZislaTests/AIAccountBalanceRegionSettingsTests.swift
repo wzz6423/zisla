@@ -9,7 +9,7 @@ import ZislaKit
 struct AIAccountBalanceRegionSettingsTests {
     @Test func qoderRegionBindingsAllowBothOrNeitherWithoutChangingProviderSelection() {
         var settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.coder, .trae, .zed],
-            aiAccountBalanceDisplayedProviders: [.trae, .zed], aiAccountBalanceQoderRegions: [])
+                                       aiAccountBalanceDisplayedProviders: [.trae, .zed], aiAccountBalanceQoderRegions: [])
         let binding = Binding(get: { settings }, set: { settings = $0 })
         let global = SettingsView.qoderRegionBinding(.global, settings: binding)
         let china = SettingsView.qoderRegionBinding(.china, settings: binding)
@@ -33,7 +33,7 @@ struct AIAccountBalanceRegionSettingsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let detector = RegionStatusDetector()
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
-            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
         defer { monitor.stop() }
         let global = AIAccountBalanceProviderStatus(monitor: monitor, provider: .coder, language: language, qoderRegion: .global)
         let china = AIAccountBalanceProviderStatus(monitor: monitor, provider: .coder, language: language, qoderRegion: .china)

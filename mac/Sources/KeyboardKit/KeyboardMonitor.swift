@@ -480,15 +480,15 @@ extension KeyboardMonitor {
             if state.isPressed {
                 if let activeSource = state.activeSource,
                    activeSource.processID != transition.source.processID
-                    || (!event.isRepeat && isWithinDuplicateWindow(
-                        transition.timestamp,
-                        of: state.lastDown?.timestamp
-                    ))
-                    || (activeSource.path != transition.source.path
-                        && isWithinDuplicateWindow(
-                            transition.timestamp,
-                            of: state.lastDown?.timestamp
-                        )) {
+                   || (!event.isRepeat && isWithinDuplicateWindow(
+                       transition.timestamp,
+                       of: state.lastDown?.timestamp
+                   ))
+                   || (activeSource.path != transition.source.path
+                       && isWithinDuplicateWindow(
+                           transition.timestamp,
+                           of: state.lastDown?.timestamp
+                       )) {
                     state.suppressedSources.insert(transition.source)
                     return true
                 }

@@ -80,29 +80,29 @@ struct MailIndexReader: Sendable {
 
         let mailboxPlaceholders = Array(repeating: "?", count: queriedMailboxes.count).joined(separator: ", ")
         let sql = """
-            SELECT
-                m.message_id,
-                COALESCE((
-                    SELECT a.address
-                    FROM sender_addresses AS sa
-                    INNER JOIN addresses AS a ON a.ROWID = sa.address
-                    WHERE sa.sender = m.sender
-                    ORDER BY a.ROWID ASC
-                    LIMIT 1
-                ), ''),
-                COALESCE(s.subject, ''),
-                COALESCE(sm.summary, ''),
-                COALESCE(m.display_date, m.date_received, 0),
-                m.read,
-                mb.url
-            FROM messages AS m
-            INNER JOIN mailboxes AS mb ON mb.ROWID = m.mailbox
-            LEFT JOIN subjects AS s ON s.ROWID = m.subject
-            LEFT JOIN summaries AS sm ON sm.ROWID = m.summary
-            WHERE m.deleted = 0 AND m.mailbox IN (\(mailboxPlaceholders))
-            ORDER BY COALESCE(m.display_date, m.date_received) DESC, m.message_id DESC, m.ROWID DESC
-            LIMIT ? OFFSET ?
-            """
+        SELECT
+            m.message_id,
+            COALESCE((
+                SELECT a.address
+                FROM sender_addresses AS sa
+                INNER JOIN addresses AS a ON a.ROWID = sa.address
+                WHERE sa.sender = m.sender
+                ORDER BY a.ROWID ASC
+                LIMIT 1
+            ), ''),
+            COALESCE(s.subject, ''),
+            COALESCE(sm.summary, ''),
+            COALESCE(m.display_date, m.date_received, 0),
+            m.read,
+            mb.url
+        FROM messages AS m
+        INNER JOIN mailboxes AS mb ON mb.ROWID = m.mailbox
+        LEFT JOIN subjects AS s ON s.ROWID = m.subject
+        LEFT JOIN summaries AS sm ON sm.ROWID = m.summary
+        WHERE m.deleted = 0 AND m.mailbox IN (\(mailboxPlaceholders))
+        ORDER BY COALESCE(m.display_date, m.date_received) DESC, m.message_id DESC, m.ROWID DESC
+        LIMIT ? OFFSET ?
+        """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
             sqlite3_finalize(statement)

@@ -32,8 +32,8 @@ struct PointerEdgeMonitorTests {
         }) { _, _ in pointerEvents += 1 }
         for type in [NSEvent.EventType.flagsChanged, .keyDown, .keyUp] {
             let event = try #require(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
-                                                    timestamp: 0, windowNumber: 0, context: nil, characters: "",
-                                                    charactersIgnoringModifiers: "", isARepeat: false, keyCode: 55))
+                                                      timestamp: 0, windowNumber: 0, context: nil, characters: "",
+                                                      charactersIgnoringModifiers: "", isARepeat: false, keyCode: 55))
             monitor.emit(event)
         }
         #expect(keyboardEvents == [.flagsChanged, .keyDown, .keyUp])

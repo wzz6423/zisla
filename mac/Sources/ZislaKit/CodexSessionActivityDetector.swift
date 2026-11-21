@@ -176,7 +176,7 @@ public final class CodexSessionActivityDetector {
         self.sessionsDirectory = sessionsDirectory
         self.sessionIndexURL = sessionIndexURL
             ?? sessionsDirectory.deletingLastPathComponent()
-                .appendingPathComponent("session_index.jsonl")
+            .appendingPathComponent("session_index.jsonl")
         self.maxRolloutFiles = max(1, maxRolloutFiles)
         self.maximumRolloutAge = max(0, maximumRolloutAge)
         jsonlReader = IncrementalJSONLReader(initialTailBytes: initialTailBytes)
@@ -917,7 +917,7 @@ public final class CodexSessionActivityDetector {
             .contentModificationDateKey,
             .fileSizeKey,
         ]),
-        values.isRegularFile == true else {
+            values.isRegularFile == true else {
             sessionIndexCache = nil
             return [:]
         }

@@ -185,7 +185,7 @@ final class ApplicationIconDataCache {
         context.flushGraphics()
         guard let pixels = bitmap.bitmapData,
               stride(from: 3, to: bitmap.bytesPerRow * bitmap.pixelsHigh, by: 4)
-                .contains(where: { pixels[$0] != 0 }) else { return nil }
+                  .contains(where: { pixels[$0] != 0 }) else { return nil }
         return bitmap.representation(using: .png, properties: [:])
     }
 }
@@ -340,13 +340,11 @@ final class AudioPlaybackMonitor {
         if let processIdentifier,
            let source = sources.first(where: {
                $0.processIdentifiers.contains(processIdentifier)
-           })
-        {
+           }) {
             return source.id
         }
         if let bundleIdentifier,
-           let source = sources.first(where: { $0.bundleIdentifier == bundleIdentifier })
-        {
+           let source = sources.first(where: { $0.bundleIdentifier == bundleIdentifier }) {
             return source.id
         }
         return nil

@@ -89,9 +89,9 @@ struct ShelfContextActionTests {
         }
         let configuredService = service
         let pending = fixture.actions.perform(.imagesToPDF, items: [second, first],
-            createQuickNote: { _ in false }, openStudio: { _ in false }, convertImages: {
-                try configuredService.convertImagesToPDF($0, to: $1)
-            })
+                                              createQuickNote: { _ in false }, openStudio: { _ in false }, convertImages: {
+                                                  try configuredService.convertImagesToPDF($0, to: $1)
+                                              })
         let task = try #require(pending)
         #expect(fixture.actions.isProcessing)
         await task.value
@@ -125,10 +125,10 @@ struct ShelfContextActionTests {
             try FileManager.default.removeItem(at: directory)
         }
         let pending = fixture.actions.perform(.imagesToPDF, items: [second, first],
-            createQuickNote: { _ in false }, openStudio: { _ in false }, convertImages: { inputs, output in
-                if outcome == "cancelled" { throw CancellationError() }
-                try PDFProcessingService().convertImagesToPDF(inputs, to: output)
-            })
+                                              createQuickNote: { _ in false }, openStudio: { _ in false }, convertImages: { inputs, output in
+                                                  if outcome == "cancelled" { throw CancellationError() }
+                                                  try PDFProcessingService().convertImagesToPDF(inputs, to: output)
+                                              })
         try await #require(pending).value
         let expectedMessage: String
         if outcome == "committed" {
@@ -167,8 +167,8 @@ struct ShelfContextActionTests {
         defer { fixture.remove() }
         let png = try Fixture.png(width: 24)
         let metadata = ShelfScreenshotMetadata(source: .init(applicationName: "Synthetic", bundleIdentifier: nil,
-            processIdentifier: nil), isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero,
-            screenFrame: nil, displayIdentifier: nil, pixelWidth: 24, pixelHeight: 12)
+                                                             processIdentifier: nil), isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero,
+                                               screenFrame: nil, displayIdentifier: nil, pixelWidth: 24, pixelHeight: 12)
         let item = try fixture.shelf.stashScreenshot(png: png, metadata: metadata)
         try FileManager.default.removeItem(at: item.url)
         try await #require(fixture.perform(.imagesToPDF, items: [item])).value
@@ -207,10 +207,10 @@ struct ShelfContextActionTests {
         let before = fixture.shelf.items
         let bytes = try Data(contentsOf: item.url)
         let failedTask = fixture.actions.perform(.imagesToPDF, items: [item], createQuickNote: { _ in false },
-            openStudio: { _ in false }, convertImages: { _, output in
-                try Data([1]).write(to: output)
-                throw CocoaError(.fileWriteOutOfSpace)
-            })
+                                                 openStudio: { _ in false }, convertImages: { _, output in
+                                                     try Data([1]).write(to: output)
+                                                     throw CocoaError(.fileWriteOutOfSpace)
+                                                 })
         let failed = try #require(failedTask)
         await failed.value
         #expect(fixture.shelf.items == before)
@@ -232,10 +232,10 @@ struct ShelfContextActionTests {
         defer { fixture.remove() }
         let item = try fixture.image(width: 24)
         let taskTask = fixture.actions.perform(.imagesToPDF, items: [item], createQuickNote: { _ in false },
-            openStudio: { _ in false }, convertImages: { _, output in
-                gate.pause()
-                try Data([1]).write(to: output)
-            })
+                                               openStudio: { _ in false }, convertImages: { _, output in
+                                                   gate.pause()
+                                                   try Data([1]).write(to: output)
+                                               })
         let task = try #require(taskTask)
         await gate.waitUntilPaused()
         #expect(fixture.perform(.imagesToPDF, items: [item]) == nil)
@@ -254,7 +254,7 @@ struct ShelfContextActionTests {
         defer { fixture.remove() }
         let item = try fixture.image(width: 24)
         let taskTask = fixture.actions.perform(.imagesToPDF, items: [item], createQuickNote: { _ in false },
-            openStudio: { _ in false }, convertImages: { _, _ in Issue.record("Cancelled work must not start conversion") })
+                                               openStudio: { _ in false }, convertImages: { _, _ in Issue.record("Cancelled work must not start conversion") })
         let task = try #require(taskTask)
         fixture.actions.cancel()
         await task.value
@@ -270,10 +270,10 @@ struct ShelfContextActionTests {
         let second = try fixture.image(width: 36)
         var note: String?
         let taskTask = fixture.actions.perform(.recognizeToQuickNote, items: [second, first],
-            createQuickNote: { note = $0; return true }, openStudio: { _ in false }, recognizeImage: { image, _ in
-                #expect(Self.isOffMainThread())
-                return [.init(text: "Text \(image.width)", boundingBox: .init(x: 0, y: 0.2, width: 1, height: 0.2))]
-            })
+                                               createQuickNote: { note = $0; return true }, openStudio: { _ in false }, recognizeImage: { image, _ in
+                                                   #expect(Self.isOffMainThread())
+                                                   return [.init(text: "Text \(image.width)", boundingBox: .init(x: 0, y: 0.2, width: 1, height: 0.2))]
+                                               })
         let task = try #require(taskTask)
         await task.value
         #expect(note == "Text 36\n\nText 24")
@@ -289,11 +289,11 @@ struct ShelfContextActionTests {
         let second = try fixture.image(width: 36)
         var attempts = 0
         let taskTask = fixture.actions.perform(.recognizeToQuickNote, items: [first, second],
-            createQuickNote: { _ in attempts += 1; return false }, openStudio: { _ in false }, recognizeImage: { image, _ in
-                if failure == "worker failure" { throw CocoaError(.fileReadCorruptFile) }
-                return failure == "empty second" && image.width == 36 ? []
-                    : [.init(text: "result", boundingBox: .init(x: 0, y: 0, width: 1, height: 1))]
-            })
+                                               createQuickNote: { _ in attempts += 1; return false }, openStudio: { _ in false }, recognizeImage: { image, _ in
+                                                   if failure == "worker failure" { throw CocoaError(.fileReadCorruptFile) }
+                                                   return failure == "empty second" && image.width == 36 ? []
+                                                       : [.init(text: "result", boundingBox: .init(x: 0, y: 0, width: 1, height: 1))]
+                                               })
         let task = try #require(taskTask)
         await task.value
         #expect(attempts == (failure == "notes denied" ? 1 : 0))
@@ -309,11 +309,11 @@ struct ShelfContextActionTests {
         let item = try fixture.image(width: 24)
         var written = false
         let taskTask = fixture.actions.perform(.recognizeToQuickNote, items: [item],
-            createQuickNote: { _ in written = true; return true }, openStudio: { _ in false }, recognizeImage: { _, operation in
-                gate.pause()
-                #expect(throws: CancellationError.self) { try operation.checkCancellation() }
-                return [.init(text: "late text", boundingBox: .init(x: 0, y: 0, width: 1, height: 1))]
-            })
+                                               createQuickNote: { _ in written = true; return true }, openStudio: { _ in false }, recognizeImage: { _, operation in
+                                                   gate.pause()
+                                                   #expect(throws: CancellationError.self) { try operation.checkCancellation() }
+                                                   return [.init(text: "late text", boundingBox: .init(x: 0, y: 0, width: 1, height: 1))]
+                                               })
         let task = try #require(taskTask)
         await gate.waitUntilPaused()
         fixture.actions.cancel()
@@ -347,13 +347,13 @@ struct ShelfContextActionTests {
         let second = try fixture.file("second.mp4", bytes: Data([2]))
         var handedOff: [URL] = []
         let taskTask = fixture.actions.perform(.editVideo, items: [second, first], createQuickNote: { _ in false },
-            openStudio: { handedOff = $0; return accepts })
+                                               openStudio: { handedOff = $0; return accepts })
         let task = try #require(taskTask)
         await task.value
         #expect(handedOff.map { $0.resolvingSymlinksInPath() } == [second.url, first.url].map { $0.resolvingSymlinksInPath() })
         #expect(fixture.shelf.items == [first, second])
         #expect(fixture.actions.message == (accepts ? AppLocalization.text("已发送到录屏工作室")
-            : AppLocalization.text("操作失败：%@", ShelfContextActionError.studioUnavailable.localizedDescription)))
+                : AppLocalization.text("操作失败：%@", ShelfContextActionError.studioUnavailable.localizedDescription)))
     }
 
     private nonisolated static func isOffMainThread() -> Bool { !Thread.isMainThread }
@@ -393,7 +393,7 @@ struct ShelfContextActionTests {
 
         nonisolated static func png(width: Int) throws -> Data {
             let context = try #require(CGContext(data: nil, width: width, height: 12, bitsPerComponent: 8,
-                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
             context.fill(CGRect(x: 0, y: 0, width: width, height: 12))
             let data = NSMutableData()

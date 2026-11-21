@@ -99,6 +99,8 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
     private let imageContext = CIContext(options: [.cacheIntermediates: false])
     private var portraitPool: CVPixelBufferPool?
     private var portraitSize: CGSize?
+    private var hdrPool: CVPixelBufferPool?
+    private var hdrSize: CGSize?
     private var lastTimes: [ScreenRecordingSampleKind: CMTime] = [:]
     private var buffered: [ScreenRecordingCaptureSample] = []
     private var terminalError: Error?
@@ -288,6 +290,7 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
         let presentationTime = CMTime(seconds: time, preferredTimescale: 1_000_000)
         guard lastTimes[sample.kind].map({ CMTimeCompare(presentationTime, $0) > 0 }) != false else { return false }
         let key: ScreenRecordingSampleKind = sample.kind == .systemAudio ? .screen : sample.kind
+        let source = sample.kind.isAudio ? sample.buffer : try canonicalHDRFrame(sample.buffer)
         if assets[key] == nil {
             let name: String
             switch key {
@@ -295,17 +298,17 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
             case .microphone: name = files.microphoneName
             case .camera: name = files.cameraName
             }
-            if let factory { assets[key] = try factory(files.url(for: name), key, sample.buffer) }
+            if let factory { assets[key] = try factory(files.url(for: name), key, source) }
             else {
-                assets[key] = try ScreenRecordingNativeAssetWriter(url: files.url(for: name), kind: key, firstSample: sample.buffer,
+                assets[key] = try ScreenRecordingNativeAssetWriter(url: files.url(for: name), kind: key, firstSample: source,
                                                                    width: width, height: height, systemAudio: configuration.systemAudio,
                                                                    frameRate: configuration.frameRate, finishQueue: queue,
                                                                    finishTimeout: finishTimeout, onFailure: { [weak self] error in
-                    self?.fail(error)
-                })
+                                                                       self?.fail(error)
+                                                                   })
             }
         }
-        let retimed = try ScreenRecordingCaptureRetimer.copy(sample.buffer, presentationTime: presentationTime)
+        let retimed = try ScreenRecordingCaptureRetimer.copy(source, presentationTime: presentationTime)
         let enhanced: CMSampleBuffer
         if sample.kind == .camera, configuration.portraitEffects.isEnabled {
             enhanced = try enhanceCamera(retimed)
@@ -326,9 +329,9 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
                 if let factory { rawAssets[key] = try factory(files.url(for: name), key, retimed) }
                 else {
                     rawAssets[key] = try ScreenRecordingNativeAssetWriter(url: files.url(for: name), kind: key,
-                        firstSample: retimed, width: width, height: height, systemAudio: false,
-                        frameRate: configuration.frameRate, finishQueue: queue, finishTimeout: finishTimeout,
-                        onFailure: { [weak self] in self?.fail($0) })
+                                                                          firstSample: retimed, width: width, height: height, systemAudio: false,
+                                                                          frameRate: configuration.frameRate, finishQueue: queue, finishTimeout: finishTimeout,
+                                                                          onFailure: { [weak self] in self?.fail($0) })
                 }
             }
             guard try rawAssets[key]!.append(retimed, kind: sample.kind) else {
@@ -355,6 +358,51 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
         return false
     }
 
+    private func canonicalHDRFrame(_ sample: CMSampleBuffer) throws -> CMSampleBuffer {
+        guard let format = sample.formatDescription, RecordingHDR.isHDR(format) else { return sample }
+        guard let source = sample.imageBuffer else { throw ScreenRecordingCaptureError.writerUnavailable }
+        if CVPixelBufferGetPixelFormatType(source) == RecordingHDR.pixelFormat,
+           CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_ColorPrimaries) as? String
+           == kCVImageBufferColorPrimaries_ITU_R_2020 as String,
+           CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_YCbCrMatrix) as? String
+           == kCVImageBufferYCbCrMatrix_ITU_R_2020 as String,
+           CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_TransferFunction) as? String
+           == kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String { return sample }
+        let size = CGSize(width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source))
+        if hdrSize != size {
+            guard CVPixelBufferPoolCreate(nil, nil, [
+                kCVPixelBufferPixelFormatTypeKey: RecordingHDR.pixelFormat,
+                kCVPixelBufferWidthKey: Int(size.width), kCVPixelBufferHeightKey: Int(size.height),
+                kCVPixelBufferIOSurfacePropertiesKey: [:],
+            ] as CFDictionary, &hdrPool) == kCVReturnSuccess else { throw ScreenRecordingCaptureError.writerUnavailable }
+            hdrSize = size
+        }
+        var output: CVPixelBuffer?
+        guard CVPixelBufferPoolCreatePixelBuffer(nil, hdrPool!, &output) == kCVReturnSuccess, let output else {
+            throw ScreenRecordingCaptureError.writerUnavailable
+        }
+        // Some encoder drivers tone-map P3 4:4:4 input even when the output is tagged as HDR.
+        CVBufferSetAttachment(output, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_2020, .shouldPropagate)
+        CVBufferSetAttachment(output, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ, .shouldPropagate)
+        CVBufferSetAttachment(output, kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_2020, .shouldPropagate)
+        imageContext.render(CIImage(cvPixelBuffer: source), to: output, bounds: CGRect(origin: .zero, size: size),
+                            colorSpace: RecordingHDR.colorSpace)
+        var description: CMVideoFormatDescription?
+        guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: output,
+                                                           formatDescriptionOut: &description) == noErr, let description else {
+            throw ScreenRecordingCaptureError.writerUnavailable
+        }
+        var timing = CMSampleTimingInfo(duration: sample.duration, presentationTimeStamp: sample.presentationTimeStamp,
+                                        decodeTimeStamp: sample.decodeTimeStamp)
+        var result: CMSampleBuffer?
+        guard CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: output, formatDescription: description,
+                                                       sampleTiming: &timing, sampleBufferOut: &result) == noErr, let result else {
+            throw ScreenRecordingCaptureError.writerUnavailable
+        }
+        CMPropagateAttachments(sample, destination: result)
+        return result
+    }
+
     private func enhanceCamera(_ sample: CMSampleBuffer) throws -> CMSampleBuffer {
         guard let source = CMSampleBufferGetImageBuffer(sample) else { throw ScreenRecordingCaptureError.writerUnavailable }
         let width = CVPixelBufferGetWidth(source)
@@ -376,18 +424,18 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         let image = try portrait.apply(CIImage(cvPixelBuffer: source), effects: configuration.portraitEffects,
-            sourceTime: sample.presentationTimeStamp.seconds)
+                                       sourceTime: sample.presentationTimeStamp.seconds)
         imageContext.render(image, to: output, bounds: .init(x: 0, y: 0, width: width, height: height),
-            colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                            colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
         CVBufferPropagateAttachments(source, output)
         var format: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: output,
-            formatDescriptionOut: &format) == noErr, let format else { throw ScreenRecordingCaptureError.writerUnavailable }
+                                                           formatDescriptionOut: &format) == noErr, let format else { throw ScreenRecordingCaptureError.writerUnavailable }
         var timing = CMSampleTimingInfo(duration: sample.duration, presentationTimeStamp: sample.presentationTimeStamp,
-            decodeTimeStamp: sample.decodeTimeStamp)
+                                        decodeTimeStamp: sample.decodeTimeStamp)
         var result: CMSampleBuffer?
         guard CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: output,
-            formatDescription: format, sampleTiming: &timing, sampleBufferOut: &result) == noErr, let result else {
+                                                       formatDescription: format, sampleTiming: &timing, sampleBufferOut: &result) == noErr, let result else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         CMPropagateAttachments(sample, destination: result)
@@ -486,7 +534,7 @@ final class ScreenRecordingNativeAssetWriter: ScreenRecordingCaptureAssetWriter,
             ]
             if preservesHDR { settings[AVVideoColorPropertiesKey] = RecordingHDR.colorProperties }
             let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings,
-                sourceFormatHint: CMSampleBufferGetFormatDescription(firstSample))
+                                           sourceFormatHint: CMSampleBufferGetFormatDescription(firstSample))
             input.expectsMediaDataInRealTime = true
             guard asset.canAdd(input) else { throw ScreenRecordingCaptureError.writerUnavailable }
             asset.add(input)
@@ -667,9 +715,9 @@ final class ScreenRecordingCaptureAudioMixer {
         source.frameLength = frames
         output.frameLength = frames
         guard CMSampleBufferCopyPCMDataIntoAudioBufferList(sample, at: 0, frameCount: Int32(frames),
-                                                          into: source.mutableAudioBufferList) == noErr,
-              AudioConverterConvertComplexBuffer(converter, frames, source.audioBufferList,
-                                                  output.mutableAudioBufferList) == noErr else {
+                                                           into: source.mutableAudioBufferList) == noErr,
+            AudioConverterConvertComplexBuffer(converter, frames, source.audioBufferList,
+                                               output.mutableAudioBufferList) == noErr else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         var timing = CMSampleTimingInfo()
@@ -682,8 +730,8 @@ final class ScreenRecordingCaptureAudioMixer {
                                         sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &result) == noErr,
               let result,
               CMSampleBufferSetDataBufferFromAudioBufferList(result, blockBufferAllocator: kCFAllocatorDefault,
-                                                            blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0,
-                                                            bufferList: output.audioBufferList) == noErr else {
+                                                             blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0,
+                                                             bufferList: output.audioBufferList) == noErr else {
             throw ScreenRecordingCaptureError.writerUnavailable
         }
         return result

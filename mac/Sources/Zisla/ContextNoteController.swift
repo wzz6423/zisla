@@ -470,8 +470,8 @@ final class ContextNoteController {
         }
         sourceApplication = NSWorkspace.shared.frontmostApplication
         let content = ContextNoteInputView(draft: draft, settingsStore: settingsStore,
-                                          onSave: { [weak self] in self?.save() },
-                                          onDiscard: { [weak self] in self?.discard() })
+                                           onSave: { [weak self] in self?.save() },
+                                           onDiscard: { [weak self] in self?.discard() })
         let hosting = NSHostingView(rootView: AppLanguageEnvironment(languageStore: languageStore, content: content))
         hosting.sizingOptions = []
         let panel = Self.makeWindow(contentView: hosting,
@@ -495,9 +495,9 @@ enum ContextNoteReminderPresenter {
               let location = item.noteLocation, controller.presentation.detection == nil else { return false }
         let preview = text.components(separatedBy: .newlines).filter { !$0.isEmpty }.joined(separator: " ")
         let detection = ClipboardAssistantDetection(kind: .text, title: preview,
-            detail: .path(ContextNoteDetailView.locationDescription(location)),
-            actions: [.showContextNote(item.id), .copyContextNote(item.id), .deleteContextNote(item.id)], fullContent: text,
-            contextNoteAddedAt: item.addedAt)
+                                                    detail: .path(ContextNoteDetailView.locationDescription(location)),
+                                                    actions: [.showContextNote(item.id), .copyContextNote(item.id), .deleteContextNote(item.id)], fullContent: text,
+                                                    contextNoteAddedAt: item.addedAt)
         controller.displayDuration = settings.clipboardAssistantDisplayDuration
         controller.isLightweightMode = settings.clipboardAssistantLightweightMode
         controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled

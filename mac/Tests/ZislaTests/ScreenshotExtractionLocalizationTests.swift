@@ -20,7 +20,7 @@ struct ScreenshotExtractionLocalizationTests {
             if language != .simplifiedChinese && language != .traditionalChinese { #expect(value != key) }
             for token in ["%@", "%ld"] {
                 #expect(value.components(separatedBy: token).count == key.components(separatedBy: token).count,
-                    "Placeholder count differs for \(language.rawValue): \(key)")
+                        "Placeholder count differs for \(language.rawValue): \(key)")
             }
         }
         let selectedFormat = try #require(table["已圈选 %ld 个区域"])

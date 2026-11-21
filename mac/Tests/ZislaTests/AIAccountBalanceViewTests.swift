@@ -14,7 +14,7 @@ struct AIAccountBalanceViewTests {
         let cache = AIMascotImageCache()
         let colorSpace = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try #require(CGContext(data: nil, width: 24, height: 24, bitsPerComponent: 8, bytesPerRow: 96,
-            space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: 24, height: 24))
         let appIcon = NSImage(cgImage: try #require(context.makeImage()), size: CGSize(width: 24, height: 24))
@@ -36,7 +36,7 @@ struct AIAccountBalanceViewTests {
             }
         }
         #expect(transparentPixels > source.pixelsWide * source.pixelsHigh / 5 && visiblePixels > 0,
-            "Brand logos must have transparent space around a visible glyph, without an app-icon backplate")
+                "Brand logos must have transparent space around a visible glyph, without an app-icon backplate")
         let identity = AIMascotIdentity(provider: provider, taskID: "")
         #expect(identity.displayName == (provider == .gpt ? "ChatGPT" : "Codex"))
         let bitmap = try await renderOffscreen(AIMascotView(identity: identity, size: 24, imageCache: cache)
@@ -63,8 +63,8 @@ struct AIAccountBalanceViewTests {
         func render(_ inner: Double?, _ innerSeverity: AIAccountQuotaSeverity?, _ outer: Double?,
                     _ outerSeverity: AIAccountQuotaSeverity? = .normal) throws -> NSBitmapImageRep {
             let renderer = ImageRenderer(content: AIAccountQuotaRing(provider: nil, fraction: outer,
-                severity: outerSeverity, diameter: diameter, innerFraction: inner, innerSeverity: innerSeverity)
-                .background(.black).foregroundStyle(.white).environment(\.colorScheme, .dark))
+                                                                     severity: outerSeverity, diameter: diameter, innerFraction: inner, innerSeverity: innerSeverity)
+                    .background(.black).foregroundStyle(.white).environment(\.colorScheme, .dark))
             renderer.scale = 3
             let image = try #require(renderer.cgImage)
             return try #require(NSBitmapImageRep(cgImage: image).converting(to: .sRGB, renderingIntent: .default))
@@ -112,11 +112,11 @@ struct AIAccountBalanceViewTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "chatgpt", providers: [.codex, .gpt], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                                                 .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
-            aiAccountBalanceDisplayedProviders: [.gpt])
+                                       aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
+                                       aiAccountBalanceDisplayedProviders: [.gpt])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
         controller.update(balances: [reading], settings: settings, language: .english)
         let notice = try #require(queue.left.first)
@@ -142,8 +142,8 @@ struct AIAccountBalanceViewTests {
         #expect(yellow > 10 && green > 10, "Low five-hour values must be yellow while healthy weekly values are green")
 
         let expectedRing = try await renderOffscreen(AIAccountQuotaRing(provider: .gpt, fraction: 0.51,
-            severity: .normal, diameter: thickness - 8, innerFraction: 0.1, innerSeverity: .warning)
-            .foregroundStyle(.white).environment(\.colorScheme, .dark),
+                                                                        severity: .normal, diameter: thickness - 8, innerFraction: 0.1, innerSeverity: .warning)
+                .foregroundStyle(.white).environment(\.colorScheme, .dark),
             size: CGSize(width: thickness - 8, height: thickness - 8))
         let scale = CGFloat(bitmap.pixelsWide) / size.width
         let ringX = Int((edge.isVertical ? 4 : 12) * scale)
@@ -175,7 +175,7 @@ struct AIAccountBalanceViewTests {
                 let a = try #require(ringPixels.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
                 let b = try #require(briefPixels.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
                 #expect(abs(a.redComponent - b.redComponent) < 0.02 && abs(a.greenComponent - b.greenComponent) < 0.02,
-                    "Brief and full modes share the same real two-ring quota mark")
+                        "Brief and full modes share the same real two-ring quota mark")
             }
         }
     }
@@ -185,11 +185,11 @@ struct AIAccountBalanceViewTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "healthy", providers: [.gpt], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 80, durationSeconds: 604_800)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                                                 .init(id: "weekly", kind: .weekly, remainingPercent: 80, durationSeconds: 604_800)])
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
-            aiAccountBalanceDisplayedProviders: [.gpt])
+                                       aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
+                                       aiAccountBalanceDisplayedProviders: [.gpt])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
         controller.update(balances: [reading], settings: settings, language: .english)
         let notice = try #require(queue.left.first)
@@ -218,9 +218,9 @@ struct AIAccountBalanceViewTests {
     }
 
     @Test(arguments: [(0.0, AIAccountQuotaSeverity.exhausted), (0.1, .warning), (10, .warning),
-        (10.1, .warning), (20, .warning), (20.1, .normal), (100, .normal)],
-        [(IslandEdge.top, true), (.bottom, true), (.left, true), (.right, true),
-            (.top, false), (.bottom, false), (.left, false), (.right, false)])
+                      (10.1, .warning), (20, .warning), (20.1, .normal), (100, .normal)],
+          [(IslandEdge.top, true), (.bottom, true), (.left, true), (.right, true),
+           (.top, false), (.bottom, false), (.left, false), (.right, false)])
     func compactQuotaTextAndRingsFollowRemainingThresholds(configuration: (Double, AIAccountQuotaSeverity), placement: (IslandEdge, Bool)) async throws {
         let (percent, ringSeverity) = configuration
         let (edge, twoWindows) = placement
@@ -228,13 +228,13 @@ struct AIAccountBalanceViewTests {
         defer { queue.removeAll() }
         let windows: [AIAccountQuotaWindow] = twoWindows
             ? [.init(id: "5h", kind: .fiveHours, remainingPercent: percent, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: percent, durationSeconds: 604_800)]
+               .init(id: "weekly", kind: .weekly, remainingPercent: percent, durationSeconds: 604_800)]
             : [.init(id: "quota", kind: .all, remainingPercent: percent)]
         let reading = AIAccountBalance(id: "threshold", providers: [.gpt], status: .available,
-            windows: windows)
+                                       windows: windows)
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
-            aiAccountBalanceDisplayedProviders: [.gpt])
+                                       aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
+                                       aiAccountBalanceDisplayedProviders: [.gpt])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
         controller.update(balances: [reading], settings: settings, language: .english)
         let notice = try #require(queue.left.first)
@@ -264,11 +264,11 @@ struct AIAccountBalanceViewTests {
             }
         }
         #expect(matchingTextPixels.allSatisfy { $0 > 10 },
-            "Quota rows must be red at zero, yellow through 20%, and green above 20%")
+                "Quota rows must be red at zero, yellow through 20%, and green above 20%")
         let reference = try await renderOffscreen(AIAccountQuotaRing(provider: .gpt, fraction: percent / 100,
-            severity: ringSeverity, diameter: 26, innerFraction: twoWindows ? percent / 100 : nil,
-            innerSeverity: twoWindows ? ringSeverity : nil)
-            .foregroundStyle(.white).environment(\.colorScheme, .dark), size: CGSize(width: 26, height: 26))
+                                                                     severity: ringSeverity, diameter: 26, innerFraction: twoWindows ? percent / 100 : nil,
+                                                                     innerSeverity: twoWindows ? ringSeverity : nil)
+                .foregroundStyle(.white).environment(\.colorScheme, .dark), size: CGSize(width: 26, height: 26))
         let ringX = Int((edge.isVertical ? 4 : 12) * scale), ringY = Int((edge.isVertical ? 12 : 4) * scale)
         var differentRingPixels = 0
         for y in 0..<reference.pixelsHigh {
@@ -287,22 +287,22 @@ struct AIAccountBalanceViewTests {
     func selectedQuotaRingUsesTheSameProviderAssetAsAITasks(provider: AIProvider) async throws {
         let diameter: CGFloat = 52
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
-                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
+                                       windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                                                 .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
         let section = AIAccountBalanceSection(balances: [reading], displayedProviders: [provider],
-            monitoredProviders: [provider], language: .english)
+                                              monitoredProviders: [provider], language: .english)
         let selected = try #require(section.displayedBalances.first)
         #expect(section.displayedBalances.count == 1 && selected.displayProvider == provider)
         let ring = AIAccountQuotaRing(provider: selected.displayProvider, fraction: 0.51, severity: .normal, diameter: diameter,
-            innerFraction: 0.1, innerSeverity: .critical)
+                                      innerFraction: 0.1, innerSeverity: .critical)
         let actual = try await renderOffscreen(ring.foregroundStyle(.white).environment(\.colorScheme, .dark),
-            size: CGSize(width: diameter, height: diameter))
+                                               size: CGSize(width: diameter, height: diameter))
         let expected = try await renderOffscreen(AIMascotView(identity: AIMascotIdentity(provider: provider, taskID: ""), size: diameter * 0.36)
             .frame(width: diameter, height: diameter).foregroundStyle(.white).environment(\.colorScheme, .dark),
             size: CGSize(width: diameter, height: diameter))
         let tracks = try await renderOffscreen(AIAccountQuotaRing(provider: nil, fraction: 0.51, severity: .normal,
-            diameter: diameter, innerFraction: 0.1, innerSeverity: .critical)
-            .foregroundStyle(.white).environment(\.colorScheme, .dark), size: CGSize(width: diameter, height: diameter))
+                                                                  diameter: diameter, innerFraction: 0.1, innerSeverity: .critical)
+                .foregroundStyle(.white).environment(\.colorScheme, .dark), size: CGSize(width: diameter, height: diameter))
         var markPixels = 0
         let scale = CGFloat(actual.pixelsWide) / diameter
         let center = CGFloat(actual.pixelsWide) / 2
@@ -317,7 +317,7 @@ struct AIAccountBalanceViewTests {
                     markPixels += 1
                     let track = try #require(tracks.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
                     #expect(max(track.redComponent, track.greenComponent, track.blueComponent) < 0.03,
-                        "The selected provider mark must sit inside the inner ring without touching its stroke")
+                            "The selected provider mark must sit inside the inner ring without touching its stroke")
                 }
             }
         }
@@ -328,13 +328,13 @@ struct AIAccountBalanceViewTests {
         let quota = AIAccountQuotaWindow(id: "quota", kind: .all, remainingPercent: 70)
         let available = AIAccountBalance(id: "claude", providers: [.claude], status: .available, windows: [quota])
         let rows = [available,
-            .init(id: "expired", providers: [.gemini], status: .credentialsExpired, windows: [quota]),
-            .init(id: "empty", providers: [.zed], status: .available),
-            .init(id: "partial", providers: [.kimi], status: .available,
-                windows: [quota, .init(id: "missing", kind: .weekly)]),
-            .init(id: "unsupported", providers: [.qwen], status: .available, windows: [quota])]
+                    .init(id: "expired", providers: [.gemini], status: .credentialsExpired, windows: [quota]),
+                    .init(id: "empty", providers: [.zed], status: .available),
+                    .init(id: "partial", providers: [.kimi], status: .available,
+                          windows: [quota, .init(id: "missing", kind: .weekly)]),
+                    .init(id: "unsupported", providers: [.qwen], status: .available, windows: [quota])]
         let section = AIAccountBalanceSection(balances: rows,
-            displayedProviders: Set(AIProvider.allCases), monitoredProviders: Set(AIProvider.allCases), language: .english)
+                                              displayedProviders: Set(AIProvider.allCases), monitoredProviders: Set(AIProvider.allCases), language: .english)
         #expect(section.displayedBalances == [available])
     }
 
@@ -347,11 +347,11 @@ struct AIAccountBalanceViewTests {
 
     @Test func cardsHonorTheExplicitMonitoringSelectionAcrossSharedAliases() {
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
-            windows: [.init(id: "quota", kind: .all, remainingPercent: 70)])
+                                       windows: [.init(id: "quota", kind: .all, remainingPercent: 70)])
         #expect(AIAccountBalanceSection(balances: [reading], displayedProviders: [.gpt],
-            monitoredProviders: [.codex], language: .english).displayedBalances.isEmpty)
+                                        monitoredProviders: [.codex], language: .english).displayedBalances.isEmpty)
         let section = AIAccountBalanceSection(balances: [reading], displayedProviders: [.gpt],
-            monitoredProviders: [.gpt], language: .english)
+                                              monitoredProviders: [.gpt], language: .english)
         #expect(section.displayedBalances.first?.providers == [.gpt])
     }
 
@@ -363,7 +363,6 @@ struct AIAccountBalanceViewTests {
         #expect(image.width == 420 && image.height == 92)
     }
 
-
     /// Pixel regions prove bounded padding and camera clearance without treating an image render as device acceptance.
     @Test(arguments: [CGFloat(0), 80, 180], [false, true])
     func compactBalanceKeepsBothLinesOutsidePhysicalCameraGap(centerInset: CGFloat, rightToLeft: Bool) async throws {
@@ -373,10 +372,10 @@ struct AIAccountBalanceViewTests {
             let weekly = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)
             let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
             var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-                aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
+                                           aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
             settings.islandPlacement.mode = .custom
             controller.update(balances: [.init(id: "chatgpt", providers: [.codex], status: .available,
-                windows: weeklyOnly ? [weekly] : [short, weekly])], settings: settings, language: .english)
+                                               windows: weeklyOnly ? [weekly] : [short, weekly])], settings: settings, language: .english)
             let notice = try #require(queue.left.first)
             #expect(notice.metadata?["quotaLine0"] == (weeklyOnly ? "7d 59%" : "5h 10%"))
             #expect(notice.metadata?["quotaLine1"] == (weeklyOnly ? nil : "7d 59%"))
@@ -411,19 +410,19 @@ struct AIAccountBalanceViewTests {
                 #expect(cameraPixels == 0, "Balance text must leave the physical camera gap empty")
                 #expect(!ringBounds.isNull && !rowBounds[0].isNull)
                 #expect(weeklyOnly ? rowBounds[1].isNull : !rowBounds[1].isNull,
-                    "Default compact quota must render exactly the real one or two rows")
+                        "Default compact quota must render exactly the real one or two rows")
                 #expect(rowBounds[0].width >= 27, "The full short quota label and percentage must remain visible")
                 if !weeklyOnly {
                     #expect(rowBounds[1].width >= 27)
                     #expect(rowBounds[1].midY - rowBounds[0].midY <= 12,
-                        "Two quota rows must stack as tightly as the combined monitor readings")
+                            "Two quota rows must stack as tightly as the combined monitor readings")
                 }
                 if centerInset > 0 {
                     #expect(ringBounds.minX <= 16 && sideWidth - ringBounds.maxX <= 16,
-                        "The provider ring must leave at most 16pt of visible padding on each camera-wing edge; observed \(ringBounds.minX), \(sideWidth - ringBounds.maxX)pt")
+                            "The provider ring must leave at most 16pt of visible padding on each camera-wing edge; observed \(ringBounds.minX), \(sideWidth - ringBounds.maxX)pt")
                     let textBounds = rowBounds[0].union(rowBounds[1])
                     #expect(textBounds.minX - rightStart <= 10 && width - textBounds.maxX <= 10,
-                        "Short quota text must leave only its compact edge padding")
+                            "Short quota text must leave only its compact edge padding")
                 }
             }
         }
@@ -436,10 +435,10 @@ struct AIAccountBalanceViewTests {
         let weekly = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 59, durationSeconds: 604_800)
         let short = AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
-            aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
+                                       aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [.init(id: "quota", providers: [.codex], status: .available,
-            windows: weeklyOnly ? [weekly] : [short, weekly])], settings: settings, language: .english)
+                                           windows: weeklyOnly ? [weekly] : [short, weekly])], settings: settings, language: .english)
         let notice = try #require(queue.left.first)
         let lines = weeklyOnly ? ["7d 59%"] : ["5h 10%", "7d 59%"]
         let font = Font.system(size: weeklyOnly ? 11 : 9, weight: weeklyOnly ? .semibold : .medium).monospacedDigit()
@@ -466,7 +465,7 @@ struct AIAccountBalanceViewTests {
             }
         }
         #expect(differentTextPixels == 0,
-            "Compact quota must render monospaced digits with the monitor's 22pt double-row rhythm and the correct font weight")
+                "Compact quota must render monospaced digits with the monitor's 22pt double-row rhythm and the correct font weight")
     }
 
     @Test(arguments: [AppLanguage.english, .arabic])
@@ -474,19 +473,20 @@ struct AIAccountBalanceViewTests {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let model = AIAccountQuotaWindow(id: "model", kind: .model, remainingPercent: 59,
-            name: language == .arabic ? "خُطَّة مُمَيَّزَة" : "Édition Ångström")
+                                         name: language == .arabic ? "خُطَّة مُمَيَّزَة" : "Édition Ångström")
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.codex],
-            aiAccountBalanceDisplayedProviders: [.codex])
+                                       aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.codex],
+                                       aiAccountBalanceDisplayedProviders: [.codex])
         settings.islandPlacement.mode = .custom
         controller.update(balances: [.init(id: "quota", providers: [.codex], status: .available,
-            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000), model])],
-            settings: settings, language: language)
+                                           windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000), model])],
+                          settings: settings, language: language)
         let notice = try #require(queue.left.first)
         let line = try #require(notice.metadata?["quotaLine1"])
         let direction: LayoutDirection = language.isRightToLeft ? .rightToLeft : .leftToRight
         let width = ceil((line as NSString).size(withAttributes: [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)]).width) + 6
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+        ]).width) + 6
         let actual = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: 34)
             .environment(\.colorScheme, .dark).environment(\.layoutDirection, direction).foregroundStyle(.white),
             size: CGSize(width: width + 56, height: 34), reduceMotion: true)
@@ -510,7 +510,7 @@ struct AIAccountBalanceViewTests {
         let actualInk = try ink(actual, startX: Int(44 * scale), startY: actual.pixelsHigh / 2, endY: actual.pixelsHigh)
         let referenceInk = try ink(reference, startX: 0, startY: 0, endY: reference.pixelsHigh)
         #expect(actualInk == referenceInk,
-            "The full extra quota glyphs must survive the compact row viewport in \(language.rawValue); observed \(actualInk)/\(referenceInk) pixels")
+                "The full extra quota glyphs must survive the compact row viewport in \(language.rawValue); observed \(actualInk)/\(referenceInk) pixels")
     }
 
     /// Offscreen rendering covers edge-dependent dimensions and nonempty quota content across LTR and RTL layouts.
@@ -518,7 +518,7 @@ struct AIAccountBalanceViewTests {
     func customAndFloatingShapesRenderTwoQuotaLines(edge: IslandEdge, language: AppLanguage) throws {
         let thickness: CGFloat = 34, length: CGFloat = 300
         let notice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Gemini", style: .status,
-            metadata: ["quotaProvider": "Gemini", "quotaSeverity": "1", "quotaLine0": "5h 20%", "quotaLine1": AppLocalization.string("每周额度", language: language) + " 70%"])
+                                  metadata: ["quotaProvider": "Gemini", "quotaSeverity": "1", "quotaLine0": "5h 20%", "quotaLine1": AppLocalization.string("每周额度", language: language) + " 70%"])
         let renderer = ImageRenderer(content: CompactAIAccountBalanceBar(notice: notice, height: thickness, edge: edge)
             .frame(width: edge.isVertical ? thickness : length, height: edge.isVertical ? length : thickness)
             .background(.black).foregroundStyle(.white).environment(\.colorScheme, .dark)
@@ -544,10 +544,10 @@ struct AIAccountBalanceViewTests {
     ) throws {
         let (thickness, rightToLeft) = configuration
         let notice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Claude", style: .status,
-            metadata: ["quotaProvider": "Claude", "quotaSeverity": "0", "quotaRemainingFraction": "0.7", "quotaLine0": "5h 70%"])
+                                  metadata: ["quotaProvider": "Claude", "quotaSeverity": "0", "quotaRemainingFraction": "0.7", "quotaLine0": "5h 70%"])
         let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
         #expect(presentation.length(thickness: thickness, edge: edge) == (thickness == 32 ? 110 : 98),
-            "Natural length must reserve the ring, two insets, a 6pt gap, and all actual quota rows")
+                "Natural length must reserve the ring, two insets, a 6pt gap, and all actual quota rows")
         for length in [presentation.length(thickness: thickness, edge: edge), CGFloat(88)] {
             let renderer = ImageRenderer(content: CompactAIAccountBalanceBar(notice: notice, height: thickness, edge: edge)
                 .frame(width: thickness, height: length).background(.black).foregroundStyle(.white)
@@ -596,25 +596,25 @@ struct AIAccountBalanceViewTests {
         }
         let balances = [AIProvider.claude, .gemini, .kimi, .grok, .coder, .zed].map {
             AIAccountBalance(id: $0.rawValue, providers: [$0], status: .available,
-                windows: [.init(id: "quota", kind: .all, remainingPercent: 70)])
+                             windows: [.init(id: "quota", kind: .all, remainingPercent: 70)])
         }
         func sectionHeight(_ width: CGFloat) -> CGFloat {
             let host = NSHostingView(rootView: AIAccountBalanceSection(balances: balances,
-                displayedProviders: Set(AIProvider.allCases), monitoredProviders: Set(AIProvider.allCases), language: .english)
-                .frame(width: width).fixedSize(horizontal: false, vertical: true))
+                                                                       displayedProviders: Set(AIProvider.allCases), monitoredProviders: Set(AIProvider.allCases), language: .english)
+                    .frame(width: width).fixedSize(horizontal: false, vertical: true))
             return host.fittingSize.height
         }
         #expect(sectionHeight(420) > sectionHeight(600) + 60,
-            "The real balance section must use the full width for its supplier cards")
+                "The real balance section must use the full width for its supplier cards")
     }
 
     @Test(arguments: [(Double(20), AIAccountQuotaSeverity.warning), (10, .critical), (0, .exhausted), (100, .normal)],
-        [ColorScheme.light, .dark])
+          [ColorScheme.light, .dark])
     func ringShowsRealRemainingArcAndThresholdColor(configuration: (Double, AIAccountQuotaSeverity), colorScheme: ColorScheme) throws {
         let (percent, severity) = configuration
         let window = AIAccountQuotaWindow(id: "quota", kind: .all, remainingPercent: percent)
         let renderer = ImageRenderer(content: AIAccountQuotaRing(provider: nil, fraction: window.remainingFraction,
-            severity: window.severity, diameter: 42).background(.black).foregroundStyle(.white).environment(\.colorScheme, colorScheme))
+                                                                 severity: window.severity, diameter: 42).background(.black).foregroundStyle(.white).environment(\.colorScheme, colorScheme))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         var bright = 0, track = 0, green = 0
@@ -640,7 +640,7 @@ struct AIAccountBalanceViewTests {
     @Test func unknownAmountHasOnlyTheTrackAndNoFabricatedArc() throws {
         let amount = AIAccountQuotaWindow(id: "amount", kind: .credits, remaining: 20, unit: .credits)
         let renderer = ImageRenderer(content: AIAccountQuotaRing(provider: nil, fraction: amount.remainingFraction,
-            severity: amount.severity, diameter: 42).background(.black).foregroundStyle(.white).environment(\.colorScheme, .dark))
+                                                                 severity: amount.severity, diameter: 42).background(.black).foregroundStyle(.white).environment(\.colorScheme, .dark))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         var track = 0
@@ -658,7 +658,7 @@ struct AIAccountBalanceViewTests {
     @Test(arguments: ["media", "mail", "focus-transition", "headphone", "pinned", "voice", "camera"])
     func queuedPinnedQuotaKeepsOnlyItsSelectedStatusVisible(kind: String) throws {
         var settings = FeatureSettings(islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: kind == "camera" ? .camera : .custom, edge: .left))
+                                       islandPlacement: IslandPlacement(mode: kind == "camera" ? .camera : .custom, edge: .left))
         settings.activityNoticeDisplayDuration = .threeSeconds
         settings.focusModeNoticeDisplayDuration = .threeSeconds
         settings.aiAccountBalancePinnedInCustomIsland = true
@@ -686,7 +686,7 @@ struct AIAccountBalanceViewTests {
         state.compactStatusHidden = true
         #expect(!SideNoticePresenter.updateCompactVisibility(notices: notices, settings: settings, displayState: state))
         #expect(state.compactStatusHidden == (kind != "pinned" && kind != "voice"),
-            "Only a selected pinned quota or voice processing may force visibility with short activity durations")
+                "Only a selected pinned quota or voice processing may force visibility with short activity durations")
     }
 
     @Test(arguments: [(CGFloat(244), AppLanguage.simplifiedChinese), (244, .english), (320, .arabic)])
@@ -695,10 +695,10 @@ struct AIAccountBalanceViewTests {
         let reset = Date(timeIntervalSince1970: 1_910_001_000)
         func card(reset: Date?, fiveHours: Double = 10, weekly: Double = 51) -> some View {
             AIAccountBalanceCard(balance: AIAccountBalance(id: "fixture", providers: [.codex], status: .available,
-                windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: fiveHours,
-                    resetsAt: reset, durationSeconds: 18_000),
-                    .init(id: "weekly", kind: .weekly, remainingPercent: weekly,
-                        resetsAt: reset, durationSeconds: 604_800)]), language: language)
+                                                           windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: fiveHours,
+                                                                           resetsAt: reset, durationSeconds: 18_000),
+                                                                     .init(id: "weekly", kind: .weekly, remainingPercent: weekly,
+                                                                           resetsAt: reset, durationSeconds: 604_800)]), language: language)
                 .foregroundStyle(.white).environment(\.colorScheme, .dark)
                 .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
         }
@@ -744,7 +744,7 @@ struct AIAccountBalanceViewTests {
     /// A long model identity must consume extra vertical space instead of compressing values or overflowing a narrow RTL row.
     @Test func narrowRTLBalanceRowsWrapLongIdentityWithoutHorizontalOverflow() async throws {
         let window = AIAccountQuotaWindow(id: "model", kind: .model, remainingPercent: 10,
-            resetsAt: Date(timeIntervalSince1970: 1_910_001_000), name: String(repeating: "gemini-long-model ", count: 6))
+                                          resetsAt: Date(timeIntervalSince1970: 1_910_001_000), name: String(repeating: "gemini-long-model ", count: 6))
         let balance = AIAccountBalance(id: "fixture", providers: [.gemini], status: .available, windows: [window])
         let view = AIAccountBalanceSection(balances: [balance], displayedProviders: [.gemini], monitoredProviders: [.gemini], language: .arabic)
         let host = NSHostingView(rootView: view.frame(width: 240).fixedSize(horizontal: false, vertical: true))
@@ -756,7 +756,7 @@ struct AIAccountBalanceViewTests {
             .environment(\.layoutDirection, .rightToLeft))
         label.layoutSubtreeIfNeeded()
         #expect(host.fittingSize.height >= label.fittingSize.height + 37,
-            "The complete long window identity must wrap without a line limit or ellipsis")
+                "The complete long window identity must wrap without a line limit or ellipsis")
     }
 
     @Test(arguments: [AIAccountBalanceStatus.notSignedIn, .credentialsExpired, .invalidResponse, .available])
@@ -764,7 +764,7 @@ struct AIAccountBalanceViewTests {
         let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("zisla-balance-status-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [],
-            accountBalanceDetector: StatusDetector(status: status), accountBalanceNotificationCenter: NotificationCenter())
+                                     accountBalanceDetector: StatusDetector(status: status), accountBalanceNotificationCenter: NotificationCenter())
         defer { monitor.stop() }
         let statusView = AIAccountBalanceProviderStatus(monitor: monitor, provider: .claude, language: .english)
         let baseline = try await renderOffscreen(statusView.foregroundStyle(.white), size: CGSize(width: 180, height: 44))
@@ -779,26 +779,26 @@ struct AIAccountBalanceViewTests {
         let refreshed = try await renderOffscreen(statusView.foregroundStyle(.white), size: CGSize(width: 180, height: 44))
         if status != .notSignedIn {
             #expect(baseline.tiffRepresentation != refreshed.tiffRepresentation,
-                "The settings row must render the newly published localized status")
+                    "The settings row must render the newly published localized status")
         }
     }
 
     @Test(arguments: [IslandEdge.top, .left])
     func sharedFloatingBalanceHonorsZeroLeadingInset(edge: IslandEdge) async throws {
         let notice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Claude", style: .status,
-            metadata: ["quotaProviderID": "claude", "quotaRemainingFraction": "1.0", "quotaSeverity": "0", "quotaLine0": "5h 100%"])
+                                  metadata: ["quotaProviderID": "claude", "quotaRemainingFraction": "1.0", "quotaSeverity": "0", "quotaLine0": "5h 100%"])
         let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
         let length = presentation.length(thickness: 32, edge: edge, leadingInset: 0)
         let size = CGSize(width: edge.isVertical ? 32 : length, height: edge.isVertical ? length : 32)
         let content = CompactPillStatusContent(presentation: presentation, text: "", edge: edge,
-            visualizationStyle: .waveform, item: nil, date: .distantPast, leadingInset: 0)
+                                               visualizationStyle: .waveform, item: nil, date: .distantPast, leadingInset: 0)
         let bitmap = try await renderOffscreen(content.foregroundStyle(.white).environment(\.colorScheme, .dark), size: size)
         var firstPixels = 0
         for y in 0..<bitmap.pixelsHigh {
             for x in 0..<bitmap.pixelsWide {
                 guard (edge.isVertical ? y : x) < 10,
-                    let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
-                    max(color.redComponent, color.greenComponent, color.blueComponent) > 0.4 else { continue }
+                      let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                      max(color.redComponent, color.greenComponent, color.blueComponent) > 0.4 else { continue }
                 firstPixels += 1
             }
         }
@@ -809,15 +809,15 @@ struct AIAccountBalanceViewTests {
         let status: AIAccountBalanceStatus
         func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>) async throws -> [AIAccountBalance] {
             [.init(id: "status", providers: [.claude], status: status,
-                windows: status == .available ? [.init(id: "quota", kind: .all, remainingPercent: 70)] : [])]
+                   windows: status == .available ? [.init(id: "quota", kind: .all, remainingPercent: 70)] : [])]
         }
     }
 
     @Test(arguments: [IslandEdge.top, .left], [false, true])
     func longBalanceSummaryScrollsInsideItsViewportAndHonorsReduceMotion(edge: IslandEdge, reduceMotion: Bool) async throws {
         let notice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Gemini", style: .status,
-            metadata: ["quotaRemainingFraction": "0.7", "quotaSeverity": "0",
-                "quotaLine0": "全部 " + String(repeating: "gemini-model 70% · ", count: 8) + "weekly 80%"])
+                                  metadata: ["quotaRemainingFraction": "0.7", "quotaSeverity": "0",
+                                             "quotaLine0": "全部 " + String(repeating: "gemini-model 70% · ", count: 8) + "weekly 80%"])
         let size = CGSize(width: edge.isVertical ? 34 : 156, height: edge.isVertical ? 156 : 34)
         let content = CompactAIAccountBalanceBar(notice: notice, height: 34, edge: edge)
             .foregroundStyle(.white).environment(\.colorScheme, .dark)
@@ -832,26 +832,25 @@ struct AIAccountBalanceViewTests {
             }
         }
         #expect(reduceMotion ? changed == 0 : changed > 30,
-            "Only overflowing quota text may move, and Reduce Motion keeps its first viewport stationary")
+                "Only overflowing quota text may move, and Reduce Motion keeps its first viewport stationary")
         #expect(first.pixelsWide == last.pixelsWide && first.pixelsHigh == last.pixelsHigh)
     }
-
 
     @Test(arguments: [false, true])
     func rotatingAccountsWithEqualQuotaTextRestartAtTheBeginningAndSamePollKeepsProgress(inheritedReduceMotion: Bool) async throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue,
-            now: { Date(timeIntervalSince1970: 100) })
+                                                                                     now: { Date(timeIntervalSince1970: 100) })
         defer { queue.removeAll() }
         let windows = [AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
-            .init(id: "weekly", kind: .weekly, remainingPercent: 70),
-            .init(id: "additional:review:secondary_window", kind: .weekly, remainingPercent: 70,
-                durationSeconds: 604_800, name: "Review allowance")]
+                       .init(id: "weekly", kind: .weekly, remainingPercent: 70),
+                       .init(id: "additional:review:secondary_window", kind: .weekly, remainingPercent: 70,
+                             durationSeconds: 604_800, name: "Review allowance")]
         let rows = [AIProvider.claude, .codex].map {
             AIAccountBalance(id: $0.rawValue, providers: [$0], status: .available, windows: windows)
         }
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.claude, .codex],
-            aiAccountBalanceDisplayedProviders: [.claude, .codex])
+                                       aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.claude, .codex],
+                                       aiAccountBalanceDisplayedProviders: [.claude, .codex])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
         controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
         let first = try #require(queue.left.first)
@@ -872,7 +871,7 @@ struct AIAccountBalanceViewTests {
             .environment(\._accessibilityReduceMotion, inheritedReduceMotion))
         host.sizingOptions = []
         let panel = NSPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                            styleMask: .borderless, backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.contentView = host
         defer { panel.contentView = nil; panel.close() }
@@ -922,7 +921,7 @@ struct AIAccountBalanceViewTests {
             })
         host.sizingOptions = []
         let panel = NSPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                            styleMask: .borderless, backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.contentView = host
         defer { panel.contentView = nil; panel.close() }

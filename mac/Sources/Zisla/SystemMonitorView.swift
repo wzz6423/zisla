@@ -914,7 +914,7 @@ private func waveLine(_ values: [Double], size: CGSize, smooth: Bool = true) -> 
     }
     // Catmull-Rom spline as cubic Béziers: smooth and natural, without the
     // hand-drawn, lopsided wobble of straight segments or overshooting curves.
-    for index in 0 ..< points.count - 1 {
+    for index in 0..<points.count - 1 {
         let p0 = points[max(0, index - 1)]
         let p1 = points[index]
         let p2 = points[index + 1]
@@ -1130,7 +1130,6 @@ private struct SystemCleanupSheet: View {
             .filter { selectedURLs.contains($0.url) }
             .reduce(0) { $0 + $1.byteSize }
     }
-
 
     private var allCandidatesSelected: Bool {
         let selectable = candidates.filter(\.isActionable)

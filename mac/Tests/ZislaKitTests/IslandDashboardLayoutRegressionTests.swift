@@ -14,7 +14,7 @@ struct IslandDashboardLayoutRegressionTests {
     @Test
     func chromeIncludesBothModuleInsets() {
         // chromeHeight must account for the module region's top AND bottom padding (12pt each).
-        let moduleTopInset: CGFloat = 12  // IslandSurfaceGeometry.moduleInset
+        let moduleTopInset: CGFloat = 12 // IslandSurfaceGeometry.moduleInset
         let expected = IslandDashboardLayout.contentTopInset
             + IslandDashboardLayout.toolbarHeight
             + IslandDashboardLayout.toolbarBottomInset

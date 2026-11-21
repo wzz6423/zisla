@@ -20,15 +20,15 @@ struct AIAgentModuleViewRefreshTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let secretURL = directory.appendingPathComponent("secrets.sqlite3")
         let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"),
-            secretStore: DatabaseAIAgentSecretStore(storageURL: secretURL))
+                                 secretStore: DatabaseAIAgentSecretStore(storageURL: secretURL))
         defer { store.flushPendingChanges() }
         store.replaceSkills([AgentSkill(name: "Fixture skill", path: directory.appendingPathComponent("SKILL.md").path,
-            source: "fixture")])
+                                        source: "fixture")])
         store.flushPendingChanges()
         let initialState = store.state
         let workspace = AIAgentWorkspace(store: store,
-            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
-            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil }))
+                                         cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
+                                         cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil }))
         defer { workspace.stop() }
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
@@ -42,7 +42,7 @@ struct AIAgentModuleViewRefreshTests {
         .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 560, height: 700),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.contentView = host
         defer { panel.contentView = nil; panel.close() }
@@ -61,7 +61,7 @@ struct AIAgentModuleViewRefreshTests {
                 && value($0, "accessibilityIdentifier") as? String != "reference-switch"
         }.compactMap { $0 as? any NSAccessibilityElementProtocol }
         #expect(switches.count == AgentSkillSyncDestination.allCases.count + initialState.skills.count,
-            "Both destination rows and discovered skill entries must expose their native switches")
+                "Both destination rows and discovered skill entries must expose their native switches")
         for control in switches {
             #expect(abs(control.accessibilityFrame().height - reference.accessibilityFrame().height) < 0.5)
         }

@@ -146,8 +146,7 @@ struct ThinScrollChromeTests {
             .thinScrollChrome()
             .background(appearanceName == .darkAqua ? Color.black : Color.white)
             .environment(\.colorScheme, appearanceName == .darkAqua ? .dark : .light)
-            .environment(\.layoutDirection, direction)
-        )
+            .environment(\.layoutDirection, direction))
         host.sizingOptions = []
         window.contentView = host
 
@@ -388,10 +387,10 @@ struct ThinScrollChromeTests {
     func keyboardOverviewAndHeatmapUseThinScrollbars(heatmap: Bool) async throws {
         let now = Date(timeIntervalSince1970: 1_900_000_000)
         let snapshot = TypingStatsSnapshot(generatedAt: now, lastInputAt: nil,
-            today: TypingDaySummary(dateKey: "2030-03-17", date: now, characterCount: 0, peakCPS: 0,
-                activeMinuteBuckets: 0, activeSeconds: 0, topAppName: nil, lastUpdatedAt: nil),
-            timelineRange: .oneHour, recentBuckets: [], apps: [], recentAppTimelines: [], history: [],
-            todayKeyCounts: [:], allTimeKeyCounts: [:])
+                                           today: TypingDaySummary(dateKey: "2030-03-17", date: now, characterCount: 0, peakCPS: 0,
+                                                                   activeMinuteBuckets: 0, activeSeconds: 0, topAppName: nil, lastUpdatedAt: nil),
+                                           timelineRange: .oneHour, recentBuckets: [], apps: [], recentAppTimelines: [], history: [],
+                                           todayKeyCounts: [:], allTimeKeyCounts: [:])
         let host = NSHostingView(rootView: Group {
             if heatmap {
                 TypingStatsKeyboardView(snapshot: snapshot)

@@ -150,7 +150,7 @@ struct ScreenRecordingOutputDirectorySettingsTests {
                                 encoding: .utf8)
         let start = try #require(source.range(of: "if input.selection == .recording {"))
         let end = try #require(source.range(of: "if input.selection == .screenshot {",
-                                           range: start.upperBound..<source.endIndex))
+                                            range: start.upperBound..<source.endIndex))
         let recording = source[start.lowerBound..<end.lowerBound]
         #expect(recording.contains("title: \"录屏工作室\""))
         #expect(recording.contains("ForEach(RecordingShortcutAction.allCases)"))
@@ -161,7 +161,8 @@ struct ScreenRecordingOutputDirectorySettingsTests {
     @Test(arguments: AppLanguage.allCases)
     func saveLocationControlsAreLocalizedInEveryLanguage(language: AppLanguage) throws {
         let tableURL = Self.packageRoot.appendingPathComponent(
-            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
+        )
         let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
         let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"),
                                 encoding: .utf8)

@@ -121,10 +121,10 @@ struct OpenCodeSessionActivityDetectorTests {
     @Test
     func parsesOnlyOpenCodeProcessIdentifiers() {
         let output = Data("""
-            123 /usr/local/bin/opencode opencode web
-            456 /usr/local/bin/node node opencode.js
-            789 /usr/local/bin/opencode opencode run task
-            """.utf8)
+        123 /usr/local/bin/opencode opencode web
+        456 /usr/local/bin/node node opencode.js
+        789 /usr/local/bin/opencode opencode run task
+        """.utf8)
         #expect(OpenCodeSessionActivityDetector.parseRunningProcessIdentifiers(output) == [789, 123])
     }
 
@@ -364,37 +364,37 @@ private func createTables(at url: URL) throws {
     defer { sqlite3_close(db) }
 
     let sessionSQL = """
-        CREATE TABLE `session` (
-            `id` text PRIMARY KEY,
-            `project_id` text NOT NULL,
-            `parent_id` text,
-            `slug` text NOT NULL,
-            `directory` text NOT NULL,
-            `title` text NOT NULL,
-            `version` text NOT NULL,
-            `share_url` text,
-            `summary_additions` integer,
-            `summary_deletions` integer,
-            `summary_files` integer,
-            `summary_diffs` text,
-            `revert` text,
-            `permission` text,
-            `time_created` integer NOT NULL,
-            `time_updated` integer NOT NULL,
-            `time_compacting` integer,
-            `time_archived` integer,
-            `workspace_id` text
-        )
-        """
+    CREATE TABLE `session` (
+        `id` text PRIMARY KEY,
+        `project_id` text NOT NULL,
+        `parent_id` text,
+        `slug` text NOT NULL,
+        `directory` text NOT NULL,
+        `title` text NOT NULL,
+        `version` text NOT NULL,
+        `share_url` text,
+        `summary_additions` integer,
+        `summary_deletions` integer,
+        `summary_files` integer,
+        `summary_diffs` text,
+        `revert` text,
+        `permission` text,
+        `time_created` integer NOT NULL,
+        `time_updated` integer NOT NULL,
+        `time_compacting` integer,
+        `time_archived` integer,
+        `workspace_id` text
+    )
+    """
     let messageSQL = """
-        CREATE TABLE `message` (
-            `id` text PRIMARY KEY,
-            `session_id` text NOT NULL,
-            `time_created` integer NOT NULL,
-            `time_updated` integer NOT NULL,
-            `data` text NOT NULL
-        )
-        """
+    CREATE TABLE `message` (
+        `id` text PRIMARY KEY,
+        `session_id` text NOT NULL,
+        `time_created` integer NOT NULL,
+        `time_updated` integer NOT NULL,
+        `data` text NOT NULL
+    )
+    """
 
     var err: UnsafeMutablePointer<CChar>?
     sqlite3_exec(db, sessionSQL, nil, nil, &err)
@@ -418,10 +418,10 @@ private func insertSession(
     defer { sqlite3_close(db) }
 
     let sql = """
-        INSERT INTO `session` (id, project_id, slug, directory, title, version,
-            time_created, time_updated, time_archived)
-        VALUES (?, 'proj1', 'slug', '/tmp', ?, '1.0', ?, ?, ?)
-        """
+    INSERT INTO `session` (id, project_id, slug, directory, title, version,
+        time_created, time_updated, time_archived)
+    VALUES (?, 'proj1', 'slug', '/tmp', ?, '1.0', ?, ?, ?)
+    """
     var stmt: OpaquePointer?
     sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
     sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)
@@ -452,9 +452,9 @@ private func insertMessage(
     defer { sqlite3_close(db) }
 
     let sql = """
-        INSERT INTO `message` (id, session_id, time_created, time_updated, data)
-        VALUES (?, ?, ?, ?, ?)
-        """
+    INSERT INTO `message` (id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?)
+    """
     var stmt: OpaquePointer?
     sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
     sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)

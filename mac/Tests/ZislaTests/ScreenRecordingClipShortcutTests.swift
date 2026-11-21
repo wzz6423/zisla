@@ -58,9 +58,9 @@ struct ScreenRecordingClipShortcutTests {
     func shortcutsIgnoreOtherWindowsModifiedKeysMissingSelectionsAndEditingLocks() throws {
         let fixture = try RecordingMultitrackTestFixture()
         let model = ScreenRecordingStudioModel(projectStore: fixture.store,
-            outputDirectoryStore: try outputDirectoryStore(for: fixture),
-            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
-            presentExportPanel: { _, _ in })
+                                               outputDirectoryStore: try outputDirectoryStore(for: fixture),
+                                               renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
+                                               presentExportPanel: { _, _ in })
         defer { model.shutdown(); remove(fixture) }
         model.install(fixture.project(), directory: fixture.directory)
         let window = makeWindow(model)
@@ -229,9 +229,9 @@ struct ScreenRecordingClipShortcutTests {
         let fixture = try RecordingMultitrackTestFixture()
         var finish: ((URL?) -> Void)?
         let model = ScreenRecordingStudioModel(projectStore: fixture.store,
-            outputDirectoryStore: try outputDirectoryStore(for: fixture),
-            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
-            presentExportPanel: { _, completion in finish = completion })
+                                               outputDirectoryStore: try outputDirectoryStore(for: fixture),
+                                               renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
+                                               presentExportPanel: { _, completion in finish = completion })
         defer { model.shutdown(); remove(fixture) }
         _ = try await fixture.createVideo()
         let project = fixture.project()
@@ -401,7 +401,8 @@ struct ScreenRecordingClipShortcutTests {
             loadSources: { [] }, loadDevices: { .init() }, requestPermission: { _ in true },
             makeSession: { _, _, _ in session },
             makeCameraPreview: { _, _ in fatalError("Camera preview is disabled in shortcut tests") },
-            now: { 10 }, scheduleTick: { _ in {} }))
+            now: { 10 }, scheduleTick: { _ in {} }
+        ))
         let model = try makeModel(fixture, capture: capture)
         defer { model.shutdown(); remove(fixture) }
         _ = try await fixture.createVideo()
@@ -511,7 +512,7 @@ struct ScreenRecordingClipShortcutTests {
         let destination = fixture.root.appendingPathComponent("result.mp4")
         let task = Task {
             try await exporter.export(project: project, directory: fixture.directory, to: destination,
-                configuration: .init(format: .mp4, resolution: .source, frameRate: 8))
+                                      configuration: .init(format: .mp4, resolution: .source, frameRate: 8))
         }
         defer { task.cancel(); gate.release() }
         for await _ in gate.entered.stream { break }
@@ -534,7 +535,7 @@ struct ScreenRecordingClipShortcutTests {
                            exporter: ScreenRecordingExporter = ScreenRecordingExporter()) throws -> ScreenRecordingStudioModel {
         let image = try #require(CIContext().createCGImage(CIImage(color: .black), from: CGRect(x: 0, y: 0, width: 64, height: 48)))
         return ScreenRecordingStudioModel(capture: capture, exporter: exporter, projectStore: fixture.store,
-            outputDirectoryStore: try outputDirectoryStore(for: fixture), renderPreview: { _, _, _ in image })
+                                          outputDirectoryStore: try outputDirectoryStore(for: fixture), renderPreview: { _, _, _ in image })
     }
 
     private func outputDirectoryStore(for fixture: RecordingMultitrackTestFixture) throws -> ScreenRecordingOutputDirectoryStore {
@@ -550,7 +551,7 @@ struct ScreenRecordingClipShortcutTests {
 
     private func makeWindow(_ model: ScreenRecordingStudioModel?) -> ScreenRecordingStudioWindow {
         let window = ScreenRecordingStudioWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 400, height: 300),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                                                 styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.studioModel = model
         window.contentView = NSView(frame: CGRect(x: 0, y: 0, width: 400, height: 300))
@@ -560,8 +561,8 @@ struct ScreenRecordingClipShortcutTests {
     private func key(_ characters: String, window: NSWindow, modifiers: NSEvent.ModifierFlags = .command,
                      repeated: Bool = false) throws -> NSEvent {
         try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
-            windowNumber: window.windowNumber, context: nil, characters: characters, charactersIgnoringModifiers: characters,
-            isARepeat: repeated, keyCode: [" ": 49, "c": 8, "\r": 36, "\u{1b}": 53, "\t": 48][characters.lowercased()] ?? 9))
+                                      windowNumber: window.windowNumber, context: nil, characters: characters, charactersIgnoringModifiers: characters,
+                                      isARepeat: repeated, keyCode: [" ": 49, "c": 8, "\r": 36, "\u{1b}": 53, "\t": 48][characters.lowercased()] ?? 9))
     }
 
     private final class ForwardingKeyView: NSView {

@@ -13,7 +13,7 @@ struct IslandAppearanceSettingsTests {
         settings.islandLayoutStyle = .pill
         settings = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(settings.islandPlacement(for: .custom) == custom,
-            "Returning to custom mode must restore the last confirmed edge, offset and inward distance")
+                "Returning to custom mode must restore the last confirmed edge, offset and inward distance")
     }
 
     @Test
@@ -79,7 +79,7 @@ struct IslandAppearanceSettingsTests {
         for step in 0..<64 {
             seed = seed &* 6364136223846793005 &+ 1442695040888963407
             let custom = IslandPlacement(mode: .custom, edge: IslandEdge.allCases[Int(seed % 4)],
-                offset: Double(seed % 1000) / 100, inwardDistance: Double(seed % 200))
+                                         offset: Double(seed % 1000) / 100, inwardDistance: Double(seed % 200))
             settings.islandPlacement = custom
             settings.islandLayoutStyle = step.isMultiple(of: 2) ? .notch : .pill
             settings.islandPlacement = try #require(settings.islandPlacement(for: .camera))
@@ -94,7 +94,7 @@ struct IslandAppearanceSettingsTests {
         var withoutHistory = object
         withoutHistory.removeValue(forKey: "lastCustomIslandPlacement")
         #expect(try JSONDecoder().decode(FeatureSettings.self,
-            from: JSONSerialization.data(withJSONObject: withoutHistory)) == .default)
+                                         from: JSONSerialization.data(withJSONObject: withoutHistory)) == .default)
     }
 
     @Test
@@ -164,10 +164,10 @@ struct IslandAppearanceSettingsTests {
     @Test
     func theNewLiquidGlassValueDoesNotRepurposeTheOldMigration() throws {
         let legacy = try JSONDecoder().decode(FeatureSettings.self,
-            from: Data(#"{"islandNotchBackground":"liquidGlass"}"#.utf8))
+                                              from: Data(#"{"islandNotchBackground":"liquidGlass"}"#.utf8))
         #expect(legacy.islandNotchBackground == .frosted)
         let current = try JSONDecoder().decode(FeatureSettings.self,
-            from: Data(#"{"islandNotchBackground":"liquidGlassCrown"}"#.utf8))
+                                               from: Data(#"{"islandNotchBackground":"liquidGlassCrown"}"#.utf8))
         #expect(current.islandNotchBackground == .liquidGlass)
         #expect(String(decoding: try JSONEncoder().encode(IslandNotchBackground.liquidGlass), as: UTF8.self)
             == #""liquidGlassCrown""#)

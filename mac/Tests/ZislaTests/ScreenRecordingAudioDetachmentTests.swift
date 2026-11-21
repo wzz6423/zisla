@@ -16,7 +16,7 @@ struct ScreenRecordingAudioDetachmentTests {
         #expect(RecordingMultitrackTimeline.migrating(project).assets[0].hasAudio)
         #expect(try await ScreenRecordingAudioDetachment.audioRanges(at: fixture.videoURL).isEmpty)
         #expect(try await ScreenRecordingAudioDetachment.prepare(project: project, directory: fixture.directory,
-            clipID: project.edits.segments[0].id.uuidString) == nil)
+                                                                 clipID: project.edits.segments[0].id.uuidString) == nil)
         #expect(try fixture.files() == ["screen.mp4"])
     }
 
@@ -32,7 +32,7 @@ struct ScreenRecordingAudioDetachmentTests {
         let selected = original.edits.segments[1].id.uuidString
         let beforeFiles = try fixture.files()
         let detached = try #require(try await ScreenRecordingAudioDetachment.prepare(project: original,
-            directory: fixture.directory, clipID: selected))
+                                                                                     directory: fixture.directory, clipID: selected))
         let timeline = try #require(detached.timeline)
         let audio = timeline.clips.filter { $0.content.trackKind == .audio }
 
@@ -44,7 +44,7 @@ struct ScreenRecordingAudioDetachmentTests {
         #expect(Set(audio.map(\.volume)) == [0.4, 0.7])
         #expect(Set(audio.map(\.trackID)).count == 2)
         #expect(timeline.tracks.allSatisfy { $0.name.isEmpty && $0.kind == .video },
-            "Audio detachment must create the same universal tracks as other timeline actions")
+                "Audio detachment must create the same universal tracks as other timeline actions")
         #expect(timeline.assets.filter { $0.kind == .audio }.map(\.file) == ["microphone.wav"])
         #expect(detached.edits == original.edits)
         #expect(try fixture.files() == beforeFiles, "Detaching must not transcode, copy, or remove source media")
@@ -62,13 +62,13 @@ struct ScreenRecordingAudioDetachmentTests {
         let trackID = timeline.addTrack(.image)
         timeline.tracks[timeline.tracks.count - 1].isMuted = true
         let imported = RecordingTimelineClip(trackID: trackID, content: .video(original.id),
-            start: 3, sourceStart: 0.5, sourceEnd: 1.5, speed: 0.5, volume: 0.35)
+                                             start: 3, sourceStart: 0.5, sourceEnd: 1.5, speed: 0.5, volume: 0.35)
         timeline.assets[0].hasAudio = false
         timeline.clips.append(imported)
         original.version = 2
         original.timeline = timeline
         let detached = try #require(try await ScreenRecordingAudioDetachment.prepare(project: original,
-            directory: fixture.directory, clipID: imported.id))
+                                                                                     directory: fixture.directory, clipID: imported.id))
         let result = try #require(detached.timeline)
         let audio = try #require(result.clips.first { $0.content.trackKind == .audio })
 
@@ -88,15 +88,15 @@ struct ScreenRecordingAudioDetachmentTests {
         let original = fixture.project(microphone: true)
         let selected = original.edits.segments[0].id.uuidString
         let detached = try #require(try await ScreenRecordingAudioDetachment.prepare(project: original,
-            directory: fixture.directory, clipID: selected))
+                                                                                     directory: fixture.directory, clipID: selected))
         let audio = try #require(detached.timeline?.clips.first { $0.content.trackKind == .audio })
         #expect(detached.timeline?.clips.filter { $0.content.trackKind == .audio }.count == 1)
         #expect(detached.timeline?.assets.first { $0.id == audio.content.assetID }?.file == "microphone.wav")
         #expect(audio.volume == 1, "Legacy default microphone gain must remain unchanged")
         #expect(try await ScreenRecordingAudioDetachment.prepare(project: detached,
-            directory: fixture.directory, clipID: selected, probe: { _ in
-                throw ScreenRecordingExportError.encoderFailure
-            }) == nil)
+                                                                 directory: fixture.directory, clipID: selected, probe: { _ in
+                                                                     throw ScreenRecordingExportError.encoderFailure
+                                                                 }) == nil)
     }
 
     @Test func delayedOrShortAudioRetainsItsOutputAlignment() async throws {
@@ -112,12 +112,12 @@ struct ScreenRecordingAudioDetachmentTests {
         project.version = 2
         project.timeline = timeline
         let detached = try #require(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: timeline.clips[0].id, probe: { _ in [0.4..<1.4] }))
+                                                                                     directory: fixture.directory, clipID: timeline.clips[0].id, probe: { _ in [0.4..<1.4] }))
         let audio = try #require(detached.timeline?.clips.first { $0.content.trackKind == .audio })
         #expect(abs(audio.start - 3.6) < 0.000_001)
         #expect(audio.sourceStart == 0.4 && audio.sourceEnd == 1.4 && audio.speed == 2)
         #expect(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: timeline.clips[0].id, probe: { _ in [1.9..<2] }) == nil)
+                                                                 directory: fixture.directory, clipID: timeline.clips[0].id, probe: { _ in [1.9..<2] }) == nil)
     }
 
     @Test func missingSelectionAndDisabledAudioDoNotReadMediaOrChangeTheTimeline() async throws {
@@ -125,17 +125,17 @@ struct ScreenRecordingAudioDetachmentTests {
         defer { fixture.remove() }
         var project = fixture.project()
         #expect(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: "missing") == nil)
+                                                                 directory: fixture.directory, clipID: "missing") == nil)
         project.timeline = RecordingMultitrackTimeline.migrating(project)
         project.version = 2
         project.timeline?.clips[0].audioEnabled = false
         #expect(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString) == nil)
+                                                                 directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString) == nil)
         project.timeline?.clips[0].audioEnabled = true
         project.timeline?.clips[0].content = .audio(project.id)
         project.timeline?.tracks[0].kind = .audio
         #expect(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString) == nil)
+                                                                 directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString) == nil)
         #expect(try fixture.files().isEmpty)
     }
 
@@ -146,7 +146,7 @@ struct ScreenRecordingAudioDetachmentTests {
         project.edits.microphoneVolume = .nan
         await #expect(throws: ScreenRecordingProjectError.invalidProject) {
             try await ScreenRecordingAudioDetachment.prepare(project: project,
-                directory: fixture.directory, clipID: "missing")
+                                                             directory: fixture.directory, clipID: "missing")
         }
         project.edits.microphoneVolume = nil
         project.version = 2
@@ -156,7 +156,7 @@ struct ScreenRecordingAudioDetachmentTests {
         try Data([1]).write(to: fixture.videoURL)
         await #expect(throws: ScreenRecordingProjectError.invalidProject) {
             try await ScreenRecordingAudioDetachment.prepare(project: project, directory: fixture.directory,
-                clipID: project.edits.segments[0].id.uuidString, probe: { _ in [0..<2] })
+                                                             clipID: project.edits.segments[0].id.uuidString, probe: { _ in [0..<2] })
         }
         #expect(try fixture.files() == ["screen.mp4"])
     }
@@ -172,10 +172,10 @@ struct ScreenRecordingAudioDetachmentTests {
         let snapshot = try Data(contentsOf: fixture.directory.appendingPathComponent("project.json"))
         await #expect(throws: ScreenRecordingExportError.unavailableMedia) {
             try await ScreenRecordingAudioDetachment.prepare(project: original, directory: fixture.directory,
-                clipID: original.edits.segments[0].id.uuidString, probe: { url in
-                    if url.lastPathComponent == "microphone.wav" { throw ScreenRecordingExportError.unavailableMedia }
-                    return [0..<2]
-                })
+                                                             clipID: original.edits.segments[0].id.uuidString, probe: { url in
+                                                                 if url.lastPathComponent == "microphone.wav" { throw ScreenRecordingExportError.unavailableMedia }
+                                                                 return [0..<2]
+                                                             })
         }
         #expect(try store.load(from: fixture.directory) == original)
         #expect(try Data(contentsOf: fixture.directory.appendingPathComponent("project.json")) == snapshot)
@@ -192,10 +192,10 @@ struct ScreenRecordingAudioDetachmentTests {
         let gate = ProbeGate()
         let task = Task {
             try await ScreenRecordingAudioDetachment.prepare(project: original, directory: fixture.directory,
-                clipID: original.edits.segments[0].id.uuidString, probe: { url in
-                    if microphone, url.lastPathComponent == "screen.mp4" { return [0..<2] }
-                    return try await gate.wait()
-                })
+                                                             clipID: original.edits.segments[0].id.uuidString, probe: { url in
+                                                                 if microphone, url.lastPathComponent == "screen.mp4" { return [0..<2] }
+                                                                 return try await gate.wait()
+                                                             })
         }
         await gate.waitUntilEntered()
         task.cancel()
@@ -212,7 +212,7 @@ struct ScreenRecordingAudioDetachmentTests {
         let task = Task {
             _ = try await gate.wait()
             return try await ScreenRecordingAudioDetachment.prepare(project: project, directory: fixture.directory,
-                clipID: project.edits.segments[0].id.uuidString)
+                                                                    clipID: project.edits.segments[0].id.uuidString)
         }
         await gate.waitUntilEntered()
         task.cancel()
@@ -228,9 +228,9 @@ struct ScreenRecordingAudioDetachmentTests {
         try Data([2]).write(to: fixture.directory.appendingPathComponent("microphone.wav"))
         let project = fixture.project(microphone: true)
         let detached = try #require(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString, probe: { url in
-                url.lastPathComponent == "screen.mp4" ? [0..<2] : []
-            }))
+                                                                                     directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString, probe: { url in
+                                                                                         url.lastPathComponent == "screen.mp4" ? [0..<2] : []
+                                                                                     }))
         #expect(detached.timeline?.assets.count == 1)
         #expect(detached.timeline?.clips.filter { $0.content.trackKind == .audio }.count == 1)
     }
@@ -244,7 +244,7 @@ struct ScreenRecordingAudioDetachmentTests {
         let project = fixture.project()
         await #expect(throws: ScreenRecordingProjectError.unsafeMediaPath) {
             try await ScreenRecordingAudioDetachment.prepare(project: project, directory: fixture.directory,
-                clipID: project.edits.segments[0].id.uuidString, probe: { _ in [0..<2] })
+                                                             clipID: project.edits.segments[0].id.uuidString, probe: { _ in [0..<2] })
         }
         #expect(try Data(contentsOf: outside) == Data([1]))
         #expect(try fixture.files() == ["screen.mp4"])
@@ -313,7 +313,7 @@ struct ScreenRecordingAudioDetachmentTests {
 
     @Test(arguments: LifecycleAction.allCases, [false, true])
     func lateAudioProbeCannotPublishAnEditOrErrorAfterItsOperationIsInvalidated(_ action: LifecycleAction,
-                                                                              _ failure: Bool) async throws {
+                                                                                _ failure: Bool) async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
         try Data([1]).write(to: fixture.videoURL)
@@ -359,7 +359,7 @@ struct ScreenRecordingAudioDetachmentTests {
         let selected = project.edits.segments.map { $0.id.uuidString }
         for id in selected {
             project = try #require(try await ScreenRecordingAudioDetachment.prepare(project: project,
-                directory: fixture.directory, clipID: id, probe: { _ in [0..<2] }))
+                                                                                    directory: fixture.directory, clipID: id, probe: { _ in [0..<2] }))
         }
         let timeline = try #require(project.timeline)
         #expect(timeline.assets.count == 2)
@@ -378,14 +378,14 @@ struct ScreenRecordingAudioDetachmentTests {
         #expect(end > 0.45 && end < 0.6, "The longer second track must not extend the audible source")
         var project = fixture.project()
         let detached = try #require(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString))
+                                                                                     directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString))
         #expect(detached.timeline?.clips.first { $0.content.trackKind == .audio }?.sourceEnd == end)
         let exporter = ScreenRecordingExporter()
         let preview = try await exporter.playbackItem(project: detached, directory: fixture.directory)
         let previewSamples = try await Self.audioSamples(preview.asset, mix: preview.audioMix)
         let destination = fixture.root.appendingPathComponent("first-track.mp4")
         try await exporter.export(project: detached, directory: fixture.directory, to: destination,
-            configuration: .init(resolution: .source, frameRate: 4))
+                                  configuration: .init(resolution: .source, frameRate: 4))
         let exported = try await Self.audioSamples(AVURLAsset(url: destination))
         for samples in [previewSamples, exported] {
             #expect(Self.toneEnergy(samples, frequency: 440, range: 0.1..<0.4) > 0.004)
@@ -395,7 +395,7 @@ struct ScreenRecordingAudioDetachmentTests {
         }
         project.edits.segments = [.init(start: 0.75, end: 1.5)]
         #expect(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString) == nil)
+                                                                 directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString) == nil)
     }
 
     @Test func boundedTimingPropertiesKeepDetachedSamplesAtTheSameOutputTime() async throws {
@@ -417,7 +417,7 @@ struct ScreenRecordingAudioDetachmentTests {
             project.version = 2
             project.timeline = timeline
             let detached = try #require(try await ScreenRecordingAudioDetachment.prepare(project: project,
-                directory: fixture.directory, clipID: timeline.clips[0].id, probe: { _ in [0.5..<1.5] }))
+                                                                                         directory: fixture.directory, clipID: timeline.clips[0].id, probe: { _ in [0.5..<1.5] }))
             let audio = try #require(detached.timeline?.clips.first { $0.content.trackKind == .audio })
             for sourceTime in [0.5, 1, 1.5] {
                 let originalTime = offset + (sourceTime - 0.25) / speed
@@ -427,13 +427,13 @@ struct ScreenRecordingAudioDetachmentTests {
             #expect(audio.volume == timeline.clips[0].volume)
             try detached.validate()
             #expect(try JSONDecoder().decode(ScreenRecordingProject.self,
-                from: JSONEncoder().encode(detached)) == detached)
+                                             from: JSONEncoder().encode(detached)) == detached)
         }
     }
 
     @Test(arguments: [0.5, 1.0, 2.0], [false, true])
     func realPreviewAndMP4PreserveBothGainsWithoutDoublePlayingDetachedSources(_ speed: Double,
-                                                                            _ customGain: Bool) async throws {
+                                                                               _ customGain: Bool) async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
         try await fixture.createVideo(withAudio: true)
@@ -448,12 +448,12 @@ struct ScreenRecordingAudioDetachmentTests {
         let before = try await exporter.playbackItem(project: project, directory: fixture.directory)
         let baseline = try await Self.audioSamples(before.asset, mix: before.audioMix)
         let detached = try #require(try await ScreenRecordingAudioDetachment.prepare(project: project,
-            directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString))
+                                                                                     directory: fixture.directory, clipID: project.edits.segments[0].id.uuidString))
         let preview = try await exporter.playbackItem(project: detached, directory: fixture.directory)
         let previewSamples = try await Self.audioSamples(preview.asset, mix: preview.audioMix)
         let destination = fixture.root.appendingPathComponent("detached.mp4")
         try await exporter.export(project: detached, directory: fixture.directory, to: destination,
-            configuration: .init(resolution: .source, frameRate: 4))
+                                  configuration: .init(resolution: .source, frameRate: 4))
         let exported = try await Self.audioSamples(AVURLAsset(url: destination))
         let range = 0.1..<(project.outputDuration - 0.1)
         for frequency in [440.0, 880.0] {
@@ -473,7 +473,7 @@ struct ScreenRecordingAudioDetachmentTests {
         try fixture.createTone(name: "microphone.wav", frequency: 880)
         let original = fixture.project(microphone: true)
         var project = try #require(try await ScreenRecordingAudioDetachment.prepare(project: original,
-            directory: fixture.directory, clipID: original.edits.segments[0].id.uuidString))
+                                                                                    directory: fixture.directory, clipID: original.edits.segments[0].id.uuidString))
         var timeline = try #require(project.timeline)
         let systemIndex = try #require(timeline.clips.firstIndex { $0.content == .audio(project.id) })
         timeline.clips[systemIndex].trackID = timeline.tracks[0].id
@@ -489,14 +489,14 @@ struct ScreenRecordingAudioDetachmentTests {
         let previewSamples = try await Self.audioSamples(preview.asset, mix: preview.audioMix)
         let destination = fixture.root.appendingPathComponent("edited-audio.mp4")
         try await exporter.export(project: project, directory: fixture.directory, to: destination,
-            configuration: .init(resolution: .source, frameRate: 4))
+                                  configuration: .init(resolution: .source, frameRate: 4))
         let exported = try await Self.audioSamples(AVURLAsset(url: destination))
         for samples in [previewSamples, exported] {
             #expect(Self.toneEnergy(samples, frequency: 440, range: 0.1..<0.4) < 0.000_001)
             #expect((0.000_2...0.000_6).contains(Self.toneEnergy(samples, frequency: 440, range: 0.65..<0.95)))
             #expect(Self.toneEnergy(samples, frequency: 440, range: 1.3..<1.7) < 0.000_001)
             #expect(Self.toneEnergy(samples, frequency: 880, range: 0.65..<0.95) < 0.000_001,
-                "Deleting the microphone clip must not revive the source video's microphone")
+                    "Deleting the microphone clip must not revive the source video's microphone")
         }
         for trackMuted in [false, true] {
             var muted = timeline
@@ -511,7 +511,7 @@ struct ScreenRecordingAudioDetachmentTests {
             #expect(try await silent.asset.loadTracks(withMediaType: .audio).isEmpty)
             let destination = fixture.root.appendingPathComponent("muted-\(trackMuted).mp4")
             try await exporter.export(project: project, directory: fixture.directory, to: destination,
-                configuration: .init(resolution: .source, frameRate: 4))
+                                      configuration: .init(resolution: .source, frameRate: 4))
             #expect(try await AVURLAsset(url: destination).loadTracks(withMediaType: .audio).isEmpty)
         }
         timeline.clips.removeAll { $0.content.trackKind == .audio }
@@ -520,7 +520,7 @@ struct ScreenRecordingAudioDetachmentTests {
         #expect(try await silent.asset.loadTracks(withMediaType: .audio).isEmpty)
         let silentDestination = fixture.root.appendingPathComponent("deleted-audio.mp4")
         try await exporter.export(project: project, directory: fixture.directory, to: silentDestination,
-            configuration: .init(resolution: .source, frameRate: 4))
+                                  configuration: .init(resolution: .source, frameRate: 4))
         #expect(try await AVURLAsset(url: silentDestination).loadTracks(withMediaType: .audio).isEmpty)
     }
 
@@ -534,7 +534,7 @@ struct ScreenRecordingAudioDetachmentTests {
         timeline.tracks[0].kind = .text
         timeline.clips[0].audioEnabled = false
         timeline.clips.append(.init(trackID: timeline.tracks[0].id, content: .audio(project.id),
-            start: 0, sourceEnd: 2, volume: 0.5))
+                                    start: 0, sourceEnd: 2, volume: 0.5))
         let exporter = ScreenRecordingExporter()
         for (hidden, muted) in [(false, false), (true, false), (false, true), (true, true)] {
             timeline.tracks[0].isHidden = hidden
@@ -545,18 +545,18 @@ struct ScreenRecordingAudioDetachmentTests {
             let preview = try await exporter.playbackItem(project: project, directory: fixture.directory)
             let destination = fixture.root.appendingPathComponent("track-\(hidden)-\(muted).mp4")
             try await exporter.export(project: project, directory: fixture.directory, to: destination,
-                configuration: .init(resolution: .source, frameRate: 4))
+                                      configuration: .init(resolution: .source, frameRate: 4))
             let exportedAsset = AVURLAsset(url: destination)
             let frames = try await RecordingMultitrackTestFixture.decode(exportedAsset)
             #expect(frames.count == 8)
             for image in [previewImage, frames[2].1] {
                 let pixel = try RecordingMultitrackTestFixture.pixel(image, x: 32, y: 24)
                 #expect(hidden ? pixel.allSatisfy { $0 < 30 } : pixel[2] > 120,
-                    "Visibility controls visual content on all tracks independently of mute")
+                        "Visibility controls visual content on all tracks independently of mute")
             }
             for asset in [preview.asset, exportedAsset] {
                 #expect(try await asset.loadTracks(withMediaType: .audio).isEmpty == muted,
-                    "Mute controls audio content on all tracks independently of visibility")
+                        "Mute controls audio content on all tracks independently of visibility")
             }
             if !muted {
                 for samples in [try await Self.audioSamples(preview.asset, mix: preview.audioMix),
@@ -574,13 +574,13 @@ struct ScreenRecordingAudioDetachmentTests {
         try await fixture.createVideo(withAudio: true)
         let original = fixture.project()
         var project = try #require(try await ScreenRecordingAudioDetachment.prepare(project: original,
-            directory: fixture.directory, clipID: original.edits.segments[0].id.uuidString))
+                                                                                    directory: fixture.directory, clipID: original.edits.segments[0].id.uuidString))
         var timeline = try #require(project.timeline)
         let audio = try #require(timeline.clips.first { $0.content.trackKind == .audio })
         timeline.clips.removeAll { $0.content.trackKind == .audio }
         for (start, gain) in [(0.0, 0.25), (0.5, 0.75), (1.5, 0.5)] {
             timeline.clips.append(.init(trackID: audio.trackID, content: audio.content, start: start,
-                sourceStart: 0.25, sourceEnd: 0.75, volume: gain))
+                                        sourceStart: 0.25, sourceEnd: 0.75, volume: gain))
         }
         project.timeline = timeline
         let exporter = ScreenRecordingExporter()
@@ -588,7 +588,7 @@ struct ScreenRecordingAudioDetachmentTests {
         let previewSamples = try await Self.audioSamples(preview.asset, mix: preview.audioMix)
         let destination = fixture.root.appendingPathComponent("adjacent-audio.mp4")
         try await exporter.export(project: project, directory: fixture.directory, to: destination,
-            configuration: .init(resolution: .source, frameRate: 4))
+                                  configuration: .init(resolution: .source, frameRate: 4))
         let exported = try await Self.audioSamples(AVURLAsset(url: destination))
         for samples in [previewSamples, exported] {
             for (start, gain) in [(0.0, 0.25), (0.5, 0.75), (1.5, 0.5)] {
@@ -687,7 +687,7 @@ struct ScreenRecordingAudioDetachmentTests {
 
         func project(microphone: Bool = false) -> ScreenRecordingProject {
             var project = ScreenRecordingProject(name: "Audio fixture", videoFile: "screen.mp4",
-                microphoneFile: microphone ? "microphone.wav" : nil, duration: 2, width: 64, height: 48)
+                                                 microphoneFile: microphone ? "microphone.wav" : nil, duration: 2, width: 64, height: 48)
             project.version = 1
             project.edits.background = .none
             project.edits.padding = 0
@@ -698,9 +698,9 @@ struct ScreenRecordingAudioDetachmentTests {
 
         func model() throws -> ScreenRecordingStudioModel {
             let image = try #require(CIContext().createCGImage(CIImage(color: CIColor(red: 0, green: 0, blue: 0)),
-                from: CGRect(x: 0, y: 0, width: 64, height: 48)))
+                                                               from: CGRect(x: 0, y: 0, width: 64, height: 48)))
             return ScreenRecordingStudioModel(projectStore: ScreenRecordingProjectStore(root: root),
-                renderPreview: { _, _, _ in image })
+                                              renderPreview: { _, _, _ in image })
         }
 
         func createTone(name: String, frequency: Double) throws {
@@ -747,7 +747,7 @@ struct ScreenRecordingAudioDetachmentTests {
             if withAudio {
                 try createTone(name: "system.m4a", frequency: 440)
                 try await NativeMediaMuxer().mux(videoURL: plain,
-                    audioURL: directory.appendingPathComponent("system.m4a"), outputURL: videoURL)
+                                                 audioURL: directory.appendingPathComponent("system.m4a"), outputURL: videoURL)
                 try FileManager.default.removeItem(at: plain)
                 try FileManager.default.removeItem(at: directory.appendingPathComponent("system.m4a"))
             }
@@ -763,15 +763,15 @@ struct ScreenRecordingAudioDetachmentTests {
             let composition = AVMutableComposition()
             let video = try #require(try await screen.loadTracks(withMediaType: .video).first)
             let destinationVideo = try #require(composition.addMutableTrack(withMediaType: .video,
-                preferredTrackID: kCMPersistentTrackID_Invalid))
+                                                                            preferredTrackID: kCMPersistentTrackID_Invalid))
             try destinationVideo.insertTimeRange(.init(start: .zero, duration: .init(seconds: 2, preferredTimescale: 600)),
-                of: video, at: .zero)
+                                                 of: video, at: .zero)
             for (asset, duration) in [(first, 0.5), (second, 2.0)] {
                 let source = try #require(try await asset.loadTracks(withMediaType: .audio).first)
                 let destination = try #require(composition.addMutableTrack(withMediaType: .audio,
-                    preferredTrackID: kCMPersistentTrackID_Invalid))
+                                                                           preferredTrackID: kCMPersistentTrackID_Invalid))
                 try destination.insertTimeRange(.init(start: .zero,
-                    duration: .init(seconds: duration, preferredTimescale: 600)), of: source, at: .zero)
+                                                      duration: .init(seconds: duration, preferredTimescale: 600)), of: source, at: .zero)
             }
             let output = directory.appendingPathComponent("two-tracks.mp4")
             let session = try #require(AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough))

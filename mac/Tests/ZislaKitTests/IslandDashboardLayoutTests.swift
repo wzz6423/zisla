@@ -28,8 +28,8 @@ struct IslandDashboardLayoutTests {
         #expect(
             height
                 == IslandDashboardLayout.chromeHeight
-                    + IslandDashboardLayout.mediaHeaderHeight
-                    + IslandDashboardLayout.cardGridHeight(forCardCount: 1)
+                + IslandDashboardLayout.mediaHeaderHeight
+                + IslandDashboardLayout.cardGridHeight(forCardCount: 1)
         )
     }
 
@@ -40,7 +40,7 @@ struct IslandDashboardLayoutTests {
         #expect(
             height
                 == IslandDashboardLayout.chromeHeight
-                    + IslandDashboardLayout.mediaHeaderHeight
+                + IslandDashboardLayout.mediaHeaderHeight
         )
         #expect(height < IslandCrownGeometry.crownFloorHeight)
     }
@@ -114,7 +114,7 @@ struct IslandDashboardLayoutTests {
         #expect(
             IslandDashboardLayout.cardGridHeight(forCardCount: 2)
                 == IslandDashboardLayout.cardGridVerticalPadding * 2
-                    + IslandDashboardLayout.cardHeight
+                + IslandDashboardLayout.cardHeight
         )
     }
 
@@ -137,8 +137,8 @@ struct IslandDashboardLayoutTests {
         #expect(
             fiveCards
                 == IslandDashboardLayout.chromeHeight
-                    + IslandDashboardLayout.mediaHeaderHeight
-                    + IslandDashboardLayout.cardGridHeight(forCardCount: 5)
+                + IslandDashboardLayout.mediaHeaderHeight
+                + IslandDashboardLayout.cardGridHeight(forCardCount: 5)
         )
     }
 

@@ -128,11 +128,11 @@ final class RecordingMultitrackMedia {
                     let recording: Bool
                     if case .recording = clip.content { recording = true } else { recording = false }
                     try await appendAudio(file, clip: clip,
-                        volume: clip.volume * (recording ? project.edits.effectiveScreenAudioVolume : 1),
-                        effects: recording ? .init() : clip.voiceEffects ?? .init())
+                                          volume: clip.volume * (recording ? project.edits.effectiveScreenAudioVolume : 1),
+                                          effects: recording ? .init() : clip.voiceEffects ?? .init())
                     if recording, let microphone = project.editingMicrophoneFile {
                         try await appendAudio(microphone, clip: clip, volume: clip.volume * project.edits.effectiveMicrophoneVolume,
-                            effects: clip.voiceEffects ?? project.edits.voiceEffects ?? .init())
+                                              effects: clip.voiceEffects ?? project.edits.voiceEffects ?? .init())
                     }
                 }
             case let .audio(id):
@@ -158,7 +158,7 @@ final class RecordingMultitrackMedia {
             let start = max(entry.clip.sourceStart, entry.range.start.seconds)
             let destination = entry.clip.start + (start - entry.clip.sourceStart) / entry.clip.speed
             let lane = try lane(at: destination, mediaType: .audio, composition: composition, lanes: &audioLanes,
-                accepts: { audioVolumes[$0.trackID] == entry.volume })
+                                accepts: { audioVolumes[$0.trackID] == entry.volume })
             _ = try insert(entry.clip, source: entry.source, range: entry.range, into: lane)
             audioVolumes[lane.trackID] = entry.volume
             let parameter = parameters[lane.trackID] ?? AVMutableAudioMixInputParameters(track: lane)
@@ -174,8 +174,8 @@ final class RecordingMultitrackMedia {
         mix.inputParameters = audioLanes.map { parameters[$0.trackID]! }
         withExtendedLifetime(retained) {}
         return .init(composition: composition, layers: layers, videoTracks: videoLanes, audioTracks: audioLanes,
-            audioMix: mix, duration: timeline.duration, adjustsSpeed: timeline.clips.contains { $0.speed != 1 },
-            voiceMedia: voiceMedia, preservesHDR: preservesHDR)
+                     audioMix: mix, duration: timeline.duration, adjustsSpeed: timeline.clips.contains { $0.speed != 1 },
+                     voiceMedia: voiceMedia, preservesHDR: preservesHDR)
     }
 
     private static func lane(at start: Double, mediaType: AVMediaType, composition: AVMutableComposition,
@@ -197,7 +197,7 @@ final class RecordingMultitrackMedia {
         let duration = CMTime(seconds: end - start, preferredTimescale: 60_000)
         let outputDuration = CMTime(seconds: (end - start) / clip.speed, preferredTimescale: 60_000)
         try track.insertTimeRange(CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 60_000), duration: duration),
-            of: source, at: destination)
+                                  of: source, at: destination)
         track.scaleTimeRange(CMTimeRange(start: destination, duration: duration), toDuration: outputDuration)
         return CMTimeRange(start: destination, duration: outputDuration)
     }
@@ -251,10 +251,10 @@ extension ScreenRecordingExporter {
         try await media.addPlaybackClock()
         try Task.checkCancellation()
         let original = try RecordingExportRenderer.outputSize(source: CGSize(width: project.width, height: project.height),
-            edits: project.edits, resolution: .source)
+                                                              edits: project.edits, resolution: .source)
         let scale = min(1, RecordingExportRenderer.maximumPreviewSize.width / max(original.width, original.height))
         let size = CGSize(width: max(2, floor(original.width * scale / 2) * 2),
-            height: max(2, floor(original.height * scale / 2) * 2))
+                          height: max(2, floor(original.height * scale / 2) * 2))
         let composition = AVMutableVideoComposition()
         composition.customVideoCompositorClass = RecordingMultitrackPlaybackCompositor.self
         composition.renderSize = size
@@ -265,7 +265,7 @@ extension ScreenRecordingExporter {
             composition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_2020
         }
         composition.instructions = [try RecordingMultitrackPlaybackInstruction(project: project, directory: directory,
-            media: media, size: size)]
+                                                                               media: media, size: size)]
         let item = AVPlayerItem(asset: media.composition)
         item.videoComposition = composition
         if !media.audioTracks.isEmpty { item.audioMix = media.audioMix }
@@ -280,10 +280,10 @@ extension ScreenRecordingExporter {
               maximumSize.width >= 2, maximumSize.height >= 2 else { throw ScreenRecordingExportError.invalidConfiguration }
         let worker = Task.detached(priority: .userInitiated) {
             let original = try RecordingExportRenderer.outputSize(source: .init(width: project.width, height: project.height),
-                edits: project.edits, resolution: .source)
+                                                                  edits: project.edits, resolution: .source)
             let scale = min(1, min(maximumSize.width / original.width, maximumSize.height / original.height))
             let size = CGSize(width: max(2, floor(original.width * scale / 2) * 2),
-                height: max(2, floor(original.height * scale / 2) * 2))
+                              height: max(2, floor(original.height * scale / 2) * 2))
             let visibleTime = timeline.duration > 0 ? min(time, max(0, timeline.duration - 1.0 / 60_000)) : 0
             let assets = Dictionary(uniqueKeysWithValues: timeline.assets.map { ($0.id, $0) })
             let store = ScreenRecordingProjectStore(root: directory)
@@ -337,7 +337,7 @@ extension ScreenRecordingExporter {
             }
             try Task.checkCancellation()
             return RecordingMultitrackPreviewScene(project: project, directory: directory, time: time, size: size, frames: frames,
-                preservesHDR: preservesHDR)
+                                                   preservesHDR: preservesHDR)
         }
         return try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
     }

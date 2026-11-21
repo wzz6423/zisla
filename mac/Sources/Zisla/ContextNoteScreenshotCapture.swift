@@ -93,7 +93,7 @@ enum ContextNoteScreenshotCapture {
         }) else { throw ScreenshotCaptureError.windowUnavailable }
         let filter = SCContentFilter(desktopIndependentWindow: window)
         return try await SCScreenshotManager.captureImage(contentFilter: filter,
-            configuration: configuration(for: filter.contentRect, scale: CGFloat(filter.pointPixelScale)))
+                                                          configuration: configuration(for: filter.contentRect, scale: CGFloat(filter.pointPixelScale)))
     }
 
     private static func captureDisplay(identifier: CGDirectDisplayID) async throws -> CGImage {
@@ -101,6 +101,6 @@ enum ContextNoteScreenshotCapture {
             throw ScreenshotCaptureError.screenUnavailable
         }
         return try await ScreenshotCaptureService.capture(screen: screen,
-            excludingApplicationWithProcessIdentifier: ProcessInfo.processInfo.processIdentifier).cgImage
+                                                          excludingApplicationWithProcessIdentifier: ProcessInfo.processInfo.processIdentifier).cgImage
     }
 }

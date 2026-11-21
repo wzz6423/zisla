@@ -14,9 +14,9 @@ struct ImmediateCleanupTests {
     func outcomesSeparateSuccessPartialFailureAndTotalFailure(succeeded: Bool, failed: Bool) {
         let outcome = ImmediateCleanupController.Outcome(didSucceed: succeeded, errors: failed ? ["fixture failure"] : [])
         #expect(outcome.noticeKey == (failed
-            ? (succeeded ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
-                : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看")
-            : "清理完成"))
+                ? (succeeded ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
+                    : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看")
+                : "清理完成"))
     }
 
     @Test
@@ -85,16 +85,16 @@ struct ImmediateCleanupTests {
         var timers: [(Timer, @Sendable (Timer) -> Void)] = []
         var uptime: TimeInterval = 0
         let assistant = PermissionSettingsAssistant(applicationURL: applicationURL, openURL: { opened.append($0); return true },
-            icon: { _ in NSImage(size: CGSize(width: 32, height: 32)) },
-            placement: { (CGRect(x: 100, y: 100, width: 600, height: 600), CGRect(x: 0, y: 0, width: 1600, height: 1000)) },
-            orderFront: { _ in }, timerFactory: { interval, callback in
-                let timer = Timer(timeInterval: interval, repeats: true, block: callback)
-                timers.append((timer, callback))
-                return timer
-            }, uptime: { uptime }, workspaceNotificationCenter: center)
+                                                    icon: { _ in NSImage(size: CGSize(width: 32, height: 32)) },
+                                                    placement: { (CGRect(x: 100, y: 100, width: 600, height: 600), CGRect(x: 0, y: 0, width: 1600, height: 1000)) },
+                                                    orderFront: { _ in }, timerFactory: { interval, callback in
+                                                        let timer = Timer(timeInterval: interval, repeats: true, block: callback)
+                                                        timers.append((timer, callback))
+                                                        return timer
+                                                    }, uptime: { uptime }, workspaceNotificationCenter: center)
         defer { assistant.dismiss() }
         let permissions = OnboardingPermissionCoordinator(dependencies: .init(read: { _, reply in reply(.unknown) },
-            request: { _, _ in Issue.record("Full Disk Access uses System Settings") }, cancel: {}, openSettings: { assistant.openSettings($0) }))
+                                                                              request: { _, _ in Issue.record("Full Disk Access uses System Settings") }, cancel: {}, openSettings: { assistant.openSettings($0) }))
         let controller = ImmediateCleanupController(operation: { _ in
             .init(didSucceed: false, errors: ["fixture permission failure"], permissions: [.fullDiskAccess])
         }, onMessage: { _ in }, requestPermission: { permissions.openSettings(for: $0) })
@@ -138,13 +138,13 @@ struct ImmediateCleanupTests {
         let recordings = fixture.directory.appendingPathComponent("recordings")
         let fileManager = ImmediateCleanupVoiceFileManager()
         let voice = VoiceHistoryStore(storageURL: fixture.directory.appendingPathComponent("voice.json"),
-            recordingsDirectory: recordings, fileManager: fileManager)
+                                      recordingsDirectory: recordings, fileManager: fileManager)
         for id in [UUID(), UUID()] {
             let url = voice.recordingURL(for: id)
             try FileManager.default.createDirectory(at: recordings, withIntermediateDirectories: true)
             try Data("fixture audio".utf8).write(to: url)
             #expect(voice.record(VoiceRecordingResult(id: id, audioFileURL: url, transcript: "retained text",
-                duration: 1, createdAt: .distantPast)))
+                                                      duration: 1, createdAt: .distantPast)))
         }
         fileManager.deniedAudioName = voice.entries[failedIndex].audioFileName
         let service = fixture.makeService()
@@ -154,12 +154,12 @@ struct ImmediateCleanupTests {
         var settings = FeatureSettings.default
         settings.voiceRecordingCleanupPolicy = .sevenDays
         let outcome = try #require(await ImmediateCleanupController.cleanConfiguredItems(settings: settings,
-            systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice))
+                                                                                         systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice))
         #expect(outcome.didSucceed == (failedIndex > 0))
         #expect(outcome.errors.count == 1 && outcome.errors[0].contains("voice deletion fixture failure"))
         #expect(outcome.noticeKey == (failedIndex > 0
-            ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
-            : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看"))
+                ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
+                : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看"))
         #expect(voice.entries.filter { $0.audioFileName != nil }.count == 2 - failedIndex)
         #expect(voice.entries.allSatisfy { $0.rawTranscript == "retained text" })
     }
@@ -171,21 +171,22 @@ struct ImmediateCleanupTests {
         let failedURL = fixture.directory.appendingPathComponent("protected.log")
         let service = SystemAutoCleanupService(defaults: fixture.defaults, scan: { _, _ in [] }, trash: { _ in
             DiskCleanupResult(successCount: successes, freedBytes: 0,
-                failures: [DiskCleanupFailure(url: failedURL, message: "permission fixture", isPermissionDenied: true)])
+                              failures: [DiskCleanupFailure(url: failedURL, message: "permission fixture", isPermissionDenied: true)])
         }, emptyTrash: { Issue.record("Disabled Trash cannot run"); return .success(()) })
         defer { service.stop() }
         let clipboard = ClipboardHistoryStore(storageURL: fixture.directory.appendingPathComponent("clipboard.sqlite"))
         await clipboard.waitUntilLoaded()
         let voice = VoiceHistoryStore(storageURL: fixture.directory.appendingPathComponent("voice.json"),
-            recordingsDirectory: fixture.directory.appendingPathComponent("recordings"))
+                                      recordingsDirectory: fixture.directory.appendingPathComponent("recordings"))
         let outcome = try #require(await ImmediateCleanupController.cleanConfiguredItems(
-            settings: FeatureSettings(systemCleanupPolicy: .sevenDays), systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice))
+            settings: FeatureSettings(systemCleanupPolicy: .sevenDays), systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice
+        ))
         #expect(outcome.didSucceed == (successes > 0))
         #expect(outcome.permissions == [.fullDiskAccess])
         #expect(outcome.errors == [failedURL.path + ": permission fixture"])
         #expect(outcome.noticeKey == (successes > 0
-            ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
-            : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看"))
+                ? "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"
+                : "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看"))
     }
 
     @Test(arguments: [false, true], [false, true])
@@ -230,27 +231,27 @@ struct ImmediateCleanupTests {
             try FileManager.default.createDirectory(at: recordings, withIntermediateDirectories: true)
             try Data("fixture audio".utf8).write(to: url)
             #expect(voice.record(VoiceRecordingResult(id: id, audioFileURL: url, transcript: "retained text",
-                duration: 1, createdAt: date)))
+                                                      duration: 1, createdAt: date)))
         }
         if mode == "clipboard-failure" {
             try fixture.executeSQL("""
-                CREATE TRIGGER fail_delete BEFORE DELETE ON clipboard_history
-                BEGIN SELECT RAISE(ABORT, 'clipboard fixture failure'); END;
-                """, at: clipboardURL)
+            CREATE TRIGGER fail_delete BEFORE DELETE ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'clipboard fixture failure'); END;
+            """, at: clipboardURL)
         }
         if mode == "voice-failure" {
             try fixture.executeSQL("""
-                CREATE TRIGGER fail_save BEFORE UPDATE ON voice_history_state
-                BEGIN SELECT RAISE(ABORT, 'voice fixture failure'); END;
-                """, at: metadata.deletingPathExtension().appendingPathExtension("sqlite"))
+            CREATE TRIGGER fail_save BEFORE UPDATE ON voice_history_state
+            BEGIN SELECT RAISE(ABORT, 'voice fixture failure'); END;
+            """, at: metadata.deletingPathExtension().appendingPathExtension("sqlite"))
         }
         let service = fixture.makeService(systemFails: mode == "system-failure", trashFails: mode == "trash-failure")
         defer { service.stop() }
         var settings = FeatureSettings(systemMonitorEnabled: mode != "disabled",
-            systemCleanupPolicy: mode == "never" ? .never : .sevenDays,
-            trashCleanupPolicy: mode == "never" ? .never : .sevenDays,
-            clipboardHistoryEnabled: mode != "disabled",
-            clipboardHistoryCleanupPolicy: mode == "never" ? .never : .sevenDays)
+                                       systemCleanupPolicy: mode == "never" ? .never : .sevenDays,
+                                       trashCleanupPolicy: mode == "never" ? .never : .sevenDays,
+                                       clipboardHistoryEnabled: mode != "disabled",
+                                       clipboardHistoryCleanupPolicy: mode == "never" ? .never : .sevenDays)
         settings.voiceRecordingCleanupPolicy = mode == "never" ? .never : .sevenDays
         service.apply(settings: settings)
         let deadlines = fixture.timers.map(\.fireDate)
@@ -258,7 +259,7 @@ struct ImmediateCleanupTests {
         let storedTrashDate = fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date
 
         let message = await ImmediateCleanupController.cleanConfiguredItems(settings: settings, systemCleanup: service,
-            clipboardHistory: clipboard, voiceHistory: voice, now: now)
+                                                                            clipboardHistory: clipboard, voiceHistory: voice, now: now)
 
         let outcome = try #require(message)
         let expectsFailure = mode.hasSuffix("failure")
@@ -295,9 +296,9 @@ struct ImmediateCleanupTests {
         let clipboard = ClipboardHistoryStore(storageURL: fixture.directory.appendingPathComponent("clipboard.sqlite"))
         await clipboard.waitUntilLoaded()
         let voice = VoiceHistoryStore(storageURL: fixture.directory.appendingPathComponent("voice.json"),
-            recordingsDirectory: fixture.directory.appendingPathComponent("recordings"))
+                                      recordingsDirectory: fixture.directory.appendingPathComponent("recordings"))
         let task = Task { await ImmediateCleanupController.cleanConfiguredItems(settings: FeatureSettings(trashCleanupPolicy: .sevenDays),
-            systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice) }
+                                                                                systemCleanup: service, clipboardHistory: clipboard, voiceHistory: voice) }
         task.cancel()
         #expect(await task.value == nil)
         #expect(fixture.timers.isEmpty && fixture.emptied == 0 && fixture.moved.isEmpty)
@@ -321,13 +322,13 @@ struct ImmediateCleanupTests {
         try FileManager.default.createDirectory(at: recordings, withIntermediateDirectories: true)
         try Data("fixture audio".utf8).write(to: audioURL)
         #expect(voice.record(VoiceRecordingResult(id: id, audioFileURL: audioURL, transcript: "retained text",
-            duration: 1, createdAt: .distantPast)))
+                                                  duration: 1, createdAt: .distantPast)))
         let service = fixture.makeService()
         defer { service.stop() }
         var settings = FeatureSettings(clipboardHistoryCleanupPolicy: .sevenDays)
         settings.voiceRecordingCleanupPolicy = .sevenDays
         let task = Task { await ImmediateCleanupController.cleanConfiguredItems(settings: settings, systemCleanup: service,
-            clipboardHistory: clipboard, voiceHistory: voice) }
+                                                                                clipboardHistory: clipboard, voiceHistory: voice) }
         let observation = clipboard.$isLoading.dropFirst().filter { $0 }.sink { _ in task.cancel() }
         defer { observation.cancel() }
 
@@ -346,7 +347,7 @@ private final class ImmediateCleanupVoiceFileManager: FileManager {
         if url.lastPathComponent.hasPrefix(".zisla-deleting-"), let deniedAudioName,
            url.lastPathComponent.hasSuffix(deniedAudioName) {
             throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError,
-                userInfo: [NSLocalizedDescriptionKey: "voice deletion fixture failure"])
+                          userInfo: [NSLocalizedDescriptionKey: "voice deletion fixture failure"])
         }
         try super.removeItem(at: url)
     }
@@ -392,20 +393,20 @@ private final class ImmediateCleanupFixture {
 
     func makeService(systemFails: Bool = false, trashFails: Bool = false) -> SystemAutoCleanupService {
         let candidate = DiskCleanupCandidate(url: directory.appendingPathComponent("cache"), kind: .appCache,
-            byteSize: 100, displayName: "fixture cache")
+                                             byteSize: 100, displayName: "fixture cache")
         return SystemAutoCleanupService(defaults: defaults, scan: { _, _ in [candidate] },
-            trash: { candidates in
-                self.moved = candidates
-                return DiskCleanupResult(successCount: systemFails ? 0 : candidates.count, freedBytes: 0,
-                    failures: systemFails ? [DiskCleanupFailure(url: candidate.url, message: "system fixture failure")] : [])
-            }, emptyTrash: {
-                self.emptied += 1
-                return trashFails ? .failure(.failed("trash fixture failure")) : .success(())
-            }, timerFactory: { interval, callback in
-                let timer = Timer(timeInterval: interval, repeats: true, block: callback)
-                self.timers.append(timer)
-                return timer
-            })
+                                        trash: { candidates in
+                                            self.moved = candidates
+                                            return DiskCleanupResult(successCount: systemFails ? 0 : candidates.count, freedBytes: 0,
+                                                                     failures: systemFails ? [DiskCleanupFailure(url: candidate.url, message: "system fixture failure")] : [])
+                                        }, emptyTrash: {
+                                            self.emptied += 1
+                                            return trashFails ? .failure(.failed("trash fixture failure")) : .success(())
+                                        }, timerFactory: { interval, callback in
+                                            let timer = Timer(timeInterval: interval, repeats: true, block: callback)
+                                            self.timers.append(timer)
+                                            return timer
+                                        })
     }
 
     func executeSQL(_ sql: String, at url: URL) throws {

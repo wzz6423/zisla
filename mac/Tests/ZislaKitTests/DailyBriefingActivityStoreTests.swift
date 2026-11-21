@@ -24,7 +24,7 @@ struct DailyBriefingActivityStoreTests {
         let store = DailyBriefingStore(fileURL: file)
         let date = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 23, minute: 59))!
         try await store.observe(.init(date: date, applicationID: "editor", applicationName: "Editor", category: .work,
-            isActive: true, isListening: false), calendar: calendar)
+                                      isActive: true, isListening: false), calendar: calendar)
         var before = DailyBriefingActivityBatch(date: date, calendar: calendar)
         before.activity.record(.clipboardCaptured)
         before.recordKeyPress(hour: 23)
@@ -137,8 +137,8 @@ struct DailyBriefingActivityStoreTests {
         let date = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 9))!
         func observation(_ offset: TimeInterval, recording: Bool, hardwareDate: Date?) -> DailyBriefingObservation {
             .init(date: date.addingTimeInterval(offset), applicationID: "editor", applicationName: "Editor", category: .work,
-                isActive: true, isListening: false,
-                hardware: hardwareDate.map { .init(date: $0, powerWatts: 10) }, recordsKeyPresses: recording)
+                  isActive: true, isListening: false,
+                  hardware: hardwareDate.map { .init(date: $0, powerWatts: 10) }, recordsKeyPresses: recording)
         }
         try await store.observe(observation(0, recording: false, hardwareDate: nil), calendar: calendar)
         #expect(try await store.day(at: date, calendar: calendar).hourlyKeyPresses == nil)
@@ -178,7 +178,7 @@ struct DailyBriefingActivityStoreTests {
         calendar.timeZone = TimeZone(secondsFromGMT: TimeZone.current.secondsFromGMT() + 900)!
         let date = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 23))!
         let observation = DailyBriefingObservation(date: date, applicationID: "fixture", applicationName: "Fixture", category: .work,
-            isActive: true, isListening: false, hardware: .init(date: date, powerWatts: 10))
+                                                   isActive: true, isListening: false, hardware: .init(date: date, powerWatts: 10))
         try await store.observe(observation, calendar: calendar)
         let day = try await store.day(at: date, calendar: calendar)
         #expect(day.powerSamples?.count == 1)
@@ -193,7 +193,7 @@ struct DailyBriefingActivityStoreTests {
         let date = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 20, minute: 59, second: 45))!
         func observation(_ offset: TimeInterval, records: Bool) -> DailyBriefingObservation {
             .init(date: date.addingTimeInterval(offset), applicationID: "fixture", applicationName: "Fixture", category: .work,
-                isActive: false, isListening: false, recordsKeyPresses: records)
+                  isActive: false, isListening: false, recordsKeyPresses: records)
         }
         try await store.observe(observation(0, records: true), calendar: calendar)
         try await store.observe(observation(30, records: true), calendar: calendar)

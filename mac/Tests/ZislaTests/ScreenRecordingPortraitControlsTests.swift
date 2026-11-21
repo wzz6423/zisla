@@ -123,7 +123,7 @@ struct ScreenRecordingPortraitControlsTests {
         let second = try #require(model.timeline?.clips.last)
         let view = ScreenRecordingEffectsView(model: model)
         let controls = ScreenRecordingPortraitControls(model: model, target: view.enhancementTarget.target,
-            showsPortrait: true, showsVoice: true)
+                                                       showsPortrait: true, showsVoice: true)
         controls.setPortrait(.init(bodySlimming: 0.6))
         controls.setVoice(.init(preset: .broadcast, amount: 0.8))
         if multitrack {
@@ -140,7 +140,7 @@ struct ScreenRecordingPortraitControlsTests {
         #expect(model.project == project && !model.canUndo)
         model.selectTimelineTrack(first.trackID)
         let global = ScreenRecordingPortraitControls(model: model, target: view.enhancementTarget.target,
-            showsPortrait: true, showsVoice: true)
+                                                     showsPortrait: true, showsVoice: true)
         global.setVoice(.init(preset: .natural, amount: 0.4))
         #expect(model.project?.edits.voiceEffects == .init(preset: .natural, amount: 0.4))
         #expect(model.timeline?.clips == RecordingMultitrackTimeline.migrating(project).clips)
@@ -164,7 +164,7 @@ struct ScreenRecordingPortraitControlsTests {
         let view = ScreenRecordingEffectsView(model: model)
         #expect(view.enhancementTarget.portrait && view.enhancementTarget.voice)
         let controls = ScreenRecordingPortraitControls(model: model, target: view.enhancementTarget.target,
-            showsPortrait: true, showsVoice: true)
+                                                       showsPortrait: true, showsVoice: true)
         controls.setPortrait(.init(brightening: 0.4))
         controls.setVoice(.init(preset: .warm, amount: 0.3))
         #expect(model.project?.edits.portraitEffects == .init(brightening: 0.4))
@@ -179,7 +179,7 @@ struct ScreenRecordingPortraitControlsTests {
     func portraitKeysAreTranslatedInEveryLanguage(_ language: AppLanguage) throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let paths = ["Sources/Zisla/ScreenRecordingPortraitControls.swift", "Sources/Zisla/ScreenRecordingCaptureBar.swift",
-            "Sources/Zisla/ScreenRecordingEffectsView.swift", "Sources/Zisla/ScreenRecordingMultitrackClipInspector.swift"]
+                     "Sources/Zisla/ScreenRecordingEffectsView.swift", "Sources/Zisla/ScreenRecordingMultitrackClipInspector.swift"]
         var keys: Set<String> = ["磨皮", "提亮", "瘦脸", "瘦身"]
         let expression = try NSRegularExpression(pattern: #"AppLocalization\.text\("([^"]+)""#)
         for path in paths {

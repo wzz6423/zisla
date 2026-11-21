@@ -117,8 +117,8 @@ public final class AIStateMonitor: ObservableObject {
     private let usageRefreshInterval: TimeInterval
     private let now: () -> Date
     #if DEBUG
-    private let debugEnvironment: [String: String]
-    private var debugUsageHistoryCleared = false
+        private let debugEnvironment: [String: String]
+        private var debugUsageHistoryCleared = false
     #endif
     private let refreshQueue = DispatchQueue(
         label: "dev.wzz.zisla.ai-state-refresh",
@@ -198,7 +198,7 @@ public final class AIStateMonitor: ObservableObject {
         self.usageRefreshInterval = max(1, usageRefreshInterval)
         self.now = now
         #if DEBUG
-        debugEnvironment = environment
+            debugEnvironment = environment
         #endif
     }
 
@@ -315,7 +315,7 @@ public final class AIStateMonitor: ObservableObject {
                 || subscriptionUsageDetector != nil || accountBalanceDetector != nil {
                 let checkInterval = min(detectorRefreshInterval, usageRefreshInterval)
                 let timer = Timer(fire: Date(timeIntervalSinceNow: checkInterval),
-                    interval: checkInterval, repeats: true) { [weak self] _ in
+                                  interval: checkInterval, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         guard let self, self.refreshGeneration == watcherGeneration else { return }
                         self.scheduleDetectorRefresh(detectorIndices: [], allowUsageScan: true)
@@ -451,7 +451,7 @@ public final class AIStateMonitor: ObservableObject {
         guard !isClearingUsageHistory else { throw CancellationError() }
         let generation = usageHistoryClearGeneration
         #if DEBUG
-        if let history = debugUsageHistory() { return history }
+            if let history = debugUsageHistory() { return history }
         #endif
         let repository = repository
         let history: AIUsageHistory = try await withCheckedThrowingContinuation { continuation in
@@ -475,10 +475,10 @@ public final class AIStateMonitor: ObservableObject {
         usageHistoryLoadPending = false
         do {
             #if DEBUG
-            if debugUsageHistory() != nil { debugUsageHistoryCleared = true }
-            else { try await clearPersistedUsageHistory() }
+                if debugUsageHistory() != nil { debugUsageHistoryCleared = true }
+                else { try await clearPersistedUsageHistory() }
             #else
-            try await clearPersistedUsageHistory()
+                try await clearPersistedUsageHistory()
             #endif
             state.usageSamples.removeAll(keepingCapacity: false)
             state.modelUsageSamples.removeAll(keepingCapacity: false)
@@ -507,11 +507,11 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     #if DEBUG
-    /// A cleared preview stays empty for this process; restarting restores the environment fixture.
-    private func debugUsageHistory() -> AIUsageHistory? {
-        guard let history = AIModelUsageDebug.history(environment: debugEnvironment, now: now()) else { return nil }
-        return debugUsageHistoryCleared ? AIUsageHistory() : history
-    }
+        /// A cleared preview stays empty for this process; restarting restores the environment fixture.
+        private func debugUsageHistory() -> AIUsageHistory? {
+            guard let history = AIModelUsageDebug.history(environment: debugEnvironment, now: now()) else { return nil }
+            return debugUsageHistoryCleared ? AIUsageHistory() : history
+        }
     #endif
 
     /// Schedules a background refresh for interactive paths, avoiding a full decode of large state files on the main thread.
@@ -527,9 +527,9 @@ public final class AIStateMonitor: ObservableObject {
     /// Invalidates old provider/region work and removes stale selection immediately, before the next query completes.
     public func configureAccountBalanceProviders(_ providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion> = [.global]) {
         #if DEBUG
-        let fixtures = AIAccountBalanceDebug.balances(environment: debugEnvironment, now: now())
-        let providers = fixtures.map { Set($0.flatMap(\.providers)) } ?? providers
-        let qoderRegions: Set<AIAccountBalanceQoderRegion> = fixtures == nil ? qoderRegions : [.global]
+            let fixtures = AIAccountBalanceDebug.balances(environment: debugEnvironment, now: now())
+            let providers = fixtures.map { Set($0.flatMap(\.providers)) } ?? providers
+            let qoderRegions: Set<AIAccountBalanceQoderRegion> = fixtures == nil ? qoderRegions : [.global]
         #endif
         let providersChanged = accountBalanceProviders != providers
         guard providersChanged || accountBalanceQoderRegions != qoderRegions else { return }
@@ -666,11 +666,11 @@ public final class AIStateMonitor: ObservableObject {
         let historyGeneration = usageHistoryGeneration
         let monitorGeneration = refreshGeneration
         #if DEBUG
-        if let history = debugUsageHistory() {
-            applyUsageHistory(.samples(history), historyGeneration: historyGeneration,
-                monitorGeneration: monitorGeneration)
-            return
-        }
+            if let history = debugUsageHistory() {
+                applyUsageHistory(.samples(history), historyGeneration: historyGeneration,
+                                  monitorGeneration: monitorGeneration)
+                return
+            }
         #endif
         let repository = repository
         let usageHistoryStart = usageHistoryStartDate(endingAt: now())
@@ -1011,9 +1011,9 @@ public final class AIStateMonitor: ObservableObject {
         let daysFromWeekStart = (weekday - calendar.firstWeekday + 7) % 7
         guard let lastWeekStart = calendar.date(byAdding: .day, value: -daysFromWeekStart, to: endDay),
               let gridStart = calendar.date(
-                byAdding: .day,
-                value: -(Self.usageHistoryWeeks - 1) * 7,
-                to: lastWeekStart
+                  byAdding: .day,
+                  value: -(Self.usageHistoryWeeks - 1) * 7,
+                  to: lastWeekStart
               ) else {
             return endDay
         }
@@ -1128,11 +1128,11 @@ public final class AIStateMonitor: ObservableObject {
                 next.modelUsageSamples.removeAll(keepingCapacity: false)
             }
             #if DEBUG
-            if includesUsageSamples, usageHistoryRequested,
-               let history = debugUsageHistory() {
-                next.usageSamples = history.usageSamples
-                next.modelUsageSamples = history.modelUsageSamples
-            }
+                if includesUsageSamples, usageHistoryRequested,
+                   let history = debugUsageHistory() {
+                    next.usageSamples = history.usageSamples
+                    next.modelUsageSamples = history.modelUsageSamples
+                }
             #endif
             if next != state { state = next }
             if includesUsageSamples && usageHistoryRequested {

@@ -22,7 +22,7 @@ enum RecordingHDR {
 
     static func image(_ image: CIImage, in bounds: CGRect, context: CIContext, preservesHDR: Bool) throws -> CGImage {
         guard let result = context.createCGImage(image, from: bounds, format: preservesHDR ? .RGBAh : .RGBA8,
-            colorSpace: CGColorSpace(name: preservesHDR ? CGColorSpace.extendedLinearSRGB : CGColorSpace.sRGB)),
+                                                 colorSpace: CGColorSpace(name: preservesHDR ? CGColorSpace.extendedLinearSRGB : CGColorSpace.sRGB)),
             let measured = ScreenshotImageRendering.preservingHeadroom(result, from: result) else {
             throw ScreenRecordingExportError.cannotRender
         }

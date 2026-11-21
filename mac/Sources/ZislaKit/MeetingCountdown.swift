@@ -15,8 +15,8 @@ public enum MeetingCountdown {
             : AppLocalization.string("会议进行中", locale: locale)
         return [NoticeSide.left, .right].map { side in
             IslandNotice(id: noticePrefix + event.id + (side == .left ? "-left" : "-right"),
-                title: event.title, detail: detail, side: side, createdAt: event.startDate,
-                symbolName: "video.fill", metadata: ["eventID": event.id])
+                         title: event.title, detail: detail, side: side, createdAt: event.startDate,
+                         symbolName: "video.fill", metadata: ["eventID": event.id])
         }
     }
 }

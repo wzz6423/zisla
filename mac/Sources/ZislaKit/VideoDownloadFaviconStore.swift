@@ -49,12 +49,12 @@ public actor VideoDownloadFaviconStore {
         let bytes = [UInt8](data.prefix(12))
         guard bytes.count >= 4 else { return false }
         switch (bytes[0], bytes[1], bytes[2], bytes[3]) {
-        case (0x89, 0x50, 0x4E, 0x47): return true  // PNG
-        case (0x00, 0x00, 0x01, 0x00): return true  // ICO
-        case (0x00, 0x00, 0x02, 0x00): return true  // CUR
-        case (0x47, 0x49, 0x46, 0x38): return true  // GIF
-        case (0xFF, 0xD8, 0xFF, _): return true  // JPEG
-        case (0x52, 0x49, 0x46, 0x46):  // RIFF container, still needs a WEBP check
+        case (0x89, 0x50, 0x4E, 0x47): return true // PNG
+        case (0x00, 0x00, 0x01, 0x00): return true // ICO
+        case (0x00, 0x00, 0x02, 0x00): return true // CUR
+        case (0x47, 0x49, 0x46, 0x38): return true // GIF
+        case (0xFF, 0xD8, 0xFF, _): return true // JPEG
+        case (0x52, 0x49, 0x46, 0x46): // RIFF container, still needs a WEBP check
             return bytes.count >= 12 && Array(bytes[8..<12]) == [0x57, 0x45, 0x42, 0x50]
         default: return false
         }
@@ -89,9 +89,9 @@ public actor VideoDownloadFaviconStore {
         for path in Self.candidatePaths {
             guard let url = URL(string: "https://\(key)\(path)") else { continue }
             guard let data = try? await fetcher.data(from: url),
-                !data.isEmpty,
-                data.count <= Self.maximumByteCount,
-                Self.looksLikeImage(data)
+                  !data.isEmpty,
+                  data.count <= Self.maximumByteCount,
+                  Self.looksLikeImage(data)
             else { continue }
             memoryCache[key] = data
             persist(data, forHost: key)

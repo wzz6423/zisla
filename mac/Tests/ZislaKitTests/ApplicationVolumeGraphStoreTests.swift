@@ -222,7 +222,7 @@ struct ApplicationVolumeGraphStoreTests {
         hardware.failure = .outputUnavailable
 
         #expect(store.apply(requests, retryingApplication: nil, rebuild: false)
-                == ["music": .outputUnavailable, "video": .outputUnavailable])
+            == ["music": .outputUnavailable, "video": .outputUnavailable])
 
         #expect(!store.hasGraphs)
         #expect(hardware.liveTaps.isEmpty && hardware.liveAggregates.isEmpty && hardware.liveIO.isEmpty)
@@ -252,7 +252,7 @@ struct ApplicationVolumeGraphStoreTests {
         #expect(output.samples(at: 0) == [0.5, -0.5])
         #expect(store.releaseStalledGraphs().isEmpty)
         #expect(store.apply(requests, retryingApplication: nil, rebuild: false)
-                == ["video": .hardware(kAudioHardwareNotRunningError)])
+            == ["video": .hardware(kAudioHardwareNotRunningError)])
         #expect(store.apply(requests, retryingApplication: "video", rebuild: false).isEmpty)
         hardware.emit(input: input, output: output, at: 2)
         #expect(output.samples(at: 0) == [0.75, -0.75])

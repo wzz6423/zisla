@@ -5,8 +5,8 @@ import ZislaCore
 
 struct AIAccountBalanceBrowserCookieLocalizationTests {
     static let keys = ["从默认浏览器导入", "正在读取默认浏览器 Cookie", "无法识别默认浏览器，请手动粘贴 Cookie",
-        "默认浏览器暂不支持 Cookie 导入，请手动粘贴", "未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴",
-        "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限"]
+                       "默认浏览器暂不支持 Cookie 导入，请手动粘贴", "未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴",
+                       "无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限"]
 
     @Test(arguments: AppLanguage.allCases)
     func cookieImportCopyHasExplicitTranslationsInEverySupportedLanguage(language: AppLanguage) throws {
@@ -47,6 +47,7 @@ struct AIAccountBalanceBrowserCookieLocalizationTests {
 
     private func table(_ language: AppLanguage) throws -> [String: String] {
         try #require(NSDictionary(contentsOf: Self.root.appendingPathComponent(
-            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
+            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
+        )) as? [String: String])
     }
 }

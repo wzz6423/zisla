@@ -30,7 +30,7 @@ struct PomodoroEngineTests {
     func progressStaysFiniteAndBoundedForInvalidDurationsAndRemainingTime(value: Double) {
         let date = Date(timeIntervalSince1970: 10_000)
         var engine = PomodoroEngine(phase: .paused, remainingWhenPaused: value,
-            focusDuration: value, restDuration: value)
+                                    focusDuration: value, restDuration: value)
         #expect((0...1).contains(engine.progress(at: date)))
         engine.startWithRemaining(value, at: date)
         #expect((0...1).contains(engine.progress(at: date)))
@@ -171,7 +171,7 @@ struct PomodoroServiceTests {
         var notifications = 0
         var sounds = 0
         let service = PomodoroService(notificationRequestHandler: { _ in notifications += 1 },
-            defaults: defaults, completionSoundHandler: { sounds += 1 }, language: { language }, now: { now })
+                                      defaults: defaults, completionSoundHandler: { sounds += 1 }, language: { language }, now: { now })
         defer { service.stop() }
         service.setFocusDuration(100)
         service.setRestDuration(40)

@@ -17,9 +17,9 @@ struct CompactMediaIdentityTests {
         for lyrics in [nil, SyncedLyrics(lines: []), SyncedLyrics(lines: [.init(time: 10, text: "Later")])] {
             let item = snapshot(lyrics: lyrics)
             let text = CompactPillStatusContent.displayText(for: presentation, settings: settings,
-                item: item, at: date)
+                                                            item: item, at: date)
             #expect(text.isEmpty,
-                "A detailed island must show the track identity while no synchronized line is available")
+                    "A detailed island must show the track identity while no synchronized line is available")
         }
     }
 
@@ -40,7 +40,7 @@ struct CompactMediaIdentityTests {
             "A missing artist must leave the full column width available to the track title")
         item.isVideo = true
         #expect(presentation.mediaIdentityLength(thickness: 32, edge: .left, text: "", item: item) == 0,
-            "Video playback must preserve its existing compact presentation")
+                "Video playback must preserve its existing compact presentation")
         item.isVideo = false
         item.title = ""
         #expect(presentation.mediaIdentityLength(thickness: 32, edge: .left, text: "", item: item) == 0)
@@ -57,12 +57,12 @@ struct CompactMediaIdentityTests {
             renamed.title = "Different title"
             let changedTitle = try await render(renamed, settings: settings, edge: edge, scale: scale)
             #expect(try differences(baseline, changedTitle) > 20,
-                "Changing the song title must change the visible detailed island with or without lyrics")
+                    "Changing the song title must change the visible detailed island with or without lyrics")
             renamed = original
             renamed.artist = "Different artist"
             let changedArtist = try await render(renamed, settings: settings, edge: edge, scale: scale)
             #expect(try differences(baseline, changedArtist) > 20,
-                "Changing the artist must change the visible detailed island with or without lyrics")
+                    "Changing the artist must change the visible detailed island with or without lyrics")
         }
     }
 
@@ -83,7 +83,7 @@ struct CompactMediaIdentityTests {
         let first = try await render(original, settings: settings, edge: edge, scale: 2)
         let next = try await render(changed, settings: settings, edge: edge, scale: 2)
         #expect(try differences(first, next) == 0,
-            "Compact mode must reserve no text region for a title, artist or lyric")
+                "Compact mode must reserve no text region for a title, artist or lyric")
     }
 
     @Test(arguments: IslandEdge.allCases, [MediaVisualizationStyle.glow, .waveform])
@@ -92,24 +92,26 @@ struct CompactMediaIdentityTests {
     ) throws {
         let settings = settings(edge: edge, style: .detailed, visualization: visualization)
         let notice = IslandNotice(id: "media-active-fixture", title: "Music",
-            metadata: ["compactLyric": String(repeating: "春", count: 100)])
+                                  metadata: ["compactLyric": String(repeating: "春", count: 100)])
         let presentation = try #require(SideNoticeLayoutEngine().compactBarSizing(
-            for: [notice], settings: settings)?.customPillPresentation)
+            for: [notice], settings: settings
+        )?.customPillPresentation)
         #expect(presentation.showsMediaIdentity)
         #expect(presentation.length(thickness: 32, edge: edge) == (visualization == .waveform ? 252 : 222),
-            "Track identity and lyrics must share the existing bounded compact island")
+                "Track identity and lyrics must share the existing bounded compact island")
     }
 
     @Test(arguments: IslandEdge.allCases)
     func aMissingLiveSnapshotKeepsTheAvailableNoticeText(edge: IslandEdge) throws {
         let settings = settings(edge: edge, style: .detailed, visualization: .glow)
         let notice = IslandNotice(id: "media-active-fixture", title: "Music",
-            detail: "Stored track", metadata: ["compactLyric": "Stored lyric"])
+                                  detail: "Stored track", metadata: ["compactLyric": "Stored lyric"])
         let presentation = try #require(SideNoticeLayoutEngine().compactBarSizing(
-            for: [notice], settings: settings)?.customPillPresentation)
+            for: [notice], settings: settings
+        )?.customPillPresentation)
         #expect(CompactPillStatusContent.displayText(for: presentation, settings: settings,
-            item: nil, at: date) == "Stored lyric",
-            "A snapshot transition must preserve the text already carried by the visible notice")
+                                                     item: nil, at: date) == "Stored lyric",
+                "A snapshot transition must preserve the text already carried by the visible notice")
         let legacy = CompactPillStatusPresentation(priority: .media, notice: notice, text: "Stored lyric")
         #expect(!legacy.showsMediaIdentity)
         #expect(legacy.length(thickness: 32, edge: edge, item: snapshot(lyrics: nil))
@@ -132,10 +134,10 @@ struct CompactMediaIdentityTests {
         let queue = SideNoticeQueue()
         let sweep = AIResultSweepController()
         let presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
-            browserDownloads: BrowserDownloadMonitor(), settingsStore: store,
-            languageStore: AppLanguageStore(defaults: defaults), isScreenLocked: true,
-            now: { date }, reduceMotion: { true }, screenSnapshotProvider: { [] })
+                                            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
+                                            browserDownloads: BrowserDownloadMonitor(), settingsStore: store,
+                                            languageStore: AppLanguageStore(defaults: defaults), isScreenLocked: true,
+                                            now: { date }, reduceMotion: { true }, screenSnapshotProvider: { [] })
         defer {
             presenter.stop()
             queue.removeAll()
@@ -153,7 +155,7 @@ struct CompactMediaIdentityTests {
         let long = try #require(presenter.compactConfiguration(for: notices, at: date).compactStatusLength)
         #expect(long > short, "The native panel must measure the visible track identity before it is presented")
         #expect(long == (visualization == .waveform ? 252 : 222),
-            "Without a lyric, long metadata must use the complete existing text budget and stop at its maximum")
+                "Without a lyric, long metadata must use the complete existing text budget and stop at its maximum")
     }
 
     @Test(arguments: IslandEdge.allCases, [LayoutDirection.leftToRight, .rightToLeft])
@@ -169,18 +171,18 @@ struct CompactMediaIdentityTests {
         changed.title = "Different title"
         let changedTitle = try await render(changed, settings: settings, edge: edge, scale: 2, direction: direction)
         #expect(try differences(first, changedTitle, in: regions.identity) > 20,
-            "The song title must be visible before the waveform in the reading direction")
+                "The song title must be visible before the waveform in the reading direction")
         changed = original
         changed.artist = "Different artist"
         let changedArtist = try await render(changed, settings: settings, edge: edge, scale: 2, direction: direction)
         #expect(try differences(first, changedArtist, in: regions.identity) > 20,
-            "The artist must share the identity region before the waveform")
+                "The artist must share the identity region before the waveform")
         changed = original
         changed.lyrics = SyncedLyrics(lines: [.init(time: 0, text: String(repeating: "江", count: 40))])
         let changedLyric = try await render(changed, settings: settings, edge: edge, scale: 2, direction: direction)
         #expect(try differences(first, changedLyric, in: regions.identity) == 0)
         #expect(try differences(first, changedLyric, in: regions.lyric) > 20,
-            "The synchronized lyric must remain visible after the waveform while the identity stays fixed")
+                "The synchronized lyric must remain visible after the waveform while the identity stays fixed")
         var longIdentity = original
         longIdentity.title = String(repeating: "Long title ", count: 40)
         longIdentity.artist = String(repeating: "Long artist ", count: 40)
@@ -189,7 +191,7 @@ struct CompactMediaIdentityTests {
         longIdentity.lyrics = changed.lyrics
         let longNext = try await render(longIdentity, settings: settings, edge: edge, scale: 2, direction: direction)
         #expect(try differences(longFirst, longNext, in: longRegions.lyric) > 20,
-            "Long titles and artists must leave a visible lyric viewport inside the same maximum length")
+                "Long titles and artists must leave a visible lyric viewport inside the same maximum length")
     }
 
     @Test(arguments: [IslandEdge.top, .bottom], [LayoutDirection.leftToRight, .rightToLeft])
@@ -200,7 +202,8 @@ struct CompactMediaIdentityTests {
         let firstLine = "春江潮水连海平海上明月共潮生滟滟随波千万里何处春江无月明"
         let secondLine = "江天一色无纤尘皎皎空中孤月轮江畔何人初见月江月何年初照人"
         var item = snapshot(lyrics: SyncedLyrics(lines: [
-            .init(time: 0, text: firstLine), .init(time: 20, text: secondLine)]))
+            .init(time: 0, text: firstLine), .init(time: 20, text: secondLine)
+        ]))
         item.isPlaying = true
         item.artworkData = try artwork()
         for scale in [CGFloat(1), 2] {
@@ -209,20 +212,20 @@ struct CompactMediaIdentityTests {
             var previous = first
             for elapsed in [10.0, 19.9, 20.0, 30.0] {
                 let next = try await render(item, settings: settings, edge: edge, scale: scale,
-                    sampledDate: date.addingTimeInterval(elapsed), direction: direction)
+                                            sampledDate: date.addingTimeInterval(elapsed), direction: direction)
                 #expect(try differences(first, next, in: regions.identity) == 0,
-                    "Advancing or changing the lyric must preserve the visible title and artist")
+                        "Advancing or changing the lyric must preserve the visible title and artist")
                 #expect(try differences(previous, next, in: regions.lyric) > 20,
-                    "The bounded lyric viewport must advance through the line and restart at the next timestamp")
+                        "The bounded lyric viewport must advance through the line and restart at the next timestamp")
                 previous = next
             }
         }
     }
 
     private func settings(edge: IslandEdge, style: MediaCompactStyle,
-        visualization: MediaVisualizationStyle) -> FeatureSettings {
+                          visualization: MediaVisualizationStyle) -> FeatureSettings {
         var settings = FeatureSettings(islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                                       islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         settings.mediaCompactStyle = style
         settings.mediaShowLyricsAndInfo = true
         settings.mediaVisualizationStyle = visualization
@@ -231,17 +234,18 @@ struct CompactMediaIdentityTests {
 
     private func presentation(settings: FeatureSettings) throws -> CompactPillStatusPresentation {
         try #require(SideNoticeLayoutEngine().compactBarSizing(
-            for: [IslandNotice(id: "media-active-fixture", title: "Music")], settings: settings)?.customPillPresentation)
+            for: [IslandNotice(id: "media-active-fixture", title: "Music")], settings: settings
+        )?.customPillPresentation)
     }
 
     private func snapshot(lyrics: SyncedLyrics?) -> NowPlayingSnapshot {
         NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
-            duration: 40, elapsedTime: 0, timestamp: date, isPlaying: true, lyrics: lyrics)
+                           duration: 40, elapsedTime: 0, timestamp: date, isPlaying: true, lyrics: lyrics)
     }
 
     private func render(_ item: NowPlayingSnapshot, settings: FeatureSettings, edge: IslandEdge,
-        scale: CGFloat, sampledDate: Date? = nil,
-        direction: LayoutDirection = .leftToRight) async throws -> NSBitmapImageRep {
+                        scale: CGFloat, sampledDate: Date? = nil,
+                        direction: LayoutDirection = .leftToRight) async throws -> NSBitmapImageRep {
         let presentation = try presentation(settings: settings)
         let suiteName = "Zisla.CompactMediaIdentity.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -270,7 +274,7 @@ struct CompactMediaIdentityTests {
         state.islandEdge = edge
         state.compactWingHeight = 32
         let view = CompactStatusBarView(queue: queue, displayState: state, media: media,
-            browserDownloads: BrowserDownloadMonitor(), settingsStore: store, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
+                                        browserDownloads: BrowserDownloadMonitor(), settingsStore: store, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         let length: CGFloat = presentation.showsWaveform ? 252 : 222
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let host = NSHostingView(rootView: view
@@ -281,7 +285,7 @@ struct CompactMediaIdentityTests {
             .transaction { $0.disablesAnimations = true })
         host.sizingOptions = []
         let window = RasterPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                                 styleMask: .borderless, backing: .buffered, defer: false)
         window.renderScale = scale
         window.isReleasedWhenClosed = false
         window.contentView = host
@@ -302,7 +306,7 @@ struct CompactMediaIdentityTests {
     }
 
     private func differences(_ first: NSBitmapImageRep, _ second: NSBitmapImageRep,
-        in rect: CGRect? = nil) throws -> Int {
+                             in rect: CGRect? = nil) throws -> Int {
         #expect(first.pixelsWide == second.pixelsWide && first.pixelsHigh == second.pixelsHigh)
         var count = 0
         let scale = CGFloat(first.pixelsWide) / first.size.width
@@ -328,7 +332,7 @@ struct CompactMediaIdentityTests {
     }
 
     private func textRegions(aroundWaveform bitmap: NSBitmapImageRep, edge: IslandEdge,
-        direction: LayoutDirection) throws -> (identity: CGRect, lyric: CGRect) {
+                             direction: LayoutDirection) throws -> (identity: CGRect, lyric: CGRect) {
         let scale = CGFloat(bitmap.pixelsWide) / bitmap.size.width
         let length = edge.isVertical ? bitmap.size.height : bitmap.size.width
         let crossPixels = edge.isVertical ? bitmap.pixelsWide : bitmap.pixelsHigh
@@ -336,7 +340,7 @@ struct CompactMediaIdentityTests {
         for axis in Int(42 * scale)..<Int((length - 42) * scale) {
             for cross in 0..<crossPixels {
                 let color = try #require(bitmap.colorAt(x: edge.isVertical ? cross : axis,
-                    y: edge.isVertical ? axis : cross)?.usingColorSpace(.sRGB))
+                                                        y: edge.isVertical ? axis : cross)?.usingColorSpace(.sRGB))
                 if color.redComponent > 0.4 && color.greenComponent < 0.2 && color.blueComponent < 0.2 {
                     positions.append(CGFloat(axis) / scale)
                     break

@@ -140,8 +140,7 @@ struct MailMarkAllReadButtonTests {
                     .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
                     .preferredColorScheme(.dark)
                     .frame(width: 32, height: 32)
-                    .background(Color.black)
-            )
+                    .background(Color.black))
             hosting.sizingOptions = []
             host = hosting
             window.contentView = host

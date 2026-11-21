@@ -15,7 +15,7 @@ struct SettingsNavigationTests {
             var environment = EnvironmentValues()
             environment.colorScheme = colorScheme
             let systemColors: [NSColor] = [.systemGray, .systemBlue, .systemIndigo, .systemRed,
-                                          .systemGreen, .systemOrange, .systemCyan]
+                                           .systemGreen, .systemOrange, .systemCyan]
             let allowedColors = systemColors.map { Color(nsColor: $0).resolve(in: environment) }
             for category in SettingsSection.allCases {
                 let color = category.iconColor.resolve(in: environment)

@@ -128,7 +128,7 @@ struct PDFImageConversionLifecycleTests {
 
     private func image(_ root: URL, name: String, width: Int, height: Int) throws -> URL {
         let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
-            bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         let output = root.appendingPathComponent(name + ".png")

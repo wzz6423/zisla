@@ -25,10 +25,11 @@ struct PomodoroUserCareTests {
             if !careEnabled {
                 let request = fixture.requests[index]
                 #expect(request.content.title == AppLocalization.string(
-                    completedMode == .focus ? "专注结束" : "休息结束", language: .english))
+                    completedMode == .focus ? "专注结束" : "休息结束", language: .english
+                ))
                 #expect(request.content.body == (completedMode == .focus
-                    ? AppLocalization.format("休息 %ld 分钟吧", locale: AppLanguage.english.locale, [7])
-                    : AppLocalization.string("开始下一段专注", language: .english)))
+                        ? AppLocalization.format("休息 %ld 分钟吧", locale: AppLanguage.english.locale, [7])
+                        : AppLocalization.string("开始下一段专注", language: .english)))
                 #expect(request.content.sound == nil, "The custom melody must not be doubled by a notification sound")
             }
             service.tick()
@@ -87,14 +88,14 @@ struct PomodoroUserCareTests {
             service.pause()
 
             #expect(service.phase == .idle && service.mode == mode.next,
-                "Pausing an expired countdown must complete it rather than freeze at zero")
+                    "Pausing an expired countdown must complete it rather than freeze at zero")
             #expect(service.engine.deadline == nil)
             #expect(service.displayClock == (mode == .focus ? "07:00" : "00:01"))
             #expect(service.focusCountdownNotice(for: .left).progress == 0)
             #expect(fixture.sounds == index + 1)
             #expect(fixture.requests.count == (careEnabled ? 0 : index + 1))
             #expect(fixture.reminders == (careEnabled
-                ? Array([UserCareReminder.focusCompleted, .restCompleted].prefix(index + 1)) : []))
+                    ? Array([UserCareReminder.focusCompleted, .restCompleted].prefix(index + 1)) : []))
             #expect(fixture.activity.count(for: .pomodoroCompleted) == 1)
             #expect(fixture.activity.completedFocusSeconds == 1)
 
@@ -140,7 +141,7 @@ struct PomodoroUserCareTests {
             #expect(fixture.sounds == index + 1 && fixture.reminders.count == index + 1)
         }
         #expect(fixture.activity.count(for: .pomodoroStarted) == 1,
-            "Resuming must not count as a new focus session")
+                "Resuming must not count as a new focus session")
         #expect(fixture.activity.count(for: .pomodoroCompleted) == 1)
         #expect(fixture.activity.completedFocusSeconds == 1)
     }
@@ -199,9 +200,9 @@ struct PomodoroUserCareTests {
         service.pause()
 
         #expect(service.phase == .paused && service.mode == .focus,
-            "A pause sampled before the deadline must not be completed by a later clock read")
+                "A pause sampled before the deadline must not be completed by a later clock read")
         #expect(abs(service.engine.remaining(at: deadline) - 0.001) < 0.000_001,
-            "Completion and pause must use the same instant so remaining time cannot freeze at zero")
+                "Completion and pause must use the same instant so remaining time cannot freeze at zero")
         #expect(fixture.sounds == 0 && fixture.requests.isEmpty && fixture.reminders.isEmpty)
         fixture.now = deadline.addingTimeInterval(10_000)
         service.start()
@@ -244,7 +245,8 @@ struct PomodoroUserCareTests {
             fixture.now += mode == .focus ? service.focusDuration : service.restDuration
             service.tick()
             #expect(fixture.requests.last?.content.title == AppLocalization.string(
-                mode == .focus ? "专注结束" : "休息结束", language: language))
+                mode == .focus ? "专注结束" : "休息结束", language: language
+            ))
         }
         #expect(fixture.sounds == 2 && fixture.reminders.isEmpty)
     }

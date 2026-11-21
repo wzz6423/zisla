@@ -76,7 +76,8 @@ struct ScreenRecordingCameraBorderTests {
         let canvas = CGRect(x: 0, y: 0, width: project.width, height: project.height)
         return try RecordingExportRenderer(project: project, size: canvas.size).image(
             screen: CIImage(color: CIColor(red: 1, green: 0, blue: 0)).cropped(to: canvas),
-            camera: hasCamera ? CIImage(color: .black).cropped(to: canvas) : nil, sourceTime: 0)
+            camera: hasCamera ? CIImage(color: .black).cropped(to: canvas) : nil, sourceTime: 0
+        )
     }
 
     private func green(_ image: CGImage, x: Int, y: Int) throws -> Double {
@@ -87,8 +88,8 @@ struct ScreenRecordingCameraBorderTests {
         var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try bytes.withUnsafeMutableBytes { storage in
             let context = try #require(CGContext(data: storage.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         return bytes

@@ -15,7 +15,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.reducesMotion = true
         fixture.settings.settings.islandShowMoreInformation = true
         let icon = IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%", image: nil,
-            style: .detailed), tooltip: "CPU")
+                                                                style: .detailed), tooltip: "CPU")
         fixture.presenter.setStatusIcons([icon])
         fixture.presenter.setScreenLocked(false)
         let host = try #require(NSApp.windows.compactMap {
@@ -32,7 +32,7 @@ struct StatusIconDestinationIntegrationTests {
         for _ in 0..<3 { fixture.presenter.setStatusIcons([icon]) }
         #expect(publications == 0, "Repeated readings must not invalidate an unchanged compact surface")
         fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu", content: .metric(.cpu,
-            text: "32%", image: nil, style: .detailed), tooltip: "CPU")])
+                                                                                       text: "32%", image: nil, style: .detailed), tooltip: "CPU")])
         #expect(publications == 1, "A new reading must update its content without republishing unchanged geometry")
         #expect(state.compactLayout?.frame == frame)
         if case let .metric(_, text, _, _) = state.statusIcons.first?.content {
@@ -50,7 +50,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.settings.settings.sideNoticesEnabled = true
         fixture.settings.settings.islandShowMoreInformation = true
         let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%", image: nil,
-            style: .detailed), tooltip: "CPU")]
+                                                                  style: .detailed), tooltip: "CPU")]
         fixture.presenter.setStatusIcons(icons)
         fixture.presenter.setScreenLocked(false)
         let host = try #require(NSApplication.shared.windows.compactMap {
@@ -59,11 +59,11 @@ struct StatusIconDestinationIntegrationTests {
         let state = host.rootView.content.displayState
         #expect(host.window?.ignoresMouseEvents == true)
         fixture.queue.enqueue(IslandNotice(id: "focus-countdown-mouse", title: "Focus", detail: "00:12:30"),
-            expiresAfter: nil)
+                              expiresAfter: nil)
         fixture.presenter.setStatusIcons(icons)
         #expect(state.statusIcons.map(\.id) == ["cpu"])
         #expect(host.window?.ignoresMouseEvents == false,
-            "Visible Pomodoro buttons must receive mouse events alongside monitor icons")
+                "Visible Pomodoro buttons must receive mouse events alongside monitor icons")
         state.compactStatusHidden = true
         fixture.presenter.setStatusIcons(icons)
         #expect(host.window?.ignoresMouseEvents == true)
@@ -79,7 +79,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.queue.removeAll()
         fixture.presenter.setStatusIcons(icons)
         #expect(host.window?.ignoresMouseEvents == true,
-            "Removing the countdown must restore passive monitor icons")
+                "Removing the countdown must restore passive monitor icons")
     }
 
     @Test(arguments: IslandEdge.allCases, [false, true]) @MainActor
@@ -93,7 +93,7 @@ struct StatusIconDestinationIntegrationTests {
         let notice = IslandNotice(id: "focus-countdown-progress", title: "Focus", detail: "00:12:30", progress: 0.5)
         fixture.queue.enqueue(notice, expiresAfter: nil)
         let icons = moreInformation ? [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%",
-            image: nil, style: .detailed), tooltip: "CPU")] : []
+                                                                                    image: nil, style: .detailed), tooltip: "CPU")] : []
         let state = SideNoticeDisplayState()
         state.islandEdge = edge
         state.placementMode = .custom
@@ -104,8 +104,8 @@ struct StatusIconDestinationIntegrationTests {
         let size = ScreenLayoutEngine(configuration: configuration).layout(for: fixture.screen).collapsedFrame.size
         let service = PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults)
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: service, onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: service, onStatusHidden: {})
         func render(_ progress: Double?, enabled: Bool, hidden: Bool = false) async throws -> NSBitmapImageRep {
             fixture.settings.settings.collapsedProgressGlowEnabled = enabled
             state.compactStatusHidden = hidden
@@ -145,7 +145,7 @@ struct StatusIconDestinationIntegrationTests {
         let hidden = try await render(1, enabled: true, hidden: true)
         #expect(try orangePixels(hidden, comparedWith: hiddenBaseline) == 0)
         #expect(fixture.queue.left.isEmpty && fixture.queue.right.count == 1,
-            "Painting progress must preserve the countdown notice")
+                "Painting progress must preserve the countdown notice")
     }
 
     @Test(arguments: IslandEdge.allCases, [LayoutDirection.leftToRight, .rightToLeft]) @MainActor
@@ -171,13 +171,13 @@ struct StatusIconDestinationIntegrationTests {
         state.placementMode = .custom
         state.compactWingHeight = 32
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         for (kind, identity) in brands {
             let left = IslandNotice(id: "update-available-cli-\(kind)-left", title: identity.displayName,
-                side: .left, style: .status, symbolName: "sparkles")
+                                    side: .left, style: .status, symbolName: "sparkles")
             let right = IslandNotice(id: "update-available-cli-\(kind)-right", title: "查看更新",
-                side: .right, style: .status, symbolName: "arrow.up.circle")
+                                     side: .right, style: .status, symbolName: "arrow.up.circle")
             fixture.queue.enqueue(left, expiresAfter: nil)
             fixture.queue.enqueue(right, expiresAfter: nil)
             for moreInformation in [false, true] {
@@ -267,24 +267,24 @@ struct StatusIconDestinationIntegrationTests {
         }
         let date = Date(timeIntervalSince1970: 100)
         let item = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil,
-            artworkData: artwork.tiffRepresentation, duration: 100, elapsedTime: 100,
-            timestamp: date, isPlaying: true)
+                                      artworkData: artwork.tiffRepresentation, duration: 100, elapsedTime: 100,
+                                      timestamp: date, isPlaying: true)
         let notices = [IslandNotice(id: "ai-active-progress", title: "AI"),
                        IslandNotice(id: "media-active-progress", title: "Song", artworkData: item.artworkData)]
         for notice in notices { fixture.queue.enqueue(notice, expiresAfter: nil) }
         fixture.media.publishSnapshot(item)
         let icons = hasIcons ? [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%",
-            image: nil, style: .detailed), tooltip: "CPU")] : []
+                                                                             image: nil, style: .detailed), tooltip: "CPU")] : []
         let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
-            settings: fixture.settings.settings, item: item, at: date))
+                                                                  settings: fixture.settings.settings, item: item, at: date))
         let state = SideNoticeDisplayState()
         state.islandEdge = edge
         state.placementMode = .custom
         state.statusIcons = icons
         state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings,
-            resultSweep: fixture.sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings,
+                                        resultSweep: fixture.sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         #expect(view.selectedCompactStatusPriority == .aiActivity)
         #expect(!view.pausesCompactTimeline,
                 "Visible playback progress must advance even when AI owns the normal priority")
@@ -335,9 +335,9 @@ struct StatusIconDestinationIntegrationTests {
         let state = SideNoticeDisplayState()
         state.placementMode = .custom
         state.statusIcons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%",
-            image: nil, style: .detailed), tooltip: "CPU")]
+                                                                          image: nil, style: .detailed), tooltip: "CPU")]
         var snapshot = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil, artworkData: nil,
-            duration: 100, elapsedTime: 50, timestamp: date, isPlaying: true)
+                                          duration: 100, elapsedTime: 50, timestamp: date, isPlaying: true)
         switch scenario {
         case "information-disabled": fixture.settings.settings.islandShowMoreInformation = false
         case "notifications-disabled": fixture.settings.settings.sideNoticesEnabled = false
@@ -349,16 +349,16 @@ struct StatusIconDestinationIntegrationTests {
         case "zero-progress": snapshot.elapsedTime = 0
         case "result-sweep":
             sweep.receive(previous: .running,
-                task: AIProgressTask(id: "hidden", provider: .codex, title: "AI", progress: nil,
-                    status: .succeeded, updatedAt: date),
-                observedSince: date, settings: fixture.settings.settings)
+                          task: AIProgressTask(id: "hidden", provider: .codex, title: "AI", progress: nil,
+                                               status: .succeeded, updatedAt: date),
+                          observedSince: date, settings: fixture.settings.settings)
             #expect(sweep.current != nil)
         default: break
         }
         fixture.media.publishSnapshot(scenario == "missing-snapshot" ? nil : snapshot)
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings,
-            resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings,
+                                        resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         #expect(view.pausesCompactTimeline == (scenario != "zero-progress"),
                 "A track at zero progress must keep its clock running; hidden or unavailable progress must pause")
         func render(enabled: Bool) async throws -> NSBitmapImageRep {
@@ -393,22 +393,22 @@ struct StatusIconDestinationIntegrationTests {
         fixture.settings.settings.collapsedProgressGlowEnabled = false
         let date = Date(timeIntervalSince1970: 100)
         let item = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil, artworkData: nil,
-            duration: 60, elapsedTime: 0, timestamp: date, isPlaying: true)
+                                      duration: 60, elapsedTime: 0, timestamp: date, isPlaying: true)
         fixture.media.publishSnapshot(item)
         let icons = [IslandStatusIcon(id: "combined", content: .combined(nil), tooltip: "Combined")]
         let notices = [IslandNotice(id: "ai-active-openai", title: "AI"),
                        IslandNotice(id: "media-active-left", title: "Song")]
         for notice in notices { fixture.queue.enqueue(notice, expiresAfter: nil) }
         let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
-            settings: fixture.settings.settings, item: item, at: date))
+                                                                  settings: fixture.settings.settings, item: item, at: date))
         let state = SideNoticeDisplayState()
         state.islandEdge = edge
         state.placementMode = .custom
         state.statusIcons = icons
         state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let bitmap = try await renderOffscreen(view.statusBarContent(at: date)
             .environment(\._accessibilityReduceMotion, true).background(.white), size: layout.size)
         let radius = style == .detailed ? VoiceRecordingIslandGeometry.bottomCornerRadius
@@ -454,15 +454,15 @@ struct StatusIconDestinationIntegrationTests {
             fixture.settings.settings.compactStatusPriority = CompactStatusPriority.normalized([.media])
             state.statusIcons = []
             let completed = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil, artworkData: nil,
-                duration: 60, elapsedTime: 60, timestamp: date, isPlaying: true)
+                                               duration: 60, elapsedTime: 60, timestamp: date, isPlaying: true)
             fixture.media.publishSnapshot(completed)
             let progressLayout = try #require(FloatingIslandInformationLayout(notices: notices, icons: [],
-                settings: fixture.settings.settings, item: completed, at: date))
+                                                                              settings: fixture.settings.settings, item: completed, at: date))
             let actual = try await renderOffscreen(view.statusBarContent(at: date)
                 .environment(\._accessibilityReduceMotion, true)
                 .environment(\._accessibilityReduceTransparency, true), size: progressLayout.size)
             let reference = CompactIslandShape(layoutStyle: .pill,
-                pillCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius)
+                                               pillCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius)
             let expected = try await renderOffscreen(reference.inset(by: CollapsedProgress.outlineInset)
                 .trim(from: 0, to: 1)
                 .stroke(MediaWaveformView.tintColor(for: nil), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
@@ -517,17 +517,17 @@ struct StatusIconDestinationIntegrationTests {
         }
         let date = Date(timeIntervalSince1970: 100)
         let item = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil,
-            artworkData: artwork.tiffRepresentation, duration: 60, elapsedTime: 0,
-            timestamp: date, isPlaying: true,
-            lyrics: SyncedLyrics(lines: [.init(time: 0,
-                text: crowded ? "" : "A long lyric line that needs the full music row width")]))
+                                      artworkData: artwork.tiffRepresentation, duration: 60, elapsedTime: 0,
+                                      timestamp: date, isPlaying: true,
+                                      lyrics: SyncedLyrics(lines: [.init(time: 0,
+                                                                         text: crowded ? "" : "A long lyric line that needs the full music row width")]))
         fixture.media.publishSnapshot(item)
         let notices = [IslandNotice(id: "ai-active-openai", title: "AI"),
                        IslandNotice(id: "media-active-left", title: "Song", artworkData: item.artworkData),
                        IslandNotice(id: "toolbox-reminder-awake", title: "Awake", detail: "30:00")]
         for notice in notices { fixture.queue.enqueue(notice, expiresAfter: nil) }
         let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
-            settings: fixture.settings.settings, item: item, at: date))
+                                                                  settings: fixture.settings.settings, item: item, at: date))
         if crowded { #expect(layout.primaryLength > ScreenLayoutConfiguration.quickActionRowWidth) }
         let state = SideNoticeDisplayState()
         state.islandEdge = edge
@@ -536,8 +536,8 @@ struct StatusIconDestinationIntegrationTests {
         state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
         var reportedLengths: [CGFloat] = []
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {}, onCompactLengthChanged: { reportedLengths.append($0) })
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {}, onCompactLengthChanged: { reportedLengths.append($0) })
         #expect(!view.pausesCompactTimeline,
                 "Visible playback progress and detailed lyrics must keep advancing while AI wins the normal priority")
         let bitmap = try await renderOffscreen(view.statusBarContent(at: date)
@@ -594,7 +594,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.settings.settings.sideNoticesEnabled = true
         fixture.settings.settings.islandShowMoreInformation = true
         fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu", content: .metric(.cpu,
-            text: "20%", image: nil, style: .detailed), tooltip: "CPU")])
+                                                                                       text: "20%", image: nil, style: .detailed), tooltip: "CPU")])
         let notices = [IslandNotice(id: "ai-active-openai", title: "AI")]
         let combined = fixture.presenter.compactConfiguration(for: notices, at: .distantPast)
         #expect(combined.statusIconSize != nil)
@@ -606,9 +606,9 @@ struct StatusIconDestinationIntegrationTests {
         fixture.presenter.setTransientNoticePresented(false)
         #expect(fixture.presenter.compactConfiguration(for: notices, at: .distantPast) == combined)
         fixture.sweep.receive(previous: .running,
-            task: AIProgressTask(id: "information", provider: .codex, title: "Test", progress: nil,
-                status: .succeeded, updatedAt: .distantPast),
-            observedSince: .distantFuture, settings: fixture.settings.settings)
+                              task: AIProgressTask(id: "information", provider: .codex, title: "Test", progress: nil,
+                                                   status: .succeeded, updatedAt: .distantPast),
+                              observedSince: .distantFuture, settings: fixture.settings.settings)
         #expect(fixture.sweep.current != nil)
         #expect(fixture.presenter.compactConfiguration(for: notices, at: .distantPast).statusIconSize == nil)
         fixture.sweep.cancel()
@@ -624,7 +624,7 @@ struct StatusIconDestinationIntegrationTests {
         var payload = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(fixture.settings.settings)) as? [String: Any])
         payload.removeValue(forKey: "islandShowMoreInformation")
         fixture.settings.settings = try JSONDecoder().decode(FeatureSettings.self,
-            from: JSONSerialization.data(withJSONObject: payload))
+                                                             from: JSONSerialization.data(withJSONObject: payload))
         let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
         fixture.presenter.setStatusIcons(icons)
         let notices = [
@@ -708,9 +708,9 @@ struct StatusIconDestinationIntegrationTests {
         fixture.presenter.setTransientNoticePresented(false)
         #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast) == idle)
         fixture.sweep.receive(previous: .running,
-            task: AIProgressTask(id: "monitor-priority", provider: .codex, title: "Test", progress: nil,
-                status: .succeeded, updatedAt: .distantPast),
-            observedSince: .distantFuture, settings: fixture.settings.settings)
+                              task: AIProgressTask(id: "monitor-priority", provider: .codex, title: "Test", progress: nil,
+                                                   status: .succeeded, updatedAt: .distantPast),
+                              observedSince: .distantFuture, settings: fixture.settings.settings)
         #expect(fixture.sweep.current != nil)
         #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast).statusIconSize == nil)
         fixture.sweep.cancel()
@@ -733,11 +733,11 @@ struct StatusIconDestinationIntegrationTests {
         let application = IslandStatusIcon(id: "app", content: .application, tooltip: "zisla")
         let monitor = IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "--", image: nil, style: .detailed), tooltip: "CPU")
         let stacked = IslandStatusIcon(id: "stacked", content: .stacked(image: nil,
-            readings: [.init(metric: .cpu, text: "--")]), tooltip: "CPU")
+                                                                        readings: [.init(metric: .cpu, text: "--")]), tooltip: "CPU")
         let combined = IslandStatusIcon(id: "combined", content: .combined(nil), tooltip: "Monitor")
         for icons in [[], [application], [monitor], [stacked], [combined], [application, monitor]] as [[IslandStatusIcon]] {
             let rows = SettingsView.compactStatusPriorities(settings: settings,
-                hasSystemMonitorIcons: icons.contains(where: \.isSystemMonitor))
+                                                            hasSystemMonitorIcons: icons.contains(where: \.isSystemMonitor))
             #expect(rows.contains(.systemMonitor) == icons.contains(where: \.isSystemMonitor))
             #expect(rows.filter { $0 != .systemMonitor } == original.filter { $0 != .systemMonitor })
         }
@@ -766,8 +766,8 @@ struct StatusIconDestinationIntegrationTests {
         fixture.queue.enqueue(IslandNotice(id: "media-active-left", title: "Music"), expiresAfter: nil)
         let state = SideNoticeDisplayState()
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         #expect(view.selectedCompactStatusPriority == .media)
         state.systemMonitorAvailable = true
         #expect(view.selectedCompactStatusPriority == .systemMonitor)
@@ -805,12 +805,12 @@ struct StatusIconDestinationIntegrationTests {
         }
         let icons = [IslandStatusIcon(id: "combined", content: .combined(image), tooltip: "Monitor")]
             + (0..<20).map { IslandStatusIcon(id: "cpu-\($0)",
-                content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU") }
+                                              content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU") }
         fixture.presenter.setStatusIcons(icons)
         for dimension: CGFloat in [280, 900] {
             let snapshot = ScreenSnapshot(displayID: 7,
-                frame: CGRect(x: 20000, y: 0, width: dimension, height: dimension),
-                visibleFrame: CGRect(x: 20000, y: 0, width: dimension, height: dimension))
+                                          frame: CGRect(x: 20000, y: 0, width: dimension, height: dimension),
+                                          visibleFrame: CGRect(x: 20000, y: 0, width: dimension, height: dimension))
             let frame = try #require(fixture.presenter.compactFrame(for: snapshot, notices: []))
             #expect((edge.isVertical ? frame.height : frame.width) == min(480, dimension - 16))
             let bitmap = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast), size: frame.size)
@@ -822,7 +822,7 @@ struct StatusIconDestinationIntegrationTests {
             for axis in 0..<axisLength {
                 for cross in 0..<crossLength {
                     let color = try #require(bitmap.colorAt(x: edge.isVertical ? cross : axis,
-                        y: edge.isVertical ? axis : cross))
+                                                            y: edge.isVertical ? axis : cross))
                     if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.5 {
                         if axis < Int(8 * scale) || axis >= axisLength - Int(8 * scale) { endPixels += 1 }
                         if axis < Int(44 * scale), color.redComponent > 0.5 && color.greenComponent < 0.2 { firstIconPixels += 1 }
@@ -1024,13 +1024,13 @@ struct StatusIconDestinationIntegrationTests {
                         IslandStatusIcon.Reading(metric: .memory, text: "2 GB/8 GB")]
         stacked.button?.image = SystemMonitorMenuBarImageRenderer.stacked(rows: ["C 20%", "M 2 GB/8 GB"], style: .compact)
         combined.button?.image = SystemMonitorMenuBarImageRenderer.combinedIcon(battery: nil, wifi: .off, level: nil,
-            foreground: .white, configuration: SystemMonitorCombinedIconAppearance(iconSize: 36))
+                                                                                foreground: .white, configuration: SystemMonitorCombinedIconAppearance(iconSize: 36))
         for style in SystemMonitorMenuBarDisplayStyle.allCases {
             let titles = metrics.map { metric, item, compact in
                 (metric, item, style == .detailed ? "\(SystemMonitorMenuBarPresentation.label(for: metric)) \(compact)" : compact)
             }
             let icons = IslandStatusIconRouting.update(destination: .island, application: application,
-                metrics: titles, stacked: stacked, readings: readings, combined: combined, style: style)
+                                                       metrics: titles, stacked: stacked, readings: readings, combined: combined, style: style)
             #expect(items.allSatisfy { !$0.isVisible })
             #expect(icons.map(\.id) == ["status-icon-application", "status-icon-combined"]
                 + SystemMonitorMenuBarMetric.allCases.map { "status-icon-\($0.rawValue)" }
@@ -1044,17 +1044,17 @@ struct StatusIconDestinationIntegrationTests {
             let image = try #require(stacked.button?.image)
             for edge in IslandEdge.allCases {
                 #expect(stackedIcon.size(edge: edge) == (edge.isVertical ? CGSize(width: 40, height: 33)
-                    : CGSize(width: image.size.width, height: 24)),
-                    "Vertical readings wrap within the compact column while horizontal rows retain their menu bar image")
+                            : CGSize(width: image.size.width, height: 24)),
+                "Vertical readings wrap within the compact column while horizontal rows retain their menu bar image")
             }
             let withoutCombined = IslandStatusIconRouting.update(destination: .island, application: application,
-                metrics: titles, stacked: stacked, readings: readings, combined: nil, style: style)
+                                                                 metrics: titles, stacked: stacked, readings: readings, combined: nil, style: style)
             #expect(withoutCombined.map(\.id) == ["status-icon-application"]
                 + SystemMonitorMenuBarMetric.allCases.map { "status-icon-\($0.rawValue)" }
                 + ["status-icon-stacked"])
             #expect(application.menu === menu)
             #expect(IslandStatusIconRouting.update(destination: .menuBar, application: application,
-                metrics: metrics, stacked: stacked, readings: readings, combined: combined, style: style).isEmpty)
+                                                   metrics: metrics, stacked: stacked, readings: readings, combined: combined, style: style).isEmpty)
             #expect(items.allSatisfy { $0.isVisible })
             #expect(application.menu === menu)
             #expect(([stacked, combined] + metrics.map({ $0.1 })).allSatisfy {
@@ -1062,7 +1062,7 @@ struct StatusIconDestinationIntegrationTests {
             })
         }
         #expect(IslandStatusIconRouting.update(destination: .island, application: nil, metrics: [],
-            stacked: nil, readings: [], combined: nil, style: .compact, islandAppIconEnabled: false).isEmpty)
+                                               stacked: nil, readings: [], combined: nil, style: .compact, islandAppIconEnabled: false).isEmpty)
     }
 
     @Test(arguments: IslandEdge.allCases, [LayoutDirection.leftToRight, .rightToLeft]) @MainActor
@@ -1083,7 +1083,7 @@ struct StatusIconDestinationIntegrationTests {
                         IslandStatusIcon.Reading(metric: .gpu, text: "0%")]
         stacked.button?.image = SystemMonitorMenuBarImageRenderer.stacked(rows: ["C 14%", "G 0%"], style: .compact)
         let icons = IslandStatusIconRouting.update(destination: .island, application: application,
-            metrics: [], stacked: stacked, readings: readings, combined: combined, style: .compact)
+                                                   metrics: [], stacked: stacked, readings: readings, combined: combined, style: .compact)
         let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
         let bitmap = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast)
             .environment(\.layoutDirection, direction)
@@ -1123,8 +1123,8 @@ struct StatusIconDestinationIntegrationTests {
         for style in SystemMonitorMenuBarDisplayStyle.allCases {
             let title = style == .detailed ? "Network ↓12 MB/s ↑7 MB/s" : "↓12 MB/s"
             let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
-                metrics: [(.network, item, title)], stacked: nil, readings: [], combined: nil, style: style,
-                islandAppIconEnabled: false)
+                                                       metrics: [(.network, item, title)], stacked: nil, readings: [], combined: nil, style: style,
+                                                       islandAppIconEnabled: false)
             guard case let .metric(metric, text, _, selectedStyle) = try #require(icons.first).content else {
                 Issue.record("The selected network metric must remain an individual icon")
                 return
@@ -1144,8 +1144,8 @@ struct StatusIconDestinationIntegrationTests {
         let tooltip = "CPU: 20%\n\(action)"
         item.button?.toolTip = tooltip
         let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
-            metrics: [(.cpu, item, "20%")], stacked: item, readings: [], combined: item, style: .detailed,
-            islandAppIconEnabled: false)
+                                                   metrics: [(.cpu, item, "20%")], stacked: item, readings: [], combined: item, style: .detailed,
+                                                   islandAppIconEnabled: false)
         #expect(icons.count == 3)
         #expect(icons.allSatisfy { $0.tooltip == "CPU: 20%" })
         #expect(item.button?.toolTip == tooltip, "Moving an icon must preserve its original menu bar behavior")
@@ -1159,8 +1159,8 @@ struct StatusIconDestinationIntegrationTests {
         state.placementMode = .custom
         state.islandEdge = .left
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+                                        pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         state.statusIcons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
         #expect(view.pausesCompactTimeline)
         state.statusIcons.append(IslandStatusIcon(id: "app", content: .application, tooltip: "zisla"))
@@ -1174,8 +1174,8 @@ struct StatusIconDestinationIntegrationTests {
     func iconImagesAndVerticalReadingsRenderInsideTheMeasuredStrip(edge: IslandEdge) async throws {
         let colorSpace = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try #require(CGContext(data: nil, width: 72, height: 72, bitsPerComponent: 8,
-            bytesPerRow: 0, space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bytesPerRow: 0, space: colorSpace,
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: 72, height: 72))
         let image = NSImage(cgImage: try #require(context.makeImage()), size: NSSize(width: 36, height: 36))
@@ -1217,8 +1217,8 @@ struct StatusIconDestinationIntegrationTests {
         item.button?.toolTip = nil
         let readings = [IslandStatusIcon.Reading(metric: .cpu, text: "20%")]
         let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
-            metrics: [(.cpu, item, "20%")], stacked: item, readings: readings, combined: item, style: .compact,
-            islandAppIconEnabled: false)
+                                                   metrics: [(.cpu, item, "20%")], stacked: item, readings: readings, combined: item, style: .compact,
+                                                   islandAppIconEnabled: false)
         #expect(icons.map(\.tooltip) == ["zisla", "20%", "20%"])
         for icon in icons {
             let size = try #require(IslandStatusIconLayout.size(icons: [icon], edge: edge))
@@ -1310,7 +1310,7 @@ struct StatusIconDestinationIntegrationTests {
         let image = try #require(SystemMonitorMenuBarImageRenderer.stacked(rows: ["C 20%", "M 2 GB/8 GB"], style: .compact))
         let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: metricImage, style: .compact), tooltip: "CPU"),
                      IslandStatusIcon(id: "stacked", content: .stacked(image: image,
-                         readings: [.init(metric: .cpu, text: "20%"), .init(metric: .memory, text: "2 GB/8 GB")]), tooltip: "Monitors")]
+                                                                       readings: [.init(metric: .cpu, text: "20%"), .init(metric: .memory, text: "2 GB/8 GB")]), tooltip: "Monitors")]
         let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
         #expect(size == CGSize(width: metricImage.size.width + image.size.width + 24, height: 32))
         let actual = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast)
@@ -1340,8 +1340,8 @@ struct StatusIconDestinationIntegrationTests {
         item.button?.image = image
         defer { NSStatusBar.system.removeStatusItem(item) }
         let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
-            metrics: [], stacked: item, readings: [.init(metric: .cpu, text: "14%"), .init(metric: .gpu, text: "30%")],
-            combined: nil, style: style, islandAppIconEnabled: false)
+                                                   metrics: [], stacked: item, readings: [.init(metric: .cpu, text: "14%"), .init(metric: .gpu, text: "30%")],
+                                                   combined: nil, style: style, islandAppIconEnabled: false)
         let icon = try #require(icons.first)
         let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
         let expectedSize = edge.isVertical ? CGSize(width: image.size.width + 8, height: 40)
@@ -1373,7 +1373,7 @@ struct StatusIconDestinationIntegrationTests {
         #expect(foregroundPixels > 10, "Merged monitor labels and readings must stay visible on the black island")
         #expect(item.button?.image === image && image.isTemplate && image.accessibilityDescription == rows.joined(separator: ", "))
         #expect(IslandStatusIconRouting.update(destination: .menuBar, application: nil, metrics: [],
-            stacked: item, readings: [], combined: nil, style: style).isEmpty)
+                                               stacked: item, readings: [], combined: nil, style: style).isEmpty)
         #expect(item.isVisible && item.button?.image === image)
     }
 
@@ -1390,7 +1390,7 @@ struct StatusIconDestinationIntegrationTests {
             let originalSize = image.size
             for sourceImage in [image, nil] {
                 let icon = IslandStatusIcon(id: "stacked", content: .stacked(image: sourceImage, readings: readings),
-                    tooltip: rows.joined(separator: ", "))
+                                            tooltip: rows.joined(separator: ", "))
                 let iconSize = icon.size(edge: edge)
                 #expect(iconSize.width == width)
                 let reference = VStack(alignment: .leading, spacing: 0) {
@@ -1408,7 +1408,7 @@ struct StatusIconDestinationIntegrationTests {
                 renderer.scale = 2
                 let natural = try #require(renderer.cgImage)
                 #expect(iconSize.height == CGFloat(natural.height) / 2,
-                    "All wrapped units and transfer rates must fit their natural text height")
+                        "All wrapped units and transfer rates must fit their natural text height")
                 let size = try #require(IslandStatusIconLayout.size(icons: [icon], edge: edge))
                 #expect(size.width <= 48)
                 let actual = try await renderOffscreen(IslandStatusIconStrip(icons: [icon], edge: edge, date: .distantPast)
@@ -1458,7 +1458,7 @@ struct StatusIconDestinationIntegrationTests {
         let date = Date(timeIntervalSince1970: 100)
         fixture.queue.enqueue(IslandNotice(id: "media-active-left", title: "Music"), expiresAfter: nil)
         fixture.media.publishSnapshot(NowPlayingSnapshot(title: "Music", artist: "Artist", album: nil, artworkData: nil,
-            duration: 100, elapsedTime: 50, timestamp: date, isPlaying: true))
+                                                         duration: 100, elapsedTime: 50, timestamp: date, isPlaying: true))
         fixture.settings.settings.collapsedProgressGlowEnabled = true
         let state = SideNoticeDisplayState()
         state.islandEdge = .left
@@ -1468,7 +1468,7 @@ struct StatusIconDestinationIntegrationTests {
         state.statusIcons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
         let size = try #require(IslandStatusIconLayout.size(icons: state.statusIcons, edge: .left))
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
+                                        browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let actual = try await renderOffscreen(view.statusBarContent(at: date), size: size)
         let expected = try await renderOffscreen(IslandStatusIconStrip(icons: state.statusIcons, edge: .left, date: date)
             .clipShape(CompactIslandShape(layoutStyle: .pill)), size: size)
@@ -1532,7 +1532,7 @@ struct StatusIconDestinationIntegrationTests {
         defer { fixture.close() }
         fixture.settings.settings.islandPlacement.inwardDistance = 120
         let coordinator = OverlayCoordinator(contentView: NSView(),
-            layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration))
+                                             layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration))
         defer { coordinator.stop() }
         coordinator.screenSnapshotProvider = { [fixture] in [fixture.screen] }
         coordinator.updateScreens([fixture.screen])
@@ -1544,7 +1544,7 @@ struct StatusIconDestinationIntegrationTests {
         }
         for pointSize in [16.0, 36.0] {
             let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(battery: nil, wifi: .off, level: nil,
-                foreground: .white, configuration: SystemMonitorCombinedIconAppearance(iconSize: pointSize)))
+                                                                                    foreground: .white, configuration: SystemMonitorCombinedIconAppearance(iconSize: pointSize)))
             fixture.presenter.setStatusIcons([IslandStatusIcon(id: "combined", content: .combined(image), tooltip: "Monitor")])
             let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: []))
             let thickness = edge.isVertical ? frame.width : frame.height
@@ -1556,7 +1556,7 @@ struct StatusIconDestinationIntegrationTests {
             coordinator.updateCompactStatus(expandsForDetailedStatus: false)
             #expect(coordinator.activeLayout?.collapsedFrame.size == CGSize(width: 24, height: 24))
             #expect(ScreenLayoutEngine.edgeDistance(of: try #require(coordinator.activeLayout).collapsedFrame,
-                in: fixture.screen.frame, edge: edge) == 72)
+                                                    in: fixture.screen.frame, edge: edge) == 72)
             fixture.presenter.publishCompactLayout(on: fixture.screen.displayID)
             #expect(coordinator.activeLayout?.collapsedFrame == frame, "A screen switch must republish the current icon dimensions")
             fixture.settings.settings.sideNoticesEnabled = true
@@ -1571,9 +1571,10 @@ struct StatusIconDestinationIntegrationTests {
             #expect(fixture.settings.settings.islandPlacement.inwardDistance == 120)
         }
         let stackedImage = try #require(SystemMonitorMenuBarImageRenderer.stacked(
-            rows: ["C 20%", "M 2 GB/8 GB"], style: .compact))
+            rows: ["C 20%", "M 2 GB/8 GB"], style: .compact
+        ))
         let stacked = IslandStatusIcon(id: "stacked", content: .stacked(image: stackedImage,
-            readings: [.init(metric: .cpu, text: "20%"), .init(metric: .memory, text: "2 GB/8 GB")]), tooltip: "Monitors")
+                                                                        readings: [.init(metric: .cpu, text: "20%"), .init(metric: .memory, text: "2 GB/8 GB")]), tooltip: "Monitors")
         fixture.presenter.setStatusIcons([stacked])
         let stackedFrame = try #require(coordinator.activeLayout).collapsedFrame
         let stackedThickness = edge.isVertical ? stackedFrame.width : stackedFrame.height
@@ -1584,7 +1585,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.presenter.setStatusIcons([])
         #expect(coordinator.activeLayout?.collapsedFrame.size == CGSize(width: 24, height: 24))
         #expect(ScreenLayoutEngine.edgeDistance(of: try #require(coordinator.activeLayout).collapsedFrame,
-            in: fixture.screen.frame, edge: edge) == 72)
+                                                in: fixture.screen.frame, edge: edge) == 72)
         fixture.settings.flushPendingChanges()
         #expect(FeatureSettingsStore(defaults: fixture.defaults).settings.islandPlacement.inwardDistance == 120)
     }
@@ -1610,8 +1611,8 @@ struct StatusIconDestinationIntegrationTests {
         #expect(fixture.presenter.compactConfiguration(for: [], at: .now).statusIconSize == nil)
         fixture.presenter.setTransientNoticePresented(false)
         fixture.sweep.receive(previous: .running,
-            task: AIProgressTask(id: "test", provider: .codex, title: "Test", progress: nil, status: .succeeded, updatedAt: .now),
-            observedSince: .distantFuture, settings: fixture.settings.settings)
+                              task: AIProgressTask(id: "test", provider: .codex, title: "Test", progress: nil, status: .succeeded, updatedAt: .now),
+                              observedSince: .distantFuture, settings: fixture.settings.settings)
         #expect(fixture.sweep.current != nil)
         #expect(fixture.presenter.compactConfiguration(for: [], at: .now).statusIconSize == nil)
         fixture.sweep.cancel()
@@ -1649,11 +1650,11 @@ struct StatusIconDestinationIntegrationTests {
 
     @MainActor
     func renderOffscreen(_ content: some View, size: CGSize,
-                                 inspect: (NSView) -> Void = { _ in }) async throws -> NSBitmapImageRep {
+                         inspect: (NSView) -> Void = { _ in }) async throws -> NSBitmapImageRep {
         let host = NSHostingView(rootView: content.frame(width: size.width, height: size.height).background(.black))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 20000, y: 0), size: size),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.alphaValue = 0
         window.contentView = host
@@ -1690,7 +1691,7 @@ struct StatusIconDestinationIntegrationTests {
         #expect(fixture.presenter.compactConfiguration(for: [], at: .now).statusIconSize == nil)
         fixture.settings.settings.islandLayoutStyle = .pill
         fixture.presenter.setStatusIcons([IslandStatusIcon(id: "network", content: .metric(.network,
-            text: String(repeating: "1", count: 1000), image: nil, style: .detailed), tooltip: "Network")])
+                                                                                           text: String(repeating: "1", count: 1000), image: nil, style: .detailed), tooltip: "Network")])
         let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: []))
         #expect(frame.height == ScreenLayoutConfiguration.quickActionRowWidth)
         #expect(fixture.screen.frame.contains(frame))
@@ -1708,12 +1709,12 @@ struct StatusIconDestinationIntegrationTests {
         let downloads = BrowserDownloadMonitor(directories: [], eventPaths: [])
         var reducesMotion = false
         let screen = ScreenSnapshot(displayID: 7, frame: CGRect(x: 20000, y: 0, width: 1440, height: 900),
-            visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
+                                    visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
         lazy var presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
-            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
-            browserDownloads: downloads, settingsStore: settings, languageStore: language, isScreenLocked: true,
-            reduceMotion: { [unowned self] in reducesMotion },
-            screenSnapshotProvider: { [unowned self] in [screen] })
+                                                 pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
+                                                 browserDownloads: downloads, settingsStore: settings, languageStore: language, isScreenLocked: true,
+                                                 reduceMotion: { [unowned self] in reducesMotion },
+                                                 screenSnapshotProvider: { [unowned self] in [screen] })
 
         init(edge: IslandEdge) throws {
             defaults = try #require(UserDefaults(suiteName: suite))

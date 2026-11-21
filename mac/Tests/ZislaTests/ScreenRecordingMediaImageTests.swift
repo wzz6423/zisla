@@ -321,7 +321,7 @@ final class RecordingImageFixture {
         directory = try ScreenRecordingProjectStore(root: root).createDirectory()
         try Data([1]).write(to: directory.appendingPathComponent("screen.mp4"))
         project = ScreenRecordingProject(name: "Synthetic images", videoFile: "screen.mp4", duration: 3,
-                                        width: 400, height: 300, timeline: .init())
+                                         width: 400, height: 300, timeline: .init())
         project.version = 2
         project.edits.background = .none
         project.edits.padding = 0
@@ -341,7 +341,7 @@ final class RecordingImageFixture {
         try Self.writeImage(to: url, width: width, height: height, transparent: transparent, orientation: orientation)
         let size = readDimensions ? try RecordingMediaImageStore.dimensions(of: url) : CGSize(width: width, height: height)
         let asset = RecordingMediaAsset(name: file, file: file, kind: .image, duration: 2,
-                                       width: Int(size.width), height: Int(size.height))
+                                        width: Int(size.width), height: Int(size.height))
         project.timeline?.assets.append(asset)
         return asset
     }
@@ -350,8 +350,8 @@ final class RecordingImageFixture {
                            orientation: Int? = nil) throws {
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
-            bytesPerRow: width * 4, space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bytesPerRow: width * 4, space: colorSpace,
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         let bounds = CGRect(x: 0, y: 0, width: width, height: height)
         context.clear(bounds)
         if transparent {
@@ -387,8 +387,8 @@ final class RecordingImageFixture {
         var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try bytes.withUnsafeMutableBytes { pointer in
             let context = try #require(CGContext(data: pointer.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         return Pixels(width: image.width, bytes: bytes)

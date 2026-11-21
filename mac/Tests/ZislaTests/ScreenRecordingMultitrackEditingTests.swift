@@ -61,7 +61,7 @@ struct ScreenRecordingMultitrackEditingTests {
         for asset in assets { #expect(model.addAssetToTimeline(asset.id, at: 0) != nil) }
         #expect(model.timeline?.tracks.count == 4 && Set(model.timeline!.clips.map(\.trackID)).count == 4)
         #expect(model.timeline?.clips.map(\.content) == [.recording(original.id), .video(assets[0].id),
-            .image(assets[1].id), .audio(assets[2].id)])
+                                                         .image(assets[1].id), .audio(assets[2].id)])
         #expect(model.timeline?.clips.count == 4 && model.timeline?.assets == imported.timeline?.assets)
         try model.save()
         #expect(try fixture.store.load(from: fixture.directory) == model.project)
@@ -100,7 +100,7 @@ struct ScreenRecordingMultitrackEditingTests {
         let directories = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
         await #expect(throws: Error.self) {
             _ = try await RecordingMediaImporter.prepare(urls: [image, invalid], project: newProject ? nil : project,
-                directory: newProject ? nil : fixture.directory, store: fixture.store)
+                                                         directory: newProject ? nil : fixture.directory, store: fixture.store)
         }
         #expect(try fixture.files() == files)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == directories)
@@ -122,12 +122,12 @@ struct ScreenRecordingMultitrackEditingTests {
         let checkpoint = try RecordingImportCopyCancellation(root: fixture.root)
         await #expect(throws: CancellationError.self) {
             _ = try await RecordingMediaImporter.prepare(urls: [image, second], project: newProject ? nil : project,
-                directory: newProject ? nil : fixture.directory, store: fixture.store, checkCancellation: {
-                    try checkpoint.check()
-                })
+                                                         directory: newProject ? nil : fixture.directory, store: fixture.store, checkCancellation: {
+                                                             try checkpoint.check()
+                                                         })
         }
         #expect(try checkpoint.copiedFiles.count == 1 && checkpoint.copiedBytes == Data(contentsOf: image),
-            "Cancellation must observe exactly the first copied media before rolling back")
+                "Cancellation must observe exactly the first copied media before rolling back")
         #expect(try fixture.files() == files)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == directories)
         #expect(try fixture.store.load(from: fixture.directory) == project)
@@ -374,7 +374,7 @@ struct ScreenRecordingMultitrackEditingTests {
         let caption = try #require(model.addOverlayCaption())
         #expect(model.timeline?.tracks.count == 2)
         #expect(model.timeline?.clips.first { $0.content == .caption(caption) }?.trackID == timeline.tracks[1].id,
-            "Adding captions must reuse an overlay's current track without reading legacy kind metadata")
+                "Adding captions must reuse an overlay's current track without reading legacy kind metadata")
         let annotation = try #require(model.addOverlayAnnotation(.rectangle))
         #expect(model.timeline?.tracks.count == 2)
         #expect(model.timeline?.clips.first { $0.content == .annotation(annotation) }?.trackID == timeline.tracks[1].id)
@@ -393,16 +393,16 @@ struct ScreenRecordingMultitrackEditingTests {
 
     @Test func draggingEveryContentAcrossDifferentLegacyTracksPreservesSourceAndClampsRows() throws {
         let tracks: [RecordingTimelineTrack] = [.init(id: "audio", kind: .audio), .init(id: "image", kind: .image),
-            .init(id: "text", kind: .text), .init(id: "video", kind: .video)]
+                                                .init(id: "text", kind: .text), .init(id: "video", kind: .video)]
         let id = UUID()
         for content in [RecordingTimelineContent.recording(id), .video(id), .image(id), .audio(id), .annotation(id), .caption(id)] {
             let original = RecordingTimelineClip(trackID: "image", content: content, start: 2,
-                sourceStart: 0.25, sourceEnd: 1.75, speed: 2,
-                layout: .init(x: 0.1, y: 0.2, width: 0.4, height: 0.5), volume: 0.3, audioEnabled: false)
+                                                 sourceStart: 0.25, sourceEnd: 1.75, speed: 2,
+                                                 layout: .init(x: 0.1, y: 0.2, width: 0.4, height: 0.5), volume: 0.3, audioEnabled: false)
             for (vertical, expectedTrack) in [(0.0, "image"), (44.0, "text"), (-44.0, "audio"),
-                                               (440.0, "video"), (-440.0, "audio")] {
+                                              (440.0, "video"), (-440.0, "audio")] {
                 let drag = RecordingMultitrackClipDrag(original: original, mode: .move, pointsPerSecond: 100,
-                    translation: .init(width: 100, height: vertical))
+                                                       translation: .init(width: 100, height: vertical))
                 let changed = try #require(drag.replacement(sourceDuration: 2, tracks: tracks, rowHeight: 44))
                 var expected = original
                 expected.start = 3
@@ -410,7 +410,7 @@ struct ScreenRecordingMultitrackEditingTests {
                 #expect(changed == expected, "Dragging must move any content to the nearest track without altering its source or gain")
             }
             let trimmed = RecordingMultitrackClipDrag(original: original, mode: .trimEnd, pointsPerSecond: 100,
-                translation: .init(width: -25, height: 44))
+                                                      translation: .init(width: -25, height: 44))
             #expect(trimmed.replacement(sourceDuration: 2, tracks: tracks, rowHeight: 44)?.trackID == original.trackID)
         }
         let original = RecordingTimelineClip(trackID: "image", content: .video(id), start: 1, sourceEnd: 2)
@@ -423,16 +423,16 @@ struct ScreenRecordingMultitrackEditingTests {
     @Test(arguments: [RecordingMultitrackClipDrag.Mode.move, .trimStart, .trimEnd])
     func clipDraggingSnapsTheNearestEndpointWithinEightScreenPointsAndRespectsSourceSpeed(_ mode: RecordingMultitrackClipDrag.Mode) throws {
         let source = RecordingTimelineClip(trackID: "first", content: .video(UUID()), start: 2,
-            sourceStart: 1, sourceEnd: 5, speed: 2)
+                                           sourceStart: 1, sourceEnd: 5, speed: 2)
         let tracks: [RecordingTimelineTrack] = [.init(id: "first"), .init(id: "second")]
         var drag = RecordingMultitrackClipDrag(original: source, mode: mode, pointsPerSecond: 100,
-            translation: .init(width: 103, height: 44))
+                                               translation: .init(width: 103, height: 44))
         let target = mode == .trimEnd ? 5.0 : 3.0
         let snapped = try #require(drag.replacement(sourceDuration: 10, tracks: tracks, rowHeight: 44,
-            snappingPoints: [target + 0.07, target]))
+                                                    snappingPoints: [target + 0.07, target]))
         #expect(drag.replacement(sourceDuration: 10, tracks: tracks, rowHeight: 44,
-            snappingPoints: [target, target + 0.07]) == snapped,
-            "The nearest boundary must win regardless of track or candidate order")
+                                 snappingPoints: [target, target + 0.07]) == snapped,
+                "The nearest boundary must win regardless of track or candidate order")
         switch mode {
         case .move:
             #expect(snapped.start == 3 && snapped.end == 5 && snapped.sourceStart == source.sourceStart)
@@ -450,8 +450,8 @@ struct ScreenRecordingMultitrackEditingTests {
         #expect(abs(edge - target - 0.1) < 0.000_001, "Moving outside eight screen points must release the snap")
         drag.translation = .zero
         #expect(drag.replacement(sourceDuration: 10, tracks: tracks, rowHeight: 44,
-            snappingPoints: [source.start + 0.01, source.end + 0.01]) == source,
-            "Selecting or clicking a trim handle without moving must never move or trim a clip")
+                                 snappingPoints: [source.start + 0.01, source.end + 0.01]) == source,
+                "Selecting or clicking a trim handle without moving must never move or trim a clip")
     }
 
     @Test
@@ -459,18 +459,18 @@ struct ScreenRecordingMultitrackEditingTests {
         let source = RecordingTimelineClip(trackID: "first", content: .image(UUID()), start: 1, sourceEnd: 2)
         let tracks: [RecordingTimelineTrack] = [.init(id: "first"), .init(id: "second")]
         let drag = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 100,
-            translation: .init(width: 195, height: 44))
+                                               translation: .init(width: 195, height: 44))
         let changed = try #require(drag.replacement(sourceDuration: nil, tracks: tracks, rowHeight: 44,
-            snappingPoints: [5]))
+                                                    snappingPoints: [5]))
         #expect(changed.end == 5 && changed.start == 3 && changed.trackID == "second" && changed.duration == source.duration)
         let zoomed = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 200,
-            translation: .init(width: 390, height: 44))
+                                                 translation: .init(width: 390, height: 44))
         #expect(zoomed.replacement(sourceDuration: nil, tracks: tracks, rowHeight: 44, snappingPoints: [5])?.start == 2.95,
-            "The same time difference outside eight points at higher zoom must remain unsnapped")
+                "The same time difference outside eight points at higher zoom must remain unsnapped")
         let vertical = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 100,
-            translation: .init(width: 0, height: 44))
+                                                   translation: .init(width: 0, height: 44))
         #expect(vertical.replacement(sourceDuration: nil, tracks: tracks, rowHeight: 44,
-            snappingPoints: [source.start + 0.01])?.start == source.start)
+                                     snappingPoints: [source.start + 0.01])?.start == source.start)
     }
 
     @Test
@@ -486,7 +486,7 @@ struct ScreenRecordingMultitrackEditingTests {
     func snappingGuideFollowsOnlyTheEdgeBeingTrimmedAndDoesNotAppearForAClick(_ mode: RecordingMultitrackClipDrag.Mode) {
         let source = RecordingTimelineClip(trackID: "first", content: .image(UUID()), start: 2, sourceEnd: 2)
         let drag = RecordingMultitrackClipDrag(original: source, mode: mode, pointsPerSecond: 100,
-            translation: .init(width: 10, height: 0))
+                                               translation: .init(width: 10, height: 0))
         let moving = mode == .trimStart ? source.start : source.end
         let fixed = mode == .trimStart ? source.end : source.start
         #expect(drag.alignedSnapPoint(for: source, points: [fixed, moving]) == moving)
@@ -498,42 +498,42 @@ struct ScreenRecordingMultitrackEditingTests {
     @Test(arguments: [RecordingMultitrackClipDrag.Mode.move, .trimStart, .trimEnd])
     func cancellingADragKeepsItCancelledThroughFurtherMouseMovementAndRelease(_ mode: RecordingMultitrackClipDrag.Mode) throws {
         let source = RecordingTimelineClip(trackID: "first", content: .video(UUID()), start: 2,
-            sourceStart: 1, sourceEnd: 5, speed: 2)
+                                           sourceStart: 1, sourceEnd: 5, speed: 2)
         let tracks: [RecordingTimelineTrack] = [.init(id: "first"), .init(id: "second")]
         var drag = RecordingMultitrackClipDrag(original: source, mode: mode, pointsPerSecond: 100,
-            translation: .init(width: 10, height: 44))
+                                               translation: .init(width: 10, height: 44))
         #expect(drag.replacement(sourceDuration: 8, tracks: tracks, rowHeight: 44) != source)
         drag.isCancelled = true
         drag.translation = .init(width: 100, height: 44)
         #expect(drag.replacement(sourceDuration: 8, tracks: tracks, rowHeight: 44, snappingPoints: [3, 4]) == nil,
-            "Escape must keep later events in the same gesture from producing a committable clip")
+                "Escape must keep later events in the same gesture from producing a committable clip")
     }
 
     @Test
     func trimmingNearSnapTargetsCannotExceedTheMediaOrCollapseTheClipAndMissingRowsAreRejected() throws {
         let source = RecordingTimelineClip(trackID: "first", content: .video(UUID()), start: 2,
-            sourceStart: 1, sourceEnd: 5, speed: 2)
+                                           sourceStart: 1, sourceEnd: 5, speed: 2)
         let tracks: [RecordingTimelineTrack] = [.init(id: "first")]
         let end = RecordingMultitrackClipDrag(original: source, mode: .trimEnd, pointsPerSecond: 100,
-            translation: .init(width: 100, height: 0))
+                                              translation: .init(width: 100, height: 0))
         #expect(end.replacement(sourceDuration: 5, tracks: tracks, rowHeight: 44, snappingPoints: [4.02]) == source)
         let start = RecordingMultitrackClipDrag(original: source, mode: .trimStart, pointsPerSecond: 100,
-            translation: .init(width: -50, height: 0))
+                                                translation: .init(width: -50, height: 0))
         let trimmed = try #require(start.replacement(sourceDuration: 5, tracks: tracks, rowHeight: 44,
-            snappingPoints: [1.45]))
+                                                     snappingPoints: [1.45]))
         #expect(trimmed.start == 1.5 && trimmed.sourceStart == 0 && trimmed.end == source.end)
         let collapsed = RecordingMultitrackClipDrag(original: source, mode: .trimEnd, pointsPerSecond: 100,
-            translation: .init(width: -300, height: 0))
+                                                    translation: .init(width: -300, height: 0))
         let minimum = try #require(collapsed.replacement(sourceDuration: 5, tracks: tracks, rowHeight: 44,
-            snappingPoints: [source.start]))
+                                                         snappingPoints: [source.start]))
         #expect(minimum.sourceEnd > minimum.sourceStart && minimum.start == source.start)
         let move = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 100,
-            translation: .init(width: 1, height: 44))
+                                               translation: .init(width: 1, height: 44))
         #expect(move.replacement(sourceDuration: 5, tracks: [], rowHeight: 44) == nil)
         #expect(move.replacement(sourceDuration: 5, tracks: tracks, rowHeight: 0) == nil)
         let zero = RecordingTimelineClip(trackID: "first", content: .image(UUID()), start: 0, sourceEnd: 2)
         let belowZero = RecordingMultitrackClipDrag(original: zero, mode: .move, pointsPerSecond: 100,
-            translation: .init(width: 1, height: 0))
+                                                    translation: .init(width: 1, height: 0))
         #expect(belowZero.replacement(sourceDuration: nil, tracks: tracks, rowHeight: 44, snappingPoints: [-0.01])?.start == 0.01)
     }
 
@@ -620,7 +620,7 @@ struct ScreenRecordingMultitrackEditingTests {
         await firstGate.release()
         await oldTask.value
         #expect(model.isBusy && model.operationTask != nil && model.project == next,
-            "An obsolete task must not unlock the editor while the new project's operation is pending")
+                "An obsolete task must not unlock the editor while the new project's operation is pending")
         await secondGate.release()
         await newTask.value
         #expect(model.canEdit && model.operationTask == nil && model.project?.timeline?.clips.count == 2)
@@ -633,11 +633,11 @@ struct ScreenRecordingMultitrackEditingTests {
         _ = try fixture.createImage()
         var recognized: URL?
         let transcriber = ScreenRecordingTranscriber(dependencies: .init(authorizationStatus: { .authorized },
-            requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { url, _, complete in
-                recognized = url
-                complete(.success([.init(start: 0.5, end: 1.5, text: "Selected source")]))
-                return {}
-            }, scheduleDeadline: { _ in {} }))
+                                                                         requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { url, _, complete in
+                                                                             recognized = url
+                                                                             complete(.success([.init(start: 0.5, end: 1.5, text: "Selected source")]))
+                                                                             return {}
+                                                                         }, scheduleDeadline: { _ in {} }))
         let model = ScreenRecordingStudioModel(transcriber: transcriber, projectStore: fixture.store)
         defer { model.shutdown() }
         let sound = RecordingMediaAsset(name: "Sound", file: "tone.wav", kind: .audio, duration: 2)
@@ -671,11 +671,11 @@ struct ScreenRecordingMultitrackEditingTests {
         let microphone = try fixture.createTone("microphone.wav")
         var recognized: URL?
         let transcriber = ScreenRecordingTranscriber(dependencies: .init(authorizationStatus: { .authorized },
-            requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { url, _, complete in
-                recognized = url
-                complete(.success([.init(start: 0.25, end: 0.75, text: "Microphone")]))
-                return {}
-            }, scheduleDeadline: { _ in {} }))
+                                                                         requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { url, _, complete in
+                                                                             recognized = url
+                                                                             complete(.success([.init(start: 0.25, end: 0.75, text: "Microphone")]))
+                                                                             return {}
+                                                                         }, scheduleDeadline: { _ in {} }))
         let model = ScreenRecordingStudioModel(transcriber: transcriber, projectStore: fixture.store)
         defer { model.shutdown() }
         var project = fixture.project()

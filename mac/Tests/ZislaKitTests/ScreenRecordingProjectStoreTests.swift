@@ -43,7 +43,7 @@ struct ScreenRecordingProjectStoreTests {
         let outside = sibling.appendingPathComponent("screen.mp4")
         try Data([2]).write(to: outside)
         try FileManager.default.createSymbolicLink(at: directory.appendingPathComponent("screen.mp4"),
-            withDestinationURL: outside)
+                                                   withDestinationURL: outside)
         let store = ScreenRecordingProjectStore(root: root)
 
         #expect(throws: ScreenRecordingProjectError.unsafeMediaPath) {

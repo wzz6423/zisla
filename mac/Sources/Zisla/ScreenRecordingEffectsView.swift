@@ -12,7 +12,7 @@ struct ScreenRecordingEffectsView: View {
             if effects.portrait {
                 ScreenRecordingInspectorSection(AppLocalization.text("人像效果"), symbol: "person.crop.rectangle") {
                     ScreenRecordingPortraitControls(model: model, target: effects.target,
-                        showsPortrait: true, showsVoice: false)
+                                                    showsPortrait: true, showsVoice: false)
                 }
             }
             ScreenRecordingInspectorSection(AppLocalization.text("画布"), symbol: "rectangle.on.rectangle") {
@@ -29,7 +29,7 @@ struct ScreenRecordingEffectsView: View {
                 }
                 .controlSize(.regular)
                 Toggle(AppLocalization.text("自定义背景颜色"), isOn: Binding(get: { model.project?.edits.backgroundColor != nil },
-                    set: { enabled in model.update { $0.edits.backgroundColor = enabled ? .background : nil } }))
+                                                                      set: { enabled in model.update { $0.edits.backgroundColor = enabled ? .background : nil } }))
                 if model.project?.edits.backgroundColor != nil {
                     ScreenRecordingColorPicker(title: "背景颜色", selection: optionalEditBinding(\.backgroundColor, default: .background))
                 }
@@ -45,7 +45,7 @@ struct ScreenRecordingEffectsView: View {
                     .accessibilityIdentifier("screenRecording.cursorTrail")
                 if model.project?.edits.cursorTrail == true {
                     ScreenRecordingColorPicker(title: "轨迹颜色", selection: optionalEditBinding(\.cursorTrailColor,
-                        default: model.project!.edits.effectiveCursorTrailColor))
+                                                                                             default: model.project!.edits.effectiveCursorTrailColor))
                         .accessibilityIdentifier("screenRecording.cursorTrailColor")
                 }
                 Toggle(AppLocalization.text("自动缩放"), isOn: editBinding(\.autoZoom, default: false))
@@ -108,7 +108,7 @@ struct ScreenRecordingEffectsView: View {
                 }
                 if effects.voice {
                     ScreenRecordingPortraitControls(model: model, target: effects.target,
-                        showsPortrait: false, showsVoice: true)
+                                                    showsPortrait: false, showsVoice: true)
                 }
             }
             if let project = model.project, project.cameraFile != nil {
@@ -132,8 +132,9 @@ struct ScreenRecordingEffectsView: View {
                         .accessibilityIdentifier("screenRecording.cameraBorder")
                     ScreenRecordingParameterRow(title: AppLocalization.text("圆角"), value: Binding(
                         get: { project.edits.effectiveCameraCornerRadius },
-                        set: { value in model.update { $0.edits.cameraCornerRadius = value } }), range: 0...0.5,
-                        identifier: "screenRecording.cameraCornerRadius")
+                        set: { value in model.update { $0.edits.cameraCornerRadius = value } }
+                    ), range: 0...0.5,
+                    identifier: "screenRecording.cameraCornerRadius")
                 }
             }
             ScreenRecordingAnnotationsView(model: model)
@@ -193,14 +194,14 @@ struct ScreenRecordingEffectsView: View {
 
     private func parameter(_ title: String, value: Binding<Double>, in range: ClosedRange<Double>) -> some View {
         ScreenRecordingParameterRow(title: AppLocalization.text(title), value: value, range: range,
-            identifier: "screenRecording.effect." + title)
+                                    identifier: "screenRecording.effect." + title)
     }
 
     private func cropField(_ title: String, keyPath: WritableKeyPath<RecordingRect, Double>) -> some View {
         ScreenRecordingNumberField(title: AppLocalization.text(title), value: Binding(get: {
             model.project?.edits.crop?[keyPath: keyPath] ?? 0
         }, set: { value in model.update { $0.edits.crop?[keyPath: keyPath] = value } }),
-            identifier: "screenRecording.crop." + title)
+        identifier: "screenRecording.crop." + title)
     }
 
     private func zoomBinding(_ id: UUID, keyPath: WritableKeyPath<RecordingZoom, Double>) -> Binding<Double> {
@@ -214,6 +215,6 @@ struct ScreenRecordingEffectsView: View {
 
     private func zoomField(_ title: String, id: UUID, keyPath: WritableKeyPath<RecordingZoom, Double>) -> some View {
         ScreenRecordingNumberField(title: AppLocalization.text(title), value: zoomBinding(id, keyPath: keyPath),
-            identifier: "screenRecording.zoomField." + id.uuidString + "." + title)
+                                   identifier: "screenRecording.zoomField." + id.uuidString + "." + title)
     }
 }

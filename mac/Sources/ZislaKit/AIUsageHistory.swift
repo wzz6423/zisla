@@ -4,7 +4,7 @@ import ZislaCore
 public enum AIUsageHistoryPresentation {
     /// Daily aggregates use whole calendar days; a rolling 24-hour cutoff would discard today's midnight row.
     public static func domain(history: AIUsageHistory, range: SystemMetricsHistoryRange, now: Date,
-        calendar: Calendar = .current) -> ClosedRange<Date> {
+                              calendar: Calendar = .current) -> ClosedRange<Date> {
         let today = calendar.startOfDay(for: now)
         let days: Int? = switch range {
         case .day: 1
@@ -24,14 +24,15 @@ public enum AIUsageHistoryPresentation {
         let next = calendar.date(byAdding: .day, value: 1, to: day) ?? day
         let selected = AIUsageHistory(
             usageSamples: history.usageSamples.filter { $0.timestamp >= day && $0.timestamp < next },
-            modelUsageSamples: history.modelUsageSamples.filter { $0.timestamp >= day && $0.timestamp < next })
+            modelUsageSamples: history.modelUsageSamples.filter { $0.timestamp >= day && $0.timestamp < next }
+        )
         return AIUsageAnalytics.dailyModelUsage(history: selected, endingAt: next, calendar: calendar).first
             ?? AIDailyModelUsage(date: day, inputTokens: 0, outputTokens: 0, models: [])
     }
 
     /// Retains endpoints and each bucket's busiest day so long archives stay bounded without hiding their peaks.
     public static func trend(history: AIUsageHistory, domain: ClosedRange<Date>, maximumPoints: Int = 240,
-        calendar: Calendar = .current) -> [UsageBreakdownPoint] {
+                             calendar: Calendar = .current) -> [UsageBreakdownPoint] {
         let lastDay = calendar.date(byAdding: .day, value: -1, to: domain.upperBound) ?? domain.lowerBound
         let days = max(1, (calendar.dateComponents([.day], from: domain.lowerBound, to: lastDay).day ?? 0) + 1)
         let budget = max(3, maximumPoints)
@@ -39,7 +40,7 @@ public enum AIUsageHistoryPresentation {
         if days <= budget {
             let end = Date(timeIntervalSinceReferenceDate: domain.upperBound.timeIntervalSinceReferenceDate.nextDown)
             return AIUsageAnalytics.dailyUsageSeries(samples: samples, endingAt: end,
-                days: days, calendar: calendar)
+                                                     days: days, calendar: calendar)
         }
 
         let daily = AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: calendar)
@@ -57,7 +58,7 @@ public enum AIUsageHistoryPresentation {
         func point(for day: Date, sample: AIUsageSample?) -> UsageBreakdownPoint {
             let next = calendar.date(byAdding: .day, value: 1, to: day) ?? day
             return UsageBreakdownPoint(timestamp: day.addingTimeInterval(next.timeIntervalSince(day) / 2),
-                inputTokens: sample?.inputTokens ?? 0, outputTokens: sample?.outputTokens ?? 0)
+                                       inputTokens: sample?.inputTokens ?? 0, outputTokens: sample?.outputTokens ?? 0)
         }
         var result = [point(for: domain.lowerBound, sample: totals[domain.lowerBound])]
         for offset in stride(from: 1, to: days - 1, by: bucketSize) {
@@ -72,7 +73,7 @@ public enum AIUsageHistoryPresentation {
 
     /// All-history heatmaps page by calendar year instead of shrinking decades of days into subpixel cells.
     public static func heatmap(history: AIUsageHistory, domain: ClosedRange<Date>, year: Date?, now: Date,
-        calendar: Calendar = .current) -> [[ContributionDay?]] {
+                               calendar: Calendar = .current) -> [[ContributionDay?]] {
         var start = domain.lowerBound
         var end = calendar.date(byAdding: .day, value: -1, to: domain.upperBound) ?? now
         if let year, let interval = calendar.dateInterval(of: .year, for: year) {
@@ -85,11 +86,11 @@ public enum AIUsageHistoryPresentation {
         let nextDay = calendar.date(byAdding: .day, value: 1, to: end) ?? domain.upperBound
         let cutoff = Date(timeIntervalSinceReferenceDate: nextDay.timeIntervalSinceReferenceDate.nextDown)
         return AIUsageAnalytics.contributionCalendar(samples: history.usageSamples, endingAt: cutoff,
-            weeks: weeks, calendar: calendar).map { week in
-                week.map { day in
-                    guard let day, day.date >= start else { return nil }
-                    return day
-                }
+                                                     weeks: weeks, calendar: calendar).map { week in
+            week.map { day in
+                guard let day, day.date >= start else { return nil }
+                return day
             }
+        }
     }
 }

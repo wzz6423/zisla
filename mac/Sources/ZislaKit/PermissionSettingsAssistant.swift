@@ -42,7 +42,7 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         self.uptime = uptime
         super.init()
         workspaceNotificationCenter.addObserver(self, selector: #selector(workspaceDidActivate(_:)),
-            name: NSWorkspace.didActivateApplicationNotification, object: nil)
+                                                name: NSWorkspace.didActivateApplicationNotification, object: nil)
     }
 
     static func supportsDragging(for id: OnboardingPermissionID) -> Bool {
@@ -136,7 +136,7 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         cancelPreparation()
         if let panel {
             panel.setFrame(Self.frame(size: panel.frame.size, settingsFrame: settingsFrame,
-                visibleFrame: destination.visibleFrame), display: true)
+                                      visibleFrame: destination.visibleFrame), display: true)
         } else {
             present(settingsFrame: settingsFrame, visibleFrame: destination.visibleFrame)
         }
@@ -183,7 +183,7 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         content.layoutSubtreeIfNeeded()
 
         let helper = PermissionSettingsAssistantPanel(contentRect: NSRect(origin: .zero, size: content.fittingSize),
-            styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel], backing: .buffered, defer: false)
+                                                      styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel], backing: .buffered, defer: false)
         helper.title = AppLocalization.string("权限", language: currentLanguage)
         helper.contentView = content
         helper.isReleasedWhenClosed = false
@@ -194,14 +194,14 @@ final class PermissionSettingsAssistant: NSObject, NSWindowDelegate {
         helper.delegate = self
         panel = helper
         helper.setFrame(Self.frame(size: helper.frame.size, settingsFrame: settingsFrame,
-            visibleFrame: visibleFrame), display: true)
+                                   visibleFrame: visibleFrame), display: true)
         orderFront(helper)
     }
 
     static func frame(size: CGSize, settingsFrame: CGRect?, visibleFrame: CGRect) -> CGRect {
         let gap: CGFloat = 12
         var result = CGRect(origin: CGPoint(x: visibleFrame.maxX - size.width - gap,
-            y: visibleFrame.midY - size.height / 2), size: size)
+                                            y: visibleFrame.midY - size.height / 2), size: size)
         if let settingsFrame {
             result.origin.y = settingsFrame.midY - size.height / 2
             result.origin.x = settingsFrame.maxX + gap

@@ -139,7 +139,7 @@ struct ApplicationOpenFailureMonitorTests {
     func ambiguousAndUnrelatedPathsDoNotPrompt(urls: [URL]) {
         let fixture = Fixture()
         let result = ApplicationOpenFailureMonitor.application(for: fixture.alert(urls: urls),
-            templates: fixture.templates, candidates: [], names: { [$0.deletingPathExtension().lastPathComponent] })
+                                                               templates: fixture.templates, candidates: [], names: { [$0.deletingPathExtension().lastPathComponent] })
         #expect(result == nil)
     }
 
@@ -152,7 +152,7 @@ struct ApplicationOpenFailureMonitorTests {
         var alert = fixture.alert()
         alert.messages = [message]
         #expect(ApplicationOpenFailureMonitor.application(for: alert, templates: fixture.templates,
-            candidates: [], names: { _ in ["Example"] }) == nil)
+                                                          candidates: [], names: { _ in ["Example"] }) == nil)
     }
 
     @Test
@@ -161,10 +161,10 @@ struct ApplicationOpenFailureMonitorTests {
         var alert = fixture.alert()
         alert.messages.append("“Other” is damaged and can’t be opened.")
         #expect(ApplicationOpenFailureMonitor.application(for: alert, templates: fixture.templates,
-            candidates: [], names: { _ in ["Example", "Other"] }) == nil)
+                                                          candidates: [], names: { _ in ["Example", "Other"] }) == nil)
         for template in ["%@", "%@%@", "missing system catalog key"] {
             #expect(ApplicationOpenFailureMonitor.application(for: fixture.alert(), templates: [template],
-                candidates: [], names: { _ in ["Example"] }) == nil)
+                                                              candidates: [], names: { _ in ["Example"] }) == nil)
         }
     }
 
@@ -178,7 +178,7 @@ struct ApplicationOpenFailureMonitorTests {
         var alert = fixture.alert()
         alert.messages = [pair.1]
         #expect(ApplicationOpenFailureMonitor.application(for: alert, templates: [pair.0],
-            candidates: [], names: { _ in ["Example"] }) == fixture.app)
+                                                          candidates: [], names: { _ in ["Example"] }) == fixture.app)
     }
 
     private final class Fixture {
@@ -196,14 +196,14 @@ struct ApplicationOpenFailureMonitorTests {
 
         var dependencies: ApplicationOpenFailureMonitor.Dependencies {
             .init(isTrusted: { self.trusted }, processes: { self.processReads += 1; return self.processes },
-                observeProcesses: { changed in self.processChanged = changed; return { self.processChanged = nil } },
-                observeAlerts: { pid, receive in
-                    guard !self.observerUnavailable else { return nil }
-                    self.callbacks[pid] = receive
-                    return { self.stopped.append(pid); self.callbacks.removeValue(forKey: pid) }
-                },
-                finderSelection: { self.selectionReads += 1; return self.selection },
-                templates: { self.templates }, applicationNames: { [$0.deletingPathExtension().lastPathComponent] })
+                  observeProcesses: { changed in self.processChanged = changed; return { self.processChanged = nil } },
+                  observeAlerts: { pid, receive in
+                      guard !self.observerUnavailable else { return nil }
+                      self.callbacks[pid] = receive
+                      return { self.stopped.append(pid); self.callbacks.removeValue(forKey: pid) }
+                  },
+                  finderSelection: { self.selectionReads += 1; return self.selection },
+                  templates: { self.templates }, applicationNames: { [$0.deletingPathExtension().lastPathComponent] })
         }
 
         func alert(urls: [URL]? = nil) -> ApplicationOpenFailureMonitor.Alert {

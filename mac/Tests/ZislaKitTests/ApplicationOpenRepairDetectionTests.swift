@@ -19,15 +19,15 @@ struct ApplicationOpenRepairDetectionTests {
         let release = DispatchSemaphore(value: 0)
         let task = Task { @MainActor in
             await ClipboardAssistantDetector.detectInBackground(content: .text("echo hello"), enabledKinds: [.shellCommand],
-                shellCommandExists: { _ in
-                    started.continuation.yield(())
-                    #expect(release.wait(timeout: .now() + 10) == .success)
-                    let cancelled = Task.isCancelled
-                    #expect(cancelled)
-                    let needsRepair = ApplicationOpenRepairService.needsRepair(at: app)
-                    #expect(!needsRepair)
-                    return true
-                })
+                                                                shellCommandExists: { _ in
+                                                                    started.continuation.yield(())
+                                                                    #expect(release.wait(timeout: .now() + 10) == .success)
+                                                                    let cancelled = Task.isCancelled
+                                                                    #expect(cancelled)
+                                                                    let needsRepair = ApplicationOpenRepairService.needsRepair(at: app)
+                                                                    #expect(!needsRepair)
+                                                                    return true
+                                                                })
         }
         // The main actor resumes after the detector suspends with its cancellation handler installed.
         for await _ in started.stream {

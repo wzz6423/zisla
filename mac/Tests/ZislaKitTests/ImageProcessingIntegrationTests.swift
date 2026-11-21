@@ -8,11 +8,11 @@ import UniformTypeIdentifiers
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_IMAGE_TOOLS_INTEGRATION"] == "1"))
 struct ImageProcessingIntegrationTests {
     #if arch(arm64)
-    private let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/opt/homebrew/bin/vips"),
-                                                avifExecutableURL: URL(fileURLWithPath: "/opt/homebrew/bin/avifenc"))
+        private let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/opt/homebrew/bin/vips"),
+                                                     avifExecutableURL: URL(fileURLWithPath: "/opt/homebrew/bin/avifenc"))
     #else
-    private let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/usr/local/bin/vips"),
-                                                avifExecutableURL: URL(fileURLWithPath: "/usr/local/bin/avifenc"))
+        private let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/usr/local/bin/vips"),
+                                                     avifExecutableURL: URL(fileURLWithPath: "/usr/local/bin/avifenc"))
     #endif
 
     @Test
@@ -110,8 +110,8 @@ struct ImageProcessingIntegrationTests {
             }
             let provider = try #require(CGDataProvider(data: Data(pixels) as CFData))
             let image = try #require(CGImage(width: 120, height: 40, bitsPerComponent: 8, bitsPerPixel: 32,
-                bytesPerRow: 120 * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+                                             bytesPerRow: 120 * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                             provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
             CGImageDestinationAddImage(destination, image, [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGDelayTime: 0.1]] as CFDictionary)
         }
         #expect(CGImageDestinationFinalize(destination))
@@ -129,7 +129,7 @@ struct ImageProcessingIntegrationTests {
             var pixels = [UInt8](repeating: 0, count: 40 * 40 * 4)
             try pixels.withUnsafeMutableBytes { buffer in
                 let context = try #require(CGContext(data: buffer.baseAddress, width: 40, height: 40, bitsPerComponent: 8,
-                    bytesPerRow: 40 * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                     bytesPerRow: 40 * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
                 context.draw(image, in: CGRect(x: 0, y: 0, width: 40, height: 40))
             }
             #expect(pixels[(20 * 40 + 20) * 4] > 220, "The stationary centre marker must stay inside every crop")
@@ -207,7 +207,7 @@ struct ImageProcessingIntegrationTests {
             kCGImagePropertyExifDictionary: [kCGImagePropertyExifDateTimeOriginal: "2026:01:02 03:04:05"],
             kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFCopyright: "Fixture copyright"],
             kCGImagePropertyGPSDictionary: [kCGImagePropertyGPSLatitude: 12.5, kCGImagePropertyGPSLatitudeRef: "N",
-                                           kCGImagePropertyGPSLongitude: 22.5, kCGImagePropertyGPSLongitudeRef: "E"],
+                                            kCGImagePropertyGPSLongitude: 22.5, kCGImagePropertyGPSLongitudeRef: "E"],
         ])
         let batch = try await service.process([source], options: .init(formats: [.png, .jpeg, .webp, .avif, .jpegXL], preserveMetadata: preserve))
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
@@ -321,8 +321,8 @@ struct ImageProcessingIntegrationTests {
         var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try pixels.withUnsafeMutableBytes { buffer in
             let context = try #require(CGContext(data: buffer.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         #expect(pixels[0] > 220)

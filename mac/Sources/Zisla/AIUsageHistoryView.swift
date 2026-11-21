@@ -23,7 +23,7 @@ final class AIUsageHistoryController: ObservableObject {
 
     convenience init(monitor: AIStateMonitor) {
         self.init(read: { try await monitor.readUsageHistory() }, clear: { try await monitor.clearUsageHistory() },
-            write: AIUsageHistoryExporter.write)
+                  write: AIUsageHistoryExporter.write)
         revisionObservation = monitor.$usageHistoryRevision.dropFirst().sink { [weak self] _ in
             Task { @MainActor [weak self] in await self?.load() }
         }
@@ -31,7 +31,7 @@ final class AIUsageHistoryController: ObservableObject {
 
     /// Injected actions keep save-panel and database failures testable without opening windows or touching user data.
     init(read: @escaping () async throws -> AIUsageHistory, clear: @escaping () async throws -> Void,
-        write: @escaping (AIUsageHistory, URL) async throws -> Void) {
+         write: @escaping (AIUsageHistory, URL) async throws -> Void) {
         self.read = read
         self.clear = clear
         self.write = write
@@ -130,7 +130,7 @@ struct AIUsageHistoryPanelPresenter: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.update(requestID: presentationState.requestID, dismiss: presentationState.dismiss,
-            controller: controller, languageStore: languageStore, hostWindow: nsView.window)
+                                   controller: controller, languageStore: languageStore, hostWindow: nsView.window)
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) { coordinator.dismiss() }
@@ -145,11 +145,11 @@ struct AIUsageHistoryPanelPresenter: NSViewRepresentable {
         init(window: SystemMetricsHistoryPanel? = nil) { self.window = window }
 
         func update(requestID: UUID?, dismiss: @escaping () -> Void, controller: AIUsageHistoryController,
-            languageStore: AppLanguageStore, hostWindow: NSWindow?) {
+                    languageStore: AppLanguageStore, hostWindow: NSWindow?) {
             guard let requestID else { awaitingDismissal = false; self.dismiss(); return }
             if window == nil {
                 let window = SystemMetricsHistoryPanel(contentRect: CGRect(x: 0, y: 0, width: 760, height: 480),
-                    styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+                                                       styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
                 window.title = AppLocalization.text("AI 用量历史")
                 window.isReleasedWhenClosed = false
                 window.hidesOnDeactivate = false
@@ -157,7 +157,7 @@ struct AIUsageHistoryPanelPresenter: NSViewRepresentable {
                 window.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]
                 window.contentMinSize = CGSize(width: 620, height: 360)
                 window.contentView = NSHostingView(rootView: AppLanguageEnvironment(languageStore: languageStore,
-                    content: AIUsageHistoryContent(controller: controller)))
+                                                                                    content: AIUsageHistoryContent(controller: controller)))
                 self.window = window
             }
             guard let window else { return }
@@ -169,7 +169,7 @@ struct AIUsageHistoryPanelPresenter: NSViewRepresentable {
             let isNewRequest = requestID != handledRequestID
             handledRequestID = requestID
             guard isNewRequest || SystemCleanupPanel.shouldOrderFront(isVisible: window.isVisible,
-                isMiniaturized: window.isMiniaturized, isAwaitingDismissalState: awaitingDismissal) else { return }
+                                                                      isMiniaturized: window.isMiniaturized, isAwaitingDismissalState: awaitingDismissal) else { return }
             WindowPlacement.center(window, on: hostWindow?.screen)
             window.present(over: hostWindow)
         }
@@ -270,7 +270,7 @@ struct AIUsageHistoryContent: View {
                             Button(AppLocalization.string("重试", locale: locale)) { Task { await controller.load() } }
                         }
                         UsageTrendChart(series: AIUsageHistoryPresentation.trend(history: controller.history, domain: domain),
-                            selectedDate: $selectedDate, domain: domain).frame(height: 180)
+                                        selectedDate: $selectedDate, domain: domain).frame(height: 180)
                         heatmap
                         if let selectedDate {
                             DailyModelUsageList(day: AIUsageHistoryPresentation.selectedDay(in: controller.history, date: selectedDate))

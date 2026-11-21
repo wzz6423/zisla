@@ -68,63 +68,63 @@ final class MailBodyWebView: WKWebView, WKNavigationDelegate {
         guard lastHTML != html else { return }
         lastHTML = html
         loadHTMLString("""
-            <!doctype html><html><head><meta charset="utf-8">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-            <style>
-            \(ThinScrollChrome.webStyle)
-            body { margin: 12px; font: 14px -apple-system, sans-serif; overflow-wrap: anywhere; }
-            a { color: #4aa3ff; }
-            img { max-width: 100%; height: auto; }
-            table { max-width: 100%; width: auto; }
-            </style></head><body>\(html)</body></html>
-            """, baseURL: nil)
+        <!doctype html><html><head><meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+        <style>
+        \(ThinScrollChrome.webStyle)
+        body { margin: 12px; font: 14px -apple-system, sans-serif; overflow-wrap: anywhere; }
+        a { color: #4aa3ff; }
+        img { max-width: 100%; height: auto; }
+        table { max-width: 100%; width: auto; }
+        </style></head><body>\(html)</body></html>
+        """, baseURL: nil)
     }
 
     // Sender templates often put their paper color on nested tables, not just the body.
     // Adapt neutral surfaces in an isolated world without enabling scripts from the email.
     private static let glassAppearanceScript = #"""
-        (() => {
-          const color = value => {
-            const match = value.match(/^rgba?\(([\d.,\s]+)\)$/);
-            if (!match) return null;
-            const channels = match[1].split(',').map(Number);
-            return { neutral: Math.max(...channels.slice(0, 3)) - Math.min(...channels.slice(0, 3)) <= 32,
-                     dark: Math.max(...channels.slice(0, 3)) < 192,
-                     alpha: channels[3] ?? 1 };
-          };
-          const accented = new WeakSet();
-          for (const element of document.querySelectorAll('*')) {
-            if (!(element instanceof HTMLElement)) continue;
-            const style = getComputedStyle(element);
-            const background = color(style.backgroundColor);
-            const foreground = color(style.color);
-            const root = element === document.documentElement || element === document.body;
-            if (!root && (accented.has(element.parentElement) || (background && !background.neutral && background.alpha > 0))) {
-              accented.add(element);
-              continue;
-            }
-            if (root || (background?.neutral && background.alpha > 0)) {
-              element.style.setProperty('background', 'transparent', 'important');
-            }
-            if (foreground?.neutral && foreground.dark && foreground.alpha > 0) {
-              element.style.setProperty('color', 'rgba(255,255,255,0.92)', 'important');
-            }
-          }
-        })();
-        """#
+    (() => {
+      const color = value => {
+        const match = value.match(/^rgba?\(([\d.,\s]+)\)$/);
+        if (!match) return null;
+        const channels = match[1].split(',').map(Number);
+        return { neutral: Math.max(...channels.slice(0, 3)) - Math.min(...channels.slice(0, 3)) <= 32,
+                 dark: Math.max(...channels.slice(0, 3)) < 192,
+                 alpha: channels[3] ?? 1 };
+      };
+      const accented = new WeakSet();
+      for (const element of document.querySelectorAll('*')) {
+        if (!(element instanceof HTMLElement)) continue;
+        const style = getComputedStyle(element);
+        const background = color(style.backgroundColor);
+        const foreground = color(style.color);
+        const root = element === document.documentElement || element === document.body;
+        if (!root && (accented.has(element.parentElement) || (background && !background.neutral && background.alpha > 0))) {
+          accented.add(element);
+          continue;
+        }
+        if (root || (background?.neutral && background.alpha > 0)) {
+          element.style.setProperty('background', 'transparent', 'important');
+        }
+        if (foreground?.neutral && foreground.dark && foreground.alpha > 0) {
+          element.style.setProperty('color', 'rgba(255,255,255,0.92)', 'important');
+        }
+      }
+    })();
+    """#
 
     // WebKit reports scripted target=_blank HTTP(S) clicks as automatic navigation on macOS 26.
     // Capture trusted and synthetic anchor clicks in our isolated world, then reuse native URL policy.
     private static let linkInterceptionScript = """
-        document.addEventListener("click", event => {
-          const target = event.target;
-          if (!(target instanceof Element)) return;
-          const anchor = target.closest("a[href]");
-          if (!anchor) return;
-          event.preventDefault();
-          window.webkit.messageHandlers.\(MailBodyWebView.linkMessageHandlerName).postMessage(anchor.href);
-        }, true);
-        """
+    document.addEventListener("click", event => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (!anchor) return;
+      event.preventDefault();
+      window.webkit.messageHandlers.\(MailBodyWebView.linkMessageHandlerName).postMessage(anchor.href);
+    }, true);
+    """
 
     func webView(
         _ webView: WKWebView,

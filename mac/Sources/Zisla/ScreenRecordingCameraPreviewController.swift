@@ -99,10 +99,10 @@ final class ScreenRecordingCameraPreviewController {
                 $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
             }) ?? panel.screen ?? NSScreen.main else { return }
             let resized = ScreenRecordingCameraPreviewLayout.resize(frame: frame, corner: corner,
-                translation: translation, visibleFrame: screen.visibleFrame)
+                                                                    translation: translation, visibleFrame: screen.visibleFrame)
             configuration.cameraSize = resized.size
             panel.setFrame(resized.frame.insetBy(dx: -ScreenRecordingCameraPreviewLayout.controlsInset,
-                                                dy: -ScreenRecordingCameraPreviewLayout.controlsInset).integral, display: true)
+                                                 dy: -ScreenRecordingCameraPreviewLayout.controlsInset).integral, display: true)
             changeSize(resized.size)
         }
         preview.onCornerRadiusChange = { [weak self] radius in
@@ -123,7 +123,7 @@ final class ScreenRecordingCameraPreviewController {
         if !placed, let screen = screen ?? NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main {
             let frame = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration, visibleFrame: screen.visibleFrame)
             panel.setFrame(frame.insetBy(dx: -ScreenRecordingCameraPreviewLayout.controlsInset,
-                                        dy: -ScreenRecordingCameraPreviewLayout.controlsInset).integral, display: false)
+                                         dy: -ScreenRecordingCameraPreviewLayout.controlsInset).integral, display: false)
             placed = true
         }
         update(configuration: configuration)
@@ -137,10 +137,10 @@ final class ScreenRecordingCameraPreviewController {
         self.configuration = configuration
         if layoutChanged, let screen = panel.screen ?? NSScreen.main {
             let frame = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration,
-                visibleFrame: screen.visibleFrame,
-                center: positionChanged ? nil : CGPoint(x: panel.frame.midX, y: panel.frame.midY))
+                                                                 visibleFrame: screen.visibleFrame,
+                                                                 center: positionChanged ? nil : CGPoint(x: panel.frame.midX, y: panel.frame.midY))
             panel.setFrame(frame.insetBy(dx: -ScreenRecordingCameraPreviewLayout.controlsInset,
-                                        dy: -ScreenRecordingCameraPreviewLayout.controlsInset).integral, display: true)
+                                         dy: -ScreenRecordingCameraPreviewLayout.controlsInset).integral, display: true)
         }
         refresh(session: capture.cameraPreviewSession, state: capture.cameraPreviewState)
     }
@@ -291,7 +291,7 @@ final class ScreenRecordingCameraPreviewView: NSView {
             onResize?(corner, frame, CGSize(width: point.x - origin.x, height: point.y - origin.y))
         case let .cornerRadius(radius, side, origin):
             onCornerRadiusChange?(ScreenRecordingCameraPreviewLayout.cornerRadius(start: radius,
-                translation: point.x - origin.x, side: side))
+                                                                                  translation: point.x - origin.x, side: side))
         }
     }
 

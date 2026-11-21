@@ -56,24 +56,28 @@ environment = dict(os.environ,
         for directory in ("Frameworks", "PrivateFrameworks")),
     DYLD_LIBRARY_PATH=str(platform / "Developer/usr/lib"), DYLD_INSERT_LIBRARIES=str(library),
     HOME=str(temporary), CFFIXED_USER_HOME=str(temporary), TMPDIR=str(temporary) + "/")
+bundles = {}
 for candidate in sorted(binary_directory.glob("*.xctest")):
     bundle = candidate / "Contents/MacOS" / candidate.stem
     tests = subprocess.check_output([str(host), "--test-bundle-path", str(bundle), "--list-tests"],
         env=environment, text=True)
-    if any(test.startswith("ZislaKitTests.") for test in tests.splitlines()):
-        break
-else:
-    sys.exit("No ZislaKitTests test bundle found")
+    for target in ("ZislaKitTests", "ZislaTests"):
+        if any(test.startswith(target + ".") for test in tests.splitlines()):
+            bundles[target] = bundle
+for target in ("ZislaKitTests", "ZislaTests"):
+    if target not in bundles:
+        sys.exit(f"No {target} test bundle found")
 filters = (
-    r"^ZislaKitTests.SystemMonitorServiceTests/(?:inFlightSamplesCannotWriteAcrossHistoryLifecycleChanges|concurrentSampleRequestsShareOneInFlightTask)",
-    r"^ZislaKitTests.DownloadServiceTests/serviceRunsSeparateDownloadTasksConcurrently",
+    ("ZislaKitTests", r"^ZislaKitTests.SystemMonitorServiceTests/(?:inFlightSamplesCannotWriteAcrossHistoryLifecycleChanges|concurrentSampleRequestsShareOneInFlightTask)"),
+    ("ZislaKitTests", r"^ZislaKitTests.DownloadServiceTests/serviceRunsSeparateDownloadTasksConcurrently"),
+    ("ZislaTests", r"^ZislaTests.AIAccountBalanceCookieInputTests(?:/|$)"),
 )
-for index, pattern in enumerate(filters):
+for index, (target, pattern) in enumerate(filters):
     log = temporary / f"{index}.log"
     with log.open("w") as output:
         process = subprocess.Popen(["zsh", str(root / "Scripts/swift-test.sh"), "--runner", "/usr/bin/env",
             *(f"{key}={value}" for key, value in environment.items() if key.startswith("DYLD_")),
-            str(host), "--test-bundle-path", str(bundle), "--filter", pattern],
+            str(host), "--test-bundle-path", str(bundles[target]), "--filter", pattern],
             env={key: value for key, value in environment.items() if not key.startswith("DYLD_")},
             stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
         try:
@@ -90,5 +94,5 @@ for index, pattern in enumerate(filters):
         sys.exit(f"Cooperative-pool regression failed ({result}): {pattern}")
     if marker not in text:
         sys.exit("The cooperative-pool limit was not applied")
-print("PASS: hardware lifecycle, shared sampling, and simultaneous downloads finish with two cooperative workers")
+print("PASS: hardware lifecycle, shared sampling, simultaneous downloads, and Cookie persistence finish with two cooperative workers")
 PYTHON

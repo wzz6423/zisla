@@ -38,7 +38,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                 }
                 let center = Double(try #require(columns.min()) + #require(columns.max())) / 2
                 #expect(abs(center - 119) <= 3,
-                    "Header is off center: \(percentage), \(textScale), pixel center \(center)")
+                        "Header is off center: \(percentage), \(textScale), pixel center \(center)")
             }
         }
     }
@@ -156,7 +156,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                             expected = value ? .percentage : .empty
                         }
                         #expect(MenuBarIconMappings.batteryGapContent(status.battery,
-                            options: MenuBarIconBatteryOptions(appearance: appearance)) == expected)
+                                                                      options: MenuBarIconBatteryOptions(appearance: appearance)) == expected)
                     }
                 }
             }
@@ -229,9 +229,9 @@ struct SystemMonitorMenuBarIconBehaviorTests {
             }.count
         }
         #expect(splitRowCount(in: top..<(top + bandHeight)) > 0,
-            "Two separated plug pins must face upward at text scale \(textScale)")
+                "Two separated plug pins must face upward at text scale \(textScale)")
         #expect(splitRowCount(in: (bottom - bandHeight + 1)..<(bottom + 1)) == 0,
-            "The single power cord must face downward at text scale \(textScale)")
+                "The single power cord must face downward at text scale \(textScale)")
     }
 
     @Test
@@ -282,7 +282,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                             #expect(glyph.x > 0 && glyph.x < CGFloat(rep.pixelsWide - 1))
                             for arc in ring {
                                 #expect(hypot(glyph.x - arc.x, glyph.y - arc.y) >= sqrt(2),
-                                    "Header touches ring: \(percentage), charging \(charging), indicator \(indicator), \(textScale), \(stroke), glyph \(glyph), arc \(arc)")
+                                        "Header touches ring: \(percentage), charging \(charging), indicator \(indicator), \(textScale), \(stroke), glyph \(glyph), arc \(arc)")
                             }
                         }
                     }
@@ -337,14 +337,14 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                     let value = try inkBounds(Array(separator..<rep.pixelsWide))
                     #expect(glyph.maxX < value.minX, "Charging glyph and percentage must have separate ink bounds")
                     #expect(value.height >= 42 * textScale / 1.98,
-                        "Connected percentage is too small: \(percentage), \(charging), \(textScale), height \(value.height)")
+                            "Connected percentage is too small: \(percentage), \(charging), \(textScale), height \(value.height)")
                     #expect(glyph.minY > 0, "Power glyph must not clip against the top of the icon")
                     bounds.append((glyph, value))
                 }
                 #expect(bounds[1].glyph.height > bounds[0].glyph.height * 1.1,
-                    "Charging glyph must grow when the slider moves from 1.62 to 1.88")
+                        "Charging glyph must grow when the slider moves from 1.62 to 1.88")
                 #expect(bounds[1].value.height > bounds[0].value.height * 1.1,
-                    "Percentage must grow together with its charging glyph")
+                        "Percentage must grow together with its charging glyph")
                 #expect(bounds[2].glyph.height > bounds[1].glyph.height)
                 #expect(bounds[2].value.height > bounds[1].value.height)
             }

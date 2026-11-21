@@ -57,7 +57,7 @@ struct ScreenRecordingVoiceMediaTests {
         _ = try await fixture.createVideo()
         await #expect(throws: ScreenRecordingExportError.unavailableMedia) {
             _ = try await media.asset(from: AVURLAsset(url: fixture.directory.appendingPathComponent("screen.mp4")),
-                effects: .init(preset: .natural, amount: 1))
+                                      effects: .init(preset: .natural, amount: 1))
         }
         #expect(try Data(contentsOf: url) == before)
         #expect(try fixture.files() == ["screen.mp4", "tone.wav"])
@@ -120,11 +120,11 @@ struct ScreenRecordingVoiceMediaTests {
         let preview = try await samples(playback.asset, mix: playback.audioMix)
         let wav = fixture.root.appendingPathComponent("voice.wav")
         try await exporter.export(project: project, directory: fixture.directory, to: wav,
-            configuration: .init(format: .wav, resolution: .source, frameRate: 8))
+                                  configuration: .init(format: .wav, resolution: .source, frameRate: 8))
         let audio = try await samples(AVURLAsset(url: wav))
         let mp4 = fixture.root.appendingPathComponent("voice.mp4")
         try await exporter.export(project: project, directory: fixture.directory, to: mp4,
-            configuration: .init(format: .mp4, resolution: .source, frameRate: 8))
+                                  configuration: .init(format: .mp4, resolution: .source, frameRate: 8))
         let video = try await samples(AVURLAsset(url: mp4))
         #expect(abs(try await playback.asset.load(.duration).seconds - 0.5) < 0.001)
         #expect(preview.count == 24_000 && audio.count == 24_000, "Playback and WAV must retain the edited half-second")
@@ -135,14 +135,14 @@ struct ScreenRecordingVoiceMediaTests {
         let audioWindow = Array(audio.dropFirst(4_800).prefix(14_400))
         let videoWindow = Array(video.dropFirst(4_800).prefix(14_400))
         try #require(previewWindow.count == 14_400 && audioWindow.count == 14_400 && videoWindow.count == 14_400,
-            "Playback and both exports must cover the same 0.1–0.4 second window")
+                     "Playback and both exports must cover the same 0.1–0.4 second window")
         let previewEnergy = energy(previewWindow)
         let audioEnergy = energy(audioWindow)
         #expect(abs(previewEnergy - audioEnergy) < 0.002,
-            "Preview energy \(previewEnergy) and WAV energy \(audioEnergy) must match before the spectral EOF tail")
+                "Preview energy \(previewEnergy) and WAV energy \(audioEnergy) must match before the spectral EOF tail")
         let videoEnergy = energy(videoWindow)
         #expect(abs(videoEnergy - audioEnergy) < 0.01,
-            "MP4 energy \(videoEnergy) and WAV energy \(audioEnergy) must match before the spectral EOF tail")
+                "MP4 energy \(videoEnergy) and WAV energy \(audioEnergy) must match before the spectral EOF tail")
         project.edits.voiceEffects = .init()
         let plain = try await exporter.playbackItem(project: project, directory: fixture.directory)
         let plainSamples = try await samples(plain.asset, mix: plain.audioMix)
@@ -195,15 +195,15 @@ struct ScreenRecordingVoiceMediaTests {
                 }
             }
             var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 48_000),
-                presentationTimeStamp: CMTime(value: Int64(12_000 + start), timescale: 48_000), decodeTimeStamp: .invalid)
+                                            presentationTimeStamp: CMTime(value: Int64(12_000 + start), timescale: 48_000), decodeTimeStamp: .invalid)
             var size = Int(format.streamDescription.pointee.mBytesPerFrame)
             var sample: CMSampleBuffer?
             try #require(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: nil,
-                formatDescription: format.formatDescription, sampleCount: 2_400, sampleTimingEntryCount: 1,
-                sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample) == noErr)
+                                                   formatDescription: format.formatDescription, sampleCount: 2_400, sampleTimingEntryCount: 1,
+                                                   sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample) == noErr)
             let packet = try #require(sample)
             try #require(CMSampleBufferSetDataBufferFromAudioBufferList(packet, blockBufferAllocator: kCFAllocatorDefault,
-                blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: buffer.audioBufferList) == noErr)
+                                                                        blockBufferMemoryAllocator: kCFAllocatorDefault, flags: 0, bufferList: buffer.audioBufferList) == noErr)
             try #require(input.append(packet))
         }
         input.markAsFinished()
@@ -236,7 +236,7 @@ struct ScreenRecordingVoiceMediaTests {
             let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(current.numSamples)))
             buffer.frameLength = buffer.frameCapacity
             try #require(CMSampleBufferCopyPCMDataIntoAudioBufferList(current, at: 0, frameCount: Int32(current.numSamples),
-                into: buffer.mutableAudioBufferList) == noErr)
+                                                                      into: buffer.mutableAudioBufferList) == noErr)
             let values = try #require(buffer.mutableAudioBufferList.pointee.mBuffers.mData).assumingMemoryBound(to: Float.self)
             for frame in 0..<current.numSamples {
                 for channel in channels.indices { channels[channel].append(values[frame * channels.count + channel]) }

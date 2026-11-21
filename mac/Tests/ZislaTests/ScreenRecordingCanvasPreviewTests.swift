@@ -23,7 +23,7 @@ struct ScreenRecordingCanvasPreviewTests {
         defer { media.remove() }
         _ = try await media.createVideo(size: dimensions.source, duration: 0.125)
         var project = ScreenRecordingProject(name: "Preview quality", videoFile: "screen.mp4", duration: 0.125,
-            width: Int(dimensions.source.width), height: Int(dimensions.source.height))
+                                             width: Int(dimensions.source.width), height: Int(dimensions.source.height))
         project.edits.background = .none
         project.edits.showCursor = false
         project.edits.clickEffects = false
@@ -37,12 +37,12 @@ struct ScreenRecordingCanvasPreviewTests {
         #expect(model.errorMessage == nil)
         let paused = try #require(model.canvasPreview)
         #expect(CGSize(width: paused.width, height: paused.height) == dimensions.expected,
-            "Paused editing must retain Full HD detail while capping large sources and preserving small ones")
+                "Paused editing must retain Full HD detail while capping large sources and preserving small ones")
 
         let item = try await exporter.playbackItem(project: project, directory: media.directory)
         let composition = try #require(item.videoComposition)
         #expect(composition.renderSize == dimensions.expected,
-            "Playback and paused editing must use the same bounded preview resolution")
+                "Playback and paused editing must use the same bounded preview resolution")
         #expect(composition.frameDuration == CMTime(value: 1, timescale: 30))
         let generator = AVAssetImageGenerator(asset: item.asset)
         generator.videoComposition = composition
@@ -59,7 +59,7 @@ struct ScreenRecordingCanvasPreviewTests {
         defer { media.remove() }
         _ = try await media.createVideo(size: .init(width: 1_920, height: 1_080), duration: 0.125)
         var project = ScreenRecordingProject(name: "Cropped portrait", videoFile: "screen.mp4", duration: 0.125,
-            width: 1_920, height: 1_080)
+                                             width: 1_920, height: 1_080)
         project.edits.background = .none
         project.edits.showCursor = false
         project.edits.clickEffects = false
@@ -75,7 +75,7 @@ struct ScreenRecordingCanvasPreviewTests {
         #expect(model.errorMessage == nil)
         let paused = try #require(model.canvasPreview)
         #expect(CGSize(width: paused.width, height: paused.height) == CGSize(width: 608, height: 1_080),
-            "Preview quality must retain the cropped canvas aspect and even pixel dimensions")
+                "Preview quality must retain the cropped canvas aspect and even pixel dimensions")
         let item = try await exporter.playbackItem(project: project, directory: media.directory)
         #expect(item.videoComposition?.renderSize == CGSize(width: 608, height: 1_080))
         #expect(model.project == project)
@@ -155,7 +155,7 @@ struct ScreenRecordingCanvasPreviewTests {
         for fontSize in [0.03, 0.09] {
             var project = fixture()
             project.captions = [.init(start: 0, end: 2, text: "MMMM",
-                layout: .init(x: 0.1, y: 0.2, width: 0.8, height: 0.5), fontSize: fontSize)]
+                                      layout: .init(x: 0.1, y: 0.2, width: 0.8, height: 0.5), fontSize: fontSize)]
             let output = try RecordingExportRenderer(project: project, size: CGSize(width: 400, height: 300))
                 .image(screen: CIImage(cgImage: base), camera: nil, sourceTime: 0)
             let pixels = try bytes(output)
@@ -200,8 +200,8 @@ struct ScreenRecordingCanvasPreviewTests {
         var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try pixels.withUnsafeMutableBytes { pointer in
             let context = try #require(CGContext(data: pointer.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         return pixels

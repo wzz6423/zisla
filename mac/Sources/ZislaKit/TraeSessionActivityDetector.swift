@@ -131,9 +131,9 @@ public final class TraeSessionActivityDetector: AIActivityDetecting {
     private func recentLogFiles() -> [Candidate] {
         guard fileManager.fileExists(atPath: logsRoot.path),
               let sessionDirs = try? fileManager.contentsOfDirectory(
-                at: logsRoot,
-                includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
-                options: [.skipsHiddenFiles]
+                  at: logsRoot,
+                  includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -143,7 +143,7 @@ public final class TraeSessionActivityDetector: AIActivityDetecting {
                 var isDir: ObjCBool = false
                 guard fileManager.fileExists(atPath: dir.path, isDirectory: &isDir),
                       isDir.boolValue else { return false }
-                return dir.lastPathComponent.count == 15  // e.g. "20260723T174155"
+                return dir.lastPathComponent.count == 15 // e.g. "20260723T174155"
             }
             .sorted { $0.lastPathComponent > $1.lastPathComponent }
 

@@ -44,7 +44,7 @@ func run(arguments: [String]) -> Int32 {
         command = try CLIParser.parse(arguments: arguments)
     } catch let error as CLIParseError {
         printError("错误：\(error.description)")
-        return 64  // EX_USAGE
+        return 64 // EX_USAGE
     } catch {
         printError("错误：\(error.localizedDescription)")
         return 64
@@ -73,7 +73,7 @@ func run(arguments: [String]) -> Int32 {
                 print("已移除任务 \(id)")
             } else {
                 printError("错误：未找到任务 \(id)")
-                return 65  // EX_DATAERR
+                return 65 // EX_DATAERR
             }
 
         case .clear:
@@ -120,7 +120,7 @@ func run(arguments: [String]) -> Int32 {
         return 65
     } catch {
         printError("错误：\(error.localizedDescription)")
-        return 70  // EX_SOFTWARE
+        return 70 // EX_SOFTWARE
     }
 }
 

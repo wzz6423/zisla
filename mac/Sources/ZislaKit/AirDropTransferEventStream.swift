@@ -54,18 +54,18 @@ final class AirDropTransferEventStream {
     func start() -> Bool {
         guard connection == nil else { return true }
         guard Bundle(path: "/System/Library/PrivateFrameworks/Sharing.framework")?.load() == true,
-            let invocationProtocol = NSProtocolFromString("SFXPCInvocationProtocol"),
-            let sequenceProtocol = NSProtocolFromString("Sharing._SFXPCAsyncSequenceContainerProtocol"),
-            let iteratorProtocol = NSProtocolFromString("Sharing._SFXPCAsyncIteratorProtocol"),
-            let blockProtocol = NSProtocolFromString("_SFXPCBlockContainerProtocol"),
-            let invocationClass = NSClassFromString("SFAirDropInvocationTransfersMonitor") as? NSSecureCoding.Type
+              let invocationProtocol = NSProtocolFromString("SFXPCInvocationProtocol"),
+              let sequenceProtocol = NSProtocolFromString("Sharing._SFXPCAsyncSequenceContainerProtocol"),
+              let iteratorProtocol = NSProtocolFromString("Sharing._SFXPCAsyncIteratorProtocol"),
+              let blockProtocol = NSProtocolFromString("_SFXPCBlockContainerProtocol"),
+              let invocationClass = NSClassFromString("SFAirDropInvocationTransfersMonitor") as? NSSecureCoding.Type
         else { return false }
 
         let archive = NSKeyedArchiver(requiringSecureCoding: true)
         archive.encode("TransfersMonitor", forKey: "name")
         archive.finishEncoding()
         guard let coder = try? NSKeyedUnarchiver(forReadingFrom: archive.encodedData),
-            let invocation = invocationClass.init(coder: coder)
+              let invocation = invocationClass.init(coder: coder)
         else { return false }
         coder.finishDecoding()
 
@@ -134,8 +134,8 @@ final class AirDropTransferEventStream {
     private func makeIterator(reply: Reply, session: UUID) {
         guard session == generation else { return }
         guard !reply.failed, let data = reply.data, let sequence = reply.object,
-            let payload = try? JSONSerialization.jsonObject(with: data) as? [String: String],
-            let identifier = payload["uuid"].flatMap(NSUUID.init(uuidString:))
+              let payload = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+              let identifier = payload["uuid"].flatMap(NSUUID.init(uuidString:))
         else { stop(session: session); return }
 
         // The container must outlive the asynchronous request, or XPC releases the remote iterator.

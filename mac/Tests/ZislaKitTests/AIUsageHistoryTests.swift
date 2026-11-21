@@ -97,12 +97,12 @@ struct AIUsageHistoryTests {
         let today = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 11)))
         let tomorrow = try #require(calendar.date(byAdding: .day, value: 1, to: today))
         let samples = [sample(at: today.addingTimeInterval(8 * 3600), input: 10),
-            sample(at: tomorrow.addingTimeInterval(-0.25), input: 20), sample(at: tomorrow, input: 99)]
+                       sample(at: tomorrow.addingTimeInterval(-0.25), input: 20), sample(at: tomorrow, input: 99)]
         let history = AIUsageHistory(usageSamples: samples, modelUsageSamples: samples)
         let domain = AIUsageHistoryPresentation.domain(history: history, range: range, now: today, calendar: calendar)
         let trend = AIUsageHistoryPresentation.trend(history: history, domain: domain, calendar: calendar)
         let heatmap = AIUsageHistoryPresentation.heatmap(history: history, domain: domain,
-            year: range == .all ? today : nil, now: today, calendar: calendar).flatMap { $0 }.compactMap { $0 }
+                                                         year: range == .all ? today : nil, now: today, calendar: calendar).flatMap { $0 }.compactMap { $0 }
         let selected = AIUsageHistoryPresentation.selectedDay(in: history, date: today, calendar: calendar)
         #expect(trend.last?.totalTokens == 34 && heatmap.last?.tokens == 34 && selected.totalTokens == 34)
         #expect(selected.models.first?.totalTokens == 34)
@@ -114,7 +114,7 @@ struct AIUsageHistoryTests {
         let date = Date(timeIntervalSince1970: 1_800_000_000)
         let model = "=SUM(A1)&<model>\u{0001}🧪"
         let history = AIUsageHistory(usageSamples: [sample(at: date, input: 20)],
-            modelUsageSamples: [sample(at: date, input: 10, model: model)])
+                                     modelUsageSamples: [sample(at: date, input: 10, model: model)])
         let parts = try extract(AIUsageHistoryExport.workbookData(history: history, timeZone: calendar.timeZone))
         #expect(parts.count == 6)
         let totals = try #require(parts["xl/worksheets/sheet1.xml"])
@@ -135,7 +135,7 @@ struct AIUsageHistoryTests {
         let history = AIUsageHistory(usageSamples: samples, modelUsageSamples: samples)
         let utc = try extract(AIUsageHistoryExport.workbookData(history: history, timeZone: calendar.timeZone))
         let shanghai = try extract(AIUsageHistoryExport.workbookData(history: history,
-            timeZone: try #require(TimeZone(identifier: "Asia/Shanghai"))))
+                                                                     timeZone: try #require(TimeZone(identifier: "Asia/Shanghai"))))
         let utcTotals = try #require(utc["xl/worksheets/sheet1.xml"])
         let localTotals = try #require(shanghai["xl/worksheets/sheet1.xml"])
         #expect(utcTotals.contains("2026-11-10") && utcTotals.contains("2026-11-11"))
@@ -181,7 +181,7 @@ struct AIUsageHistoryTests {
         try #require(process.terminationStatus == 0, "unzip must accept the actual xlsx package")
         var result: [String: String] = [:]
         for part in ["[Content_Types].xml", "_rels/.rels", "xl/workbook.xml", "xl/_rels/workbook.xml.rels",
-            "xl/worksheets/sheet1.xml", "xl/worksheets/sheet2.xml"] {
+                     "xl/worksheets/sheet1.xml", "xl/worksheets/sheet2.xml"] {
             result[part] = try String(contentsOf: directory.appendingPathComponent(part), encoding: .utf8)
         }
         return result

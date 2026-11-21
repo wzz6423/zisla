@@ -26,13 +26,13 @@ struct BrowserDownloadFileNameResolver: Sendable {
                         currentPaths: Set(paths.map(\.path))
                     ))
                     let rows: [[String: Any]] = metadataRows ?? (try? downloadRows(at: profile.appendingPathComponent("History"), sql: """
-                        SELECT current_path, target_path FROM downloads
-                        WHERE state = 0 AND current_path IN (\(quotedPaths.joined(separator: ",")))
-                        """)) ?? []
+                    SELECT current_path, target_path FROM downloads
+                    WHERE state = 0 AND current_path IN (\(quotedPaths.joined(separator: ",")))
+                    """)) ?? []
                     for row in rows {
                         guard let currentPath = row["current_path"] as? String,
-                            let targetPath = row["target_path"] as? String,
-                            targetPath.hasPrefix("/"), targetPath != "/"
+                              let targetPath = row["target_path"] as? String,
+                              targetPath.hasPrefix("/"), targetPath != "/"
                         else { continue }
                         let target = URL(fileURLWithPath: targetPath)
                         guard BrowserDownloadTempExtension(rawValue: target.pathExtension.lowercased()) == nil

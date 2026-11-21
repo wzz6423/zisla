@@ -54,7 +54,7 @@ struct AISessionWorkspaceCleanup: Sendable {
             "Library/Application Support/Windsurf/User/workspaceStorage",
         ].map { home.appendingPathComponent($0, isDirectory: true) }
             + ["CODEX_HOME", "QWEN_HOME"]
-                .compactMap { key in environment[key].flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0, isDirectory: true) : nil } }
+            .compactMap { key in environment[key].flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0, isDirectory: true) : nil } }
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? home.appendingPathComponent("Documents", isDirectory: true)
         documentsRoot = documents
@@ -88,16 +88,16 @@ struct AISessionWorkspaceCleanup: Sendable {
         case "claude code": .claude
         case "deepseek", "deepseek harness", "dsh": .harness
         default: AIProvider(token: name) ?? AIProvider.allCases.first {
-            AIMascotLibrary.providerDisplayName(for: $0).caseInsensitiveCompare(name) == .orderedSame
-        }
+                AIMascotLibrary.providerDisplayName(for: $0).caseInsensitiveCompare(name) == .orderedSame
+            }
         }
     }
 
     func candidates() -> [DiskCleanupCandidate] {
         roots.flatMap { root -> [DiskCleanupCandidate] in
             guard let children = try? fileManager.contentsOfDirectory(
-                      at: root.url, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: []
-                  ) else { return [] }
+                at: root.url, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: []
+            ) else { return [] }
             return children.compactMap { child in
                 guard child.deletingLastPathComponent().standardizedFileURL.path == root.url.path,
                       Self.workspaceDay(child.lastPathComponent) != nil || UUID(uuidString: child.lastPathComponent) != nil,
@@ -119,7 +119,7 @@ struct AISessionWorkspaceCleanup: Sendable {
     func overlapsWorkspaceRoot(_ url: URL) -> Bool {
         if workspaceDiscoveryFailed,
            SystemMonitorPathSafety.isURL(url, withinAllowedRoots: [documentsRoot])
-            || SystemMonitorPathSafety.isURL(documentsRoot, withinAllowedRoots: [url]) { return true }
+           || SystemMonitorPathSafety.isURL(documentsRoot, withinAllowedRoots: [url]) { return true }
         return roots.contains {
             SystemMonitorPathSafety.isURL(url, withinAllowedRoots: [$0.url])
                 || SystemMonitorPathSafety.isURL($0.url, withinAllowedRoots: [url])
@@ -211,7 +211,7 @@ struct AISessionWorkspaceCleanup: Sendable {
             date = Date(timeIntervalSince1970: number.doubleValue / (milliseconds ? 1000 : 1))
         } else if let text = timestamp as? String,
                   let parsed = (try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(text))
-                    ?? (try? Date.ISO8601FormatStyle().parse(text)) {
+                  ?? (try? Date.ISO8601FormatStyle().parse(text)) {
             date = parsed
         } else { date = nil }
         return Session(provider: provider, id: id, directory: directory.map {

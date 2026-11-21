@@ -155,7 +155,7 @@ struct DailyBriefingTimelineChartsTests {
         let start = try #require(calendar.date(from: DateComponents(year: 2026, month: value.month, day: value.date)))
         let last = start.addingTimeInterval(value.hours * 3600 - 300)
         let chart = DailyBriefingPowerChart(samples: [.init(date: last, averageWatts: 64)], day: start,
-            calendar: calendar, language: .english, accent: .blue, ink: .black)
+                                            calendar: calendar, language: .english, accent: .blue, ink: .black)
 
         #expect(chart.domain == 0...value.hours)
         #expect(chart.ticks.last == value.hours)
@@ -195,7 +195,7 @@ struct DailyBriefingTimelineChartsTests {
         var zeroCount = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         zeroCount["sampleCount"] = 0
         let invalidCount = try JSONDecoder().decode(DailyBriefingPowerSample.self,
-            from: JSONSerialization.data(withJSONObject: zeroCount))
+                                                    from: JSONSerialization.data(withJSONObject: zeroCount))
         let invalidPower = powerChart([
             .init(date: day, averageWatts: .infinity),
             .init(date: day, averageWatts: .nan),
@@ -217,9 +217,9 @@ struct DailyBriefingTimelineChartsTests {
     func bothDenseLinesAndIsolatedPointsUseTheTemplateAccent() throws {
         let accent = Color(red: 0.9, green: 0.1, blue: 0.8)
         let keyboard = DailyBriefingKeyPressChart(hourlyCounts: (0..<24).map { Optional(Int64($0 * 100)) },
-            language: .english, accent: accent, ink: .black)
+                                                  language: .english, accent: accent, ink: .black)
         let power = DailyBriefingPowerChart(samples: [.init(date: day, averageWatts: 25)], day: day,
-            calendar: calendar, language: .english, accent: accent, ink: .black)
+                                            calendar: calendar, language: .english, accent: accent, ink: .black)
         for image in [try rendered(keyboard, width: 360), try rendered(power, width: 360)] {
             #expect(try containsColor(in: image) { $0.redComponent - $0.greenComponent > 0.5 && $0.blueComponent - $0.greenComponent > 0.45 })
         }

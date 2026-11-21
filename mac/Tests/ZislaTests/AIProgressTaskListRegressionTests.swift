@@ -37,7 +37,7 @@ struct AIProgressTaskListRegressionTests {
         }
 
         #expect((widths.max() ?? 0) - (widths.min() ?? 0) < 0.5,
-            "Task refreshes must not repeatedly reserve and release a scrollbar gutter at a fixed window size")
+                "Task refreshes must not repeatedly reserve and release a scrollbar gutter at a fixed window size")
         #expect(!fixture.window.isVisible)
     }
 
@@ -67,7 +67,7 @@ struct AIProgressTaskListRegressionTests {
         let scroller = try #require(scroll.verticalScroller as? ThinScroller)
         #expect(scroller.knobProportion > 0 && scroller.knobProportion < 1)
         #expect(try paintedKnobWidth(scroller) == 3,
-            "Preserving native policy must retain the three-point scrollbar knob")
+                "Preserving native policy must retain the three-point scrollbar knob")
     }
 
     @Test
@@ -81,16 +81,16 @@ struct AIProgressTaskListRegressionTests {
         fixture.reload()
         await fixture.settle(turns: 4)
         #expect(try fixture.list().1.numberOfRows == 9,
-            "Finished tasks must leave the running list")
+                "Finished tasks must leave the running list")
 
         try fixture.repository.clearTasks()
         fixture.reload()
         await fixture.settle(turns: 4)
         #expect(fixture.monitor.state.tasks.isEmpty)
         #expect(fixture.descendants.compactMap { $0 as? NSTableView }.isEmpty,
-            "The empty task state must release the native task list")
+                "The empty task state must release the native task list")
         #expect(fixture.descendants.compactMap { $0 as? NSScrollView }.count == 1,
-            "Empty tasks must leave the outer module as the sole vertical scrolling surface")
+                "Empty tasks must leave the outer module as the sole vertical scrolling surface")
 
         try fixture.upsert(index: 0, step: 1)
         try fixture.upsert(index: 0, step: 2)
@@ -99,7 +99,7 @@ struct AIProgressTaskListRegressionTests {
         let snapshot = fixture.monitor.state
         await fixture.settle(turns: 8)
         #expect(try fixture.list().1.numberOfRows == 2,
-            "Returning tasks must rebuild the list without duplicating an updated task")
+                "Returning tasks must rebuild the list without duplicating an updated task")
         #expect(fixture.monitor.state == snapshot)
         try fixture.repository.remove(id: "fixture-1")
         fixture.reload()
@@ -109,7 +109,7 @@ struct AIProgressTaskListRegressionTests {
     }
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_AI_LIST_STRESS"] == "1"),
-        .timeLimit(.minutes(1)), arguments: [UInt64(0xA1_1157), UInt64(0xC0_DE28)])
+          .timeLimit(.minutes(1)), arguments: [UInt64(0xA1_1157), UInt64(0xC0_DE28)])
     func boundedTaskChurnAndWheelScrollingKeepTheListConsistent(seed: UInt64) async throws {
         let fixture = try TaskListFixture(taskCount: 192)
         defer { fixture.close() }
@@ -130,14 +130,14 @@ struct AIProgressTaskListRegressionTests {
             let snapshot = fixture.monitor.state
             let widths: [CGFloat] = [560, 752, 980]
             fixture.window.setContentSize(NSSize(width: widths[Int(random % 3)],
-                height: step % 2 == 0 ? 160 : 240))
+                                                 height: step % 2 == 0 ? 160 : 240))
             await fixture.settle(turns: 2)
             let activeCount = snapshot.tasks.filter(\.status.isActive).count
             if activeCount > 0 {
                 let (scroll, table) = try fixture.list()
                 fixture.scroll(scroll, fraction: CGFloat((random >> 24) % 101) / 100)
                 let event = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel,
-                    wheelCount: 1, wheel1: step % 2 == 0 ? 54 : -54, wheel2: 0, wheel3: 0))
+                                                 wheelCount: 1, wheel1: step % 2 == 0 ? 54 : -54, wheel2: 0, wheel3: 0))
                 scroll.scrollWheel(with: try #require(NSEvent(cgEvent: event)))
                 wheelSteps += 1
                 await fixture.settle(turns: 2)
@@ -145,7 +145,7 @@ struct AIProgressTaskListRegressionTests {
                 #expect(scroll.documentView === table)
                 #expect(table.frame.height.isFinite && scroll.contentView.bounds.minY.isFinite)
                 #expect(scroll.contentView.bounds.intersects(table.bounds),
-                    "Seed \(seed), step \(step): wheel scrolling must leave task content in the viewport")
+                        "Seed \(seed), step \(step): wheel scrolling must leave task content in the viewport")
             } else {
                 #expect(fixture.descendants.compactMap { $0 as? NSTableView }.isEmpty)
             }
@@ -157,9 +157,9 @@ struct AIProgressTaskListRegressionTests {
 
     private func paintedKnobWidth(_ scroller: NSScroller) throws -> Int {
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil,
-            pixelsWide: Int(scroller.bounds.width), pixelsHigh: Int(scroller.bounds.height),
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                                                   pixelsWide: Int(scroller.bounds.width), pixelsHigh: Int(scroller.bounds.height),
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         let context = try #require(NSGraphicsContext(bitmapImageRep: bitmap))
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
@@ -196,12 +196,12 @@ private final class TaskListFixture {
         let date = now
         monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [], now: { date })
         host = NSHostingView(rootView: AnyView(AIProgressModuleView(monitor: monitor, monitoredBalanceProviders: [])
-            .environment(\.colorScheme, .dark)
-            .environment(\.locale, language.locale)
-            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)))
+                .environment(\.colorScheme, .dark)
+                .environment(\.locale, language.locale)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)))
         host.sizingOptions = []
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 752, height: 160),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                          styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         do {
@@ -216,13 +216,13 @@ private final class TaskListFixture {
     func upsert(index: Int, step: Int, isFinished: Bool = false) throws {
         let variant = (index + step) % 5
         try repository.upsert(AIProgressTask(id: "fixture-\(index)", provider: .codex,
-            title: "Synthetic task \(index)", detail: "gpt-6.1-sol", progress: variant == 0 ? 0.5 : nil,
-            status: isFinished ? .succeeded : variant == 1 ? .blocked : variant == 2 ? .error : .running,
-            updatedAt: now.addingTimeInterval(Double(step * 100 + index)),
-            sessionURL: variant == 3 ? nil : URL(string: "codex://fixture/\(index)"),
-            effort: "max", startedAt: now.addingTimeInterval(-120),
-            failureReason: variant == 2 ? "Synthetic failure" : nil,
-            processIdentifier: Int32(10_000 + index)))
+                                             title: "Synthetic task \(index)", detail: "gpt-6.1-sol", progress: variant == 0 ? 0.5 : nil,
+                                             status: isFinished ? .succeeded : variant == 1 ? .blocked : variant == 2 ? .error : .running,
+                                             updatedAt: now.addingTimeInterval(Double(step * 100 + index)),
+                                             sessionURL: variant == 3 ? nil : URL(string: "codex://fixture/\(index)"),
+                                             effort: "max", startedAt: now.addingTimeInterval(-120),
+                                             failureReason: variant == 2 ? "Synthetic failure" : nil,
+                                             processIdentifier: Int32(10_000 + index)))
     }
 
     func reload() { monitor.reload(includeUsageSamples: false) }

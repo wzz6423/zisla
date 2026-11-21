@@ -6,7 +6,7 @@ import Testing
 struct MuseUsageParserTests {
     @Test func cacheAndReasoningAreSubsetsAndCompletedEventIdentityIsStable() throws {
         let record = event("example", input: 100, output: 20,
-            extra: ["cache_read_tokens": 30, "cache_write_tokens": 10, "reasoning_tokens": 5, "total_tokens": 120])
+                           extra: ["cache_read_tokens": 30, "cache_write_tokens": 10, "reasoning_tokens": 5, "total_tokens": 120])
         let sample = try #require(MuseUsageParser.sample(from: record))
         #expect(sample.provider == .muse && sample.inputTokens == 100 && sample.outputTokens == 20)
         #expect(sample.totalTokens == 120)
@@ -47,11 +47,11 @@ struct MuseUsageParserTests {
         let home = URL(fileURLWithPath: "/fixture/home")
         #expect(MuseUsageParser.defaultSessionsDirectory(home: home, environment: [:]).path == "/fixture/home/.local/share/muse/sessions")
         #expect(MuseUsageParser.defaultSessionsDirectory(home: home,
-            environment: ["MUSE_SESSIONS_DIR": "/fixture/sessions", "XDG_DATA_HOME": "/fixture/data"]).path == "/fixture/sessions")
+                                                         environment: ["MUSE_SESSIONS_DIR": "/fixture/sessions", "XDG_DATA_HOME": "/fixture/data"]).path == "/fixture/sessions")
         #expect(MuseUsageParser.defaultSessionsDirectory(home: home,
-            environment: ["MUSE_SESSIONS_DIR": "relative", "XDG_DATA_HOME": "/fixture/data"]).path == "/fixture/data/muse/sessions")
+                                                         environment: ["MUSE_SESSIONS_DIR": "relative", "XDG_DATA_HOME": "/fixture/data"]).path == "/fixture/data/muse/sessions")
         #expect(MuseUsageParser.defaultSessionsDirectory(home: home,
-            environment: ["XDG_DATA_HOME": "relative"]).path == "/fixture/home/.local/share/muse/sessions")
+                                                         environment: ["XDG_DATA_HOME": "relative"]).path == "/fixture/home/.local/share/muse/sessions")
     }
 
     @Test func incrementalReaderDeduplicatesCopiesAndRecoversFromTruncatedAppendAndReplacement() throws {
@@ -97,7 +97,7 @@ struct MuseUsageParserTests {
             let valid = event("fuzz-\(index)", input: input, output: output, extra: ["cached_tokens": input])
             #expect(MuseUsageParser.sample(from: valid)?.totalTokens == input + output)
             #expect(MuseUsageParser.sample(from: event("fuzz-\(index)", input: input, output: output,
-                extra: ["cache_read_tokens": input + 1])) == nil)
+                                                       extra: ["cache_read_tokens": input + 1])) == nil)
         }
     }
 
@@ -105,7 +105,7 @@ struct MuseUsageParserTests {
         ["schema_version": 1, "record_type": "event", "payload_type": "runtime.session",
          "payload_schema_version": 1, "recorded_at": 1_909_999_990_000_000, "id": id,
          "payload": ["event": ["kind": "model_completed", "model": "fixture-model",
-            "usage": ["input_tokens": input, "output_tokens": output].merging(extra) { _, new in new }]]]
+                               "usage": ["input_tokens": input, "output_tokens": output].merging(extra) { _, new in new }]]]
     }
 
     private func line(_ record: [String: Any]) throws -> Data {

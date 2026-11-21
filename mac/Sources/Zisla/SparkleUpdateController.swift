@@ -28,21 +28,21 @@ struct SparkleUpdateConfiguration: Equatable {
         installedSliceCount: Int = SparkleUpdateConfiguration.installedSliceCount
     ) {
         guard let releaseFeeds = Self.feedPair(
-            giteeKey: "SUFeedURL",
-            githubKey: "ZislaReleaseFallbackAppcastURL",
-            in: infoDictionary,
-            architecture: architecture,
-            installedSliceCount: installedSliceCount
-        ),
-        let previewFeeds = Self.feedPair(
-            giteeKey: "ZislaPreviewAppcastURL",
-            githubKey: "ZislaPreviewFallbackAppcastURL",
-            in: infoDictionary,
-            architecture: architecture,
-            installedSliceCount: installedSliceCount
-        ),
-        let publicKey = infoDictionary["SUPublicEDKey"] as? String,
-        Data(base64Encoded: publicKey)?.count == 32 else {
+                  giteeKey: "SUFeedURL",
+                  githubKey: "ZislaReleaseFallbackAppcastURL",
+                  in: infoDictionary,
+                  architecture: architecture,
+                  installedSliceCount: installedSliceCount
+              ),
+              let previewFeeds = Self.feedPair(
+                  giteeKey: "ZislaPreviewAppcastURL",
+                  githubKey: "ZislaPreviewFallbackAppcastURL",
+                  in: infoDictionary,
+                  architecture: architecture,
+                  installedSliceCount: installedSliceCount
+              ),
+              let publicKey = infoDictionary["SUPublicEDKey"] as? String,
+              Data(base64Encoded: publicKey)?.count == 32 else {
             return nil
         }
 
@@ -115,11 +115,11 @@ struct SparkleUpdateConfiguration: Equatable {
 
     static let hostArchitecture: String = {
         #if arch(arm64)
-        "arm64"
+            "arm64"
         #else
-        // A translated slice runs on Apple silicon, where following the slice would leave
-        // this Mac on the Intel build, and therefore on Rosetta, for every later update.
-        isTranslatedProcess() ? "arm64" : "x86_64"
+            // A translated slice runs on Apple silicon, where following the slice would leave
+            // this Mac on the Intel build, and therefore on Rosetta, for every later update.
+            isTranslatedProcess() ? "arm64" : "x86_64"
         #endif
     }()
 

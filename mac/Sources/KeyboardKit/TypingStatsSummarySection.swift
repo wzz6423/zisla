@@ -107,9 +107,9 @@ struct TypingStatsSummarySection: View {
                     L10n.format("统计暂未更新：%@", message),
                     systemImage: "arrow.clockwise.circle"
                 )
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

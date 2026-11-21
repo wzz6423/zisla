@@ -51,7 +51,7 @@ struct ScreenRecordingExportTests {
         edits.crop = .init(x: 0, y: 0, width: 0.5, height: 1)
         let source = CGSize(width: 2_560, height: 1_440)
         #expect(try RecordingExportRenderer.outputSize(source: source, edits: edits, resolution: .source)
-                == CGSize(width: 1_280, height: 1_440))
+            == CGSize(width: 1_280, height: 1_440))
         let fullHD = try RecordingExportRenderer.outputSize(source: source, edits: edits, resolution: .fullHD)
         #expect(fullHD.height == 1_920)
         #expect(Int(fullHD.width).isMultiple(of: 2))
@@ -217,7 +217,7 @@ struct ScreenRecordingExportTests {
         #expect(try Self.pixel(shadow, x: 100, y: 21).green < Self.pixel(base, x: 100, y: 21).green)
         project.edits.background = .midnight
         #expect(try Self.pixel(RecordingExportRenderer(project: project, size: size)
-            .image(screen: screen, camera: nil, sourceTime: 0), x: 3, y: 3).red < 0.1)
+                .image(screen: screen, camera: nil, sourceTime: 0), x: 3, y: 3).red < 0.1)
         project.edits.background = .gradient
         let gradient = try RecordingExportRenderer(project: project, size: size)
             .image(screen: screen, camera: nil, sourceTime: 0)
@@ -311,11 +311,11 @@ struct ScreenRecordingExportTests {
         let screen = marker.composited(over: Self.solid(red: 0, green: 0, blue: 0, size: size))
         let renderer = try RecordingExportRenderer(project: project, size: size)
         let entering = try renderer.image(screen: screen, camera: nil,
-            sourceTime: slice.sourceTime(at: 0.25 / speed), slice: slice)
+                                          sourceTime: slice.sourceTime(at: 0.25 / speed), slice: slice)
         let plateau = try renderer.image(screen: screen, camera: nil,
-            sourceTime: slice.sourceTime(at: 1.2 / speed), slice: slice)
+                                         sourceTime: slice.sourceTime(at: 1.2 / speed), slice: slice)
         let leaving = try renderer.image(screen: screen, camera: nil,
-            sourceTime: slice.sourceTime(at: 2.15 / speed), slice: slice)
+                                         sourceTime: slice.sourceTime(at: 2.15 / speed), slice: slice)
         #expect(try Self.pixel(entering, x: 24, y: 60).red > 0.8,
                 "The slower entering zoom must keep the edge marker visible before reaching the focus crop")
         #expect(try Self.pixel(plateau, x: 24, y: 60).red < 0.1)
@@ -517,7 +517,7 @@ struct ScreenRecordingExportTests {
         let width = 256
         let height = 16
         let primaries: [[UInt8]] = [[255, 0, 0], [0, 255, 0], [0, 0, 255],
-            [255, 255, 0], [255, 0, 255], [0, 255, 255]]
+                                    [255, 255, 0], [255, 0, 255], [0, 255, 255]]
         var bytes = [UInt8](repeating: 255, count: width * height * 4)
         for y in 0..<height {
             for x in 0..<width {
@@ -530,13 +530,13 @@ struct ScreenRecordingExportTests {
         }
         let image = try bytes.withUnsafeMutableBytes { buffer in
             let context = try #require(CGContext(data: buffer.baseAddress, width: width, height: height,
-                bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             return try #require(context.makeImage())
         }
         let destination = fixture.root.appendingPathComponent("neutral.gif")
         let writer = try RecordingExportGIFWriter(url: destination, size: .init(width: width, height: height),
-            frameRate: 12, preserveGrayscale: true)
+                                                  frameRate: 12, preserveGrayscale: true)
         try writer.append(image)
         try writer.finish()
         let data = try Data(contentsOf: destination)
@@ -558,16 +558,16 @@ struct ScreenRecordingExportTests {
         for x in 0..<width {
             let pixel = try RecordingMultitrackTestFixture.pixel(decoded, x: x, y: 3)
             #expect(pixel[0] == pixel[1] && pixel[1] == pixel[2],
-                "A fading white stroke must stay neutral throughout the gray ramp: \(pixel)")
+                    "A fading white stroke must stay neutral throughout the gray ramp: \(pixel)")
             #expect(pixel[0] >= previous && abs(Int(pixel[0]) - x) <= 32,
-                "The fade must preserve its monotonic brightness within one GIF palette step")
+                    "The fade must preserve its monotonic brightness within one GIF palette step")
             previous = pixel[0]
         }
         #expect(try RecordingMultitrackTestFixture.pixel(decoded, x: 0, y: 3) == [0, 0, 0])
         #expect(try RecordingMultitrackTestFixture.pixel(decoded, x: 255, y: 3) == [255, 255, 255])
         for x in primaries.indices {
             #expect(try RecordingMultitrackTestFixture.pixel(decoded, x: x, y: 12) == primaries[x],
-                "Neutral fade support must preserve saturated screen colors")
+                    "Neutral fade support must preserve saturated screen colors")
         }
     }
 
@@ -593,7 +593,7 @@ struct ScreenRecordingExportTests {
                 if multitrack { project.timeline = .migrating(project) }
                 let destination = fixture.root.appendingPathComponent("palette-\(multitrack)-\(index).gif")
                 try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: destination,
-                    configuration: .init(format: .gif, resolution: .source, frameRate: 4))
+                                                           configuration: .init(format: .gif, resolution: .source, frameRate: 4))
                 let data = try Data(contentsOf: destination)
                 for paletteIndex in 0..<256 {
                     let offset = 13 + paletteIndex * 3
@@ -777,11 +777,11 @@ struct ScreenRecordingExportTests {
         var project = Self.project()
         project.edits.crop = .init(x: 0, y: 0, width: 0.5, height: 1)
         let image = try await ScreenRecordingExporter().preview(project: project, directory: fixture.directory,
-                                                               sourceTime: 1.5, maximumSize: .init(width: 100, height: 80))
+                                                                sourceTime: 1.5, maximumSize: .init(width: 100, height: 80))
         #expect(image.height == 80 && image.width == 52)
         #expect(try Self.pixel(image, x: 26, y: 40).blue > 0.7)
         let oddLimit = try await ScreenRecordingExporter().preview(project: Self.project(), directory: fixture.directory,
-                                                                  sourceTime: 0.137, maximumSize: .init(width: 100, height: 75))
+                                                                   sourceTime: 0.137, maximumSize: .init(width: 100, height: 75))
         #expect(oddLimit.width == 100 && oddLimit.height == 74)
     }
 
@@ -796,7 +796,7 @@ struct ScreenRecordingExportTests {
                                                    sourceTime: time, maximumSize: .init(width: 160, height: 120))
             let center = try Self.pixel(image, x: 80, y: 60)
             #expect(time < 1 ? center.red > 0.7 && center.blue < 0.2
-                            : center.blue > 0.7 && center.red < 0.2)
+                : center.blue > 0.7 && center.red < 0.2)
         }
     }
 
@@ -933,7 +933,7 @@ struct ScreenRecordingExportTests {
             let image = try #require(CGImageSourceCreateImageAtIndex(source, index, nil))
             let center = try Self.pixel(image, x: 80, y: 60)
             #expect((4..<8).contains(index) ? center.blue > 0.7 && center.red < 0.2
-                                          : center.red > 0.7 && center.blue < 0.2)
+                : center.red > 0.7 && center.blue < 0.2)
         }
     }
 
@@ -966,14 +966,14 @@ struct ScreenRecordingExportTests {
         for (index, image) in images.enumerated() {
             let center = try Self.pixel(image, x: 80, y: 60)
             #expect(index == 1 ? center.blue > 0.7 && center.red < 0.2
-                              : center.red > 0.7 && center.blue < 0.2)
+                : center.red > 0.7 && center.blue < 0.2)
         }
         #expect(try fixture.stagingFiles().isEmpty)
     }
 
     private static func project(duration: Double = 2) -> ScreenRecordingProject {
         var project = ScreenRecordingProject(name: "Fixture", createdAt: Date(timeIntervalSince1970: 0),
-                                              videoFile: "screen.mp4", duration: duration, width: 160, height: 120)
+                                             videoFile: "screen.mp4", duration: duration, width: 160, height: 120)
         project.edits.background = .none
         project.edits.padding = 0
         project.edits.cornerRadius = 0
@@ -1134,7 +1134,7 @@ struct ScreenRecordingExportTests {
             if withAudio {
                 try createTone(name: "system.m4a", frequency: 440)
                 try await NativeMediaMuxer().mux(videoURL: plainURL, audioURL: directory.appendingPathComponent("system.m4a"),
-                                                outputURL: directory.appendingPathComponent(name))
+                                                 outputURL: directory.appendingPathComponent(name))
             }
         }
     }

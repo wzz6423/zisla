@@ -29,7 +29,7 @@ struct DailyBriefingIntegrationTests {
                 reports.append(report)
                 let data = try DailyBriefingRenderer.png(report: report, template: template, language: language)
                 return try DailyBriefingPNGExport.write(data, for: report.day.date, language: language,
-                    calendar: report.calendar, directory: folder)
+                                                        calendar: report.calendar, directory: folder)
             }
         )
         var settings = DailyBriefingSettings(enabled: true, selectedContent: [.notificationCount, .clipboardCaptured])
@@ -77,18 +77,18 @@ struct DailyBriefingIntegrationTests {
         let due = settings.exportDate(on: morning, calendar: calendar)
         var attempts = 0
         let controller = DailyBriefingController(store: store,
-            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: false) },
-            typing: { _ in throw CocoaError(.fileReadNoPermission) },
-            readScreenTime: { _ in Issue.record("Disabled system reading must not access system data"); return .init() },
-            export: { report, template, language, folder in
-                attempts += 1
-                #expect(report.typing == nil)
-                #expect(template == .minimal)
-                #expect(language == .english)
-                #expect(folder == directory)
-                if attempts == 1 { throw CocoaError(.fileWriteOutOfSpace) }
-                return folder.appendingPathComponent("result.png")
-            })
+                                                 observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: false) },
+                                                 typing: { _ in throw CocoaError(.fileReadNoPermission) },
+                                                 readScreenTime: { _ in Issue.record("Disabled system reading must not access system data"); return .init() },
+                                                 export: { report, template, language, folder in
+                                                     attempts += 1
+                                                     #expect(report.typing == nil)
+                                                     #expect(template == .minimal)
+                                                     #expect(language == .english)
+                                                     #expect(folder == directory)
+                                                     if attempts == 1 { throw CocoaError(.fileWriteOutOfSpace) }
+                                                     return folder.appendingPathComponent("result.png")
+                                                 })
         var messages: [String] = []
         let observation = AppModel.observeDailyBriefingExports(controller) { messages.append($0) }
         defer { observation.cancel() }
@@ -124,9 +124,9 @@ struct DailyBriefingIntegrationTests {
         let morning = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 9))!
         var attempts = 0
         let controller = DailyBriefingController(store: store,
-            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: nil) },
-            typing: { _ in nil }, readScreenTime: { _ in .init() },
-            export: { _, _, _, folder in attempts += 1; return folder.appendingPathComponent("manual.png") })
+                                                 observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: nil) },
+                                                 typing: { _ in nil }, readScreenTime: { _ in .init() },
+                                                 export: { _, _, _, folder in attempts += 1; return folder.appendingPathComponent("manual.png") })
         var messages: [String] = []
         let observation = AppModel.observeDailyBriefingExports(controller) { messages.append($0) }
         defer { observation.cancel() }
@@ -166,12 +166,13 @@ struct DailyBriefingIntegrationTests {
                     throw CocoaError(.fileWriteOutOfSpace)
                 }
                 return folder.appendingPathComponent("briefing.png")
-            })
+            }
+        )
         var messages: [String] = []
         let observation = AppModel.observeDailyBriefingExports(controller) { messages.append($0) }
         defer { observation.cancel() }
         controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
-            directory: directory, language: .english, startsTimer: false)
+                             directory: directory, language: .english, startsTimer: false)
         await controller.exportToday(at: date)
         let url = try #require(controller.lastExportURL)
         let success = AppLocalization.text("已保存到 %@", url.lastPathComponent)
@@ -202,12 +203,13 @@ struct DailyBriefingIntegrationTests {
             export: { _, _, _, folder in
                 Issue.record("An unreadable archive must fail before exporting")
                 return folder.appendingPathComponent("unexpected.png")
-            })
+            }
+        )
         var messages: [String] = []
         let observation = AppModel.observeDailyBriefingExports(controller) { messages.append($0) }
         defer { observation.cancel() }
         controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
-            directory: directory, language: .english, startsTimer: false)
+                             directory: directory, language: .english, startsTimer: false)
 
         await controller.exportToday(at: Date(timeIntervalSince1970: 1_800_000_000))
         await controller.exportToday(at: Date(timeIntervalSince1970: 1_800_000_000))
@@ -232,13 +234,14 @@ struct DailyBriefingIntegrationTests {
             export: { _, _, _, folder in
                 if failExport { throw CocoaError(.fileWriteNoPermission) }
                 return folder.appendingPathComponent("briefing.png")
-            })
+            }
+        )
         weak var weakController = controller
         var messages: [String] = []
         let observation = AppModel.observeDailyBriefingExports(controller!) { messages.append($0) }
         defer { observation.cancel() }
         controller?.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
-            directory: directory, language: .english, startsTimer: false)
+                              directory: directory, language: .english, startsTimer: false)
         let date = Date(timeIntervalSince1970: 1_800_000_000)
         await controller?.exportToday(at: date)
         observation.cancel()
@@ -262,7 +265,8 @@ struct DailyBriefingIntegrationTests {
             store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
             observation: { .init(date: $0, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: nil) },
             typing: { _ in nil }, readScreenTime: { _ in .init() },
-            export: { _, _, _, folder in folder.appendingPathComponent(fileName) })
+            export: { _, _, _, folder in folder.appendingPathComponent(fileName) }
+        )
         var messages: [String] = []
         let observation = AppModel.observeDailyBriefingExports(controller) { messages.append($0) }
         let defaults = UserDefaults.standard
@@ -277,7 +281,7 @@ struct DailyBriefingIntegrationTests {
             localizedArguments[AppLocalization.defaultsKey] = language.rawValue
             defaults.setVolatileDomain(localizedArguments, forName: UserDefaults.argumentDomain)
             controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
-                directory: directory, language: language, startsTimer: false)
+                                 directory: directory, language: language, startsTimer: false)
             await controller.exportToday(at: Date(timeIntervalSince1970: 1_800_000_000))
 
             let tableURL = root.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
@@ -298,18 +302,19 @@ struct DailyBriefingIntegrationTests {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let error = NSError(domain: NSCocoaErrorDomain, code: CocoaError.fileNoSuchFile.rawValue,
-            userInfo: [NSLocalizedDescriptionKey: "Folder ‘briefing.png’ does not exist."])
+                            userInfo: [NSLocalizedDescriptionKey: "Folder ‘briefing.png’ does not exist."])
         let controller = DailyBriefingController(
             store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
             observation: { .init(date: $0, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: nil) },
             typing: { _ in nil }, readScreenTime: { _ in .init() },
-            export: { _, _, _, _ in throw error })
+            export: { _, _, _, _ in throw error }
+        )
         var messages: [String] = []
         let observation = AppModel.observeDailyBriefingExports(controller) { messages.append($0) }
         defer { observation.cancel() }
         for language in AppLanguage.allCases {
             controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
-                directory: directory, language: language, startsTimer: false)
+                                 directory: directory, language: language, startsTimer: false)
             await controller.exportToday(at: Date(timeIntervalSince1970: 1_800_000_000))
 
             #expect(messages.last == AppLocalization.string("简报导出或记录失败", language: language)
@@ -330,13 +335,13 @@ struct DailyBriefingIntegrationTests {
         let calendar = DailyBriefingDay.calendar
         let morning = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 9))!
         let controller = DailyBriefingController(store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
-            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: true) },
-            typing: { _ in .init(characters: 15, topApplication: "Editor", peakHour: 9) },
-            readScreenTime: { _ in .init() })
+                                                 observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: true) },
+                                                 typing: { _ in .init(characters: 15, topApplication: "Editor", peakHour: 9) },
+                                                 readScreenTime: { _ in .init() })
         controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false), directory: directory, language: .english, startsTimer: false)
         await controller.tick(at: morning)
         controller.configure(settings: .init(enabled: true, minuteOfDay: 9 * 60 + 1, template: .terminal, readsSystemScreenTime: false),
-            directory: output, language: .arabic, startsTimer: false)
+                             directory: output, language: .arabic, startsTimer: false)
         await controller.tick(at: morning.addingTimeInterval(30))
         #expect(controller.lastExportURL == nil)
         await controller.tick(at: morning.addingTimeInterval(60))
@@ -367,12 +372,12 @@ struct DailyBriefingIntegrationTests {
         try locations.setDirectory(first, for: .dailyBriefing)
         var exportedFolders: [URL] = []
         let controller = DailyBriefingController(store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
-            saveLocations: locations,
-            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: false, isListening: nil) },
-            typing: { _ in nil }, readScreenTime: { _ in .init() },
-            export: { _, _, _, folder in exportedFolders.append(folder); return folder.appendingPathComponent("briefing.png") })
+                                                 saveLocations: locations,
+                                                 observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: false, isListening: nil) },
+                                                 typing: { _ in nil }, readScreenTime: { _ in .init() },
+                                                 export: { _, _, _, folder in exportedFolders.append(folder); return folder.appendingPathComponent("briefing.png") })
         controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
-            directory: locations[.dailyBriefing], language: .english, startsTimer: false)
+                             directory: locations[.dailyBriefing], language: .english, startsTimer: false)
         let date = Date(timeIntervalSince1970: 1_800_000_000)
 
         try locations.setDirectory(downloads, for: .download)
@@ -396,17 +401,17 @@ struct DailyBriefingIntegrationTests {
         var expectsSystemData = true
         var exports = 0
         let controller = DailyBriefingController(store: store,
-            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: false) },
-            typing: { _ in nil }, readScreenTime: { _ in .init(notificationCount: 7) },
-            export: { report, template, language, folder in
-                exports += 1
-                #expect(report.selectedContent == selection)
-                #expect(report.notificationCount == (expectsSystemData ? 7 : nil))
-                #expect(DailyBriefingPoster(report: report, template: template, language: language).displayedContent == selection)
-                let png = try DailyBriefingRenderer.png(report: report, template: template, language: language)
-                #expect(png.starts(with: [137, 80, 78, 71]))
-                return folder.appendingPathComponent("result.png")
-            })
+                                                 observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: false) },
+                                                 typing: { _ in nil }, readScreenTime: { _ in .init(notificationCount: 7) },
+                                                 export: { report, template, language, folder in
+                                                     exports += 1
+                                                     #expect(report.selectedContent == selection)
+                                                     #expect(report.notificationCount == (expectsSystemData ? 7 : nil))
+                                                     #expect(DailyBriefingPoster(report: report, template: template, language: language).displayedContent == selection)
+                                                     let png = try DailyBriefingRenderer.png(report: report, template: template, language: language)
+                                                     #expect(png.starts(with: [137, 80, 78, 71]))
+                                                     return folder.appendingPathComponent("result.png")
+                                                 })
         var settings = DailyBriefingSettings(enabled: true, selectedContent: selection)
         controller.configure(settings: settings, directory: directory, language: .english, startsTimer: false)
         await controller.exportToday()
@@ -463,8 +468,8 @@ struct DailyBriefingIntegrationTests {
     func templatesRenderCompleteLocalizedImages(template: DailyBriefingTemplate, language: AppLanguage) throws {
         let image = try DailyBriefingRenderer.image(report: .example(), template: template, language: language, scale: 1)
         let legacyContent: Set<DailyBriefingContent> = [.localUsage, .firstActivity, .lastActivity, .allDevicesUsage,
-            .hourlyUsage, .workTime, .leisureTime, .otherTime, .characters, .topTypingApplication, .peakTypingHour,
-            .islandOpenings, .listeningTime, .peakPower, .batteryRange, .peakFan]
+                                                        .hourlyUsage, .workTime, .leisureTime, .otherTime, .characters, .topTypingApplication, .peakTypingHour,
+                                                        .islandOpenings, .listeningTime, .peakPower, .batteryRange, .peakFan]
         let legacy = try DailyBriefingRenderer.image(report: .example(selectedContent: legacyContent), template: template, language: language, scale: 1)
         #expect(image.width == 900)
         #expect((900...2200).contains(legacy.height), "Original content must retain its compact layout")
@@ -523,7 +528,7 @@ struct DailyBriefingIntegrationTests {
         var day = DailyBriefingDay(date: Date(timeIntervalSince1970: 1_800_000_000), calendar: DailyBriefingDay.calendar)
         day.activity = nil
         let report = DailyBriefingReport(day: day,
-            generatedAt: Date(timeIntervalSince1970: 1_800_000_000), typing: nil, allDeviceSeconds: nil)
+                                         generatedAt: Date(timeIntervalSince1970: 1_800_000_000), typing: nil, allDeviceSeconds: nil)
         let png = try DailyBriefingRenderer.png(report: report, template: template, language: .english)
         #expect(png.starts(with: [137, 80, 78, 71, 13, 10, 26, 10]))
         let decoded = try #require(NSBitmapImageRep(data: png))

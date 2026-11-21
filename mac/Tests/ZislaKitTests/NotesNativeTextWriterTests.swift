@@ -40,7 +40,7 @@ struct NotesNativeTextWriterTests {
         #expect(NotesNativeTextEdit(originalPlainText: "plain", imageSources: [], prefix: "", suffix: "").replacements(in: "plain") == nil)
         for position in [true, false] {
             let invalid = NotesNativeTextEdit(originalPlainText: "\u{FFFC}", imageSources: ["drawing"],
-                prefix: position ? "\u{FFFC}" : "", suffix: position ? "" : "\u{FFFC}")
+                                              prefix: position ? "\u{FFFC}" : "", suffix: position ? "" : "\u{FFFC}")
             #expect(invalid.replacements(in: "\u{FFFC}") == nil)
         }
     }
@@ -190,7 +190,8 @@ struct NotesNativeTextWriterTests {
             if fixture.replacementCount == 2 { fixture.selected = "other" }
         }
         if case .success = await NotesNativeTextWriter(dependencies: fixture.dependencies).write(
-            noteID: "note", edit: fixture.edit(prefix: "新前面", suffix: "新后面")) {
+            noteID: "note", edit: fixture.edit(prefix: "新前面", suffix: "新后面")
+        ) {
             Issue.record("Selection changes during a failed write must be reported")
         }
         #expect(fixture.text == "旧前面\u{FFFC}新后面")
@@ -238,7 +239,7 @@ struct NotesNativeTextWriterTests {
     @Test
     func detectsOnlyUnexposedNativeObjectsFromTheReadScript() async throws {
         for (text, count, native) in [("plain", "0", false), ("\u{FFFC}", "0", true),
-                                     ("\u{FFFC}", "1", false), ("\u{FFFC}\u{FFFC}", "1", true)] {
+                                      ("\u{FFFC}", "1", false), ("\u{FFFC}\u{FFFC}", "1", true)] {
             let result = await NotesAppBridge.readNote(id: "fixture") { source in
                 Self.compileNotesScript(source)
                 return .success([text, "<img src='drawing'>", "false", count])
@@ -403,8 +404,8 @@ private final class NativeNoteFixture {
             if let error = self.readFailure { return .failure(error) }
             if self.replacementCount > 0, self.afterWriteFault == "read" { return .failure(.failed("injected readback failure")) }
             return .success(NotesAppBridge.NoteContent(plainText: self.afterWriteFault == "text" && self.replacementCount > 0 ? "另一个版本\u{FFFC}" : self.text,
-                bodyHTML: self.afterWriteFault == "image" && self.replacementCount > 0 ? "<img src='different'>" : self.bodyHTML,
-                isPasswordProtected: self.locked, requiresNativeTextEditing: self.native && !(self.afterWriteFault == "native" && self.replacementCount > 0)))
+                                                       bodyHTML: self.afterWriteFault == "image" && self.replacementCount > 0 ? "<img src='different'>" : self.bodyHTML,
+                                                       isPasswordProtected: self.locked, requiresNativeTextEditing: self.native && !(self.afterWriteFault == "native" && self.replacementCount > 0)))
         }, selectedNoteID: { self.selected }, editor: { _ in
             guard self.editorAvailable else { return nil }
             return .init(text: { self.text }, replace: { range, value in

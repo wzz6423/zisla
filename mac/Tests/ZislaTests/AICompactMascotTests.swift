@@ -13,8 +13,8 @@ struct AICompactMascotTests {
     @Test(arguments: IslandEdge.allCases, [false, true])
     func floatingAIKeepsEveryProviderInsideItsExistingIconSlot(edge: IslandEdge, showsInformation: Bool) throws {
         let settings = FeatureSettings(statusIconDestination: .island,
-            islandShowMoreInformation: showsInformation, islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                                       islandShowMoreInformation: showsInformation, islandLayoutStyle: .pill,
+                                       islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         let singleProvider = (0..<3).map { notice(provider: .gpt, id: String($0)) }
         let multipleProviders = [singleProvider[0], notice(provider: .claude, id: "1"), notice(provider: .claude, id: "2")]
         let engine = SideNoticeLayoutEngine()
@@ -25,15 +25,15 @@ struct AICompactMascotTests {
         func rendered(_ notices: [IslandNotice], direction: LayoutDirection) throws -> NSBitmapImageRep {
             if showsInformation {
                 let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: [],
-                    settings: settings, item: nil, at: date))
+                                                                          settings: settings, item: nil, at: date))
                 #expect(layout.size == size, "Stacked providers must not widen the information row")
                 return try render(FloatingIslandInformationView(layout: layout, visualizationStyle: .waveform,
-                    item: nil, date: date), size: size, direction: direction)
+                                                                item: nil, date: date), size: size, direction: direction)
             }
             let value = try #require(engine.compactPillPresentations(for: notices, settings: settings).first)
             #expect(value.length(thickness: 32, edge: edge) == length)
             return try render(CompactPillStatusContent(presentation: value, text: value.text,
-                edge: edge, visualizationStyle: .waveform, item: nil, date: date), size: size, direction: direction)
+                                                       edge: edge, visualizationStyle: .waveform, item: nil, date: date), size: size, direction: direction)
         }
         for direction in [LayoutDirection.leftToRight, .rightToLeft] {
             let single = try rendered(singleProvider, direction: direction)
@@ -133,7 +133,7 @@ struct AICompactMascotTests {
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         func content(_ presentation: CompactPillStatusPresentation) throws -> NSBitmapImageRep {
             try render(CompactPillStatusContent(presentation: presentation, text: "1", edge: edge,
-                visualizationStyle: .waveform, item: nil, date: date), size: size)
+                                                visualizationStyle: .waveform, item: nil, date: date), size: size)
         }
         #expect(try differentPixels(content(legacy), content(current), edge: edge, range: 0..<length) == 0)
         #expect(try orangePixels(content(legacy), edge: edge, range: 12..<36) > 10)
@@ -160,7 +160,7 @@ struct AICompactMascotTests {
         let running = notice(provider: .gpt, id: "running")
         queue.enqueue(running, expiresAfter: nil)
         let completed = AIProgressTask(id: "completed", provider: .claude, title: "Claude",
-            progress: nil, status: status, updatedAt: date)
+                                       progress: nil, status: status, updatedAt: date)
         sweep.receive(previous: .running, task: completed, observedSince: .distantPast, settings: settings.settings)
         let current = try #require(sweep.current)
         let state = SideNoticeDisplayState()
@@ -168,9 +168,9 @@ struct AICompactMascotTests {
         state.placementMode = .custom
         state.compactWingHeight = 32
         let view = CompactStatusBarView(queue: queue, displayState: state, media: NowPlayingService(),
-            browserDownloads: BrowserDownloadMonitor(directories: [], eventPaths: []), settingsStore: settings,
-            resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
-            onStatusHidden: {})
+                                        browserDownloads: BrowserDownloadMonitor(directories: [], eventPaths: []), settingsStore: settings,
+                                        resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
+                                        onStatusHidden: {})
         let size = edge.isVertical ? CGSize(width: 32, height: 68) : CGSize(width: 60, height: 32)
         let showingResult = try render(view.statusBarContent(at: date), size: size)
         #expect(view.activeAINotices.count == 2)
@@ -187,7 +187,7 @@ struct AICompactMascotTests {
 
     private func notice(provider: AIProvider, id: String) -> IslandNotice {
         let task = AIProgressTask(id: id, provider: provider, title: provider.rawValue,
-            progress: nil, status: .running, updatedAt: date)
+                                  progress: nil, status: .running, updatedAt: date)
         return IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task), title: task.title)
     }
 

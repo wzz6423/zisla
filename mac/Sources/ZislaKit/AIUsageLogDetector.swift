@@ -166,7 +166,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         for candidate in candidates.sorted(by: { cacheKey(for: $0) < cacheKey(for: $1) }) {
             let key = cacheKey(for: candidate)
             if let cached = cache[key],
-                  cached.modificationDate == candidate.modificationDate,
+               cached.modificationDate == candidate.modificationDate,
                cached.changeDate == candidate.changeDate,
                cached.size == candidate.size {
                 samples.append(contentsOf: cached.samples)
@@ -255,13 +255,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         guard enabledProviders.contains(provider),
               fileManager.fileExists(atPath: root.path),
               let enumerator = fileManager.enumerator(
-                at: root,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
+                  at: root,
+                  includingPropertiesForKeys: [
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
+                  ],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -270,9 +270,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         for case let url as URL in enumerator {
             guard accepts(url, for: provider),
                   let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
                   ]),
                   values.isRegularFile == true else {
                 continue
@@ -532,7 +532,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 return []
             }
             return parseCodex(root, candidate: candidate, priorTotal: &parserState.codexPriorTotal,
-                model: parserState.codexModel).map { [$0] } ?? []
+                              model: parserState.codexModel).map { [$0] } ?? []
         case .claude:
             return parseClaude(root, candidate: candidate).map { [$0] } ?? []
         case .grok:
@@ -912,7 +912,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
 
     /// Inherits nearest model/date metadata and sorts dictionary traversal so sibling reordering cannot change identities.
     private func usageContexts(in value: Any, model: String?, timestamp date: Date, path: String,
-        location: [AIGenericUsageContext.PathComponent]) -> [UsageContext] {
+                               location: [AIGenericUsageContext.PathComponent]) -> [UsageContext] {
         if let dictionary = value as? [String: Any] {
             let ownModel = AIUsageAnalytics.normalizedModel(dictionary["model"] as? String) ?? model
             let ownDate = timestamp(in: dictionary, fallback: date)
@@ -928,7 +928,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             }
             for key in dictionary.keys.sorted() {
                 result.append(contentsOf: usageContexts(in: dictionary[key]!, model: ownModel,
-                    timestamp: ownDate, path: path + "/" + Data(key.utf8).base64EncodedString(), location: location + [.key(key)]))
+                                                        timestamp: ownDate, path: path + "/" + Data(key.utf8).base64EncodedString(), location: location + [.key(key)]))
             }
             return result
         }
@@ -936,7 +936,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return values.enumerated().flatMap { index, value in
                 let identity = ((value as? [String: Any])?["id"] as? String) ?? String(index)
                 return usageContexts(in: value, model: model, timestamp: date,
-                    path: path + "/" + Data(identity.utf8).base64EncodedString(), location: location + [.index(index)])
+                                     path: path + "/" + Data(identity.utf8).base64EncodedString(), location: location + [.index(index)])
             }
         }
         return []

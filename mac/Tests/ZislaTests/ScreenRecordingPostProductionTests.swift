@@ -32,7 +32,7 @@ struct ScreenRecordingPostProductionTests {
         project.edits.microphoneVolume = 0.75
         project.edits.segments = [.init(start: 0, end: 1, speed: 2)]
         let media = try await RecordingExportMedia.prepare(project: project, directory: fixture.directory,
-            timeline: RecordingExportTimeline(project: project))
+                                                           timeline: RecordingExportTimeline(project: project))
         let expected: [Float] = (screenAudio ? [0.25] : []) + (microphone ? [0.75] : [])
 
         expectVolumes(media.audioMix(for: media.audioTracks), equal: expected)
@@ -58,7 +58,7 @@ struct ScreenRecordingPostProductionTests {
             project.edits.screenAudioVolume = screenLevel
             project.edits.microphoneVolume = microphoneLevel
             let media = try await RecordingExportMedia.prepare(project: project, directory: fixture.directory,
-                timeline: RecordingExportTimeline(project: project))
+                                                               timeline: RecordingExportTimeline(project: project))
             expectVolumes(media.audioMix(for: media.audioTracks), equal: [Float(screenLevel), Float(microphoneLevel)])
         }
         #expect(FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("screen.mp4").path))
@@ -104,13 +104,14 @@ struct ScreenRecordingPostProductionTests {
                                   .init(start: 0.1, end: 0.4, speed: 0.5),
                                   .init(start: 0.6, end: 0.9)]
         project.edits.annotations = [.init(kind: .arrow, start: 0.6, end: 0.9,
-            x: 0.1, y: 0.25, endX: 0.4, endY: 0.25, color: .init(red: 0, green: 1, blue: 0), lineWidth: 0.05)]
+                                           x: 0.1, y: 0.25, endX: 0.4, endY: 0.25, color: .init(red: 0, green: 1, blue: 0), lineWidth: 0.05)]
         let item = try await ScreenRecordingExporter().playbackItem(project: project, directory: fixture.directory)
         let reader = try AVAssetReader(asset: item.asset)
         let output = AVAssetReaderVideoCompositionOutput(
             videoTracks: try await item.asset.loadTracks(withMediaType: .video), videoSettings: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            ])
+            ]
+        )
         output.videoComposition = try #require(item.videoComposition)
         reader.add(output)
         try #require(reader.startReading(), "Continuous edited playback must start decoding")
@@ -189,8 +190,8 @@ struct ScreenRecordingPostProductionTests {
         var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try bytes.withUnsafeMutableBytes { pointer in
             let context = try #require(CGContext(data: pointer.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         let offset = (y * image.width + x) * 4
@@ -240,7 +241,7 @@ struct ScreenRecordingPostProductionTests {
                 var buffer: CVPixelBuffer?
                 #expect(CVPixelBufferPoolCreatePixelBuffer(nil, try #require(adaptor.pixelBufferPool), &buffer) == kCVReturnSuccess)
                 context.render(CIImage(color: color).cropped(to: CGRect(x: 0, y: 0, width: 64, height: 48)),
-                    to: try #require(buffer))
+                               to: try #require(buffer))
                 #expect(adaptor.append(try #require(buffer), withPresentationTime: CMTime(value: Int64(index), timescale: 2)))
             }
             input.markAsFinished()
@@ -250,7 +251,7 @@ struct ScreenRecordingPostProductionTests {
             if withAudio {
                 try createTone(name: "system.m4a")
                 try await NativeMediaMuxer().mux(videoURL: plain, audioURL: directory.appendingPathComponent("system.m4a"),
-                    outputURL: directory.appendingPathComponent("screen.mp4"))
+                                                 outputURL: directory.appendingPathComponent("screen.mp4"))
             }
         }
     }

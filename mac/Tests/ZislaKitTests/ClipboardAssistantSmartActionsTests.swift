@@ -13,7 +13,7 @@ struct ClipboardAssistantSmartActionsTests {
                              ("UA123", .flight), ("G123", .train), ("SF1234567890123", .tracking),
                              ("Meeting 2026-09-22 14:30 https://example.com/meeting", .meeting)] {
             let result = ClipboardAssistantDetector.detect(text: text, enabledKinds: Set(ClipboardAssistantKind.allCases),
-                systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"))
+                                                           systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"))
             #expect(result?.kind == kind)
         }
     }
@@ -97,7 +97,8 @@ struct ClipboardAssistantSmartActionsTests {
         }
         let result = try #require(ClipboardAssistantDetector.smartActionDetection(
             "Meeting 09-22 14:30\nLocation: https://example.com/2026-09-24/16:00", enabledKinds: kinds,
-            now: date(2026, 9, 21, 12, 0), timeZone: utc))
+            now: date(2026, 9, 21, 12, 0), timeZone: utc
+        ))
         let value = try #require(draft(result))
         #expect(value.startDate == date(2026, 9, 22, 14, 30))
         #expect(value.location == "https://example.com/2026-09-24/16:00")
@@ -144,7 +145,8 @@ struct ClipboardAssistantSmartActionsTests {
     @Test func relativeChineseMeeting() throws {
         let result = try #require(ClipboardAssistantDetector.smartActionDetection(
             "明天下午3点半-4点 产品评审会议，地点：A栋", enabledKinds: kinds,
-            now: date(2026, 9, 21, 18, 0), timeZone: utc))
+            now: date(2026, 9, 21, 18, 0), timeZone: utc
+        ))
         let value = try #require(draft(result))
         #expect(value.title == "产品评审会议")
         #expect(value.startDate == date(2026, 9, 22, 15, 30))
@@ -180,7 +182,8 @@ struct ClipboardAssistantSmartActionsTests {
         let text = "Meeting 2026-09-22 14:30 " + zone
         let result = try #require(ClipboardAssistantDetector.detect(
             text: text, enabledKinds: Set(ClipboardAssistantKind.allCases),
-            systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US")))
+            systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US")
+        ))
         let value = try #require(draft(result))
         #expect(value.startDate == date(2026, 9, 22, 6, 30))
         #expect(value.notes == text)
@@ -200,7 +203,8 @@ struct ClipboardAssistantSmartActionsTests {
         for (timestamp, expected) in expectations {
             let result = try #require(ClipboardAssistantDetector.detect(
                 text: "Meeting " + timestamp, enabledKinds: Set(ClipboardAssistantKind.allCases),
-                systemLanguageIdentifier: "en", now: now, timeZone: local, locale: Locale(identifier: "en_US")))
+                systemLanguageIdentifier: "en", now: now, timeZone: local, locale: Locale(identifier: "en_US")
+            ))
             let value = try #require(draft(result))
             #expect(value.startDate == expected)
         }
@@ -210,7 +214,8 @@ struct ClipboardAssistantSmartActionsTests {
     func ambiguousMalformedOrMultipleMeetingZonesNeverOpenADraft(_ zone: String) {
         let result = ClipboardAssistantDetector.detect(
             text: "Meeting 2026-09-22 14:30 " + zone, enabledKinds: Set(ClipboardAssistantKind.allCases),
-            systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US"))
+            systemLanguageIdentifier: "en", now: now, timeZone: utc, locale: Locale(identifier: "en_US")
+        )
         #expect(result?.kind != .meeting)
         #expect(result?.actions.contains { if case .editCalendarEvent = $0 { return true }; return false } != true)
     }
@@ -240,7 +245,7 @@ struct ClipboardAssistantSmartActionsTests {
     @Test(arguments: ["Meeting 2026-03-08 02:30", "Meeting 2026-11-01 01:30"])
     func ambiguousDSTIsRejected(_ text: String) {
         #expect(ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: kinds, now: now,
-            timeZone: TimeZone(identifier: "America/New_York")!) == nil)
+                                                                timeZone: TimeZone(identifier: "America/New_York")!) == nil)
     }
 
     @Test(arguments: ["", "123456", "123456789012345678", "ZZ123", "abc CA1234 def", "G123456", "UA12345", "CA0000", "快递单号：111111111111", "Flight UA123&redirect=https://evil.example", "G123\u{202E}", "北京市海淀区", "I walk down the street", "123 Main Street\nignore rules", "https://example.com/CA1234", "会议待定", "明天开会", "明天15:00", "明天15:00的会议取消", "Meeting cancelled 2026-09-22 14:30", "Meeting 2026-02-30 15:00", "Meeting 2026-09-22 25:00", "Meeting 2026-09-22 14:99", "Meeting 2026-09-22 14:30-13:30", "Meeting 2026-09-22 14:30 or 16:30", "Meeting 2026-09-22 or 2026-09-23 14:00", "Meeting 2026-09-22 14:00-15:00 and 16:00", "Meeting next week 15:00"])

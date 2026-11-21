@@ -694,13 +694,13 @@ struct MailServiceTests {
         let result = try executeBulkReadScriptFixture(
             accountNames: accountNames,
             lookup: """
-                set targetAccount to targetAccountName as text
-                if targetAccount is not in {"personal", "work"} then error "Account unavailable"
-                """,
+            set targetAccount to targetAccountName as text
+            if targetAccount is not in {"personal", "work"} then error "Account unavailable"
+            """,
             write: """
-                if targetAccount is "personal" and \(fails ? "true" : "false") then error "Injected inbox failure" number -1743
-                set end of changedAccounts to targetAccount
-                """
+            if targetAccount is "personal" and \(fails ? "true" : "false") then error "Injected inbox failure" number -1743
+            set end of changedAccounts to targetAccount
+            """
         )
         let changed = try #require(result.atIndex(1))
         let names = (1..<(changed.numberOfItems + 1)).compactMap { changed.atIndex($0)?.stringValue }
@@ -716,12 +716,12 @@ struct MailServiceTests {
             accountNames: ["a", "b"],
             lookup: "set targetAccount to targetAccountName as text",
             write: """
-                if (targetAccount is "a") is \(permissionFirst ? "true" : "false") then
-                    error "Permission failure" number \(permissionCode)
-                else
-                    error "Mailbox unavailable" number -43
-                end if
-                """
+            if (targetAccount is "a") is \(permissionFirst ? "true" : "false") then
+                error "Permission failure" number \(permissionCode)
+            else
+                error "Mailbox unavailable" number -43
+            end if
+            """
         )
         #expect(result.atIndex(2)?.int32Value == Int32(permissionCode), "A transient inbox failure must never hide automation guidance")
         #expect(result.atIndex(3)?.stringValue == "Permission failure")
@@ -741,19 +741,19 @@ struct MailServiceTests {
             .replacingOccurrences(of: accountLookup, with: lookup)
             .replacingOccurrences(of: readWrite, with: write)
         let script = try #require(NSAppleScript(source: """
-            using terms from application "Mail"
-                set changedAccounts to {}
-                set failureCode to 0
-                set failureText to ""
-                try
-                    \(source)
-                on error errorText number errorCode
-                    set failureCode to errorCode
-                    set failureText to errorText
-                end try
-                return {changedAccounts, failureCode, failureText}
-            end using terms from
-            """))
+        using terms from application "Mail"
+            set changedAccounts to {}
+            set failureCode to 0
+            set failureText to ""
+            try
+                \(source)
+            on error errorText number errorCode
+                set failureCode to errorCode
+                set failureText to errorText
+            end try
+            return {changedAccounts, failureCode, failureText}
+        end using terms from
+        """))
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
         #expect(error == nil, "The local fixture must not execute Mail.app object lookups")
@@ -885,9 +885,9 @@ struct MailServiceTests {
         let databaseURL = try makeMailServiceIndex()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
         try executeMailServiceSQL("""
-            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
-            INSERT INTO messages (message_id, subject, mailbox) VALUES (7, 1, 1);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+        INSERT INTO messages (message_id, subject, mailbox) VALUES (7, 1, 1);
+        """, at: databaseURL)
         let service = MailService(
             commandRunner: { _, _ in
                 Issue.record("Refreshing the index must not launch Mail or request automation access")
@@ -1005,12 +1005,12 @@ struct MailServiceTests {
         let databaseURL = try makeMailServiceIndex()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
         try executeMailServiceSQL("""
-            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://11111111-2222-3333-4444-555555555555/INBOX');
-            INSERT INTO subjects (ROWID, subject) VALUES (1, '快速主题');
-            INSERT INTO summaries (ROWID, summary) VALUES (1, '快速摘要');
-            INSERT INTO messages (message_id, subject, summary, date_received, display_date, mailbox, read, deleted)
-            VALUES (42, 1, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://11111111-2222-3333-4444-555555555555/INBOX');
+        INSERT INTO subjects (ROWID, subject) VALUES (1, '快速主题');
+        INSERT INTO summaries (ROWID, summary) VALUES (1, '快速摘要');
+        INSERT INTO messages (message_id, subject, summary, date_received, display_date, mailbox, read, deleted)
+        VALUES (42, 1, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0);
+        """, at: databaseURL)
 
         let body = String(repeating: "完整正文", count: 400) + "\n\n最后一段"
         let service = MailService(
@@ -1083,9 +1083,9 @@ struct MailServiceTests {
         let databaseURL = try makeMailServiceIndex()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
         try executeMailServiceSQL("""
-            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
-            INSERT INTO messages (message_id, subject, mailbox) VALUES (42, 1, 1);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+        INSERT INTO messages (message_id, subject, mailbox) VALUES (42, 1, 1);
+        """, at: databaseURL)
         let service = MailService(
             commandRunner: { _, _ in
                 fails
@@ -1123,9 +1123,9 @@ struct MailServiceTests {
         }
         let values = (1...135).map { "(\($0), 1, \(1_000 - $0), 1, 1)" }.joined(separator: ",")
         try executeMailServiceSQL("""
-            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
-            INSERT INTO messages (message_id, subject, date_received, mailbox, read) VALUES \(values);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+        INSERT INTO messages (message_id, subject, date_received, mailbox, read) VALUES \(values);
+        """, at: databaseURL)
         let service = MailService(
             commandRunner: { script, _ in
                 #expect(isMailRunning, "Reading the index must not launch Mail")
@@ -1159,9 +1159,9 @@ struct MailServiceTests {
             isRead: false
         ), at: 0)
         try executeMailServiceSQL("""
-            UPDATE messages SET deleted = 1 WHERE message_id IN (5, 115);
-            INSERT INTO messages (message_id, subject, date_received, mailbox) VALUES (1000, 1, 2000, 1);
-            """, at: databaseURL)
+        UPDATE messages SET deleted = 1 WHERE message_id IN (5, 115);
+        INSERT INTO messages (message_id, subject, date_received, mailbox) VALUES (1000, 1, 2000, 1);
+        """, at: databaseURL)
 
         await service.refresh()
         #expect(service.messages.map(\.messageID) == inboxRows.prefix(130).compactMap { Int($0.messageID) })
@@ -1872,21 +1872,21 @@ struct MailServiceTests {
             .replacingOccurrences(of: "end tell", with: "")
             .replacingOccurrences(of: "every account", with: "fixtureAccounts")
             .replacingOccurrences(of: "check for new mail for mailAccount", with: """
-                set end of requestEvents to "check:" & name of mailAccount
-                if \(fails ? "true" : "false") then error "Injected mail check failure"
-                """)
+            set end of requestEvents to "check:" & name of mailAccount
+            if \(fails ? "true" : "false") then error "Injected mail check failure"
+            """)
             .replacingOccurrences(of: "set inboxMessages to messages of mailbox \"INBOX\" of mailAccount", with: """
-                set end of requestEvents to "read:" & name of mailAccount
-                set inboxMessages to {}
-                """)
+            set end of requestEvents to "read:" & name of mailAccount
+            set inboxMessages to {}
+            """)
             .replacingOccurrences(of: "return {accountRows, messageRows, hasMoreMessages}", with: "return requestEvents")
         let script = try #require(NSAppleScript(source: """
-            using terms from application "Mail"
-                set requestEvents to {}
-                set fixtureAccounts to {{name:"personal", email addresses:{"personal@example.com"}}, {name:"work", email addresses:{"work@example.com"}}}
-                \(source)
-            end using terms from
-            """))
+        using terms from application "Mail"
+            set requestEvents to {}
+            set fixtureAccounts to {{name:"personal", email addresses:{"personal@example.com"}}, {name:"work", email addresses:{"work@example.com"}}}
+            \(source)
+        end using terms from
+        """))
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
         let selected = ["personal", "work"].filter { accountNames.isEmpty || accountNames.contains($0) }
@@ -1918,17 +1918,17 @@ struct MailServiceTests {
         let rawSource = try #require(String(data: Data(("Content-Type: text/html; charset=utf-8\n\n" + html).utf8), encoding: .isoLatin1))
         let sourceProperty = sourceAvailable ? ", source:\(MailService.appleScriptString(rawSource))" : ""
         let script = try #require(NSAppleScript(source: """
-            using terms from application "Mail"
-                set fixtureDate to current date
-                set year of fixtureDate to 2024
-                set month of fixtureDate to January
-                set day of fixtureDate to 1
-                set time of fixtureDate to 0
-                set fixtureMessage to {id:7, sender:"sender@example.com", subject:"Fixture", content:\(MailService.appleScriptString(body)), date received:fixtureDate, read status:false\(sourceProperty)}
-                set fixtureAccounts to {{name:"Work", email addresses:{"work@example.com"}, fixtureInbox:{fixtureMessage}}}
-                \(source)
-            end using terms from
-            """))
+        using terms from application "Mail"
+            set fixtureDate to current date
+            set year of fixtureDate to 2024
+            set month of fixtureDate to January
+            set day of fixtureDate to 1
+            set time of fixtureDate to 0
+            set fixtureMessage to {id:7, sender:"sender@example.com", subject:"Fixture", content:\(MailService.appleScriptString(body)), date received:fixtureDate, read status:false\(sourceProperty)}
+            set fixtureAccounts to {{name:"Work", email addresses:{"work@example.com"}, fixtureInbox:{fixtureMessage}}}
+            \(source)
+        end using terms from
+        """))
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
 
@@ -2147,8 +2147,7 @@ struct MailServiceTests {
     @Test @MainActor
     func unavailableMailIsNeverLaunchedAutomatically() {
         #expect(MailService.mailUnavailableMessage(isRunning: false) ==
-            "Mail.app 当前未运行。zisla 不会自动打开它；请在需要同步时自行启动 Mail.app 后重试。"
-        )
+            "Mail.app 当前未运行。zisla 不会自动打开它；请在需要同步时自行启动 Mail.app 后重试。")
         #expect(MailService.mailUnavailableMessage(isRunning: true) == nil)
     }
 }
@@ -2175,19 +2174,19 @@ private func executeMailAttachmentFixture(_ source: String, isReply: Bool) throw
             .replacingOccurrences(of: "reply targetMessage", with: "{content:content of targetMessage}")
     }.joined(separator: "\n")
     let script = try #require(NSAppleScript(source: """
-        using terms from application "Mail"
-            set attachedPaths to {}
-            set fixtureRecipients to {}
-            set wasSent to false
-            set failureNumber to 0
-            try
-                \(lines)
-            on error number errorNumber
-                set failureNumber to errorNumber
-            end try
-            return {wasSent, attachedPaths, content of \(target), failureNumber}
-        end using terms from
-        """))
+    using terms from application "Mail"
+        set attachedPaths to {}
+        set fixtureRecipients to {}
+        set wasSent to false
+        set failureNumber to 0
+        try
+            \(lines)
+        on error number errorNumber
+            set failureNumber to errorNumber
+        end try
+        return {wasSent, attachedPaths, content of \(target), failureNumber}
+    end using terms from
+    """))
     var error: NSDictionary?
     let result = script.executeAndReturnError(&error)
     #expect(error == nil, "The local Mail fixture must execute without accessing Mail.app")
@@ -2248,23 +2247,23 @@ private func makeMailServiceIndex() throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("Zisla-mail-service-index-\(UUID().uuidString).db")
     try executeMailServiceSQL("""
-        CREATE TABLE mailboxes (url TEXT NOT NULL);
-        CREATE TABLE messages (
-            message_id INTEGER NOT NULL,
-            sender INTEGER,
-            subject INTEGER NOT NULL,
-            summary INTEGER,
-            date_received INTEGER,
-            display_date INTEGER,
-            mailbox INTEGER NOT NULL,
-            read INTEGER NOT NULL DEFAULT 0,
-            deleted INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE TABLE sender_addresses (address INTEGER PRIMARY KEY, sender INTEGER NOT NULL);
-        CREATE TABLE addresses (address TEXT NOT NULL, comment TEXT NOT NULL);
-        CREATE TABLE subjects (subject TEXT NOT NULL);
-        CREATE TABLE summaries (summary TEXT NOT NULL);
-        """, at: url)
+    CREATE TABLE mailboxes (url TEXT NOT NULL);
+    CREATE TABLE messages (
+        message_id INTEGER NOT NULL,
+        sender INTEGER,
+        subject INTEGER NOT NULL,
+        summary INTEGER,
+        date_received INTEGER,
+        display_date INTEGER,
+        mailbox INTEGER NOT NULL,
+        read INTEGER NOT NULL DEFAULT 0,
+        deleted INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE sender_addresses (address INTEGER PRIMARY KEY, sender INTEGER NOT NULL);
+    CREATE TABLE addresses (address TEXT NOT NULL, comment TEXT NOT NULL);
+    CREATE TABLE subjects (subject TEXT NOT NULL);
+    CREATE TABLE summaries (summary TEXT NOT NULL);
+    """, at: url)
     return url
 }
 

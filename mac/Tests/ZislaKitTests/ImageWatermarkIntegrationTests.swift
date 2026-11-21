@@ -8,12 +8,12 @@ import UniformTypeIdentifiers
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_IMAGE_TOOLS_INTEGRATION"] == "1"))
 struct ImageWatermarkIntegrationTests {
     #if arch(arm64)
-    private let executable = URL(fileURLWithPath: "/opt/homebrew/bin/vips")
+        private let executable = URL(fileURLWithPath: "/opt/homebrew/bin/vips")
     #else
-    private let executable = URL(fileURLWithPath: "/usr/local/bin/vips")
+        private let executable = URL(fileURLWithPath: "/usr/local/bin/vips")
     #endif
     private var service: ImageProcessingService { ImageProcessingService(executableURL: executable,
-        avifExecutableURL: executable.deletingLastPathComponent().appendingPathComponent("avifenc")) }
+                                                                         avifExecutableURL: executable.deletingLastPathComponent().appendingPathComponent("avifenc")) }
 
     @Test(arguments: ImageWatermarkPosition.allCases)
     func imageWatermarkCompositesAfterTransformAndResizeWithoutChangingTheSource(position: ImageWatermarkPosition) async throws {
@@ -27,7 +27,7 @@ struct ImageWatermarkIntegrationTests {
         let originalWatermark = try Data(contentsOf: watermark)
         let options = ImageWatermarkOptions(content: .image(watermark), opacity: 0.5, scale: 0.25, position: position)
         let batch = try await service.process([input], options: .init(quality: 100,
-            resize: .init(method: .fit, width: 40, height: 80), transform: .init(rotation: .clockwise90, flipHorizontal: true), watermark: options))
+                                                                      resize: .init(method: .fit, width: 40, height: 80), transform: .init(rotation: .clockwise90, flipHorizontal: true), watermark: options))
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.failures.isEmpty, "\(batch.failures)")
         let output = try #require(batch.items.first?.outputs.first)
@@ -53,9 +53,9 @@ struct ImageWatermarkIntegrationTests {
         let watermark = fixture.root.appendingPathComponent("oriented.png")
         try ImageTransformTests.Pixels.write(ImageWatermarkTests.Pixels.solid(width: 80, height: 40, alpha: 0), to: input)
         try ImageTransformTests.Pixels.write(ImageWatermarkTests.Pixels.solid(width: 10, height: 20, red: 255, alpha: 128), to: watermark,
-            properties: [kCGImagePropertyOrientation: 6])
+                                             properties: [kCGImagePropertyOrientation: 6])
         let batch = try await service.process([input], options: .init(quality: 100,
-            watermark: .init(content: .image(watermark), opacity: 0.5, scale: 0.25, position: .topLeft)))
+                                                                      watermark: .init(content: .image(watermark), opacity: 0.5, scale: 0.25, position: .topLeft)))
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.failures.isEmpty, "\(batch.failures)")
         let image = try ImageWatermarkTests.Pixels.load(try #require(batch.items.first?.outputs.first).url)
@@ -74,7 +74,7 @@ struct ImageWatermarkIntegrationTests {
         try ImageTransformTests.Pixels.write(ImageWatermarkTests.Pixels.solid(width: 12, height: 6, red: 255), to: watermark)
         let original = try Data(contentsOf: input)
         let batch = try await service.process([input], options: .init(quality: 100,
-            watermark: .init(content: .image(watermark), opacity: 1, scale: 0.25, position: .topLeft)))
+                                                                      watermark: .init(content: .image(watermark), opacity: 1, scale: 0.25, position: .topLeft)))
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.failures.isEmpty, "\(batch.failures)")
         let output = try #require(batch.items.first?.outputs.first)
@@ -99,7 +99,7 @@ struct ImageWatermarkIntegrationTests {
         defer { fixture.remove() }
         let source = try fixture.png(width: 80, height: 40, delays: [0.08, 0.25])
         let batch = try await service.process([source], options: .init(formats: [format], quality: 100,
-            watermark: .init(content: .text("Zisla"), opacity: 1, scale: 0.7, position: .topLeft, color: "#FF0000")))
+                                                                       watermark: .init(content: .text("Zisla"), opacity: 1, scale: 0.7, position: .topLeft, color: "#FF0000")))
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.failures.isEmpty, "\(batch.failures)")
         let output = try #require(batch.items.first?.outputs.first)
@@ -134,7 +134,7 @@ struct ImageWatermarkIntegrationTests {
         ])
         let original = try Data(contentsOf: input)
         let batch = try await service.process([input], options: .init(quality: 100, preserveMetadata: preserve,
-            watermark: .init(content: .text("© Zisla"), opacity: 1, color: "#FF0000")))
+                                                                      watermark: .init(content: .text("© Zisla"), opacity: 1, color: "#FF0000")))
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.failures.isEmpty, "\(batch.failures)")
         let output = try #require(batch.items.first?.outputs.first)
@@ -186,10 +186,10 @@ struct ImageWatermarkIntegrationTests {
             var environment = ProcessInfo.processInfo.environment
             environment["LC_ALL"] = "C"
             return try await AIAgentProcessRunner.run(executableURL: executable, arguments: arguments, standardInput: input,
-                environment: environment, workingDirectoryURL: work, timeout: 30)
+                                                      environment: environment, workingDirectoryURL: work, timeout: 30)
         }
         let batch = try await service.process([first, second], options: .init(quality: 100,
-            watermark: .init(content: .image(watermark), opacity: 1, scale: 0.5, position: .topLeft)))
+                                                                              watermark: .init(content: .image(watermark), opacity: 1, scale: 0.5, position: .topLeft)))
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.failures.isEmpty && batch.items.count == 2, "\(batch.failures)")
         for item in batch.items {

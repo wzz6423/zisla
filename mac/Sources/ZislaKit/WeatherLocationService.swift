@@ -244,8 +244,7 @@ struct CurrentLocationRequestState: Sendable {
 
 @MainActor
 final class CoreLocationCurrentLocationProvider:
-    NSObject, CurrentLocationProviding, CLLocationManagerDelegate
-{
+    NSObject, CurrentLocationProviding, CLLocationManagerDelegate {
     private var manager: CLLocationManager?
     private var continuation: CheckedContinuation<GeoCoordinate, Error>?
     private var timeoutTask: Task<Void, Never>?

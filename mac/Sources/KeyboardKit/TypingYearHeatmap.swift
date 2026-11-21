@@ -92,8 +92,8 @@ struct TypingYearHeatmap: View, Equatable {
                         presentation.rangeDescription
                     )
                 )
-                    .font(.caption)
-                    .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
+                .font(.caption)
+                .foregroundStyle(KeyboardVisualStyle.instrumentSecondary)
             }
 
             heatmapContent(

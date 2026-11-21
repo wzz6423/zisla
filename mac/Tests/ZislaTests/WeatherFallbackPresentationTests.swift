@@ -103,14 +103,14 @@ struct WeatherFallbackPresentationTests {
         #expect(language.isRightToLeft
             ? abs(sourceFrame.maxX - document.bounds.maxX + 2) < 0.5
             : abs(sourceFrame.minX - document.bounds.minX) < 0.5,
-                "Weather attribution must retain the enclosing layout direction in \(language.rawValue): \(sourceFrame)")
+            "Weather attribution must retain the enclosing layout direction in \(language.rawValue): \(sourceFrame)")
         #expect(document.frame.width <= scroll.contentView.bounds.width,
                 "Weather rows must fit the viewport, including the vertical scrollbar")
         var shiftedBounds = scroll.contentView.bounds
         shiftedBounds.origin.x += 24
         #expect(abs(scroll.contentView.constrainBoundsRect(shiftedBounds).minX
-            - scroll.contentView.bounds.minX) < 0.5,
-                "A horizontal scroll gesture must not move weather or clip the temperature")
+                    - scroll.contentView.bounds.minX) < 0.5,
+        "A horizontal scroll gesture must not move weather or clip the temperature")
         #expect(scroll.horizontalScrollElasticity == .none,
                 "Horizontal trackpad movement must not rubber-band the weather list")
         if locationCount > 1 {
@@ -397,7 +397,7 @@ struct WeatherFallbackPresentationTests {
         ).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .frame(height: 160, alignment: .topLeading)),
-                "All expired locations must show weather unavailable, not an empty scroll view")
+        "All expired locations must show weather unavailable, not an empty scroll view")
         #expect(try expired != pixels([:], at: allExpired), "An initial empty state must still show waiting for refresh")
         var recovered = london
         recovered.temperature = 25

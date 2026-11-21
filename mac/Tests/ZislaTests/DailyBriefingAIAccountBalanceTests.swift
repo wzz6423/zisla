@@ -11,7 +11,7 @@ struct DailyBriefingAIAccountBalanceTests {
     @Test func quotaIsIndependentSelectedAndDebugOrUnavailableDataDoesNotAllocateSection() throws {
         let date = Date(timeIntervalSince1970: 1_910_000_000)
         var report = DailyBriefingReport(day: DailyBriefingDay(date: date, calendar: DailyBriefingDay.calendar), generatedAt: date, typing: nil,
-            allDeviceSeconds: nil, selectedContent: [.aiAccountBalances])
+                                         allDeviceSeconds: nil, selectedContent: [.aiAccountBalances])
         #expect(report.aiAccountBalances.isEmpty)
         #expect(DailyBriefingPoster(report: report, template: .minimal, language: .english).displayedContent.isEmpty)
         var reading = balance(date)
@@ -35,9 +35,9 @@ struct DailyBriefingAIAccountBalanceTests {
         let reading = balance(sampleDate)
         var reports: [DailyBriefingReport] = []
         let controller = DailyBriefingController(store: DailyBriefingStore(fileURL: root.appendingPathComponent("history.json")),
-            observation: { .init(date: $0, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: false) },
-            aiAccountBalances: { [reading] }, typing: { _ in nil }, readScreenTime: { _ in .init() },
-            export: { report, _, _, directory in reports.append(report); return directory.appendingPathComponent("fixture.png") })
+                                                 observation: { .init(date: $0, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: false) },
+                                                 aiAccountBalances: { [reading] }, typing: { _ in nil }, readScreenTime: { _ in .init() },
+                                                 export: { report, _, _, directory in reports.append(report); return directory.appendingPathComponent("fixture.png") })
         controller.configure(settings: .init(enabled: true, selectedContent: [.aiAccountBalances]), directory: root, language: .english, startsTimer: false)
         await controller.exportToday(at: selectedDay)
         let report = try #require(reports.first)
@@ -54,6 +54,6 @@ struct DailyBriefingAIAccountBalanceTests {
 
     private func balance(_ sampledAt: Date) -> AIAccountBalance {
         .init(id: "fixture", providers: [.gpt], status: .available,
-            windows: [.init(id: "rolling", kind: .rolling, remainingPercent: 10)], updatedAt: sampledAt)
+              windows: [.init(id: "rolling", kind: .rolling, remainingPercent: 10)], updatedAt: sampledAt)
     }
 }

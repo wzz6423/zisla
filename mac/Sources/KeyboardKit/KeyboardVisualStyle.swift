@@ -310,8 +310,8 @@ struct KeyboardWindowGlass: View {
     var body: some View {
         Rectangle()
             .fill(KeyboardVisualStyle.canvas.opacity(KeyboardVisualStyle.glassTintOpacity))
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 
@@ -399,7 +399,7 @@ private final class KeyboardPreferenceWindowAccessorView: NSView {
         let desiredAppearance = appearancePreference.nsAppearance
         let appearanceChanged =
             window.appearance?.name != desiredAppearance?.name
-            || (window.appearance == nil) != (desiredAppearance == nil)
+                || (window.appearance == nil) != (desiredAppearance == nil)
         if appearanceChanged {
             window.appearance = desiredAppearance
         }

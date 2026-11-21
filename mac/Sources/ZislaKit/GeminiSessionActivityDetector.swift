@@ -87,13 +87,13 @@ public final class GeminiSessionActivityDetector: AIActivityDetecting {
     private func recentSessionFiles() -> [Candidate] {
         guard fileManager.fileExists(atPath: sessionsRoot.path),
               let enumerator = fileManager.enumerator(
-                at: sessionsRoot,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
-                ],
-                options: [.skipsHiddenFiles]
+                  at: sessionsRoot,
+                  includingPropertiesForKeys: [
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
+                  ],
+                  options: [.skipsHiddenFiles]
               ) else {
             return []
         }
@@ -103,9 +103,9 @@ public final class GeminiSessionActivityDetector: AIActivityDetecting {
             guard url.lastPathComponent.hasPrefix("session-"),
                   url.pathExtension == "jsonl" || url.pathExtension == "json",
                   let values = try? url.resourceValues(forKeys: [
-                    .isRegularFileKey,
-                    .contentModificationDateKey,
-                    .fileSizeKey,
+                      .isRegularFileKey,
+                      .contentModificationDateKey,
+                      .fileSizeKey,
                   ]),
                   values.isRegularFile == true else {
                 continue

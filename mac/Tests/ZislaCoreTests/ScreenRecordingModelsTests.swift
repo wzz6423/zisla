@@ -25,7 +25,7 @@ struct ScreenRecordingModelsTests {
         edits.removeValue(forKey: "cursorTrail")
         legacy["edits"] = edits
         let decoded = try JSONDecoder().decode(ScreenRecordingProject.self,
-            from: JSONSerialization.data(withJSONObject: legacy))
+                                               from: JSONSerialization.data(withJSONObject: legacy))
         source.edits.cursorTrail = nil
         try decoded.validate()
         #expect(decoded == source, "Older manifests must load without a version bump or enabled trail")
@@ -42,7 +42,7 @@ struct ScreenRecordingModelsTests {
     }
 
     @Test(arguments: [nil, RecordingColor(red: 0, green: 0, blue: 0),
-        .init(red: 1, green: 1, blue: 1), .init(red: 0.2, green: 0.7, blue: 0.4)] as [RecordingColor?])
+                      .init(red: 1, green: 1, blue: 1), .init(red: 0.2, green: 0.7, blue: 0.4)] as [RecordingColor?])
     func cursorTrailColorRoundTripsWithoutChangingOtherEdits(_ color: RecordingColor?) throws {
         var source = project()
         source.edits = RecordingEdits(segments: source.edits.segments, cursorTrail: true, cursorTrailColor: color)
@@ -69,13 +69,13 @@ struct ScreenRecordingModelsTests {
         try decoded.validate()
         #expect(decoded == source && decoded.version == version)
         #expect(decoded.edits.effectiveCursorTrailColor == .init(red: 1, green: 1, blue: 1),
-            "Existing manifests must keep a white trail without writing a new color or migrating their version")
+                "Existing manifests must keep a white trail without writing a new color or migrating their version")
     }
 
     @Test(arguments: [Double.nan, .infinity, -.infinity, -0.001, 1.000_001])
     func invalidCursorTrailColorComponentsAreRejected(_ component: Double) {
         for color in [RecordingColor(red: component, green: 0, blue: 0),
-            .init(red: 0, green: component, blue: 0), .init(red: 0, green: 0, blue: component)] {
+                      .init(red: 0, green: component, blue: 0), .init(red: 0, green: 0, blue: component)] {
             var source = project()
             source.edits.cursorTrailColor = color
             #expect(throws: ScreenRecordingProjectError.invalidProject) { try source.validate() }

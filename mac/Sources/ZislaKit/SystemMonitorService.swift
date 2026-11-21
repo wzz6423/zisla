@@ -982,13 +982,13 @@ enum SystemSampler {
                 defer { IOObjectRelease(service) }
                 var properties: Unmanaged<CFMutableDictionary>?
                 guard IORegistryEntryCreateCFProperties(
-                    service,
-                    &properties,
-                    kCFAllocatorDefault,
-                    0
-                ) == KERN_SUCCESS,
-                let dictionary = properties?.takeRetainedValue() as? [String: Any],
-                let statistics = dictionary["PerformanceStatistics"] as? [String: Any]
+                          service,
+                          &properties,
+                          kCFAllocatorDefault,
+                          0
+                      ) == KERN_SUCCESS,
+                      let dictionary = properties?.takeRetainedValue() as? [String: Any],
+                      let statistics = dictionary["PerformanceStatistics"] as? [String: Any]
                 else { continue }
 
                 for key in ["Temperature", "Controller Temperature", "Composite Temperature"] {
@@ -1030,13 +1030,13 @@ enum SystemSampler {
             defer { IOObjectRelease(service) }
             var properties: Unmanaged<CFMutableDictionary>?
             guard IORegistryEntryCreateCFProperties(
-                service,
-                &properties,
-                kCFAllocatorDefault,
-                0
-            ) == KERN_SUCCESS,
-            let dictionary = properties?.takeRetainedValue() as? [String: Any],
-            let statistics = dictionary["Statistics"] as? [String: Any]
+                      service,
+                      &properties,
+                      kCFAllocatorDefault,
+                      0
+                  ) == KERN_SUCCESS,
+                  let dictionary = properties?.takeRetainedValue() as? [String: Any],
+                  let statistics = dictionary["Statistics"] as? [String: Any]
             else { continue }
 
             if let readValue = counterValue(statistics["Bytes (Read)"]) {
@@ -1188,8 +1188,8 @@ enum SystemSampler {
     private static func primaryInterfaceName() -> String? {
         guard let store = SCDynamicStoreCreate(nil, "Zisla" as CFString, nil, nil),
               let state = SCDynamicStoreCopyValue(
-                store,
-                "State:/Network/Global/IPv4" as CFString
+                  store,
+                  "State:/Network/Global/IPv4" as CFString
               ) as? [String: Any]
         else { return nil }
         return state["PrimaryInterface"] as? String
@@ -1226,13 +1226,13 @@ enum SystemSampler {
                 defer { IOObjectRelease(service) }
                 var properties: Unmanaged<CFMutableDictionary>?
                 guard IORegistryEntryCreateCFProperties(
-                    service,
-                    &properties,
-                    kCFAllocatorDefault,
-                    0
-                ) == KERN_SUCCESS,
-                let dictionary = properties?.takeRetainedValue() as? [String: Any],
-                let statistics = dictionary["PerformanceStatistics"] as? [String: Any]
+                          service,
+                          &properties,
+                          kCFAllocatorDefault,
+                          0
+                      ) == KERN_SUCCESS,
+                      let dictionary = properties?.takeRetainedValue() as? [String: Any],
+                      let statistics = dictionary["PerformanceStatistics"] as? [String: Any]
                 else { continue }
 
                 maximumUsage = maximum(
@@ -1572,15 +1572,15 @@ enum SystemHardwareInfoReader {
 
     static func read(sysctlInt: SysctlIntReader = SystemSysctl.intValue(named:)) -> SystemHardwareInfo {
         guard let output = try? AIAgentProcessRunner.runSynchronously(
-            executableURL: URL(fileURLWithPath: "/usr/sbin/system_profiler"),
-            arguments: ["-json", "SPHardwareDataType", "SPDisplaysDataType"],
-            workingDirectoryURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
-            timeout: 30,
-            maximumOutputBytes: 4 * 1_024 * 1_024,
-            maximumErrorBytes: 64 * 1_024
-        ),
-        !output.didTimeout,
-        output.status == 0
+                  executableURL: URL(fileURLWithPath: "/usr/sbin/system_profiler"),
+                  arguments: ["-json", "SPHardwareDataType", "SPDisplaysDataType"],
+                  workingDirectoryURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+                  timeout: 30,
+                  maximumOutputBytes: 4 * 1_024 * 1_024,
+                  maximumErrorBytes: 64 * 1_024
+              ),
+              !output.didTimeout,
+              output.status == 0
         else {
             return .unavailable
         }
@@ -2976,12 +2976,12 @@ public enum SystemDiskCleanup {
                 at: child,
                 fileManager: fileManager,
                 depth: depth + 1,
-                    maxDepth: maxDepth,
-                    home: home,
-                    runningProcessPaths: runningProcessPaths,
-                    runningProcessWorkingDirectories: runningProcessWorkingDirectories,
-                    visited: &visited,
-                    result: &result
+                maxDepth: maxDepth,
+                home: home,
+                runningProcessPaths: runningProcessPaths,
+                runningProcessWorkingDirectories: runningProcessWorkingDirectories,
+                visited: &visited,
+                result: &result
             )
         }
     }
@@ -3243,11 +3243,11 @@ public enum SystemDiskCleanup {
         guard depth <= maxDepth,
               fileManager.fileExists(atPath: url.path),
               visited.insert(url.standardizedFileURL.path).inserted,
-                  let children = try? fileManager.contentsOfDirectory(
-                      at: url,
-                      includingPropertiesForKeys: [.isDirectoryKey],
-                      options: []
-                  )
+              let children = try? fileManager.contentsOfDirectory(
+                  at: url,
+                  includingPropertiesForKeys: [.isDirectoryKey],
+                  options: []
+              )
         else {
             return
         }

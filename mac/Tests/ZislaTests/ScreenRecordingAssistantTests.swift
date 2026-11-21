@@ -256,7 +256,7 @@ struct ScreenRecordingAssistantTests {
             .init(start: 3, end: 5, text: String(repeating: "长", count: 84)),
         ])
         #expect(captions.map(\.text) == ["Hello world.", "你好世界。", String(repeating: "长", count: 42),
-                                       String(repeating: "长", count: 42)])
+                                         String(repeating: "长", count: 42)])
         #expect(captions.map(\.start) == [0, 1, 3, 4])
         #expect(captions.map(\.end) == [1, 2, 4, 5])
         #expect(captions.allSatisfy { $0.text.count <= ScreenRecordingCaptionFormatter.maximumCharacters })

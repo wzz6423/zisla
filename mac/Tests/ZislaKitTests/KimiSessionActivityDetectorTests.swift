@@ -72,7 +72,7 @@ struct KimiSessionActivityDetectorTests {
         #expect(try detector.activeTasks().isEmpty, "Cancellation must clear the previous activity state")
         #expect(try detector.activeTasks().isEmpty, "Cached cancellation must not revive a task")
         #expect(try KimiSessionActivityDetector(homeDirectory: home).activeTasks().isEmpty,
-            "Replaying a cancelled transcript must remain idle")
+                "Replaying a cancelled transcript must remain idle")
 
         try appendKimiLine(#"{"type":"turn.prompt","time":1910000043000}"#, to: wireURL)
         let next = try #require(detector.activeTasks().first)
@@ -100,10 +100,10 @@ struct KimiSessionActivityDetectorTests {
         try handle.seekToEnd()
         try handle.write(contentsOf: Data(#"{"type":"turn.cancel","time":1910000052000"#.utf8))
         #expect(try detector.activeTasks().first?.status == .error,
-            "An incomplete cancellation must preserve the last readable activity")
+                "An incomplete cancellation must preserve the last readable activity")
         try handle.write(contentsOf: Data("}".utf8))
         #expect(try detector.activeTasks().first?.status == .error,
-            "A cancellation without a newline must preserve the last readable activity")
+                "A cancellation without a newline must preserve the last readable activity")
         try handle.write(contentsOf: Data("\n".utf8))
         #expect(try detector.activeTasks().isEmpty, "Completing the cancellation must clear the error")
     }

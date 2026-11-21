@@ -70,7 +70,7 @@ struct SettingsView: View {
         )
         .background(Color(nsColor: .windowBackgroundColor))
         .background(AIUsageHistoryPanelPresenter(presentationState: aiUsageHistoryPresentation,
-            controller: aiUsageHistory, languageStore: model.languageStore))
+                                                 controller: aiUsageHistory, languageStore: model.languageStore))
         .background(
             SystemMetricsHistoryPanelPresenter(
                 presentationState: historyPanelPresentation,
@@ -146,7 +146,7 @@ struct SettingsView: View {
 
     private var settingsSearchResults: [SettingsSearchItem] {
         SettingsSearchIndex.results(for: input.settingsQuery, settings: settingsStore.settings, locale: locale,
-            displayCount: activityNoticeDisplays.count)
+                                    displayCount: activityNoticeDisplays.count)
     }
 
     private var searchResultsContent: some View {
@@ -1247,14 +1247,14 @@ struct SettingsView: View {
                     )
                     rowDivider
                     featureToggle("启用录屏", detail: "",
-                        symbol: "record.circle", keyPath: \.screenRecordingEnabled)
+                                  symbol: "record.circle", keyPath: \.screenRecordingEnabled)
                 }
             }
 
             if input.selection == .recording {
                 settingsGroup("录屏") {
                     featureToggle("启用录屏", detail: "",
-                        symbol: "record.circle", keyPath: \.screenRecordingEnabled)
+                                  symbol: "record.circle", keyPath: \.screenRecordingEnabled)
                     rowDivider
                     settingRow(symbol: "rectangle.stack", title: "录屏工作室", detail: "") {
                         Button(AppLocalization.text("打开")) { model.presentScreenRecording() }
@@ -1467,8 +1467,8 @@ struct SettingsView: View {
                         get: { model.settingsStore.settings.keyboardVolume },
                         set: { model.settingsStore.settings.keyboardVolume = $0 }
                     ), in: 0...1)
-                    .frame(width: 150)
-                    .disabled(!model.settingsStore.settings.keyboardEnabled)
+                        .frame(width: 150)
+                        .disabled(!model.settingsStore.settings.keyboardEnabled)
                 }
                 rowDivider
                 featureToggle("播放键盘回弹音", detail: "", symbol: "arrow.uturn.backward", keyPath: \.keyboardPlaysReleaseSound, isNested: true)
@@ -1536,7 +1536,7 @@ struct SettingsView: View {
             }
             settingsGroup("收起态展示优先级") {
                 let priorities = Self.compactStatusPriorities(settings: settingsStore.settings,
-                    hasSystemMonitorIcons: model.islandHasSystemMonitorIcons)
+                                                              hasSystemMonitorIcons: model.islandHasSystemMonitorIcons)
                 ForEach(Array(priorities.enumerated()), id: \.element) { index, priority in
                     if index > 0 { rowDivider }
                     reorderSettingRow(
@@ -1718,7 +1718,7 @@ struct SettingsView: View {
 
     private var aiAccountBalanceSettings: some View {
         let websites = AIAccountBalanceWebsite.selected(for: settingsStore.settings.aiAccountBalanceMonitoredProviders,
-            qoderRegions: settingsStore.settings.aiAccountBalanceQoderRegions)
+                                                        qoderRegions: settingsStore.settings.aiAccountBalanceQoderRegions)
         return settingsGroup("AI 进度与用量") {
             featureToggle("低额度提醒", detail: "", symbol: "gauge.with.dots.needle.67percent", keyPath: \.aiAccountBalanceNoticeEnabled)
                 .disabled(!model.settingsStore.settings.aiProgressEnabled
@@ -1749,7 +1749,7 @@ struct SettingsView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
                                 AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: provider,
-                                    language: model.languageStore.language)
+                                                               language: model.languageStore.language)
                             }
                             Toggle(AppLocalization.text("监控额度"), isOn: balanceProviderBinding(provider, monitored: true))
                                 .toggleStyle(.switch).fixedSize()
@@ -1764,7 +1764,7 @@ struct SettingsView: View {
                                     if settingsStore.settings.aiAccountBalanceMonitoredProviders.contains(.coder)
                                         && settingsStore.settings.aiAccountBalanceQoderRegions.contains(region) {
                                         AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: .coder,
-                                            language: model.languageStore.language, qoderRegion: region)
+                                                                       language: model.languageStore.language, qoderRegion: region)
                                     } else {
                                         AppLocalizedText(region.title)
                                     }
@@ -2559,7 +2559,7 @@ struct SettingsView: View {
 
     private func screenshotConflictMessage(actionName: String, conflict: ScreenshotHotkeyAction) -> String {
         AppLocalization.text("%@快捷键与%@冲突，未保存",
-            AppLocalization.text(actionName), AppLocalization.text(conflict.name))
+                             AppLocalization.text(actionName), AppLocalization.text(conflict.name))
     }
 
     private var currentScreenshotHotkeyConflict: String? {
@@ -2601,7 +2601,7 @@ struct SettingsView: View {
         for action in RecordingShortcutAction.allCases {
             if let conflict = settings.recordingShortcutConflict(for: settings.screenRecordingHotkey(for: action), excluding: action) {
                 return AppLocalization.text("%@快捷键与%@冲突，请修改其中一个",
-                    AppLocalization.text(action.title), AppLocalization.text(conflict))
+                                            AppLocalization.text(action.title), AppLocalization.text(conflict))
             }
         }
         return nil
@@ -2611,7 +2611,7 @@ struct SettingsView: View {
         let settings = model.settingsStore.settings
         if let conflict = settings.recordingShortcutConflict(for: hotkey, excluding: action) {
             recordingHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存",
-                AppLocalization.text(action.title), AppLocalization.text(conflict))
+                                                                    AppLocalization.text(action.title), AppLocalization.text(conflict))
             return
         }
         model.settingsStore.settings.screenRecordingHotkeys[String(action.rawValue)] = hotkey
@@ -2623,7 +2623,7 @@ struct SettingsView: View {
         guard settings.screenRecordingEnabled,
               let conflict = RecordingShortcutAction.allCases.first(where: { hotkey.conflicts(with: settings.screenRecordingHotkey(for: $0)) }) else { return nil }
         return AppLocalization.text("%@快捷键与%@冲突，未保存",
-            AppLocalization.text(actionName), AppLocalization.text(conflict.title))
+                                    AppLocalization.text(actionName), AppLocalization.text(conflict.title))
     }
 
     private func updateScreenshotHotkey(
@@ -2635,7 +2635,7 @@ struct SettingsView: View {
         if settings.screenRecordingEnabled,
            let conflict = RecordingShortcutAction.allCases.first(where: { hotkey.conflicts(with: settings.screenRecordingHotkey(for: $0)) }) {
             screenshotHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存",
-                actionName, AppLocalization.text(conflict.title))
+                                                                     actionName, AppLocalization.text(conflict.title))
             return
         }
         if let reservedAction = ScreenshotEditorWindow.reservedAction(for: hotkey) {
@@ -2927,10 +2927,10 @@ struct SettingsView: View {
                         do { try Self.chooseSaveDirectory(location, locations: model.saveLocations) }
                         catch { model.transientMessage = error.localizedDescription }
                     }
-                        .buttonStyle(.bordered)
-                        .keepsIntrinsicWidth()
-                        .accessibilityLabel(AppLocalization.format("更改 %@ 的保存位置", locale: locale,
-                            [AppLocalization.string(location.title, locale: locale)]))
+                    .buttonStyle(.bordered)
+                    .keepsIntrinsicWidth()
+                    .accessibilityLabel(AppLocalization.format("更改 %@ 的保存位置", locale: locale,
+                                                               [AppLocalization.string(location.title, locale: locale)]))
                 }
             }
             HStack {
@@ -3884,7 +3884,7 @@ struct SettingsView: View {
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier),
            let bundle = Bundle(url: url),
            let name = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
-            ?? bundle.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String,
+           ?? bundle.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String,
            !name.isEmpty {
             return name
         }
@@ -4231,7 +4231,7 @@ struct SettingsView: View {
                 (Text(AppLocalization.string(title, locale: locale))
                     + (isDefaultAction
                         ? Text(" " + AppLocalization.string("（默认）", locale: locale))
-                            .foregroundColor(.secondary)
+                        .foregroundColor(.secondary)
                         : Text("")))
                     .font(.system(size: 13, weight: .medium))
                     .fitsLines(2)
@@ -4291,8 +4291,7 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 6) {
                 if let brandIconAsset,
-                   let image = brandIcon(named: brandIconAsset)
-                {
+                   let image = brandIcon(named: brandIconAsset) {
                     Image(nsImage: image)
                         .resizable()
                         .renderingMode(.template)
@@ -4353,21 +4352,21 @@ struct SettingsView: View {
                 model.checkForUpdates(manual: true)
             }
         } else {
-        switch model.updateState {
-        case .checking:
-            ProgressView().controlSize(.small)
-        case .current:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.zislaSuccess)
-        case .available:
-            Image(systemName: "arrow.up.circle.fill")
-                .foregroundStyle(Color.zislaInfo)
-        case .failed:
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Color.zislaWarning)
-        case .idle:
-            EmptyView()
-        }
+            switch model.updateState {
+            case .checking:
+                ProgressView().controlSize(.small)
+            case .current:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.zislaSuccess)
+            case .available:
+                Image(systemName: "arrow.up.circle.fill")
+                    .foregroundStyle(Color.zislaInfo)
+            case .failed:
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.zislaWarning)
+            case .idle:
+                EmptyView()
+            }
         }
     }
 

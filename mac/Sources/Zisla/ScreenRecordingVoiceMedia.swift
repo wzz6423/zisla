@@ -27,7 +27,7 @@ actor RecordingVoiceMedia {
         if directory == nil {
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-voice-media-\(UUID())", isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false,
-                attributes: [.posixPermissions: 0o700])
+                                                    attributes: [.posixPermissions: 0o700])
             directory = folder
         }
         let url = directory!.appendingPathComponent("\(UUID()).mov")

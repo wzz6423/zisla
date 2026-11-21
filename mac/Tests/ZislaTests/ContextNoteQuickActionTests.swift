@@ -41,7 +41,7 @@ struct ContextNoteQuickActionTests {
             .transaction { $0.disablesAnimations = true })
         host.sizingOptions = []
         let panel = RasterPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 533, height: 37),
-                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                                styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.renderScale = CGFloat(renderScale)
         panel.isReleasedWhenClosed = false
         defer { panel.close() }
@@ -116,7 +116,7 @@ struct ContextNoteQuickActionTests {
         .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         reference.sizingOptions = []
         let referencePanel = RasterPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 26, height: 37),
-                                     styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         referencePanel.renderScale = CGFloat(renderScale)
         referencePanel.isReleasedWhenClosed = false
         defer { referencePanel.close() }
@@ -149,9 +149,9 @@ struct ContextNoteQuickActionTests {
         controller.onPerformAction = { actions.append($0) }
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
             let event = try #require(NSEvent.mouseEvent(with: type,
-                location: CGPoint(x: language.isRightToLeft ? 440 : 100, y: 18.5), modifierFlags: [],
-                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: panel.windowNumber, context: nil,
-                eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                                                        location: CGPoint(x: language.isRightToLeft ? 440 : 100, y: 18.5), modifierFlags: [],
+                                                        timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: panel.windowNumber, context: nil,
+                                                        eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
             panel.sendEvent(event)
         }
         #expect(actions == [.showContextNote(item.id)])
@@ -163,17 +163,20 @@ struct ContextNoteQuickActionTests {
     func reminderWidthReservesTheTimestampInsteadOfHiddenActionButtons() {
         let id = UUID()
         let ordinary = ClipboardAssistantDetection(kind: .text, title: "remember",
-            actions: [.showContextNote(id), .copyContextNote(id), .deleteContextNote(id)])
+                                                   actions: [.showContextNote(id), .copyContextNote(id), .deleteContextNote(id)])
         var reminder = ordinary
         reminder.contextNoteAddedAt = Date(timeIntervalSince1970: 123_456)
         let ordinaryWidth = ClipboardAssistantController.trailingControlsWidth(
-            for: ordinary, isLightweightMode: false, shortcutHint: nil, locale: Locale(identifier: "en"))
+            for: ordinary, isLightweightMode: false, shortcutHint: nil, locale: Locale(identifier: "en")
+        )
         let reminderWidth = ClipboardAssistantController.trailingControlsWidth(
-            for: reminder, isLightweightMode: false, shortcutHint: nil, locale: Locale(identifier: "en"))
+            for: reminder, isLightweightMode: false, shortcutHint: nil, locale: Locale(identifier: "en")
+        )
         #expect(reminderWidth > 22)
         #expect(reminderWidth < ordinaryWidth)
         #expect(ClipboardAssistantController.trailingControlsWidth(
-            for: reminder, isLightweightMode: true, shortcutHint: nil, locale: Locale(identifier: "en")) == reminderWidth)
+            for: reminder, isLightweightMode: true, shortcutHint: nil, locale: Locale(identifier: "en")
+        ) == reminderWidth)
     }
 
     @Test

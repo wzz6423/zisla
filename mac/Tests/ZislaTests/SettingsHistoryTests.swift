@@ -56,7 +56,7 @@ struct SettingsHistoryTests {
             (.workflow, .row("播放来源")),
         ]
         let settings = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false,
-            lockScreenInfoEnabled: false, sideNoticesEnabled: false, userCareEnabled: false)
+                                       lockScreenInfoEnabled: false, sideNoticesEnabled: false, userCareEnabled: false)
         for (page, anchor) in destinations {
             input.select(page, searchTarget: anchor)
         }

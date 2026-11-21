@@ -118,8 +118,8 @@ struct AudioSplitEditorSheet: View {
                             timeLabel(draft.analysis.suggestion.releaseTransientTime)
                         )
                     )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 .padding(12)
                 .keyboardPanel(radius: KeyboardVisualStyle.compactRadius)

@@ -119,10 +119,10 @@ public final class PiSessionActivityDetector: AIActivityDetecting {
             let arguments = String(fields[2])
             let isNodeLauncher = executable == "node" || executable == "bun"
             guard executable == "pi"
-                    || isNodeLauncher && (
-                        arguments.contains("/pi-coding-agent/")
-                            || arguments.contains("pi-coding-agent/dist/cli")
-                    )
+                || isNodeLauncher && (
+                    arguments.contains("/pi-coding-agent/")
+                        || arguments.contains("pi-coding-agent/dist/cli")
+                )
             else { continue }
             let argumentFields = fields[2].split(whereSeparator: \.isWhitespace)
             guard !argumentFields.contains("--no-session") else { continue }

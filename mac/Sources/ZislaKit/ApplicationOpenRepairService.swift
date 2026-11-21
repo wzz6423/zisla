@@ -160,8 +160,8 @@ public struct ApplicationOpenRepairService: Sendable {
         }
         if signature == .incompleteAdhoc,
            diagnostic == "code has no resources but signature indicates they must be present"
-            || (assessment.status == 1 && diagnostic == "internal error in code signing subsystem")
-            || (assessment.status == 3 && diagnostic == "rejected") { return }
+           || (assessment.status == 1 && diagnostic == "internal error in code signing subsystem")
+           || (assessment.status == 3 && diagnostic == "rejected") { return }
         if assessment.status == 3, diagnostic == "rejected" {
             if signature == .valid { return }
             if signature == .adhoc {
@@ -193,7 +193,7 @@ public struct ApplicationOpenRepairService: Sendable {
               uniqueJSONKeys(data), Set(report.keys) == ["output"],
               let issues = report["output"] as? [[String: String]], issues.count == 2 else { return false }
         let fields: Set<String> = ["SyspolicyCheckShortError", "SyspolicyCheckErrorLevel", "SyspolicyCheckLongError",
-            "SyspolicyCheckAdditionalInformation", "SyspolicyCheckAdvice", "SyspolicyCheckDocumentationLink", "SyspolicyCheckErrorFile"]
+                                   "SyspolicyCheckAdditionalInformation", "SyspolicyCheckAdvice", "SyspolicyCheckDocumentationLink", "SyspolicyCheckErrorFile"]
         var expected = ["Adhoc Signed App": "Warning", "Notary Ticket Missing": "Fatal"]
         for issue in issues {
             guard Set(issue.keys).isSubset(of: fields), let name = issue["SyspolicyCheckShortError"],

@@ -173,8 +173,8 @@ struct AIAgentServicesTests {
         store.state = AIAgentState(cliAutoUpdateEnabled: false)
         workspace.setCLIAutoUpdateEnabled(true, for: .codex)
         workspace.start()
-        await waitForFile(at: updateMarker)
-        await waitForCLICommandRunToFinish(workspace)
+        await workspace.refreshCLIs()
+        await workspace.refreshCLIs()
 
         #expect(store.state.isCLIAutoUpdateEnabled(for: .codex))
         #expect(FileManager.default.fileExists(atPath: updateMarker.path))
@@ -192,8 +192,8 @@ struct AIAgentServicesTests {
         workspace.setCLIAutoUpdateEnabled(false, for: .codex)
         workspace.setCLIAutoUpdateEnabled(true, for: .claude)
         workspace.start()
-        await waitForFile(at: argumentsFile)
-        await waitForCLICommandRunToFinish(workspace)
+        await workspace.refreshCLIs()
+        await workspace.refreshCLIs()
 
         let arguments = try String(contentsOf: argumentsFile, encoding: .utf8)
         #expect(arguments.contains("@anthropic-ai/claude-code@latest"))
@@ -377,12 +377,13 @@ struct AIAgentServicesTests {
         )
         workspace.store.state = AIAgentState(cliAutoUpdateEnabled: false, cliAutoUpdateOverrides: ["codex": true])
         workspace.start()
+        await workspace.refreshCLIs()
         await waitForFile(at: started)
         try #require(FileManager.default.fileExists(atPath: started.path))
         #expect(workspace.isRunningCLICommands)
         workspace.setCLIAutoUpdateEnabled(false, for: .codex)
         try Data().write(to: release)
-        await waitForCLICommandRunToFinish(workspace)
+        await workspace.refreshCLIs()
 
         #expect(workspace.cliCommandProgress?.state == .succeeded)
         #expect(try String(contentsOf: argumentsFile, encoding: .utf8).contains("@openai/codex@latest"))
@@ -1051,7 +1052,6 @@ struct AIAgentServicesTests {
         ))
     }
 
-
     @Test
     func cliDiscoveryUsesNPMGlobalPathAndResolvesSymlinks() throws {
         let root = FileManager.default.temporaryDirectory
@@ -1636,7 +1636,6 @@ struct AIAgentServicesTests {
     private func parallelCommand(startedAt: URL, waitingFor peer: URL) -> String {
         "touch '\(startedAt.path)'; for _ in $(seq 1 50); do [ -f '\(peer.path)' ] && exit 0; sleep 0.01; done; exit 1"
     }
-
 
     @Test
     func additionalCLIDiscoveryAndVersionDetection() async throws {

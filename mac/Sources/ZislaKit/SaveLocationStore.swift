@@ -65,7 +65,7 @@ public final class SaveLocationStore: ObservableObject {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let download = ScreenRecordingOutputDirectoryStore(defaults: defaults,
-            bookmarkKey: SaveLocation.download.bookmarkKey, pathKey: nil)
+                                                           bookmarkKey: SaveLocation.download.bookmarkKey, pathKey: nil)
         var stores: [SaveLocation: ScreenRecordingOutputDirectoryStore] = [.download: download]
         for location in SaveLocation.allCases where location != .download {
             let pathKey = location.pathKey!
@@ -80,7 +80,7 @@ public final class SaveLocationStore: ObservableObject {
                 }
             }
             stores[location] = ScreenRecordingOutputDirectoryStore(defaults: defaults,
-                bookmarkKey: location.bookmarkKey, pathKey: pathKey)
+                                                                   bookmarkKey: location.bookmarkKey, pathKey: pathKey)
         }
         self.stores = stores
         directories = stores.mapValues(\.directory)
@@ -101,7 +101,7 @@ public final class SaveLocationStore: ObservableObject {
                 defaults.set(location.defaultDirectory.path, forKey: pathKey)
             }
             stores[location] = ScreenRecordingOutputDirectoryStore(defaults: defaults,
-                bookmarkKey: location.bookmarkKey, pathKey: location.pathKey)
+                                                                   bookmarkKey: location.bookmarkKey, pathKey: location.pathKey)
         }
         directories = stores.mapValues(\.directory)
     }

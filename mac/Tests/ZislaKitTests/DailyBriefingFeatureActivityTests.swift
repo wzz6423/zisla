@@ -71,8 +71,8 @@ struct DailyBriefingFeatureActivityTests {
             if activity == .shelfItemsAdded { added += count }
         }
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         let png = try #require(bitmap.representation(using: .png, properties: [:]))
         #expect(store.importImage(png) == 1)
         #expect(store.importImage(Data()) == 0)
@@ -81,8 +81,8 @@ struct DailyBriefingFeatureActivityTests {
         #expect(store.importPromisedFile(at: staged, from: directory) == 1)
         #expect(store.importPromisedFile(at: directory.deletingLastPathComponent(), from: directory) == 0)
         let metadata = ShelfScreenshotMetadata(source: .init(applicationName: "Fixture", bundleIdentifier: nil, processIdentifier: nil),
-            isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero, screenFrame: nil,
-            displayIdentifier: nil, pixelWidth: 2, pixelHeight: 2)
+                                               isLongScreenshot: false, initialCaptureRect: .zero, captureRect: .zero, screenFrame: nil,
+                                               displayIdentifier: nil, pixelWidth: 2, pixelHeight: 2)
         _ = try store.stashScreenshot(png: png, metadata: metadata)
         #expect(throws: (any Error).self) { try store.stashScreenshot(png: Data(), metadata: metadata) }
         #expect(added == 3)
@@ -95,7 +95,7 @@ struct DailyBriefingFeatureActivityTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         var date = Date(timeIntervalSince1970: 1_800_000_000)
         let service = PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults,
-            completionSoundHandler: {}, now: { date })
+                                      completionSoundHandler: {}, now: { date })
         defer { service.stop() }
         service.notificationsMuted = true
         service.setFocusDuration(2)
@@ -128,12 +128,13 @@ struct DailyBriefingFeatureActivityTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let note = NotesAppBridge.NoteSummary(id: "fixture", title: "Fixture", modifiedAt: .now)
         let service = QuickNotesService(welcomeDismissalDefaults: defaults,
-            operations: .init(
-                listNotes: { .success([note]) },
-                readNote: { _ in .success(.init(plainText: "fixture", bodyHTML: "fixture", isPasswordProtected: false)) },
-                writeNote: { _, _ in fails ? .failure(.failed("fixture failure")) : .success(()) },
-                createNote: { _, _ in fails ? .failure(.failed("fixture failure")) : .success("created") },
-                deleteNote: { _ in fails ? .failure(.failed("fixture failure")) : .success(()) }), saveDelay: .zero)
+                                        operations: .init(
+                                            listNotes: { .success([note]) },
+                                            readNote: { _ in .success(.init(plainText: "fixture", bodyHTML: "fixture", isPasswordProtected: false)) },
+                                            writeNote: { _, _ in fails ? .failure(.failed("fixture failure")) : .success(()) },
+                                            createNote: { _, _ in fails ? .failure(.failed("fixture failure")) : .success("created") },
+                                            deleteNote: { _ in fails ? .failure(.failed("fixture failure")) : .success(()) }
+                                        ), saveDelay: .zero)
         var totals = DailyBriefingActivityTotals()
         service.onDailyBriefingActivity = { activity, count, seconds, _ in
             totals.record(activity, count: count, focusSeconds: seconds)

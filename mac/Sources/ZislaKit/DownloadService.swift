@@ -403,7 +403,7 @@ public actor DownloadService {
             guard request.browserCookieSource == nil,
                   Self.requiresBrowserCookieDetection(error, urlString: request.urlString),
                   let probeResult = try await probeFormatsUsingAvailableBrowserCookies(
-                    urlString: request.urlString
+                      urlString: request.urlString
                   ),
                   let browserCookieSource = probeResult.browserCookieSource
             else {

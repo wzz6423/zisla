@@ -133,8 +133,8 @@ struct ScreenRecordingZeroPaddingTests {
             return (red: pixels[offset], green: pixels[offset + 1], blue: pixels[offset + 2])
         }
         #expect(colors.contains { $0.red > 252 && $0.green < 3 && $0.blue < 3 }
-                && colors.contains { $0.blue > 252 && $0.green < 3 && $0.red < 3 },
-                "Nonzero padding must preserve both colored source edges rather than crop them to fill the inset")
+            && colors.contains { $0.blue > 252 && $0.green < 3 && $0.red < 3 },
+            "Nonzero padding must preserve both colored source edges rather than crop them to fill the inset")
         #expect(pixels[0] > 252 && pixels[2] > 252,
                 "Nonzero padding must retain the selected background")
     }
@@ -149,21 +149,21 @@ struct ScreenRecordingZeroPaddingTests {
         let still = try renderer.image(screen: screen, camera: nil, sourceTime: 0)
         var output: CVPixelBuffer?
         #expect(CVPixelBufferCreate(nil, Int(size.width), Int(size.height), kCVPixelFormatType_32BGRA,
-                                   [kCVPixelBufferIOSurfacePropertiesKey as String: [:]] as CFDictionary,
-                                   &output) == kCVReturnSuccess)
+                                    [kCVPixelBufferIOSurfacePropertiesKey as String: [:]] as CFDictionary,
+                                    &output) == kCVReturnSuccess)
         let buffer = try #require(output)
         let rendered = try renderer.render(screen: screen, camera: nil, sourceTime: 0)
         renderer.context.render(rendered, to: buffer, bounds: renderer.canvas,
                                 colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
         let video = try #require(renderer.context.createCGImage(CIImage(cvPixelBuffer: buffer), from: renderer.canvas,
-                                                              format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!))
+                                                                format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!))
         #expect(try bytes(still) == bytes(video), "Still preview and video pixel-buffer output must use the same canvas geometry")
         try expectGreenCanvas(video)
     }
 
     private func project(size: CGSize) -> ScreenRecordingProject {
         var project = ScreenRecordingProject(name: "Zero Padding", videoFile: "screen.mp4", duration: 1,
-                                              width: Int(size.width), height: Int(size.height))
+                                             width: Int(size.width), height: Int(size.height))
         project.edits.showCursor = false
         project.edits.clickEffects = false
         project.edits.showCaptions = false
@@ -179,9 +179,9 @@ struct ScreenRecordingZeroPaddingTests {
                               width: crop.width * size.width, height: crop.height * size.height)
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         let context = try #require(CGContext(data: nil, width: Int(size.width), height: Int(size.height),
-                                            bitsPerComponent: 8, bytesPerRow: Int(size.width) * 4,
-                                            space: colorSpace,
-                                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bitsPerComponent: 8, bytesPerRow: Int(size.width) * 4,
+                                             space: colorSpace,
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(colorSpace: colorSpace, components: [0, 0, 1, 1])!)
         context.fill(CGRect(origin: .zero, size: size))
         // Keep contrasting pixels outside the fractional boundary's sampling footprint.
@@ -203,9 +203,9 @@ struct ScreenRecordingZeroPaddingTests {
         var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try pixels.withUnsafeMutableBytes { pointer in
             let context = try #require(CGContext(data: pointer.baseAddress, width: image.width, height: image.height,
-                                                bitsPerComponent: 8, bytesPerRow: image.width * 4,
-                                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         return pixels

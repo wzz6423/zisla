@@ -129,7 +129,7 @@ public struct FileShelfItem: Identifiable, Equatable {
         } else if contentType.conforms(to: .sourceCode) || contentType.conforms(to: .script) {
             return .code
         } else if contentType.conforms(to: .text) || contentType.conforms(to: .pdf) ||
-                  contentType.conforms(to: .spreadsheet) || contentType.conforms(to: .presentation) {
+            contentType.conforms(to: .spreadsheet) || contentType.conforms(to: .presentation) {
             return .document
         }
 
@@ -240,8 +240,8 @@ public final class FileShelfStore: ObservableObject {
 
     private func screenshotItem(id: UUID, addedAt: Date, metadata: ShelfScreenshotMetadata) -> FileShelfItem {
         FileShelfItem(id: id,
-            url: screenshotDatabase.directory.appendingPathComponent("cache").appendingPathComponent(id.uuidString + ".png"),
-            addedAt: addedAt, bookmarkData: Data(), screenshotMetadata: metadata)
+                      url: screenshotDatabase.directory.appendingPathComponent("cache").appendingPathComponent(id.uuidString + ".png"),
+                      addedAt: addedAt, bookmarkData: Data(), screenshotMetadata: metadata)
     }
 
     private func removeScreenshotCache(id: UUID) {
@@ -750,11 +750,11 @@ public final class FileShelfStore: ObservableObject {
                     order[item.id] = lastOrder
                 }
                 return StoredItem(id: item.id, bookmarkData: item.bookmarkData, addedAt: item.addedAt, url: item.url,
-                    text: item.text, isManaged: item.isManaged ? true : nil, noteLocation: item.noteLocation,
-                    hasNoteScreenshot: item.noteScreenshotURL == nil ? nil : true, shelfOrder: order[item.id],
-                    noteReminderInterval: item.noteReminderInterval.rawValue,
-                    nextNoteReminderAt: item.nextNoteReminderAt,
-                    noteMeetingIDs: item.noteMeetingIDs.isEmpty ? nil : item.noteMeetingIDs)
+                                  text: item.text, isManaged: item.isManaged ? true : nil, noteLocation: item.noteLocation,
+                                  hasNoteScreenshot: item.noteScreenshotURL == nil ? nil : true, shelfOrder: order[item.id],
+                                  noteReminderInterval: item.noteReminderInterval.rawValue,
+                                  nextNoteReminderAt: item.nextNoteReminderAt,
+                                  noteMeetingIDs: item.noteMeetingIDs.isEmpty ? nil : item.noteMeetingIDs)
             }
             let data = try JSONEncoder().encode(stored)
             try data.write(to: storageURL, options: .atomic)

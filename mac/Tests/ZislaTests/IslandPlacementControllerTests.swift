@@ -49,7 +49,7 @@ struct IslandPlacementControllerTests {
             let gripOffset = edge.isVertical ? CGPoint(x: thickness / 4, y: 0)
                 : CGPoint(x: 0, y: thickness / 4)
             #expect(fixture.controller.beginDragging(at: CGPoint(x: initial.midX + gripOffset.x,
-                y: initial.midY + gripOffset.y)))
+                                                                 y: initial.midY + gripOffset.y)))
             let screen = fixture.screens[0].frame
             for requestedGap: CGFloat in [0, 8, 28, thickness * 3, thickness * 3 + 40, 28] {
                 let center: CGPoint
@@ -149,8 +149,8 @@ struct IslandPlacementControllerTests {
     func dragCanCrossIntoAnExternalScreenWithNegativeCoordinates() throws {
         let fixture = Fixture()
         fixture.screens.append(ScreenSnapshot(displayID: 2,
-            frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
-            visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056)))
+                                              frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
+                                              visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056)))
         fixture.show()
         #expect(fixture.controller.windowCount == 2)
         let frame = try #require(fixture.controller.previewFrame)
@@ -183,8 +183,8 @@ struct IslandPlacementControllerTests {
     func displayRemovalCancelsButScreenReorderingDoesNot() {
         let fixture = Fixture()
         fixture.screens.append(ScreenSnapshot(displayID: 2,
-            frame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
-            visibleFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1056)))
+                                              frame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
+                                              visibleFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1056)))
         fixture.show()
         fixture.screens.reverse()
         fixture.observer?()
@@ -296,7 +296,7 @@ struct IslandPlacementControllerTests {
         fixture.show(initial: IslandPlacement(mode: .custom, edge: .left))
         let window = try #require(fixture.presented.first as? IslandPlacementWindow)
         let observer = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification,
-            object: window, queue: .main) { [weak fixture] _ in
+                                                              object: window, queue: .main) { [weak fixture] _ in
             MainActor.assumeIsolated { fixture?.closedWindowCount += 1 }
         }
         defer { NotificationCenter.default.removeObserver(observer) }
@@ -313,15 +313,15 @@ struct IslandPlacementControllerTests {
 
     private func keyEvent(code: UInt16, characters: String, window: NSWindow) throws -> NSEvent {
         try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
-            windowNumber: window.windowNumber, context: nil, characters: characters,
-            charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code))
+                                      windowNumber: window.windowNumber, context: nil, characters: characters,
+                                      charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code))
     }
 
     @MainActor
     private final class Fixture {
         static let screen = ScreenSnapshot(displayID: 1,
-            frame: CGRect(x: 20000, y: 0, width: 1440, height: 900),
-            visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
+                                           frame: CGRect(x: 20000, y: 0, width: 1440, height: 900),
+                                           visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
         var screens = [Fixture.screen]
         var presented: [NSWindow] = []
         var committed: [IslandPlacement] = []
@@ -339,8 +339,8 @@ struct IslandPlacementControllerTests {
         func show(initial: IslandPlacement = IslandPlacement(),
                   configuration: ScreenLayoutConfiguration = ScreenLayoutConfiguration()) {
             controller.show(initialPlacement: initial, configuration: configuration,
-                completion: { [unowned self] in committed.append($0) },
-                onCancel: { [unowned self] in cancelled += 1 })
+                            completion: { [unowned self] in committed.append($0) },
+                            onCancel: { [unowned self] in cancelled += 1 })
         }
     }
 }

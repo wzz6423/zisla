@@ -325,12 +325,12 @@ public struct VoiceTranscriptDelivery {
         let systemWide = AXUIElementCreateSystemWide()
         var hitElement: AXUIElement?
         guard AXUIElementCopyElementAtPosition(
-            systemWide,
-            Float(location.x),
-            Float(location.y),
-            &hitElement
-        ) == .success,
-        let hitElement else { return .noInput }
+                  systemWide,
+                  Float(location.x),
+                  Float(location.y),
+                  &hitElement
+              ) == .success,
+              let hitElement else { return .noInput }
 
         let hitPID = pidOf(element: hitElement)
         guard let pid = hitPID, isExternalProcess(pid) else { return .noInput }
@@ -419,11 +419,11 @@ public struct VoiceTranscriptDelivery {
         }
 
         guard let expected = Self.replacingSelection(
-                in: actualCurrent,
-                location: min(range.location, (actualCurrent as NSString).length),
-                length: min(range.length, (actualCurrent as NSString).length - range.location),
-                with: text
-              ) else {
+            in: actualCurrent,
+            location: min(range.location, (actualCurrent as NSString).length),
+            length: min(range.length, (actualCurrent as NSString).length - range.location),
+            with: text
+        ) else {
             return false
         }
 

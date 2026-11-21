@@ -23,8 +23,7 @@ struct TeleprompterViewTests {
 
         let hostingView = NSHostingView(rootView:
             TeleprompterView(onClose: {})
-                .frame(width: 760, height: 640)
-        )
+                .frame(width: 760, height: 640))
         let textView = try await waitForTextView(in: hostingView)
         #expect(textView.isEditable)
 

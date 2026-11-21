@@ -149,7 +149,7 @@ struct ClipboardAssistantShortcutTests {
         defer { controller.dismiss(animated: false) }
         let custom = modifierOnly
             ? VoiceInputHotkeyPreset(keyCode: UInt32(kVK_Option), carbonModifiers: UInt32(optionKey),
-                                    keyDisplayName: "Option", modifierSides: [.leftOption])
+                                     keyDisplayName: "Option", modifierSides: [.leftOption])
             : Self.hotkey(UInt32(kVK_ANSI_N), "N")
         controller.setTriggers(hotkey: custom, mouseButton: nil)
         controller.present(Self.detection, visualStyle: .transparent)
@@ -590,7 +590,7 @@ struct ClipboardAssistantShortcutTests {
         #expect(registry.hotkeys.count == 3)
         #expect(controller.shortcutHint(for: Self.actions[0]) == "⌘ 1")
         let hasPermission = controller.setTriggers(hotkey: ClipboardAssistantDefaults.triggerHotkey, mouseButton: nil,
-                                                  dismissHotkey: ClipboardAssistantDefaults.dismissHotkey)
+                                                   dismissHotkey: ClipboardAssistantDefaults.dismissHotkey)
         #expect(hasPermission == (failure != .inputMonitoringPermissionRequired))
         registry.failures = [:]
         controller.present(Self.detection, visualStyle: .transparent)

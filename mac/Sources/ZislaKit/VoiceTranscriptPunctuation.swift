@@ -6,8 +6,7 @@ package enum VoiceTranscriptPunctuation {
     private static let cjk = try! NSRegularExpression(pattern: #"[\p{Han}\p{Hiragana}\p{Katakana}]"#)
     private static let newlines = try! NSRegularExpression(pattern: #"\r\n|[\r\n]"#)
     private static let technical = try! NSRegularExpression(pattern:
-        #"\p{N}+(?:[.,:/-]\p{N}+)+|(?m:^\h*\p{N}+[.)、])|(?i:\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc)\.)|(?:\b[A-Za-z]\.){2,}|\b[A-Za-z_]\w*\([^()\r\n]*\)"#
-    )
+        #"\p{N}+(?:[.,:/-]\p{N}+)+|(?m:^\h*\p{N}+[.)、])|(?i:\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc)\.)|(?:\b[A-Za-z]\.){2,}|\b[A-Za-z_]\w*\([^()\r\n]*\)"#)
     private static let commandNames: Set<String> = ["git", "curl", "echo", "printf", "ssh", "npm", "pnpm", "swift", "python", "python3", "make"]
     private static let fullWidth: [Character: Character] = [
         ",": "，", ".": "。", ";": "；", ":": "：", "?": "？", "!": "！",

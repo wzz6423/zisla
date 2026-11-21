@@ -69,7 +69,7 @@ struct ClipboardCalendarEditorTests {
         let now = try #require(utc.date(from: DateComponents(year: 2026, month: 11, day: 10, hour: 8, minute: 55)))
         let invite = "Meeting 2026-11-10 09:00-10:00\nSubject: Workflow review\nLocation: Room A\nJoin: https://meet.google.com/abc-defg-hij"
         let detection = try #require(ClipboardAssistantDetector.detect(text: invite, enabledKinds: [.meeting],
-            systemLanguageIdentifier: "en", now: now, timeZone: utc.timeZone, locale: Locale(identifier: "en_US")))
+                                                                       systemLanguageIdentifier: "en", now: now, timeZone: utc.timeZone, locale: Locale(identifier: "en_US")))
         let action = try #require(detection.actions.first)
         guard case .editCalendarEvent(let draft) = action else {
             Issue.record("Meeting detection did not produce a calendar draft")
@@ -78,14 +78,14 @@ struct ClipboardCalendarEditorTests {
         #expect(draft.notes == invite)
         let store = ClipboardInviteEventStore()
         store.savedCalendar = try #require(EKCalendar.perform(NSSelectorFromString("calendarWithEventStore:"),
-            with: store)?.takeUnretainedValue() as? EKCalendar)
+                                                              with: store)?.takeUnretainedValue() as? EKCalendar)
         store.savedCalendar?.title = "Fixture"
         let service = CalendarService(store: store, mutations: .live(store: store),
-            environment: CalendarServiceEnvironment(authorizationStatus: { _ in .fullAccess }, now: { now },
-                notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()))
+                                      environment: CalendarServiceEnvironment(authorizationStatus: { _ in .fullAccess }, now: { now },
+                                                                              notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()))
         defer { service.stop() }
         try CalendarItemEditor.complete(response: confirm ? .alertFirstButtonReturn : .alertSecondButtonReturn,
-            calendar: service, draft: draft, kind: .event)
+                                        calendar: service, draft: draft, kind: .event)
         service.refreshMeetings()
         if confirm {
             let meeting = try #require(service.meetingEvents.first)
@@ -103,7 +103,7 @@ struct ClipboardCalendarEditorTests {
 
     var draft: ClipboardCalendarDraft {
         ClipboardCalendarDraft(title: "Review", startDate: Date(timeIntervalSince1970: 1_000),
-            endDate: Date(timeIntervalSince1970: 4_600), location: "Room A", notes: "https://example.com/meeting")
+                               endDate: Date(timeIntervalSince1970: 4_600), location: "Room A", notes: "https://example.com/meeting")
     }
 }
 @MainActor
@@ -116,10 +116,11 @@ private final class DraftMutationRecorder {
             createEvent: { [self] title, start, end, allDay, location, notes in
                 if let failure { throw failure }
                 savedDraft = ClipboardCalendarDraft(title: title, startDate: start, endDate: end,
-                    isAllDay: allDay, location: location, notes: notes)
+                                                    isAllDay: allDay, location: location, notes: notes)
             },
             createReminder: { [self] title, _, _ in savedReminder = title },
-            delete: { _, _, _ in }, setReminderCompleted: { _, _ in })
+            delete: { _, _, _ in }, setReminderCompleted: { _, _ in }
+        )
     }
 }
 

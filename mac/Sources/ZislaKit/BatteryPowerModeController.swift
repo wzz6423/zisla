@@ -27,7 +27,7 @@ final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
 
     func execute(arguments: [String], authorizationPrepared: Bool = false) -> AIAgentProcessOutput {
         let (status, pipe) = launch(path: "/usr/bin/pmset", arguments: arguments,
-            authorizationPrepared: authorizationPrepared)
+                                    authorizationPrepared: authorizationPrepared)
         var output = Data()
         if let pipe {
             let fileHandle = FileHandle(fileDescriptor: fileno(pipe), closeOnDealloc: false)
@@ -191,7 +191,7 @@ public final class BatteryPowerModeController: ObservableObject {
             runAuthorizedCommand: { _, arguments, _ in
                 let execution = Task.detached(priority: .userInitiated) {
                     return BatteryPowerModeAuthorizationSession.shared.execute(arguments: arguments,
-                        authorizationPrepared: true)
+                                                                               authorizationPrepared: true)
                 }
                 return await withTaskCancellationHandler {
                     await execution.value
@@ -293,7 +293,7 @@ public final class BatteryPowerModeController: ObservableObject {
             do {
                 let status = try await prepareAuthorization()
                 try Self.checkChangeResult(AIAgentProcessOutput(status: status, standardOutput: Data(),
-                    standardError: "", didTimeout: false))
+                                                                standardError: "", didTimeout: false))
                 guard !Task.isCancelled else { return false }
                 let latest = try await readSnapshot()
                 apply(latest)

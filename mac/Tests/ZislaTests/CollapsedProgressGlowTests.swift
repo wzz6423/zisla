@@ -84,7 +84,7 @@ struct CollapsedProgressGlowTests {
     func notchPlaybackAndPomodoroFillFromLeftToRightOnlyAtTheBottom(progress: Double, countdown: Bool) async throws {
         let size = CGSize(width: 180, height: 34)
         let pixels = try await Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement(),
-            includesMedia: !countdown, countdown: countdown)
+                                                   includesMedia: !countdown, countdown: countdown)
         let width = Int(size.width)
         let height = Int(size.height)
 
@@ -141,7 +141,7 @@ struct CollapsedProgressGlowTests {
     @MainActor
     func notchRecordingProgressFillsOnlyTheBottomWithAndWithoutMedia(progress: Double, includesMedia: Bool) async throws {
         let pixels = try await Self.playbackPixels(progress: 0.1, style: .notch, placement: IslandPlacement(),
-                                             recordingProgress: progress, includesMedia: includesMedia)
+                                                   recordingProgress: progress, includesMedia: includesMedia)
         #expect(pixels[..<(180 * 31)].allSatisfy { $0 < 0.02 },
                 "Notch exports must leave the top and side edges clear even when music is waiting")
         let filledEnd = Int(180 * progress) - 5
@@ -157,7 +157,7 @@ struct CollapsedProgressGlowTests {
     @MainActor
     func notchDownloadProgressFillsFromLeftToRightOnlyAtTheBottom(noticeID: String, progress: Double) async throws {
         let pixels = try await Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement(),
-                                             downloadNoticeID: noticeID)
+                                                   downloadNoticeID: noticeID)
         #expect(pixels[..<(180 * 31)].allSatisfy { $0 < 0.02 },
                 "Notch downloads must leave the top and side edges clear")
         #expect(Self.lit(pixels, width: 180, x: 22...26, y: 31...33))
@@ -173,9 +173,9 @@ struct CollapsedProgressGlowTests {
     func pillExportAndDownloadProgressKeepTheClockwiseOutline(noticeID: String, placement: IslandPlacement) async throws {
         let recording = noticeID.hasPrefix(ScreenRecordingOperationNotice.prefix)
         let full = try await Self.playbackPixels(progress: 1, style: .pill, placement: placement,
-            recordingProgress: recording ? 1 : nil, downloadNoticeID: recording ? nil : noticeID, includesMedia: false)
+                                                 recordingProgress: recording ? 1 : nil, downloadNoticeID: recording ? nil : noticeID, includesMedia: false)
         let half = try await Self.playbackPixels(progress: 0.5, style: .pill, placement: placement,
-            recordingProgress: recording ? 0.5 : nil, downloadNoticeID: recording ? nil : noticeID, includesMedia: false)
+                                                 recordingProgress: recording ? 0.5 : nil, downloadNoticeID: recording ? nil : noticeID, includesMedia: false)
         let size = placement.edge.isVertical ? CGSize(width: 34, height: 180) : CGSize(width: 180, height: 34)
         let width = Int(size.width)
         let height = Int(size.height)
@@ -236,7 +236,7 @@ struct CollapsedProgressGlowTests {
             for inset in [CGFloat(0), CollapsedProgress.outlineInset] {
                 let path = shape.inset(by: inset).path(in: rect)
                 let expected = IslandSilhouette(topCornerRadius: radius, bottomCornerRadius: radius,
-                                               insetAmount: inset).path(in: rect)
+                                                insetAmount: inset).path(in: rect)
                 let bounds = rect.insetBy(dx: inset, dy: inset)
                 #expect(path.boundingRect == bounds)
                 let points = Self.flattened(path)
@@ -528,8 +528,8 @@ struct CollapsedProgressGlowTests {
     @Test(arguments: [false, true]) @MainActor
     func progressRetainsItsSelectedTint(usesBottomTrack: Bool) throws {
         let renderer = ImageRenderer(content: CollapsedProgressGlow(progress: 1,
-            tint: Color(.displayP3, red: 1, green: 0, blue: 0), usesBottomTrack: usesBottomTrack)
-            .frame(width: 180, height: 34).background(.black))
+                                                                    tint: Color(.displayP3, red: 1, green: 0, blue: 0), usesBottomTrack: usesBottomTrack)
+                .frame(width: 180, height: 34).background(.black))
         renderer.scale = 1
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         let color = try #require(bitmap.colorAt(x: 90, y: usesBottomTrack ? 32 : 1)?.usingColorSpace(.deviceRGB))
@@ -608,24 +608,24 @@ struct CollapsedProgressGlowTests {
         settings.settings.islandNotchBackground = .black
         let date = Date(timeIntervalSince1970: 100)
         let snapshot = includesMedia ? NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
-            duration: 100, elapsedTime: progress * 100, timestamp: date, isPlaying: true) : nil
+                                                          duration: 100, elapsedTime: progress * 100, timestamp: date, isPlaying: true) : nil
         let media = NowPlayingService(loadLyrics: { _, _, _ in .init(lyrics: nil, artistName: nil) },
-            initialRemoteSnapshot: snapshot)
+                                      initialRemoteSnapshot: snapshot)
         defer { media.publishSnapshot(nil) }
         media.resolveSnapshot()
         let queue = SideNoticeQueue()
         defer { queue.removeAll() }
         if includesMedia || downloadNoticeID != nil {
             queue.enqueue(IslandNotice(id: downloadNoticeID ?? "media-active-progress", title: "Track", side: .left,
-                                      progress: downloadNoticeID == nil ? nil : progress), expiresAfter: nil)
+                                       progress: downloadNoticeID == nil ? nil : progress), expiresAfter: nil)
         }
         if let recordingProgress {
             queue.enqueue(IslandNotice(id: "screen-recording-operation-progress", title: "Recording",
-                                      progress: recordingProgress), expiresAfter: nil)
+                                       progress: recordingProgress), expiresAfter: nil)
         }
         if countdown {
             queue.enqueue(IslandNotice(id: "focus-countdown-progress", title: "Focus", detail: "00:24:57",
-                                      progress: progress), expiresAfter: nil)
+                                       progress: progress), expiresAfter: nil)
         }
         let state = SideNoticeDisplayState()
         state.placementMode = placement.mode
@@ -633,8 +633,8 @@ struct CollapsedProgressGlowTests {
         state.compactWingHeight = 34
         let size = placement.edge.isVertical ? CGSize(width: 34, height: 180) : CGSize(width: 180, height: 34)
         let view = CompactStatusBarView(queue: queue, displayState: state, media: media,
-            browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
-            resultSweep: AIResultSweepController(), pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
+                                        browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
+                                        resultSweep: AIResultSweepController(), pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         func render(enabled: Bool) async throws -> [Double] {
             settings.settings.collapsedProgressGlowEnabled = enabled
             // ImageRenderer omits AppKit-backed countdown content and its progress overlay.
@@ -644,7 +644,7 @@ struct CollapsedProgressGlowTests {
                 .frame(width: size.width, height: size.height).background(.black))
             host.sizingOptions = []
             let window = PlaybackRasterPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
-                styleMask: .borderless, backing: .buffered, defer: false)
+                                             styleMask: .borderless, backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = host
             defer { window.contentView = nil; window.close() }
@@ -728,9 +728,9 @@ struct CollapsedProgressGlowTests {
             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
             pillCornerRadius: pillCornerRadius, usesBottomTrack: usesBottomTrack
         )
-            .frame(width: size.width, height: size.height)
-            .clipShape(CompactIslandShape(layoutStyle: style, pillCornerRadius: pillCornerRadius))
-            .background(.black))
+        .frame(width: size.width, height: size.height)
+        .clipShape(CompactIslandShape(layoutStyle: style, pillCornerRadius: pillCornerRadius))
+        .background(.black))
         renderer.scale = 1
         renderer.colorMode = .extendedLinear
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))

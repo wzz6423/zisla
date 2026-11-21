@@ -29,23 +29,23 @@ struct AIAgentModuleView: View {
 
     var body: some View {
         configurationContent
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .alert(pendingCLIActionTitle, isPresented: $showCLIConfirmation) {
-            Button(AppLocalization.text("取消"), role: .cancel) {
-                pendingCLICommands = []
-                pendingCLIKinds = []
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .alert(pendingCLIActionTitle, isPresented: $showCLIConfirmation) {
+                Button(AppLocalization.text("取消"), role: .cancel) {
+                    pendingCLICommands = []
+                    pendingCLIKinds = []
+                }
+                Button(AppLocalization.text("继续")) {
+                    let commands = pendingCLICommands
+                    guard !commands.isEmpty else { return }
+                    pendingCLICommands = []
+                    agent.startCLICommands(commands, title: pendingCLIActionTitle, kinds: pendingCLIKinds)
+                    pendingCLIKinds = []
+                }
+            } message: {
+                Text(pendingCLIActionMessage)
             }
-            Button(AppLocalization.text("继续")) {
-                let commands = pendingCLICommands
-                guard !commands.isEmpty else { return }
-                pendingCLICommands = []
-                agent.startCLICommands(commands, title: pendingCLIActionTitle, kinds: pendingCLIKinds)
-                pendingCLIKinds = []
-            }
-        } message: {
-            Text(pendingCLIActionMessage)
-        }
     }
 
     @ViewBuilder

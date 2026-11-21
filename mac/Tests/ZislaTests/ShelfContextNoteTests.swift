@@ -14,7 +14,7 @@ struct ShelfContextNoteTests {
         try withStore { store, directory in
             let identity = CalendarEventIdentity(calendarIdentifier: "work", eventIdentifier: "meeting")
             let location = ContextNoteLocation.webPage(url: URL(string: "https://meet.google.com/abc-defg-hij")!,
-                title: "Team meeting", applicationName: "Calendar")
+                                                       title: "Team meeting", applicationName: "Calendar")
             let editor = ContextNoteShelfEditor()
             let discarded = ContextNoteDraft(location: location, meetingID: identity)
             editor.begin(discarded)
@@ -46,7 +46,7 @@ struct ShelfContextNoteTests {
             let location = try #require(Self.note.noteLocation)
             let note = try #require(store.addContextNote("original", location: location, screenshot: png))
             let enabled = try #require(store.updateContextNote(id: note.id, text: "original", reminderInterval: .oneDay,
-                at: Date(timeIntervalSince1970: 100)))
+                                                               at: Date(timeIntervalSince1970: 100)))
             #expect(store.setMeeting(identity, associated: true, withNote: note.id))
             let associated = try #require(store.items.first)
             #expect(try Data(contentsOf: #require(associated.noteScreenshotURL)) == png)

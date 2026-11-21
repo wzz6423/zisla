@@ -28,11 +28,11 @@ struct ScreenshotRecognitionTests {
         let control = try #require(Self.accessibilityObjects(host).first {
             $0.responds(to: NSSelectorFromString("accessibilityHelp"))
                 && $0.value(forKey: "accessibilityHelp") as? String
-                    == AppLocalization.text("识别图片中的文字或表格")
+                == AppLocalization.text("识别图片中的文字或表格")
         })
         let selection = RecognitionMenuSelection(title: AppLocalization.text(title), model: fixture.model)
         NotificationCenter.default.addObserver(selection, selector: #selector(RecognitionMenuSelection.began(_:)),
-            name: NSMenu.didBeginTrackingNotification, object: nil)
+                                               name: NSMenu.didBeginTrackingNotification, object: nil)
         defer { NotificationCenter.default.removeObserver(selection) }
         let action = NSSelectorFromString("accessibilityPerformPress")
         try #require(control.responds(to: action))
@@ -55,22 +55,21 @@ struct ScreenshotRecognitionTests {
         let source = "识别成功 2468"
         var result: String?
         let task = try #require(model.recognize(mode,
-            translationService: .init(providers: [{ text, _ in
-                #expect(text == source, "Translation must receive the recovered OCR text")
-                return "Recovered translation"
-            }]), chooseTableDestination: { destination }, recognizeImage: { image, operation in
-                try operation.recognize(image) { _, request in
-                    #expect(request.recognitionLevel == .accurate, "Recovery must retain accurate Chinese recognition")
-                    #expect(request.recognitionLanguages.contains("zh-Hans"))
-                    if request.computeDevice(for: .main) == nil {
-                        if outcome == "failure" { throw Self.engineFailure }
-                        return []
-                    }
-                    #expect(Self.usesCPU(request), "The failed engine must recover without Neural Engine acceleration")
-                    return Self.fragments(source)
-                }
-            }
-        ) { text, _ in result = text })
+                                                translationService: .init(providers: [{ text, _ in
+                                                    #expect(text == source, "Translation must receive the recovered OCR text")
+                                                    return "Recovered translation"
+                                                }]), chooseTableDestination: { destination }, recognizeImage: { image, operation in
+                                                    try operation.recognize(image) { _, request in
+                                                        #expect(request.recognitionLevel == .accurate, "Recovery must retain accurate Chinese recognition")
+                                                        #expect(request.recognitionLanguages.contains("zh-Hans"))
+                                                        if request.computeDevice(for: .main) == nil {
+                                                            if outcome == "failure" { throw Self.engineFailure }
+                                                            return []
+                                                        }
+                                                        #expect(Self.usesCPU(request), "The failed engine must recover without Neural Engine acceleration")
+                                                        return Self.fragments(source)
+                                                    }
+                                                }) { text, _ in result = text })
         await task.value
         #expect(!model.isRecognizing)
         switch mode {
@@ -82,7 +81,7 @@ struct ScreenshotRecognitionTests {
             if FileManager.default.fileExists(atPath: destination.path) {
                 #expect(try Data(contentsOf: destination).starts(with: [0x50, 0x4B]))
                 let output = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/unzip"),
-                    arguments: ["-p", destination.path, "xl/worksheets/sheet1.xml"], workingDirectoryURL: directory)
+                                                                arguments: ["-p", destination.path, "xl/worksheets/sheet1.xml"], workingDirectoryURL: directory)
                 #expect(output.status == 0)
                 #expect(String(decoding: output.standardOutput, as: UTF8.self).contains(source))
             }
@@ -172,12 +171,12 @@ struct ScreenshotRecognitionTests {
                 return []
             }
             #expect(!cancel && outcome == "empty" && fragments.isEmpty,
-                "Unavailable device discovery must retain the original empty result")
+                    "Unavailable device discovery must retain the original empty result")
         } catch is CancellationError {
             #expect(cancel && request.wasCancelled)
         } catch {
             #expect(!cancel && outcome == "failure" && (error as NSError) == Self.engineFailure,
-                "Unavailable device discovery must retain the original OCR error")
+                    "Unavailable device discovery must retain the original OCR error")
         }
         #expect(request.computeDevice(for: .main) == nil)
     }
@@ -202,11 +201,11 @@ struct ScreenshotRecognitionTests {
             #expect(outcome == "failure" && error is RecognitionFailure)
         }
         #expect(request.computeDevice(for: .main) == nil,
-            "CPU recovery must not force later images in the batch to use the CPU")
+                "CPU recovery must not force later images in the batch to use the CPU")
         if outcome != "cancelled" {
             let next = try operation.recognize(image) { _, request in
                 #expect(request.computeDevice(for: .main) == nil,
-                    "The next image must start with Vision's automatic device selection")
+                        "The next image must start with Vision's automatic device selection")
                 return Self.fragments("next image")
             }
             #expect(next == Self.fragments("next image"))
@@ -232,7 +231,7 @@ struct ScreenshotRecognitionTests {
             #expect(outcome != "ordinary error")
         } catch {
             #expect(outcome == "ordinary error" && error is RecognitionFailure,
-                "CPU attempts must distinguish cancellation from ordinary recognition failures")
+                    "CPU attempts must distinguish cancellation from ordinary recognition failures")
         }
     }
 
@@ -244,7 +243,7 @@ struct ScreenshotRecognitionTests {
         selection.began(Notification(name: NSMenu.didBeginTrackingNotification, object: NSMenu()))
         RunLoop.main.run(mode: .eventTracking, before: Date(timeIntervalSinceNow: 0.05))
         #expect(selection.selected && !selection.startedRecognition,
-            "A missing menu item must end tracking rather than block the test host")
+                "A missing menu item must end tracking rather than block the test host")
         #expect(!fixture.model.isRecognizing)
     }
 
@@ -266,7 +265,7 @@ struct ScreenshotRecognitionTests {
         let localizationRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/Localization")
         let translations = try #require(NSDictionary(contentsOf: localizationRoot
-            .appendingPathComponent("\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
+                .appendingPathComponent("\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
         let keys = ["正在识别...", "正在翻译…", "识别失败：%@", "未识别到文字", "翻译失败，请重试或使用浏览器翻译", "表格已保存：%@"]
         for key in keys {
             let translation = try #require(translations[key], "Missing \(language.rawValue) recognition status: \(key)")
@@ -313,7 +312,7 @@ struct ScreenshotRecognitionTests {
         let finish = CGPoint(x: start.x + 100, y: start.y - 100)
         for (type, point) in [(NSEvent.EventType.leftMouseDown, start), (.leftMouseDragged, finish), (.leftMouseUp, finish)] {
             let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
-                windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+                                                        windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
             switch type {
             case .leftMouseDown: handle.mouseDown(with: event)
             case .leftMouseDragged: handle.mouseDragged(with: event)
@@ -373,14 +372,14 @@ struct ScreenshotRecognitionTests {
         let status = try #require(statusObject as? any NSAccessibilityElementProtocol)
         let statusFrame = status.accessibilityFrame()
         #expect(statusFrame.width > 0 && statusFrame.width <= 240,
-            "A long recognition error must not consume an unbounded width in the toolbar")
+                "A long recognition error must not consume an unbounded width in the toolbar")
         #expect(statusFrame.height <= ScreenshotToolbarLayout.height,
-            "A long recognition error must remain on one toolbar row")
+                "A long recognition error must remain on one toolbar row")
         #expect(statusObject.value(forKey: "accessibilityHelp") as? String == message,
-            "Truncating the visible status must retain the complete error in its tooltip")
+                "Truncating the visible status must retain the complete error in its tooltip")
         #expect(toolbar.frame.width <= availableWidth - 24)
         #expect(toolbar.frame.width == min(originalWidth + 240 + ScreenshotToolbarLayout.spacing, availableWidth - 24),
-            "Showing status must reserve room within the available toolbar viewport")
+                "Showing status must reserve room within the available toolbar viewport")
         if availableWidth == 1_600 { try Self.expectStatusBesideRecognition(message, in: host) }
         fixture.model.statusMessage = nil
         for _ in 0..<3 {
@@ -406,8 +405,8 @@ struct ScreenshotRecognitionTests {
         fixture.model.statusMessage = message
         let frame = fixture.controller.longCaptureToolbarFrame(on: screen)
         #expect(frame.width == min(originalFrame.width + ScreenshotToolbarLayout.statusWidth(for: message)
-            + ScreenshotToolbarLayout.spacing, screen.visibleFrame.width - 24),
-            "The floating toolbar window must account for its inline recognition status")
+                    + ScreenshotToolbarLayout.spacing, screen.visibleFrame.width - 24),
+        "The floating toolbar window must account for its inline recognition status")
         #expect(screen.visibleFrame.contains(frame))
         fixture.model.statusMessage = nil
         #expect(fixture.controller.longCaptureToolbarFrame(on: screen) == originalFrame)
@@ -449,14 +448,13 @@ struct ScreenshotRecognitionTests {
         let translated = "  Translated line\nSecond translated line  "
         var result: String?
         let task = try #require(model.recognize(.translate,
-            targetLanguage: language.translateTargetCode,
-            translationService: .init(providers: [{ text, target in
-                #expect(text == source)
-                #expect(target == language.translateTargetCode)
-                return translated
-            }]),
-            recognizeImage: { _, _ in Self.fragments(source) }
-        ) { text, _ in result = text })
+                                                targetLanguage: language.translateTargetCode,
+                                                translationService: .init(providers: [{ text, target in
+                                                    #expect(text == source)
+                                                    #expect(target == language.translateTargetCode)
+                                                    return translated
+                                                }]),
+                                                recognizeImage: { _, _ in Self.fragments(source) }) { text, _ in result = text })
         await task.value
         #expect(result == translated)
         #expect(model.statusMessage == nil)
@@ -467,16 +465,15 @@ struct ScreenshotRecognitionTests {
     func unsuccessfulOCRNeverStartsTranslation(outcome: String) async throws {
         let model = ScreenshotEditorModel(image: outcome == "invalid image" ? NSImage() : try makeImage())
         let task = try #require(model.recognize(.translate,
-            translationService: .init(providers: [{ _, _ in
-                Issue.record("Unsuccessful OCR must not send text to translation providers")
-                return "unexpected"
-            }]),
-            recognizeImage: { _, _ in
-                if outcome == "failure" { throw RecognitionFailure() }
-                if outcome == "invalid image" { Issue.record("Invalid image must not reach Vision") }
-                return []
-            }
-        ) { _, _ in Issue.record("Unsuccessful OCR must not present a translation") })
+                                                translationService: .init(providers: [{ _, _ in
+                                                    Issue.record("Unsuccessful OCR must not send text to translation providers")
+                                                    return "unexpected"
+                                                }]),
+                                                recognizeImage: { _, _ in
+                                                    if outcome == "failure" { throw RecognitionFailure() }
+                                                    if outcome == "invalid image" { Issue.record("Invalid image must not reach Vision") }
+                                                    return []
+                                                }) { _, _ in Issue.record("Unsuccessful OCR must not present a translation") })
         await task.value
         #expect(!model.isRecognizing)
         #expect(model.statusMessage != nil)
@@ -487,7 +484,7 @@ struct ScreenshotRecognitionTests {
         _ = NSApplication.shared
         let model = ScreenshotEditorModel(image: try makeImage())
         let screenshot = ScreenshotEditorWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 320, height: 200),
-            styleMask: [.borderless], backing: .buffered, defer: false)
+                                                styleMask: [.borderless], backing: .buffered, defer: false)
         screenshot.isReleasedWhenClosed = false
         screenshot.alphaValue = 0
         screenshot.level = .screenSaver
@@ -509,11 +506,10 @@ struct ScreenshotRecognitionTests {
                     "AppKit making the error dialog key must not place it below the screenshot")
         }
         let failed = try #require(model.recognize(.translate,
-            translationService: .init(providers: [{ _, _ in throw URLError(.notConnectedToInternet) }],
-                waitForTimeout: {}),
-            makeTranslationFailureAlert: { alert },
-            recognizeImage: { _, _ in Self.fragments("source") }
-        ) { _, _ in Issue.record("A failed translation must not present or copy the OCR source") })
+                                                  translationService: .init(providers: [{ _, _ in throw URLError(.notConnectedToInternet) }],
+                                                                            waitForTimeout: {}),
+                                                  makeTranslationFailureAlert: { alert },
+                                                  recognizeImage: { _, _ in Self.fragments("source") }) { _, _ in Issue.record("A failed translation must not present or copy the OCR source") })
         await failed.value
         await withCheckedContinuation { continuation in
             RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
@@ -532,9 +528,8 @@ struct ScreenshotRecognitionTests {
         #expect(alert.window.level == .normal, "A closed error dialog must release its level observer")
         var result: String?
         let retry = try #require(model.recognize(.translate,
-            translationService: .init(providers: [{ _, _ in "recovered translation" }]),
-            recognizeImage: { _, _ in Self.fragments("source") }
-        ) { text, _ in result = text })
+                                                 translationService: .init(providers: [{ _, _ in "recovered translation" }]),
+                                                 recognizeImage: { _, _ in Self.fragments("source") }) { text, _ in result = text })
         await retry.value
         #expect(result == "recovered translation")
         #expect(!model.isRecognizing)
@@ -553,7 +548,7 @@ struct ScreenshotRecognitionTests {
         case "unavailable": ClipboardTranslationError.unavailable
         case "timeout": URLError(.timedOut)
         case "system": NSError(domain: "TranslationErrorDomain", code: 11,
-            userInfo: [NSLocalizedDescriptionKey: "Synthetic target language is unavailable"])
+                               userInfo: [NSLocalizedDescriptionKey: "Synthetic target language is unavailable"])
         default: RecognitionFailure()
         }
         let task = try #require(model.recognize(.text, recognizeImage: { _, _ in Self.fragments("source") }) {
@@ -568,7 +563,7 @@ struct ScreenshotRecognitionTests {
         #expect(alert.wasPresented)
         #expect(alert.messageText == AppLocalization.text("翻译"))
         #expect(alert.informativeText == (kind == "unavailable"
-            ? summary : summary + "\n\n" + error.localizedDescription))
+                ? summary : summary + "\n\n" + error.localizedDescription))
         #expect(alert.buttons.map(\.title) == [AppLocalization.text("关闭")])
         #expect(alert.accessoryView == nil)
         #expect(model.statusMessage == nil)
@@ -586,17 +581,16 @@ struct ScreenshotRecognitionTests {
         alert.window.alphaValue = 0
         defer { alert.window.close() }
         let task = try #require(model.recognize(.translate,
-            translationService: .init(providers: [{ _, _ in throw ClipboardTranslationError.unavailable }],
-                waitForTimeout: {}),
-            makeTranslationFailureAlert: {
-                switch action {
-                case "close": fixture.controller.close()
-                default: model.image = replacement
-                }
-                model.statusMessage = "replacement capture"
-                return alert
-            }, recognizeImage: { _, _ in Self.fragments("source") }
-        ) { _, _ in Issue.record("Failed translation must not present a successful result") })
+                                                translationService: .init(providers: [{ _, _ in throw ClipboardTranslationError.unavailable }],
+                                                                          waitForTimeout: {}),
+                                                makeTranslationFailureAlert: {
+                                                    switch action {
+                                                    case "close": fixture.controller.close()
+                                                    default: model.image = replacement
+                                                    }
+                                                    model.statusMessage = "replacement capture"
+                                                    return alert
+                                                }, recognizeImage: { _, _ in Self.fragments("source") }) { _, _ in Issue.record("Failed translation must not present a successful result") })
         await task.value
         await withCheckedContinuation { continuation in
             RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
@@ -611,12 +605,11 @@ struct ScreenshotRecognitionTests {
         let model = ScreenshotEditorModel(image: try makeImage())
         let gate = TranslationGate()
         let task = try #require(model.recognize(.translate,
-            translationService: .init(providers: [{ _, _ in await gate.translate() }]),
-            makeTranslationFailureAlert: {
-                Issue.record("Task cancellation must not be reported as a translation failure")
-                return NSAlert()
-            }, recognizeImage: { _, _ in Self.fragments("source") }
-        ) { _, _ in Issue.record("Task cancellation must not present or copy a translation") })
+                                                translationService: .init(providers: [{ _, _ in await gate.translate() }]),
+                                                makeTranslationFailureAlert: {
+                                                    Issue.record("Task cancellation must not be reported as a translation failure")
+                                                    return NSAlert()
+                                                }, recognizeImage: { _, _ in Self.fragments("source") }) { _, _ in Issue.record("Task cancellation must not present or copy a translation") })
         #expect(await XCTWaiter.fulfillment(of: [gate.started], timeout: 3) == .completed)
         task.cancel()
         let completed = XCTestExpectation(description: "Cancelled translation finished")
@@ -639,13 +632,12 @@ struct ScreenshotRecognitionTests {
         let model = fixture.model
         let gate = TranslationGate()
         let task = try #require(model.recognize(.translate,
-            translationService: .init(providers: [{ _, _ in await gate.translate() }]),
-            makeTranslationFailureAlert: {
-                Issue.record("Cancelled translation must not open an error dialog")
-                return NSAlert()
-            },
-            recognizeImage: { _, _ in Self.fragments("source") }
-        ) { _, _ in Issue.record("Cancelled translation must not present or copy a result") })
+                                                translationService: .init(providers: [{ _, _ in await gate.translate() }]),
+                                                makeTranslationFailureAlert: {
+                                                    Issue.record("Cancelled translation must not open an error dialog")
+                                                    return NSAlert()
+                                                },
+                                                recognizeImage: { _, _ in Self.fragments("source") }) { _, _ in Issue.record("Cancelled translation must not present or copy a result") })
         #expect(await XCTWaiter.fulfillment(of: [gate.started], timeout: 3) == .completed)
         #expect(model.isRecognizing)
         #expect(model.statusMessage == AppLocalization.text("正在翻译…"))
@@ -693,8 +685,7 @@ struct ScreenshotRecognitionTests {
             }
         })
         let task = try #require(model.recognize(.translate, translationService: service,
-            recognizeImage: { _, _ in Self.fragments("old screenshot") }
-        ) { _, _ in Issue.record("A winning translation queued before capture replacement must be discarded") })
+                                                recognizeImage: { _, _ in Self.fragments("old screenshot") }) { _, _ in Issue.record("A winning translation queued before capture replacement must be discarded") })
         #expect(await XCTWaiter.fulfillment(of: [providerStarted, timeoutStarted], timeout: 3) == .completed)
         output.continuation.yield("old translation")
         // Keep the main actor occupied until the service has returned its winning result.
@@ -724,14 +715,13 @@ struct ScreenshotRecognitionTests {
             #expect(copies == (mode == .translate ? [text] : []))
         }
         let task = try #require(model.recognize(mode,
-            translationService: .init(providers: [{ _, _ in text }]),
-            recognizeImage: { _, _ in Self.fragments(text) }
-        ) { result, operation in
-            model.presentRecognitionResult(result, mode: mode, operation: operation, alert: alert) {
-                copies.append($0)
-                return copiesSuccessfully
-            }
-        })
+                                                translationService: .init(providers: [{ _, _ in text }]),
+                                                recognizeImage: { _, _ in Self.fragments(text) }) { result, operation in
+                model.presentRecognitionResult(result, mode: mode, operation: operation, alert: alert) {
+                    copies.append($0)
+                    return copiesSuccessfully
+                }
+            })
         await task.value
         await withCheckedContinuation { continuation in
             RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
@@ -749,8 +739,8 @@ struct ScreenshotRecognitionTests {
         #expect(scroll.hasVerticalScroller && !scroll.hasHorizontalScroller)
         if mode == .translate {
             #expect(model.statusMessage == (copiesSuccessfully
-                ? AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
-                : AppLocalization.text("无法写入剪贴板")))
+                    ? AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
+                    : AppLocalization.text("无法写入剪贴板")))
         } else {
             #expect(copies.isEmpty)
             #expect(model.statusMessage == nil)
@@ -758,7 +748,7 @@ struct ScreenshotRecognitionTests {
     }
 
     @Test(arguments: ["short", "path", "unspaced", "tabs", "unicode", "multiline"],
-        [NSAppearance.Name.aqua, .darkAqua])
+          [NSAppearance.Name.aqua, .darkAqua])
     func recognitionResultsWrapWithinTheViewportAndInheritTheDialogAppearance(
         content: String, appearanceName: NSAppearance.Name
     ) async throws {
@@ -855,14 +845,13 @@ struct ScreenshotRecognitionTests {
             + String(repeating: "directory/", count: 120) + String(repeating: "X", count: 600) + "  "
         var copies: [String] = []
         let task = try #require(model.recognize(mode,
-            translationService: .init(providers: [{ text, _ in text }]),
-            recognizeImage: { _, _ in Self.fragments(text) }
-        ) { text, operation in
-            model.presentRecognitionResult(text, mode: mode, operation: operation, alert: alert) {
-                copies.append($0)
-                return true
-            }
-        })
+                                                translationService: .init(providers: [{ text, _ in text }]),
+                                                recognizeImage: { _, _ in Self.fragments(text) }) { text, operation in
+                model.presentRecognitionResult(text, mode: mode, operation: operation, alert: alert) {
+                    copies.append($0)
+                    return true
+                }
+            })
         await task.value
         await withCheckedContinuation { continuation in
             RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
@@ -878,15 +867,14 @@ struct ScreenshotRecognitionTests {
         alert.window.isReleasedWhenClosed = false
         defer { alert.window.close() }
         let task = try #require(model.recognize(mode,
-            translationService: .init(providers: [{ text, _ in text }]),
-            recognizeImage: { _, _ in Self.fragments("stale result") }
-        ) { text, operation in
-            model.presentRecognitionResult(text, mode: mode, operation: operation, alert: alert) { _ in
-                Issue.record("A result invalidated before presentation must not change the clipboard")
-                return true
-            }
-            model.cancelRecognition()
-        })
+                                                translationService: .init(providers: [{ text, _ in text }]),
+                                                recognizeImage: { _, _ in Self.fragments("stale result") }) { text, operation in
+                model.presentRecognitionResult(text, mode: mode, operation: operation, alert: alert) { _ in
+                    Issue.record("A result invalidated before presentation must not change the clipboard")
+                    return true
+                }
+                model.cancelRecognition()
+            })
         await task.value
         await withCheckedContinuation { continuation in
             RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
@@ -1257,9 +1245,9 @@ struct ScreenshotRecognitionTests {
         let image: CGImage
         if hdr {
             let context = try #require(CGContext(data: nil, width: source.width, height: source.height,
-                bitsPerComponent: 16, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-                    | CGBitmapInfo.floatComponents.rawValue | CGBitmapInfo.byteOrder16Little.rawValue))
+                                                 bitsPerComponent: 16, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                                                     | CGBitmapInfo.floatComponents.rawValue | CGBitmapInfo.byteOrder16Little.rawValue))
             context.draw(source, in: CGRect(x: 0, y: 0, width: source.width, height: source.height))
             image = try #require(context.makeImage())
         } else { image = source }
@@ -1317,12 +1305,12 @@ struct ScreenshotRecognitionTests {
         let toolbar = try #require(handle.superview)
         let toolbarFrame = toolbar.convert(toolbar.bounds, to: host)
         #expect(toolbarFrame.insetBy(dx: -1, dy: -1).contains(statusFrame),
-            "Recognition status must stay within the toolbar instead of the screen's notch area")
+                "Recognition status must stay within the toolbar instead of the screen's notch area")
         #expect(abs(statusFrame.midY - recognitionFrame.midY) <= 2,
-            "OCR and translation status must share the recognition button's row")
+                "OCR and translation status must share the recognition button's row")
         let gap = min(abs(statusFrame.minX - recognitionFrame.maxX), abs(recognitionFrame.minX - statusFrame.maxX))
         #expect(gap <= ScreenshotToolbarLayout.spacing + 2 && !statusFrame.intersects(recognitionFrame),
-            "The status must sit beside the recognition button in both text directions")
+                "The status must sit beside the recognition button in both text directions")
     }
 
     private static func dragHandle(in view: NSView) -> ScreenshotToolbarDragHandleView? {
@@ -1351,8 +1339,8 @@ struct ScreenshotRecognitionTests {
     private func makeImage(text: String = "Synthetic") throws -> NSImage {
         let size = CGSize(width: 720, height: 160)
         let context = try #require(CGContext(data: nil, width: Int(size.width), height: Int(size.height),
-            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
@@ -1520,9 +1508,9 @@ struct ScreenshotRecognitionTests {
             settings = FeatureSettingsStore(defaults: defaults)
             let pixels = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
             controller = ScreenshotEditorWindowController(image: image, screenImage: image, screenCGImage: pixels,
-                screen: nil, captureRect: CGRect(origin: .zero, size: image.size), capturedApplication: nil,
-                settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
-                onClose: {})
+                                                          screen: nil, captureRect: CGRect(origin: .zero, size: image.size), capturedApplication: nil,
+                                                          settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
+                                                          onClose: {})
             controller.window?.alphaValue = 0
             let hosting = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
             model = hosting.rootView.content.model

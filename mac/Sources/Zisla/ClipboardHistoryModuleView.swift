@@ -304,7 +304,7 @@ struct ClipboardHistoryModuleView: View {
         }
         .task(id: queryID) {
             await Self.updateQuery(store: store, filter: $filter, categoryFilter: $categoryFilter,
-                grouping: $grouping, searchText: $searchText)
+                                   grouping: $grouping, searchText: $searchText)
         }
         .onAppear { pageInput = displayedPageNumber }
         .onChange(of: store.currentPage) { _, _ in
@@ -334,7 +334,7 @@ struct ClipboardHistoryModuleView: View {
         if current.scope != requestedFilter.scope || current.category != requestedCategory
             || current.searchText != normalizedSearch || current.grouping != requestedGrouping {
             store.updateQuery(scope: requestedFilter.scope, searchText: requestedSearch,
-                category: requestedCategory, grouping: requestedGrouping)
+                              category: requestedCategory, grouping: requestedGrouping)
         } else if !store.isLoading {
             return
         }
@@ -590,7 +590,7 @@ struct ClipboardHistoryModuleView: View {
                         categoryFilter = category
                     } label: {
                         filterBarLabel(category.title, symbol: category.symbol,
-                            count: category == .all ? nil : count, isSelected: isSelected)
+                                       count: category == .all ? nil : count, isSelected: isSelected)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(hasItems ? .primary : .tertiary)

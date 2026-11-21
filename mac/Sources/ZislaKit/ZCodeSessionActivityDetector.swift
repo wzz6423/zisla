@@ -47,69 +47,69 @@ public final class ZCodeSessionActivityDetector: AIActivityDetecting {
         // in-flight turn must be inferred from model_usage rows that have no
         // matching turn_usage row yet.
         let sql = """
-            WITH live AS (
-                SELECT mu.session_id AS session_id,
-                       mu.turn_id AS turn_id,
-                       MIN(mu.started_at) AS started_at,
-                       MAX(mu.started_at) AS last_activity_at
-                FROM model_usage mu
-                LEFT JOIN turn_usage t
-                    ON t.session_id = mu.session_id AND t.turn_id = mu.turn_id
-                WHERE mu.turn_id IS NOT NULL AND t.turn_id IS NULL
-                GROUP BY mu.session_id, mu.turn_id
-            )
-            SELECT * FROM (
-                SELECT t.session_id,
-                       t.turn_id,
-                       LOWER(t.status) AS status,
-                       t.started_at,
-                       t.completed_at,
-                       t.error_code,
-                       (
-                           SELECT m.model_id
-                           FROM model_usage m
-                           WHERE m.session_id = t.session_id
-                             AND m.turn_id = t.turn_id
-                           ORDER BY m.started_at DESC
-                           LIMIT 1
-                       ) AS model_id,
-                       s.time_updated
-                FROM turn_usage t
-                LEFT JOIN session s ON s.id = t.session_id
-                WHERE LOWER(t.status) IN ('running', 'error')
-                  AND (
-                      CASE LOWER(t.status)
-                          WHEN 'running' THEN COALESCE(s.time_updated, t.started_at)
-                          ELSE COALESCE(t.completed_at, t.started_at, s.time_updated)
-                      END
-                  ) >= ?
+        WITH live AS (
+            SELECT mu.session_id AS session_id,
+                   mu.turn_id AS turn_id,
+                   MIN(mu.started_at) AS started_at,
+                   MAX(mu.started_at) AS last_activity_at
+            FROM model_usage mu
+            LEFT JOIN turn_usage t
+                ON t.session_id = mu.session_id AND t.turn_id = mu.turn_id
+            WHERE mu.turn_id IS NOT NULL AND t.turn_id IS NULL
+            GROUP BY mu.session_id, mu.turn_id
+        )
+        SELECT * FROM (
+            SELECT t.session_id,
+                   t.turn_id,
+                   LOWER(t.status) AS status,
+                   t.started_at,
+                   t.completed_at,
+                   t.error_code,
+                   (
+                       SELECT m.model_id
+                       FROM model_usage m
+                       WHERE m.session_id = t.session_id
+                         AND m.turn_id = t.turn_id
+                       ORDER BY m.started_at DESC
+                       LIMIT 1
+                   ) AS model_id,
+                   s.time_updated
+            FROM turn_usage t
+            LEFT JOIN session s ON s.id = t.session_id
+            WHERE LOWER(t.status) IN ('running', 'error')
+              AND (
+                  CASE LOWER(t.status)
+                      WHEN 'running' THEN COALESCE(s.time_updated, t.started_at)
+                      ELSE COALESCE(t.completed_at, t.started_at, s.time_updated)
+                  END
+              ) >= ?
 
-                UNION ALL
+            UNION ALL
 
-                SELECT l.session_id,
-                       l.turn_id,
-                       'running' AS status,
-                       l.started_at,
-                       NULL AS completed_at,
-                       NULL AS error_code,
-                       (
-                           SELECT m.model_id
-                           FROM model_usage m
-                           WHERE m.session_id = l.session_id
-                             AND m.turn_id = l.turn_id
-                           ORDER BY m.started_at DESC
-                           LIMIT 1
-                       ) AS model_id,
-                       s.time_updated
-                FROM live l
-                LEFT JOIN session s ON s.id = l.session_id
-                WHERE l.last_activity_at >= ?
-            )
-            ORDER BY CASE status
-                        WHEN 'running' THEN COALESCE(time_updated, started_at)
-                        ELSE COALESCE(completed_at, started_at, time_updated)
-                    END DESC
-            """
+            SELECT l.session_id,
+                   l.turn_id,
+                   'running' AS status,
+                   l.started_at,
+                   NULL AS completed_at,
+                   NULL AS error_code,
+                   (
+                       SELECT m.model_id
+                       FROM model_usage m
+                       WHERE m.session_id = l.session_id
+                         AND m.turn_id = l.turn_id
+                       ORDER BY m.started_at DESC
+                       LIMIT 1
+                   ) AS model_id,
+                   s.time_updated
+            FROM live l
+            LEFT JOIN session s ON s.id = l.session_id
+            WHERE l.last_activity_at >= ?
+        )
+        ORDER BY CASE status
+                    WHEN 'running' THEN COALESCE(time_updated, started_at)
+                    ELSE COALESCE(completed_at, started_at, time_updated)
+                END DESC
+        """
 
         var statement: OpaquePointer?
         let prepareResult = sqlite3_prepare_v2(database, sql, -1, &statement, nil)

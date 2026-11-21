@@ -467,7 +467,7 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
     public var editingDuration: Double { max(duration, outputDuration) }
     public var mediaFiles: [String] {
         Array(Set(([videoFile, cameraFile, microphoneFile, rawCameraFile, rawMicrophoneFile].compactMap { $0 }
-            + (timeline?.assets.map(\.file) ?? [])).filter { !$0.isEmpty })).sorted()
+                + (timeline?.assets.map(\.file) ?? [])).filter { !$0.isEmpty })).sorted()
     }
 
     public func validate() throws {
@@ -487,17 +487,17 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
               Set(edits.zoomClips.map(\.id)).count == edits.zoomClips.count,
               Set(captions.map(\.id)).count == captions.count,
               edits.segments.allSatisfy({ $0.start.isFinite && $0.end.isFinite && $0.speed.isFinite
-                  && $0.start >= 0 && $0.end > $0.start && $0.end <= duration + 0.001
-                  && (0.1...8).contains($0.speed) }),
+                      && $0.start >= 0 && $0.end > $0.start && $0.end <= duration + 0.001
+                      && (0.1...8).contains($0.speed) }),
               edits.zoomClips.allSatisfy({ $0.time.isFinite && $0.duration.isFinite
-                  && $0.time >= 0 && $0.time < duration && $0.duration > 0
-                  && $0.duration <= duration && (1...5).contains($0.scale)
-                  && (0...1).contains($0.x) && (0...1).contains($0.y) }),
+                      && $0.time >= 0 && $0.time < duration && $0.duration > 0
+                      && $0.duration <= duration && (1...5).contains($0.scale)
+                      && (0...1).contains($0.x) && (0...1).contains($0.y) }),
               captions.allSatisfy({ $0.start.isFinite && $0.end.isFinite && $0.start >= 0
-                  && $0.end > $0.start && $0.end <= overlayDuration + 0.001 && $0.text.count <= 4_000
-                  && $0.layout?.isNormalized != false && $0.fontSize.map({ (0.01...0.3).contains($0) }) != false }),
+                      && $0.end > $0.start && $0.end <= overlayDuration + 0.001 && $0.text.count <= 4_000
+                      && $0.layout?.isNormalized != false && $0.fontSize.map({ (0.01...0.3).contains($0) }) != false }),
               pointers.allSatisfy({ $0.time.isFinite && $0.time >= 0 && $0.time <= duration + 0.1
-                  && (0...1).contains($0.x) && (0...1).contains($0.y) }),
+                      && (0...1).contains($0.x) && (0...1).contains($0.y) }),
               (0...0.3).contains(edits.padding), (0...0.2).contains(edits.cornerRadius),
               (0...1).contains(edits.shadow), (0.5...4).contains(edits.cursorSize),
               (0.1...0.5).contains(edits.cameraSize),

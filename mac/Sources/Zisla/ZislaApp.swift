@@ -558,12 +558,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 .removeDuplicates().eraseToAnyPublisher(),
             screenLayout: model.$islandScreenLayout.eraseToAnyPublisher()
         )
-            .sink { [weak self, weak coordinator] size in
-                self?.updateExpandedPanelSize(
-                    size, duringVoiceRecording: model.voiceInput.isCapturingInput, coordinator: coordinator
-                )
-            }
-            .store(in: &cancellables)
+        .sink { [weak self, weak coordinator] size in
+            self?.updateExpandedPanelSize(
+                size, duringVoiceRecording: model.voiceInput.isCapturingInput, coordinator: coordinator
+            )
+        }
+        .store(in: &cancellables)
         model.$isMirrorPresented
             .combineLatest(model.$isTeleprompterPresented)
             .sink { [weak self, weak coordinator, weak model] isMirrorPresented, isTeleprompterPresented in
@@ -679,7 +679,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard coordinator?.activeDisplayID == displayID else { return }
             coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,
                                              compactStatusSideWidth: sideWidth,
-                                              statusIconSize: iconSize)
+                                             statusIconSize: iconSize)
         }
         configureMainMenu()
         registerScreenshotHotkeys()
@@ -840,12 +840,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 .map { _ in () }
                 .eraseToAnyPublisher()
         )
-            .sink { [weak coordinator] _ in
-                Task { @MainActor in
-                    coordinator?.refreshPersistentPanels()
-                }
+        .sink { [weak coordinator] _ in
+            Task { @MainActor in
+                coordinator?.refreshPersistentPanels()
             }
-            .store(in: &cancellables)
+        }
+        .store(in: &cancellables)
 
         model.$isSharingPickerVisible
             .removeDuplicates()
@@ -873,16 +873,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             model.$isIslandVisible,
             model.$isTeleprompterPresented
         )
-            .sink { [weak coordinator] module, visible, isTeleprompterPresented in
-                Task { @MainActor in
-                    coordinator?.setAllowsKeyWindow(
-                        visible && (
-                            module.allowsIslandKeyboardFocus || isTeleprompterPresented
-                        )
+        .sink { [weak coordinator] module, visible, isTeleprompterPresented in
+            Task { @MainActor in
+                coordinator?.setAllowsKeyWindow(
+                    visible && (
+                        module.allowsIslandKeyboardFocus || isTeleprompterPresented
                     )
-                }
+                )
             }
-            .store(in: &cancellables)
+        }
+        .store(in: &cancellables)
 
         // Voice recording: expand the island to one row and show live transcription below.
         // Capture starts → save current panel size, switch to compact size, expand the island.
@@ -1103,9 +1103,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         expandedSizeUpdateTask?.cancel()
         pendingVoiceRecordingPanelRestore = nil
         expandedSizeUpdateTask = Task { @MainActor [weak self, weak coordinator] in
-        // Defer module button event handling to the next run-loop turn before resizing the NSPanel
-        // frame, avoiding a spurious "mouse exited" AppKit hit-test triggered mid-click.
-        // For rapid module switches, only the last size is applied.
+            // Defer module button event handling to the next run-loop turn before resizing the NSPanel
+            // frame, avoiding a spurious "mouse exited" AppKit hit-test triggered mid-click.
+            // For rapid module switches, only the last size is applied.
             await Task.yield()
             guard !Task.isCancelled, let coordinator else { return }
             // Two-phase resize: the panel window itself never animates (see IslandPanel.resize),
@@ -1216,7 +1216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let recordingMenu = NSMenu(title: localized("录屏"))
         for action in RecordingShortcutAction.allCases {
             let item = recordingMenu.addItem(withTitle: localized(action.title),
-                action: #selector(performRecordingMenuAction(_:)), keyEquivalent: "")
+                                             action: #selector(performRecordingMenuAction(_:)), keyEquivalent: "")
             item.tag = action.rawValue
             item.target = self
         }
@@ -1378,14 +1378,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                                                      style: settings.systemMonitorMenuBarDisplayStyle))
         }
         let readings = SystemMonitorMenuBarRows.normalized(top: settings.systemMonitorMenuBarTopRow,
-            bottom: settings.systemMonitorMenuBarBottomRow).joined().map { metric in
-                IslandStatusIcon.Reading(metric: metric,
-                    text: SystemMonitorCombinedMenuBarPresentation.value(metric, snapshot: AppModel.shared.systemMonitor.snapshot))
-            }
+                                                           bottom: settings.systemMonitorMenuBarBottomRow).joined().map { metric in
+            IslandStatusIcon.Reading(metric: metric,
+                                     text: SystemMonitorCombinedMenuBarPresentation.value(metric, snapshot: AppModel.shared.systemMonitor.snapshot))
+        }
         let icons = IslandStatusIconRouting.update(destination: settings.effectiveStatusIconDestination,
-            application: statusItem, metrics: metrics, stacked: mergedMonitorStatusItem, readings: readings,
-            combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle,
-            islandAppIconEnabled: settings.islandAppIconEnabled)
+                                                   application: statusItem, metrics: metrics, stacked: mergedMonitorStatusItem, readings: readings,
+                                                   combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle,
+                                                   islandAppIconEnabled: settings.islandAppIconEnabled)
         AppModel.shared.islandHasSystemMonitorIcons = icons.contains(where: \.isSystemMonitor)
         noticePresenter?.setStatusIcons(icons)
     }
@@ -1948,7 +1948,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func performRecordingAction(_ action: RecordingShortcutAction) {
         guard AppModel.shared.settingsStore.settings.screenRecordingEnabled
-                || action == .pause || action == .stop else { return }
+            || action == .pause || action == .stop else { return }
         if action == .pause || action == .stop { screenRecordingController?.perform(action); return }
         recordingStudio().perform(action)
     }
@@ -1961,12 +1961,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let hotkey = settings.screenRecordingHotkey(for: action)
             if let conflict = settings.recordingShortcutConflict(for: hotkey, excluding: action) {
                 AppModel.shared.transientMessage = AppLocalization.text("%@快捷键与%@冲突，请修改其中一个",
-                    AppLocalization.text(action.title), AppLocalization.text(conflict))
+                                                                        AppLocalization.text(action.title), AppLocalization.text(conflict))
                 continue
             }
             let manager = GlobalHotkeyManager()
             let result = manager.register(hotkey: hotkey,
-                onKeyDown: { [weak self] in self?.performRecordingAction(action) }, onKeyUp: {})
+                                          onKeyDown: { [weak self] in self?.performRecordingAction(action) }, onKeyUp: {})
             recordingHotkeyManagers[action] = manager
             reportScreenshotHotkeyRegistration(result, actionName: AppLocalization.text(action.title))
         }

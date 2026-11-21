@@ -27,7 +27,7 @@ enum AIAccountGrokQuotaParser {
             else if flags == 0x80 {
                 guard let text = String(data: body, encoding: .utf8),
                       text.components(separatedBy: .newlines).filter({ $0.lowercased().hasPrefix("grpc-status:") })
-                        .allSatisfy({ $0.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) == "0" }) else {
+                          .allSatisfy({ $0.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) == "0" }) else {
                     throw AIAccountBalanceError.invalidResponse
                 }
             } else { throw AIAccountBalanceError.invalidResponse }
@@ -53,7 +53,7 @@ enum AIAccountGrokQuotaParser {
         }
         let duration = start.flatMap { begin in end.map { $0.timeIntervalSince(begin) } }.flatMap { $0 > 0 ? $0 : nil }
         let window = AIAccountQuotaWindow(id: "credits", kind: AIAccountBalanceParser.kind(duration: duration),
-            remainingPercent: 100 - used, resetsAt: reset, durationSeconds: duration)
+                                          remainingPercent: 100 - used, resetsAt: reset, durationSeconds: duration)
         guard window.isValid else { throw AIAccountBalanceError.invalidResponse }
         return [window]
     }

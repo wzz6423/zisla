@@ -152,10 +152,10 @@ actor LyricsService {
             if let http = response as? HTTPURLResponse,
                http.statusCode == 200 {
                 let selection = try Self.selectLyricsTrack(
-                   from: data,
-                   title: title,
-                   artist: artist,
-                   duration: duration
+                    from: data,
+                    title: title,
+                    artist: artist,
+                    duration: duration
                 )
                 if selection.lyrics != nil {
                     return selection

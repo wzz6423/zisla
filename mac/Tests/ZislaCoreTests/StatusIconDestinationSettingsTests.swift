@@ -6,17 +6,17 @@ struct StatusIconDestinationSettingsTests {
     @Test
     func moreInformationDefaultsOnAndMalformedValuesPreserveOtherSettings() throws {
         let original = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false,
-            statusIconDestination: .island)
+                                       statusIconDestination: .island)
         #expect(FeatureSettings.default.islandShowMoreInformation)
         var payload = try encoded(original)
         payload.removeValue(forKey: "islandShowMoreInformation")
         #expect(try JSONDecoder().decode(FeatureSettings.self,
-            from: JSONSerialization.data(withJSONObject: payload)) == original)
+                                         from: JSONSerialization.data(withJSONObject: payload)) == original)
         let invalidValues: [Any] = [NSNull(), "true", 1, [String](), [String: String]()]
         for value in invalidValues {
             payload["islandShowMoreInformation"] = value
             #expect(try JSONDecoder().decode(FeatureSettings.self,
-                from: JSONSerialization.data(withJSONObject: payload)) == original)
+                                             from: JSONSerialization.data(withJSONObject: payload)) == original)
         }
         var disabled = original
         disabled.islandShowMoreInformation = false

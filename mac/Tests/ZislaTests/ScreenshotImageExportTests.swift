@@ -23,7 +23,7 @@ struct ScreenshotImageExportTests {
             fixture.panel.directoryURL = fixture.directory
             let message: String? = await withCheckedContinuation { continuation in
                 ScreenshotImageExport.presentSavePanel(for: Self.png, directory: locations[.screenshot], panel: fixture.panel,
-                    systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
+                                                       systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                     continuation.resume(returning: $0)
                 }
                 #expect(fixture.panel.directoryURL?.standardizedFileURL == directory.standardizedFileURL,
@@ -54,7 +54,7 @@ struct ScreenshotImageExportTests {
 
         let message: String? = await withCheckedContinuation { continuation in
             ScreenshotImageExport.presentSavePanel(for: Self.png, directory: fixture.directory, panel: fixture.panel,
-                systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
+                                                   systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                 continuation.resume(returning: $0)
             }
             #expect(fixture.panel.presentedStandalone)
@@ -89,7 +89,7 @@ struct ScreenshotImageExportTests {
 
         let message: String? = await withCheckedContinuation { continuation in
             ScreenshotImageExport.presentSavePanel(for: Self.png, directory: fixture.directory, panel: fixture.panel,
-                systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
+                                                   systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                 continuation.resume(returning: $0)
             }
             #expect(fixture.panel.presentedStandalone)
@@ -115,7 +115,7 @@ struct ScreenshotImageExportTests {
         defer { fixture.close() }
         let message: String? = await withCheckedContinuation { continuation in
             ScreenshotImageExport.presentSavePanel(for: Self.png, directory: fixture.directory, panel: fixture.panel,
-                systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
+                                                   systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                 continuation.resume(returning: $0)
             }
             for isDark in [false, true, false] {
@@ -143,7 +143,7 @@ struct ScreenshotImageExportTests {
         let response: NSApplication.ModalResponse = outcome == "cancel" ? .cancel : outcome == "abort" ? .abort : .OK
         let message: String? = await withCheckedContinuation { continuation in
             ScreenshotImageExport.presentSavePanel(for: Self.png, directory: fixture.directory, panel: fixture.panel,
-                systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
+                                                   systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                 continuation.resume(returning: $0)
             }
             fixture.panel.respond(response)

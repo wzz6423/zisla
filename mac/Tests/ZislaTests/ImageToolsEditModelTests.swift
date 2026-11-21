@@ -417,8 +417,8 @@ struct ImageToolsEditModelTests {
 
         static func image(width: Int = 40, height: Int = 20, red: UInt8 = 80, alpha: UInt8 = 255) throws -> CGImage {
             let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
-                bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+                                                 bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
             context.setFillColor(red: CGFloat(red) / 255, green: 0.4, blue: 0.8, alpha: CGFloat(alpha) / 255)
             context.fill(CGRect(x: 0, y: 0, width: width, height: height))
             return try #require(context.makeImage())
@@ -426,18 +426,18 @@ struct ImageToolsEditModelTests {
 
         static func unreadImage(width: Int, height: Int) throws -> CGImage {
             var callbacks = CGDataProviderDirectCallbacks(version: 0, getBytePointer: nil, releaseBytePointer: nil,
-                getBytesAtPosition: { _, buffer, _, count in
-                    Issue.record("Rejected or pre-canceled edits must not read their pixels")
-                    buffer.initializeMemory(as: UInt8.self, repeating: 0, count: count)
-                    return count
-                }, releaseInfo: nil)
+                                                          getBytesAtPosition: { _, buffer, _, count in
+                                                              Issue.record("Rejected or pre-canceled edits must not read their pixels")
+                                                              buffer.initializeMemory(as: UInt8.self, repeating: 0, count: count)
+                                                              return count
+                                                          }, releaseInfo: nil)
             let provider = try #require(CGDataProvider(directInfo: nil, size: Int64(width * height * 4), callbacks: &callbacks))
             return try providerImage(provider, width: width, height: height)
         }
 
         static func invalidPixelImage() throws -> CGImage {
             var callbacks = CGDataProviderDirectCallbacks(version: 0, getBytePointer: nil, releaseBytePointer: nil,
-                getBytesAtPosition: { _, _, _, _ in 0 }, releaseInfo: nil)
+                                                          getBytesAtPosition: { _, _, _, _ in 0 }, releaseInfo: nil)
             let provider = try #require(CGDataProvider(directInfo: nil, size: 40 * 20 * 4, callbacks: &callbacks))
             return try providerImage(provider, width: 40, height: 20)
         }
@@ -445,26 +445,26 @@ struct ImageToolsEditModelTests {
         static func gatedImage(_ gate: PixelGate) throws -> CGImage {
             let info = Unmanaged.passRetained(gate).toOpaque()
             var callbacks = CGDataProviderDirectCallbacks(version: 0, getBytePointer: nil, releaseBytePointer: nil,
-                getBytesAtPosition: { info, buffer, _, count in
-                    Unmanaged<PixelGate>.fromOpaque(info!).takeUnretainedValue().read(buffer, count: count)
-                }, releaseInfo: { info in Unmanaged<PixelGate>.fromOpaque(info!).release() })
+                                                          getBytesAtPosition: { info, buffer, _, count in
+                                                              Unmanaged<PixelGate>.fromOpaque(info!).takeUnretainedValue().read(buffer, count: count)
+                                                          }, releaseInfo: { info in Unmanaged<PixelGate>.fromOpaque(info!).release() })
             let provider = try #require(CGDataProvider(directInfo: info, size: 40 * 20 * 4, callbacks: &callbacks))
             return try providerImage(provider, width: 40, height: 20)
         }
 
         private static func providerImage(_ provider: CGDataProvider, width: Int, height: Int) throws -> CGImage {
             try #require(CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
-                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+                                 bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                 bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                 provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
         }
 
         static func bytes(_ image: CGImage) throws -> [UInt8] {
             var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
             try bytes.withUnsafeMutableBytes { buffer in
                 let context = try #require(CGContext(data: buffer.baseAddress, width: image.width, height: image.height,
-                    bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+                                                     bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
                 context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
             }
             return bytes

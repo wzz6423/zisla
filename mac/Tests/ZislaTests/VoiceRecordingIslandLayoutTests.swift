@@ -66,7 +66,7 @@ struct VoiceRecordingIslandLayoutTests {
     func compactRecordingExpandsBesideThePillAndKeepsItsIconArea(edge: IslandEdge) {
         let collapsed = edge.isVertical ? CGSize(width: 32, height: 70) : CGSize(width: 120, height: 32)
         let layout = IslandModuleLayout.compactSurface(collapsedSize: collapsed, overflowWidth: 120, edge: edge,
-            locale: AppLanguage.simplifiedChinese.locale)
+                                                       locale: AppLanguage.simplifiedChinese.locale)
         let expected = edge.isVertical ? CGSize(width: 320, height: 80) : CGSize(width: 120, height: 52)
         #expect(layout.islandSize == expected)
         #expect(layout.panelSize == (edge.isVertical ? expected : CGSize(width: 120, height: 56)))
@@ -91,7 +91,7 @@ struct VoiceRecordingIslandLayoutTests {
     func emptyAndSmallRecordingSurfacesHaveNoNegativeRows(edge: IslandEdge) {
         for available in [CGSize.zero, CGSize(width: 8, height: 10), CGSize(width: -1, height: -1)] {
             let geometry = VoiceRecordingIslandGeometry(collapsedSize: CGSize(width: 32, height: 70),
-                availableSize: available, edge: edge)
+                                                        availableSize: available, edge: edge)
             #expect(geometry.surfaceSize.width >= 0 && geometry.surfaceSize.height >= 0)
             for frame in [geometry.topRowFrame, geometry.transcriptRowFrame] {
                 #expect(frame.width >= 0 && frame.height >= 0)
@@ -102,7 +102,7 @@ struct VoiceRecordingIslandLayoutTests {
     @Test
     func recordingGeometryKeepsLegacyNotchWingsAndOneTranscriptRow() {
         let geometry = VoiceRecordingIslandGeometry(collapsedSize: CGSize(width: 240, height: 34),
-            availableSize: CGSize(width: 320, height: 58))
+                                                    availableSize: CGSize(width: 320, height: 58))
         #expect(geometry.surfaceSize == CGSize(width: 320, height: 54))
         #expect(geometry.topRowFrame == CGRect(x: 0, y: 0, width: 320, height: 34))
         #expect(geometry.transcriptRowFrame == CGRect(x: 0, y: 34, width: 320, height: 20))
@@ -116,7 +116,7 @@ struct VoiceRecordingIslandLayoutTests {
     @Test(arguments: [IslandEdge.top, .bottom])
     func recordingFromAnIdleCustomCircleHasRoomForBothIconsAndItsTranscript(edge: IslandEdge) {
         let layout = IslandModuleLayout.compactSurface(collapsedSize: CGSize(width: 32, height: 32),
-            overflowWidth: 32, edge: edge)
+                                                       overflowWidth: 32, edge: edge)
         #expect(layout.islandSize.width >= 70,
                 "The idle 32pt circle cannot fit the mic, waveform and padded transcript")
     }
@@ -125,12 +125,12 @@ struct VoiceRecordingIslandLayoutTests {
     @MainActor
     func customRecordingIconsStayAdjacentWhileCameraWingsKeepTheirClearance() throws {
         let geometry = VoiceRecordingIslandGeometry(collapsedSize: CGSize(width: 32, height: 32),
-            availableSize: CGSize(width: 180, height: 52))
+                                                    availableSize: CGSize(width: 180, height: 52))
         func iconSpan(adjacent: Bool) throws -> Int {
             let renderer = ImageRenderer(content: VoiceTranscriptionView(isRecording: false, transcript: "",
-                errorDescription: nil,
-                geometry: geometry, keepsIconsAdjacent: adjacent)
-                .frame(width: 180, height: 52).background(.black))
+                                                                         errorDescription: nil,
+                                                                         geometry: geometry, keepsIconsAdjacent: adjacent)
+                    .frame(width: 180, height: 52).background(.black))
             renderer.scale = 1
             let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
             let columns = (0..<bitmap.pixelsWide).filter { x in

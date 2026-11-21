@@ -80,7 +80,7 @@ extension RecordingExportFormat {
         if self == .gif { return .gif }
         if self == .mp4 { return .mpeg4Movie }
         return UTType(tag: fileExtension, tagClass: .filenameExtension,
-            conformingTo: self == .livePhoto ? .package : isAudioOnly ? .audio : .movie)!
+                      conformingTo: self == .livePhoto ? .package : isAudioOnly ? .audio : .movie)!
     }
 }
 

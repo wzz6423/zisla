@@ -12,9 +12,9 @@ struct ScreenRecordingMediaMetadataTests {
     @Test func exifDateHonorsOffsetFractionsAndRejectsInvalidInput() {
         let expected = ISO8601DateFormatter().date(from: "2026-10-29T01:30:45Z")!
         #expect(RecordingMediaMetadata.exifDate("2026:10:29 09:30:45", offset: "+08:00", subseconds: "125",
-            timeZone: utc) == expected.addingTimeInterval(0.125))
+                                                timeZone: utc) == expected.addingTimeInterval(0.125))
         #expect(RecordingMediaMetadata.exifDate("2026:10:28 20:00:45", offset: "-05:30",
-            timeZone: utc) == expected)
+                                                timeZone: utc) == expected)
         #expect(RecordingMediaMetadata.exifDate("2026:10:29 01:30:45", timeZone: utc) == expected)
         for value in ["", "bad", "2026:02:30 01:30:45", "2026:10:29 24:30:45", "2026:10:29 01:30:45junk"] {
             #expect(RecordingMediaMetadata.exifDate(value, timeZone: utc) == nil)
@@ -45,7 +45,7 @@ struct ScreenRecordingMediaMetadataTests {
         #expect(RecordingMediaMetadata.capturedAt(image: target) == expected)
         try FileManager.default.setAttributes([.creationDate: Date(timeIntervalSince1970: 0)], ofItemAtPath: imageURL.path)
         #expect(RecordingMediaMetadata.capturedAt(image: imageURL) == nil,
-            "A file creation date must not be mistaken for the camera capture date")
+                "A file creation date must not be mistaken for the camera capture date")
         #expect(RecordingMediaMetadata.capturedAt(image: fixture.directory.appendingPathComponent("missing.png")) == nil)
     }
 
@@ -60,7 +60,7 @@ struct ScreenRecordingMediaMetadataTests {
         for (index, original) in [nil, "invalid", "2026:10:29 09:30:45"].enumerated() {
             let target = fixture.directory.appendingPathComponent("date-\(index).tiff")
             let destination = try #require(CGImageDestinationCreateWithURL(target as CFURL,
-                UTType.tiff.identifier as CFString, 1, nil))
+                                                                           UTType.tiff.identifier as CFString, 1, nil))
             var properties: [String: Any] = [kCGImagePropertyTIFFDictionary as String:
                 [kCGImagePropertyTIFFDateTime as String: tiffDate]]
             if let original {
@@ -72,8 +72,8 @@ struct ScreenRecordingMediaMetadataTests {
             CGImageDestinationAddImage(destination, image, properties as CFDictionary)
             try #require(CGImageDestinationFinalize(destination))
             #expect(RecordingMediaMetadata.capturedAt(image: target) == (index == 2
-                ? ISO8601DateFormatter().date(from: "2026-10-29T01:30:45Z") : expected),
-                "A valid original camera timestamp takes precedence; absent or invalid EXIF uses embedded TIFF metadata")
+                        ? ISO8601DateFormatter().date(from: "2026-10-29T01:30:45Z") : expected),
+            "A valid original camera timestamp takes precedence; absent or invalid EXIF uses embedded TIFF metadata")
         }
     }
 

@@ -1485,7 +1485,6 @@ struct CLIParserTests {
     }
 }
 
-
 struct MessageNotificationTests {
     @Test
     func normalizeContentCollapsesWhitespaceAndTruncates() {
@@ -2704,8 +2703,8 @@ struct AIUsageAnalyticsTests {
         let base = Date(timeIntervalSince1970: 0)
         let samples = [
             AIUsageSample(provider: .claude, timestamp: base.addingTimeInterval(2 * 86_400 + 100), inputTokens: 500, outputTokens: 200),
-            AIUsageSample(provider: .grok,   timestamp: base.addingTimeInterval(4 * 86_400 + 100), inputTokens: 10,  outputTokens: 5),
-            AIUsageSample(provider: .codex,  timestamp: base.addingTimeInterval(6 * 86_400 + 100), inputTokens: 600, outputTokens: 300),
+            AIUsageSample(provider: .grok, timestamp: base.addingTimeInterval(4 * 86_400 + 100), inputTokens: 10, outputTokens: 5),
+            AIUsageSample(provider: .codex, timestamp: base.addingTimeInterval(6 * 86_400 + 100), inputTokens: 600, outputTokens: 300),
         ]
 
         let series = AIUsageAnalytics.smoothedDailyUsageSeries(
@@ -2927,7 +2926,7 @@ struct FeatureSettingsTests {
         var settings = defaults
         settings.clipboardAssistantEnabled = true
         let customCombo = VoiceInputHotkeyPreset(
-            keyCode: 16,                      // Y
+            keyCode: 16, // Y
             carbonModifiers: 0x0800,
             keyDisplayName: "Y"
         )
@@ -3059,7 +3058,7 @@ private func setSQLiteUserVersion(at url: URL, to version: Int) throws {
 private func setSQLiteModificationDate(_ date: Date, at url: URL) throws {
     let fileManager = FileManager.default
     for candidate in [url, URL(fileURLWithPath: url.path + "-wal")]
-    where fileManager.fileExists(atPath: candidate.path) {
+        where fileManager.fileExists(atPath: candidate.path) {
         try fileManager.setAttributes([.modificationDate: date], ofItemAtPath: candidate.path)
     }
 }
@@ -3165,9 +3164,9 @@ private func readDetectedUsageEvents(from url: URL) throws -> [AIUsageSample] {
 
     var statement: OpaquePointer?
     let sql = """
-        SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-        FROM detected_usage_events ORDER BY timestamp
-        """
+    SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+    FROM detected_usage_events ORDER BY timestamp
+    """
     guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
         sqlite3_finalize(statement)
         throw SQLiteTestError.statementFailed
@@ -3216,9 +3215,9 @@ private func readUsageSamples(from url: URL) throws -> [AIUsageSample] {
 
     var statement: OpaquePointer?
     let sql = """
-        SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-        FROM usage_samples ORDER BY position
-        """
+    SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+    FROM usage_samples ORDER BY position
+    """
     guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
         sqlite3_finalize(statement)
         throw SQLiteTestError.statementFailed

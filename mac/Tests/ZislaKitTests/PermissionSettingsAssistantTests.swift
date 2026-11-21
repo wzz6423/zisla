@@ -23,7 +23,7 @@ struct PermissionSettingsAssistantTests {
         await fixture.settle()
         let panel = try #require(fixture.assistant.panel)
         #expect(panel.frame.maxX == fixture.settingsFrame!.minX - 12,
-            "Use the settled Settings frame, not an intermediate animation frame")
+                "Use the settled Settings frame, not an intermediate animation frame")
         #expect(panel.frame.midY == fixture.settingsFrame!.midY)
     }
 
@@ -136,12 +136,12 @@ struct PermissionSettingsAssistantTests {
         fixture.settingsFrame = nil
         NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
         fixture.workspaceCenter.post(name: NSWorkspace.didActivateApplicationNotification, object: nil,
-            userInfo: [NSWorkspace.applicationUserInfoKey: NSRunningApplication.current])
+                                     userInfo: [NSWorkspace.applicationUserInfoKey: NSRunningApplication.current])
         #expect(fixture.assistant.panel === panel, "Returning to the app must preserve the drag helper")
         fixture.assistant.settingsDidActivate()
         await fixture.settle()
         #expect(fixture.assistant.panel === panel && panel.frame == frame,
-            "A missing Settings window must not close or reposition the helper")
+                "A missing Settings window must not close or reposition the helper")
         #expect(fixture.settingsTimers.allSatisfy { !$0.isValid }, "Stop relocation polling when Settings disappears")
     }
 
@@ -165,8 +165,8 @@ struct PermissionSettingsAssistantTests {
             let item = try #require(image.draggingItems().first)
             #expect(item.item as? NSURL == fixture.applicationURL as NSURL)
             let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero,
-                modifierFlags: [], timestamp: 0, windowNumber: panel.windowNumber, context: nil,
-                eventNumber: 0, clickCount: 1, pressure: 0))
+                                                        modifierFlags: [], timestamp: 0, windowNumber: panel.windowNumber, context: nil,
+                                                        eventNumber: 0, clickCount: 1, pressure: 0))
             #expect(image.menu(for: event)?.items.isEmpty == true)
         }
         #expect(fixture.presentations == 5)
@@ -365,7 +365,7 @@ struct PermissionSettingsAssistantTests {
             RunLoop.main.run(mode: .default, before: deadline)
         }
         #expect(fixture.assistant.panel != nil && fixture.presentations == 1,
-            "A Settings window that appears after activation must be found without another activation event")
+                "A Settings window that appears after activation must be found without another activation event")
         #expect(!timer.isValid)
         fixture.tickSettings()
         #expect(fixture.presentations == 1)
@@ -403,7 +403,7 @@ struct PermissionSettingsAssistantTests {
         for operation: NSDragOperation in [[], .generic, .copy] {
             image.draggingSession(session, endedAt: CGPoint(x: 100, y: 400), operation: operation)
             #expect(fixture.assistant.panel === panel && panel.frame == frame,
-                "A drag without a Settings destination must preserve the helper and its position")
+                    "A drag without a Settings destination must preserve the helper and its position")
         }
         fixture.settingsFrame = CGRect(x: 50, y: 200, width: 700, height: 600)
         image.draggingSession(session, endedAt: CGPoint(x: 100, y: 400), operation: [])
@@ -459,10 +459,10 @@ struct PermissionSettingsAssistantTests {
         let screen = CGRect(x: -1600, y: -300, width: 1600, height: 1000)
         let size = CGSize(width: 250, height: 190)
         let right = PermissionSettingsAssistant.frame(size: size,
-            settingsFrame: CGRect(x: -1450, y: -100, width: 700, height: 800), visibleFrame: screen)
+                                                      settingsFrame: CGRect(x: -1450, y: -100, width: 700, height: 800), visibleFrame: screen)
         #expect(right.minX == -738 && screen.contains(right))
         let left = PermissionSettingsAssistant.frame(size: size,
-            settingsFrame: CGRect(x: -700, y: -100, width: 650, height: 800), visibleFrame: screen)
+                                                     settingsFrame: CGRect(x: -700, y: -100, width: 650, height: 800), visibleFrame: screen)
         #expect(left.maxX == -712 && screen.contains(left))
         let unavailable = PermissionSettingsAssistant.frame(size: size, settingsFrame: nil, visibleFrame: screen)
         #expect(unavailable.maxX == screen.maxX - 12 && screen.contains(unavailable))
@@ -470,7 +470,7 @@ struct PermissionSettingsAssistantTests {
         #expect(screen.contains(fullScreen))
         for y in [CGFloat(-900), 1200] {
             let clipped = PermissionSettingsAssistant.frame(size: size,
-                settingsFrame: CGRect(x: -1450, y: y, width: 700, height: 800), visibleFrame: screen)
+                                                            settingsFrame: CGRect(x: -1450, y: y, width: 700, height: 800), visibleFrame: screen)
             #expect(screen.contains(clipped))
         }
     }
@@ -517,20 +517,20 @@ struct PermissionSettingsAssistantTests {
 
         func makeAssistant(applicationURL: URL, language: AppLanguage = .english) -> PermissionSettingsAssistant {
             PermissionSettingsAssistant(applicationURL: applicationURL,
-                openURL: { [unowned self] in self.opened.append($0); return self.canOpen },
-                icon: { _ in NSImage(size: NSSize(width: 64, height: 64)) },
-                placement: { [unowned self] in (self.settingsFrame, self.visibleFrame) },
-                orderFront: { [unowned self] _ in self.presentations += 1 },
-                language: { language },
-                timerFactory: { [unowned self] interval, block in
-                    let timer = Timer(timeInterval: interval, repeats: true, block: block)
-                    timer.fireDate = .distantFuture
-                    self.settingsTimers.append(timer)
-                    self.timerHandlers.append(block)
-                    return timer
-                },
-                uptime: { [unowned self] in self.uptime },
-                workspaceNotificationCenter: workspaceCenter)
+                                        openURL: { [unowned self] in self.opened.append($0); return self.canOpen },
+                                        icon: { _ in NSImage(size: NSSize(width: 64, height: 64)) },
+                                        placement: { [unowned self] in (self.settingsFrame, self.visibleFrame) },
+                                        orderFront: { [unowned self] _ in self.presentations += 1 },
+                                        language: { language },
+                                        timerFactory: { [unowned self] interval, block in
+                                            let timer = Timer(timeInterval: interval, repeats: true, block: block)
+                                            timer.fireDate = .distantFuture
+                                            self.settingsTimers.append(timer)
+                                            self.timerHandlers.append(block)
+                                            return timer
+                                        },
+                                        uptime: { [unowned self] in self.uptime },
+                                        workspaceNotificationCenter: workspaceCenter)
         }
 
         func settle() async {

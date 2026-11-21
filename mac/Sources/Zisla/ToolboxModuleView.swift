@@ -164,10 +164,10 @@ struct ToolboxModuleView: View {
                         model.screenCleaning.isKeyboardCleaning ? AppLocalization.text("结束清洁") : AppLocalization.text("清理键盘"),
                         systemImage: "keyboard"
                     )
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Metrics.controlHeight)
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Metrics.controlHeight)
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .background(Color.fillCard)

@@ -105,7 +105,7 @@ final class ShelfContextActions: ObservableObject {
                 case .imagesToPDF:
                     let directory = temporaryDirectory.appendingPathComponent("zisla-shelf-action-" + UUID().uuidString, isDirectory: true)
                     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
-                        attributes: [.posixPermissions: 0o700])
+                                                            attributes: [.posixPermissions: 0o700])
                     staging = directory
                     let output = directory.appendingPathComponent("images.pdf")
                     let worker = Task.detached(priority: .userInitiated) {
@@ -127,7 +127,7 @@ final class ShelfContextActions: ObservableObject {
                             _ = try RecordingMediaImageStore.dimensions(of: url)
                             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                                   let image = CGImageSourceCreateImageAtIndex(source, 0,
-                                    [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
+                                                                              [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
                                 throw ShelfContextActionError.unavailableFile(url.lastPathComponent)
                             }
                             let fragments = try await recognizeImage(image, operation)

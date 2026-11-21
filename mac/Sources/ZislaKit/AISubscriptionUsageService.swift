@@ -182,8 +182,8 @@ public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
                 samples[key] = sample
             } else {
                 samples[key] = AIUsageSample(sourceID: key, provider: .cursor,
-                    timestamp: date,
-                    inputTokens: inputWithCache.partialValue, outputTokens: output, model: model)
+                                             timestamp: date,
+                                             inputTokens: inputWithCache.partialValue, outputTokens: output, model: model)
             }
         }
         return samples.values.sorted { ($0.sourceID ?? "") < ($1.sourceID ?? "") }

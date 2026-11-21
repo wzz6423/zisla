@@ -49,10 +49,10 @@ final class RecordingPortraitProcessor {
             detection = nil
             let scale = min(1, 512 / max(extent.width, extent.height))
             let reduced = image.transformed(by: CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
-                tx: -extent.minX * scale, ty: -extent.minY * scale))
+                                                                  tx: -extent.minX * scale, ty: -extent.minY * scale))
             let found = try detector(reduced, needsFaces, needsBodies)
             detection = (extent.size, sourceTime, needsFaces, needsBodies,
-                Regions(faces: Self.bounded(found.faces), bodies: Self.bounded(found.bodies)))
+                         Regions(faces: Self.bounded(found.faces), bodies: Self.bounded(found.bodies)))
         }
         let regions = detection!.regions
         var output = image
@@ -95,7 +95,7 @@ final class RecordingPortraitProcessor {
 
     private static func rectangle(_ normalized: CGRect, in extent: CGRect) -> CGRect {
         CGRect(x: extent.minX + normalized.minX * extent.width, y: extent.minY + normalized.minY * extent.height,
-            width: normalized.width * extent.width, height: normalized.height * extent.height)
+               width: normalized.width * extent.width, height: normalized.height * extent.height)
     }
 
     private static func detect(_ image: CIImage, faces: Bool, bodies: Bool) throws -> Regions {
@@ -107,14 +107,14 @@ final class RecordingPortraitProcessor {
         if bodies { requests.append(bodyRequest) }
         try VNImageRequestHandler(ciImage: image).perform(requests)
         return Regions(faces: faceRequest.results?.map(\.boundingBox) ?? [],
-            bodies: bodyRequest.results?.map(\.boundingBox) ?? [])
+                       bodies: bodyRequest.results?.map(\.boundingBox) ?? [])
     }
 
     private static let kernels: Kernels? = {
         #if SWIFT_PACKAGE && !SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE
-        let bundle = Bundle.module
+            let bundle = Bundle.module
         #else
-        let bundle = Bundle.main
+            let bundle = Bundle.main
         #endif
         guard let url = bundle.url(forResource: "RecordingPortraitKernels", withExtension: "metallib") else { return nil }
         return try? Kernels(library: Data(contentsOf: url))

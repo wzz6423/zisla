@@ -107,7 +107,7 @@ struct IslandParticleLogoTests {
             .frame(width: 80, height: 32).background(.black))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 80, height: 32),
-            styleMask: [.borderless], backing: .buffered, defer: false)
+                              styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -149,7 +149,8 @@ struct IslandParticleLogoTests {
             view.drawFrame(at: time)
             let native = try #require(view.layer?.contents) as! CGImage
             let expected = ImageRenderer(content: IslandParticleLogo.rendering(
-                side: 18, time: time, reduceMotion: reduceMotion))
+                side: 18, time: time, reduceMotion: reduceMotion
+            ))
             expected.scale = 2
             let expectedImage = try #require(expected.cgImage)
             let actualBytes = Array(try #require(native.dataProvider?.data) as Data)
@@ -211,13 +212,13 @@ struct IslandParticleLogoTests {
             let shortMark = try pixels(IslandParticleLogo(side: 12, time: fixture.date.timeIntervalSinceReferenceDate)
                 .frame(width: shortSize.width, height: shortSize.height))
             #expect(try pixels(fixture.view.statusBarContent(at: fixture.date)
-                .frame(width: shortSize.width, height: shortSize.height)) == shortMark,
-                    "A shortened pill must scale the whole brand mark instead of clipping the 18pt silhouette")
+                        .frame(width: shortSize.width, height: shortSize.height)) == shortMark,
+            "A shortened pill must scale the whole brand mark instead of clipping the 18pt silhouette")
             fixture.state.compactWingHeight = 24
 
             fixture.queue.enqueue(IslandNotice(id: "toolbox-reminder-logo", title: "Reminder", detail: "Fixture"), expiresAfter: nil)
             #expect(try pixels(fixture.view.statusBarContent(at: fixture.date)
-                .frame(width: size.width, height: size.height)) != expected, "Active status content must replace the idle mark")
+                    .frame(width: size.width, height: size.height)) != expected, "Active status content must replace the idle mark")
             #expect(fixture.view.pausesCompactTimeline, "Static activity content must not keep the idle logo clock running")
             fixture.state.compactStatusHidden = true
             let hidden = try pixels(fixture.view.statusBarContent(at: fixture.date)
@@ -229,7 +230,7 @@ struct IslandParticleLogoTests {
             fixture.state.placementMode = .camera
             #expect(fixture.view.pausesCompactTimeline)
             #expect(try pixels(fixture.view.statusBarContent(at: fixture.date)
-                .frame(width: size.width, height: size.height)).allSatisfy { $0 == 0 }, "Camera-aligned pills must not add a brand mark over the camera")
+                    .frame(width: size.width, height: size.height)).allSatisfy { $0 == 0 }, "Camera-aligned pills must not add a brand mark over the camera")
         }
         fixture.settings.settings.islandLayoutStyle = .notch
         fixture.state.placementMode = .custom
@@ -387,7 +388,7 @@ struct IslandParticleLogoTests {
 
         var view: CompactStatusBarView {
             CompactStatusBarView(queue: queue, displayState: state, media: media, browserDownloads: downloads,
-                settingsStore: settings, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
+                                 settingsStore: settings, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         }
 
         func close() {

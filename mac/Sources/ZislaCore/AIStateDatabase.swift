@@ -65,41 +65,41 @@ final class AIStateDatabase {
             try execute("PRAGMA journal_mode=WAL")
             try execute("PRAGMA synchronous=NORMAL")
             try execute("""
-                CREATE TABLE IF NOT EXISTS tasks (
-                    position INTEGER PRIMARY KEY AUTOINCREMENT,
-                    id TEXT UNIQUE NOT NULL,
-                    payload BLOB NOT NULL
-                )
-                """)
+            CREATE TABLE IF NOT EXISTS tasks (
+                position INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT UNIQUE NOT NULL,
+                payload BLOB NOT NULL
+            )
+            """)
             try execute("""
-                CREATE TABLE IF NOT EXISTS usage_samples (
-                    position INTEGER PRIMARY KEY AUTOINCREMENT,
-                    source_id TEXT UNIQUE,
-                    provider TEXT NOT NULL,
-                    timestamp REAL NOT NULL,
-                    input_tokens INTEGER NOT NULL,
-                    output_tokens INTEGER NOT NULL,
-                    cost_usd REAL,
-                    model TEXT
-                )
-                """)
+            CREATE TABLE IF NOT EXISTS usage_samples (
+                position INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_id TEXT UNIQUE,
+                provider TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                cost_usd REAL,
+                model TEXT
+            )
+            """)
             try execute("""
-                CREATE INDEX IF NOT EXISTS usage_samples_timestamp
-                ON usage_samples(timestamp)
-                """)
+            CREATE INDEX IF NOT EXISTS usage_samples_timestamp
+            ON usage_samples(timestamp)
+            """)
             try execute("""
-                CREATE TABLE IF NOT EXISTS detected_usage_cursor (
-                    id INTEGER PRIMARY KEY CHECK(id = 1),
-                    timestamp REAL NOT NULL
-                )
-                """)
+            CREATE TABLE IF NOT EXISTS detected_usage_cursor (
+                id INTEGER PRIMARY KEY CHECK(id = 1),
+                timestamp REAL NOT NULL
+            )
+            """)
             try execute("""
-                CREATE TABLE IF NOT EXISTS detected_usage_baselines (
-                    timestamp REAL PRIMARY KEY,
-                    input_tokens INTEGER NOT NULL,
-                    output_tokens INTEGER NOT NULL
-                )
-                """)
+            CREATE TABLE IF NOT EXISTS detected_usage_baselines (
+                timestamp REAL PRIMARY KEY,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL
+            )
+            """)
             try execute("""
                 CREATE TABLE IF NOT EXISTS notices (
                     position INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,27 +107,27 @@ final class AIStateDatabase {
                 )
             """)
             try execute("""
-                CREATE TABLE IF NOT EXISTS model_usage_samples (
-                    timestamp REAL NOT NULL,
-                    provider TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    origin TEXT NOT NULL,
-                    input_tokens INTEGER NOT NULL,
-                    output_tokens INTEGER NOT NULL,
-                    PRIMARY KEY(timestamp, provider, model, origin)
-                )
-                """)
+            CREATE TABLE IF NOT EXISTS model_usage_samples (
+                timestamp REAL NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                origin TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                PRIMARY KEY(timestamp, provider, model, origin)
+            )
+            """)
             try execute("""
-                CREATE TABLE IF NOT EXISTS detected_usage_daily (
-                    source_id TEXT NOT NULL,
-                    provider TEXT NOT NULL,
-                    timestamp REAL NOT NULL,
-                    model TEXT NOT NULL,
-                    input_tokens INTEGER NOT NULL,
-                    output_tokens INTEGER NOT NULL,
-                    PRIMARY KEY(source_id, timestamp, model)
-                )
-                """)
+            CREATE TABLE IF NOT EXISTS detected_usage_daily (
+                source_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                model TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                PRIMARY KEY(source_id, timestamp, model)
+            )
+            """)
             try execute("CREATE INDEX IF NOT EXISTS detected_usage_daily_timestamp ON detected_usage_daily(timestamp)")
             try migrateUsageToDailyTotalsIfNeeded()
             try migrateDetectedUsageCursorIfNeeded()
@@ -173,15 +173,15 @@ final class AIStateDatabase {
     func loadUsageHistory(startingAt startDate: Date?, endingBefore endDate: Date?) throws -> AIUsageHistory {
         try transaction {
             AIUsageHistory(usageSamples: try loadUsage(startingAt: startDate, endingBefore: endDate),
-                modelUsageSamples: try loadModelUsage(startingAt: startDate, endingBefore: endDate))
+                           modelUsageSamples: try loadModelUsage(startingAt: startDate, endingBefore: endDate))
         }
     }
 
     func upsertTask(_ task: AIProgressTask) throws {
         let statement = try prepare("""
-            INSERT INTO tasks(id, payload) VALUES(?, ?)
-            ON CONFLICT(id) DO UPDATE SET payload = excluded.payload
-            """)
+        INSERT INTO tasks(id, payload) VALUES(?, ?)
+        ON CONFLICT(id) DO UPDATE SET payload = excluded.payload
+        """)
         defer { sqlite3_finalize(statement) }
         try bind(task.id, to: 1, in: statement)
         try bind(try JSONEncoder().encode(task), to: 2, in: statement)
@@ -217,7 +217,8 @@ final class AIStateDatabase {
         }
         return try transaction {
             let changed = try recordUsageDeltasInCurrentTransaction(
-                AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current))
+                AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
+            )
             try addModelUsage(AIUsageAnalytics.dailyModelUsageSamples(samples: samples), origin: "manual")
             try trimModelUsage()
             return changed
@@ -274,10 +275,9 @@ final class AIStateDatabase {
     /// Uses a half-open range so a briefing never includes the following day's aggregate.
     private func loadUsage(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> [AIUsageSample] {
         let statement = try prepare("""
-            SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-            FROM usage_samples WHERE timestamp >= ? AND timestamp < ? ORDER BY position
-            """
-        )
+        SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+        FROM usage_samples WHERE timestamp >= ? AND timestamp < ? ORDER BY position
+        """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, startDate?.timeIntervalSinceReferenceDate ?? -Double.greatestFiniteMagnitude))
         try check(sqlite3_bind_double(statement, 2, endDate?.timeIntervalSinceReferenceDate ?? Double.greatestFiniteMagnitude))
@@ -295,10 +295,10 @@ final class AIStateDatabase {
     /// Combines manual and detected origins only after reading the same bounded date range.
     private func loadModelUsage(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> [AIUsageSample] {
         let statement = try prepare("""
-            SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULLIF(model, '')
-            FROM model_usage_samples WHERE timestamp >= ? AND timestamp < ?
-            ORDER BY timestamp, provider, model, origin
-            """)
+        SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULLIF(model, '')
+        FROM model_usage_samples WHERE timestamp >= ? AND timestamp < ?
+        ORDER BY timestamp, provider, model, origin
+        """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, startDate?.timeIntervalSinceReferenceDate ?? -Double.greatestFiniteMagnitude))
         try check(sqlite3_bind_double(statement, 2, endDate?.timeIntervalSinceReferenceDate ?? Double.greatestFiniteMagnitude))
@@ -351,20 +351,20 @@ final class AIStateDatabase {
 
     private func migrateDetectedUsageEventsIfNeeded() throws {
         try execute("""
-            CREATE TABLE IF NOT EXISTS detected_usage_events (
-                source_id TEXT PRIMARY KEY,
-                provider TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                input_tokens INTEGER NOT NULL,
-                output_tokens INTEGER NOT NULL,
-                cost_usd REAL,
-                model TEXT
-            )
-            """)
+        CREATE TABLE IF NOT EXISTS detected_usage_events (
+            source_id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL,
+            timestamp REAL NOT NULL,
+            input_tokens INTEGER NOT NULL,
+            output_tokens INTEGER NOT NULL,
+            cost_usd REAL,
+            model TEXT
+        )
+        """)
         try execute("""
-            CREATE INDEX IF NOT EXISTS detected_usage_events_timestamp
-            ON detected_usage_events(timestamp)
-            """)
+        CREATE INDEX IF NOT EXISTS detected_usage_events_timestamp
+        ON detected_usage_events(timestamp)
+        """)
         guard try usageSchemaVersion() < 6 else { return }
         try setUsageSchemaVersion(6)
     }
@@ -376,9 +376,9 @@ final class AIStateDatabase {
             try execute("DELETE FROM detected_usage_daily")
             try execute("DELETE FROM model_usage_samples")
             let statement = try prepare("""
-                SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-                FROM detected_usage_events ORDER BY timestamp, source_id
-                """)
+            SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+            FROM detected_usage_events ORDER BY timestamp, source_id
+            """)
             defer { sqlite3_finalize(statement) }
             var days: Set<Date> = []
             while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
@@ -398,16 +398,16 @@ final class AIStateDatabase {
     /// Keeps origins separate and saturates token sums so repeated manual increments cannot overflow.
     private func addModelUsage(_ samples: [AIUsageSample], origin: String) throws {
         let lookup = try prepare("""
-            SELECT input_tokens, output_tokens FROM model_usage_samples
-            WHERE timestamp = ? AND provider = ? AND model = ? AND origin = ?
-            """)
+        SELECT input_tokens, output_tokens FROM model_usage_samples
+        WHERE timestamp = ? AND provider = ? AND model = ? AND origin = ?
+        """)
         defer { sqlite3_finalize(lookup) }
         let insert = try prepare("""
-            INSERT INTO model_usage_samples(timestamp, provider, model, origin, input_tokens, output_tokens)
-            VALUES(?, ?, ?, ?, ?, ?)
-            ON CONFLICT(timestamp, provider, model, origin) DO UPDATE SET
-                input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens
-            """)
+        INSERT INTO model_usage_samples(timestamp, provider, model, origin, input_tokens, output_tokens)
+        VALUES(?, ?, ?, ?, ?, ?)
+        ON CONFLICT(timestamp, provider, model, origin) DO UPDATE SET
+            input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens
+        """)
         defer { sqlite3_finalize(insert) }
         for sample in samples where sample.totalTokens > 0 {
             let day = Calendar.current.startOfDay(for: sample.timestamp)
@@ -439,9 +439,9 @@ final class AIStateDatabase {
         let model = AIUsageAnalytics.normalizedModel(sample.model) ?? ""
         let day = Calendar.current.startOfDay(for: sample.timestamp)
         let lookup = try prepare("""
-            SELECT input_tokens, output_tokens FROM detected_usage_daily
-            WHERE source_id = ? AND timestamp = ? AND model = ?
-            """)
+        SELECT input_tokens, output_tokens FROM detected_usage_daily
+        WHERE source_id = ? AND timestamp = ? AND model = ?
+        """)
         defer { sqlite3_finalize(lookup) }
         try bind(sample.sourceID, to: 1, in: lookup)
         try check(sqlite3_bind_double(lookup, 2, day.timeIntervalSinceReferenceDate))
@@ -450,11 +450,11 @@ final class AIStateDatabase {
         let input = AIUsageTokenMath.adding(exists ? tokenCount(at: 0, in: lookup) : 0, sample.inputTokens)
         let output = AIUsageTokenMath.adding(exists ? tokenCount(at: 1, in: lookup) : 0, sample.outputTokens)
         let insert = try prepare("""
-            INSERT INTO detected_usage_daily(source_id, provider, timestamp, model, input_tokens, output_tokens)
-            VALUES(?, ?, ?, ?, ?, ?)
-            ON CONFLICT(source_id, timestamp, model) DO UPDATE SET
-                input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens
-            """)
+        INSERT INTO detected_usage_daily(source_id, provider, timestamp, model, input_tokens, output_tokens)
+        VALUES(?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source_id, timestamp, model) DO UPDATE SET
+            input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens
+        """)
         defer { sqlite3_finalize(insert) }
         try bind(sample.sourceID, to: 1, in: insert)
         try bind(sample.provider.rawValue, to: 2, in: insert)
@@ -472,9 +472,9 @@ final class AIStateDatabase {
         try check(sqlite3_bind_double(delete, 1, day.timeIntervalSinceReferenceDate))
         try stepDone(delete)
         let statement = try prepare("""
-            SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULLIF(model, '')
-            FROM detected_usage_daily WHERE timestamp = ? ORDER BY source_id, model
-            """)
+        SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULLIF(model, '')
+        FROM detected_usage_daily WHERE timestamp = ? ORDER BY source_id, model
+        """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, day.timeIntervalSinceReferenceDate))
         var samples: [AIUsageSample] = []
@@ -493,9 +493,9 @@ final class AIStateDatabase {
     private func legacyDetectedUsageTotals() throws -> [DetectedUsageTotal] {
         guard try tableExists("detected_usage_totals") else { return [] }
         let statement = try prepare("""
-            SELECT timestamp, input_tokens, output_tokens
-            FROM detected_usage_totals ORDER BY timestamp
-            """)
+        SELECT timestamp, input_tokens, output_tokens
+        FROM detected_usage_totals ORDER BY timestamp
+        """)
         defer { sqlite3_finalize(statement) }
         var totals: [DetectedUsageTotal] = []
         while try stepHasRow(statement, fallback: AppLocalization.text("无法读取历史 AI 用量汇总")) {
@@ -510,9 +510,9 @@ final class AIStateDatabase {
 
     private func tableExists(_ name: String) throws -> Bool {
         let statement = try prepare("""
-            SELECT 1 FROM sqlite_master
-            WHERE type = 'table' AND name = ? LIMIT 1
-            """)
+        SELECT 1 FROM sqlite_master
+        WHERE type = 'table' AND name = ? LIMIT 1
+        """)
         defer { sqlite3_finalize(statement) }
         try bind(name, to: 1, in: statement)
         return try stepHasRow(statement, fallback: AppLocalization.text("无法查询 AI 状态数据库结构"))
@@ -520,22 +520,22 @@ final class AIStateDatabase {
 
     private func recordUsageDeltasInCurrentTransaction(_ samples: [AIUsageSample]) throws -> Int {
         let lookup = try prepare("""
-            SELECT provider, timestamp, input_tokens, output_tokens, cost_usd, model
-            FROM usage_samples WHERE source_id = ? LIMIT 1
-            """)
+        SELECT provider, timestamp, input_tokens, output_tokens, cost_usd, model
+        FROM usage_samples WHERE source_id = ? LIMIT 1
+        """)
         defer { sqlite3_finalize(lookup) }
         let insert = try prepare("""
-            INSERT INTO usage_samples(
-                source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-            ) VALUES(?, ?, ?, ?, ?, ?, ?)
-            """)
+        INSERT INTO usage_samples(
+            source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+        ) VALUES(?, ?, ?, ?, ?, ?, ?)
+        """)
         defer { sqlite3_finalize(insert) }
         let update = try prepare("""
-            UPDATE usage_samples SET
-                provider = ?, timestamp = ?, input_tokens = ?, output_tokens = ?,
-                cost_usd = ?, model = ?
-            WHERE source_id = ?
-            """)
+        UPDATE usage_samples SET
+            provider = ?, timestamp = ?, input_tokens = ?, output_tokens = ?,
+            cost_usd = ?, model = ?
+        WHERE source_id = ?
+        """)
         defer { sqlite3_finalize(update) }
 
         var inserted = 0
@@ -582,22 +582,22 @@ final class AIStateDatabase {
     private func recordDetectedUsageInCurrentTransaction(_ samples: [AIUsageSample]) throws -> Int {
         let legacyCursor = try detectedUsageCursor()
         let lookup = try prepare("""
-            SELECT provider, timestamp, input_tokens, output_tokens, cost_usd, model
-            FROM detected_usage_events WHERE source_id = ? LIMIT 1
-            """)
+        SELECT provider, timestamp, input_tokens, output_tokens, cost_usd, model
+        FROM detected_usage_events WHERE source_id = ? LIMIT 1
+        """)
         defer { sqlite3_finalize(lookup) }
         let insert = try prepare("""
-            INSERT INTO detected_usage_events(
-                source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-            ) VALUES(?, ?, ?, ?, ?, ?, ?)
-            """)
+        INSERT INTO detected_usage_events(
+            source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+        ) VALUES(?, ?, ?, ?, ?, ?, ?)
+        """)
         defer { sqlite3_finalize(insert) }
         let update = try prepare("""
-            UPDATE detected_usage_events SET
-                provider = ?, timestamp = ?, input_tokens = ?, output_tokens = ?,
-                cost_usd = ?, model = ?
-            WHERE source_id = ?
-            """)
+        UPDATE detected_usage_events SET
+            provider = ?, timestamp = ?, input_tokens = ?, output_tokens = ?,
+            cost_usd = ?, model = ?
+        WHERE source_id = ?
+        """)
         defer { sqlite3_finalize(update) }
 
         var rawDeltasByDay: [Date: AIUsageSample] = [:]
@@ -651,11 +651,11 @@ final class AIStateDatabase {
                    normalized.timestamp == existing.timestamp, inputDelta == 0, outputDelta == 0 {
                     let day = Calendar.current.startOfDay(for: existing.timestamp)
                     let enrich = try prepare("""
-                        UPDATE detected_usage_daily SET model = ?
-                        WHERE source_id = ? AND model = '' AND timestamp = ?
-                            AND (SELECT COUNT(*) FROM detected_usage_daily WHERE source_id = ?) = 1
-                            AND input_tokens = ? AND output_tokens = ?
-                        """)
+                    UPDATE detected_usage_daily SET model = ?
+                    WHERE source_id = ? AND model = '' AND timestamp = ?
+                        AND (SELECT COUNT(*) FROM detected_usage_daily WHERE source_id = ?) = 1
+                        AND input_tokens = ? AND output_tokens = ?
+                    """)
                     defer { sqlite3_finalize(enrich) }
                     try bind(model, to: 1, in: enrich)
                     try bind(sourceID, to: 2, in: enrich)
@@ -764,9 +764,9 @@ final class AIStateDatabase {
     /// Uses daily deltas rather than cumulative event snapshots so growth across midnight stays on its new day.
     private func detectedUsageEventTotal(at day: Date) throws -> DetectedUsageTotal {
         let statement = try prepare("""
-            SELECT input_tokens, output_tokens
-            FROM detected_usage_daily WHERE timestamp = ?
-            """)
+        SELECT input_tokens, output_tokens
+        FROM detected_usage_daily WHERE timestamp = ?
+        """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, day.timeIntervalSinceReferenceDate))
         var inputTokens = 0
@@ -790,9 +790,9 @@ final class AIStateDatabase {
 
     private func detectedUsageBaseline(at day: Date) throws -> DetectedUsageTotal {
         let statement = try prepare("""
-            SELECT input_tokens, output_tokens
-            FROM detected_usage_baselines WHERE timestamp = ? LIMIT 1
-            """)
+        SELECT input_tokens, output_tokens
+        FROM detected_usage_baselines WHERE timestamp = ? LIMIT 1
+        """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, day.timeIntervalSinceReferenceDate))
         guard try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量基线")) else {
@@ -807,12 +807,12 @@ final class AIStateDatabase {
 
     private func replaceDetectedUsageBaseline(_ total: DetectedUsageTotal) throws {
         let statement = try prepare("""
-            INSERT INTO detected_usage_baselines(timestamp, input_tokens, output_tokens)
-            VALUES(?, ?, ?)
-            ON CONFLICT(timestamp) DO UPDATE SET
-                input_tokens = excluded.input_tokens,
-                output_tokens = excluded.output_tokens
-            """)
+        INSERT INTO detected_usage_baselines(timestamp, input_tokens, output_tokens)
+        VALUES(?, ?, ?)
+        ON CONFLICT(timestamp) DO UPDATE SET
+            input_tokens = excluded.input_tokens,
+            output_tokens = excluded.output_tokens
+        """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, total.timestamp.timeIntervalSinceReferenceDate))
         try check(sqlite3_bind_int64(
@@ -853,17 +853,17 @@ final class AIStateDatabase {
     private func migrateLegacyDetectedUsageEventIfNeeded(for sample: AIUsageSample) throws {
         guard let sourceID = sample.sourceID,
               let legacySourceID = try uniqueLegacyDetectedUsageSourceID(
-                for: sourceID,
-                provider: sample.provider,
-                timestamp: sample.timestamp
+                  for: sourceID,
+                  provider: sample.provider,
+                  timestamp: sample.timestamp
               ) else {
             return
         }
 
         let statement = try prepare("""
-            UPDATE detected_usage_events SET source_id = ?
-            WHERE source_id = ?
-            """)
+        UPDATE detected_usage_events SET source_id = ?
+        WHERE source_id = ?
+        """)
         defer { sqlite3_finalize(statement) }
         try bind(sourceID, to: 1, in: statement)
         try bind(legacySourceID, to: 2, in: statement)
@@ -880,9 +880,9 @@ final class AIStateDatabase {
         for sample in samples {
             guard let oldID = sample.sourceID else { continue }
             let rows = try prepare("""
-                SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULL
-                FROM detected_usage_daily WHERE source_id = ?
-                """)
+            SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULL
+            FROM detected_usage_daily WHERE source_id = ?
+            """)
             defer { sqlite3_finalize(rows) }
             try bind(oldID, to: 1, in: rows)
             var history: [AIUsageSample] = []
@@ -898,14 +898,14 @@ final class AIStateDatabase {
                 modelDays.insert(row.timestamp)
             }
             let event = try prepare("""
-                INSERT INTO detected_usage_events(source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model)
-                SELECT ?, provider, timestamp, input_tokens, output_tokens, cost_usd, NULL
-                FROM detected_usage_events WHERE source_id = ?
-                ON CONFLICT(source_id) DO UPDATE SET
-                    timestamp = MAX(timestamp, excluded.timestamp),
-                    input_tokens = MAX(input_tokens, excluded.input_tokens),
-                    output_tokens = MAX(output_tokens, excluded.output_tokens), model = NULL
-                """)
+            INSERT INTO detected_usage_events(source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model)
+            SELECT ?, provider, timestamp, input_tokens, output_tokens, cost_usd, NULL
+            FROM detected_usage_events WHERE source_id = ?
+            ON CONFLICT(source_id) DO UPDATE SET
+                timestamp = MAX(timestamp, excluded.timestamp),
+                input_tokens = MAX(input_tokens, excluded.input_tokens),
+                output_tokens = MAX(output_tokens, excluded.output_tokens), model = NULL
+            """)
             defer { sqlite3_finalize(event) }
             try bind("zisla-legacy-generic:\(oldID)", to: 1, in: event)
             try bind(oldID, to: 2, in: event)
@@ -919,7 +919,7 @@ final class AIStateDatabase {
 
     /// Resolves the whole scan before any high-water mark advances, so input order cannot spend unrelated history.
     private func prepareGenericUsageMigration(_ samples: [AIUsageSample], using lookup: OpaquePointer?,
-        modelDays: inout Set<Date>) throws -> Set<String> {
+                                              modelDays: inout Set<Date>) throws -> Set<String> {
         let generic = samples.filter { genericFileKey($0.legacySourceID) != nil }
         let groups = Dictionary(grouping: generic) { sample in
             genericFileKey(sample.legacySourceID)!
@@ -930,10 +930,10 @@ final class AIStateDatabase {
             let current = groups[fileKey]!.sorted { ($0.sourceID ?? "") < ($1.sourceID ?? "") }
             let prefix = fileKey + "-entry-"
             let old = try prepare("""
-                SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-                FROM detected_usage_events WHERE source_id >= ? AND source_id < ?
-                ORDER BY source_id
-                """)
+            SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+            FROM detected_usage_events WHERE source_id >= ? AND source_id < ?
+            ORDER BY source_id
+            """)
             defer { sqlite3_finalize(old) }
             try bind(prefix, to: 1, in: old)
             try bind(fileKey + "-entry.", to: 2, in: old)
@@ -998,9 +998,9 @@ final class AIStateDatabase {
             for sourceID in conflicting { matched.removeValue(forKey: sourceID) }
             try archiveGenericUsage(legacy, modelDays: &modelDays)
             let baseline = try prepare("""
-                INSERT INTO detected_usage_events(source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model)
-                VALUES(?,?,?,?,?,?,?)
-                """)
+            INSERT INTO detected_usage_events(source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model)
+            VALUES(?,?,?,?,?,?,?)
+            """)
             defer { sqlite3_finalize(baseline) }
             for sourceID in matched.keys.sorted() {
                 var value = matched[sourceID]!
@@ -1043,7 +1043,7 @@ final class AIStateDatabase {
 
     /// Only a regenerated old root digest proves that a changed message owns a historical token baseline.
     private func verifiesGenericContext(_ sample: AIUsageSample, historical: AIUsageSample,
-        hashesRemaining: inout Int) -> Bool {
+                                        hashesRemaining: inout Int) -> Bool {
         guard hashesRemaining > 0, let context = sample.genericContext,
               context.document.count <= AIGenericUsageContext.maximumDocumentBytes,
               let root = try? JSONSerialization.jsonObject(with: context.document) as? [String: Any],
@@ -1063,8 +1063,8 @@ final class AIStateDatabase {
                 for removesMessageDate in [false, true] {
                     guard hashesRemaining > 0 else { return false }
                     guard let recovered = recoveredGenericDocument(root, path: context.path, historical: historical,
-                        date: date, stripsMetadata: stripsMetadata, removesMessageDate: removesMessageDate),
-                          let data = try? JSONSerialization.data(withJSONObject: recovered, options: [.sortedKeys]) else { continue }
+                                                                   date: date, stripsMetadata: stripsMetadata, removesMessageDate: removesMessageDate),
+                        let data = try? JSONSerialization.data(withJSONObject: recovered, options: [.sortedKeys]) else { continue }
                     hashesRemaining -= 1
                     if AIUsageLogIdentity.digest(data) == digest { return true }
                 }
@@ -1075,7 +1075,7 @@ final class AIStateDatabase {
 
     /// Removes appended siblings and restores only recorded numeric/date fields; unrelated message content stays untouched.
     private func recoveredGenericDocument(_ value: Any, path: [AIGenericUsageContext.PathComponent],
-        historical: AIUsageSample, date: Any, stripsMetadata: Bool, removesMessageDate: Bool, isRoot: Bool = true) -> Any? {
+                                          historical: AIUsageSample, date: Any, stripsMetadata: Bool, removesMessageDate: Bool, isRoot: Bool = true) -> Any? {
         guard let first = path.first else {
             guard var usage = value as? [String: Any] else { return nil }
             let inputKeys = ["input_tokens", "inputTokens", "prompt_tokens", "promptTokens", "promptTokenCount", "prompt_token_count"]
@@ -1088,14 +1088,14 @@ final class AIStateDatabase {
         case let .index(index):
             guard let values = value as? [Any], values.indices.contains(index),
                   let recovered = recoveredGenericDocument(values[index], path: Array(path.dropFirst()),
-                    historical: historical, date: date, stripsMetadata: stripsMetadata,
-                    removesMessageDate: removesMessageDate, isRoot: false) else { return nil }
+                                                           historical: historical, date: date, stripsMetadata: stripsMetadata,
+                                                           removesMessageDate: removesMessageDate, isRoot: false) else { return nil }
             return [recovered]
         case let .key(key):
             guard var dictionary = value as? [String: Any], let child = dictionary[key],
                   let recovered = recoveredGenericDocument(child, path: Array(path.dropFirst()),
-                    historical: historical, date: date, stripsMetadata: stripsMetadata,
-                    removesMessageDate: removesMessageDate, isRoot: false) else { return nil }
+                                                           historical: historical, date: date, stripsMetadata: stripsMetadata,
+                                                           removesMessageDate: removesMessageDate, isRoot: false) else { return nil }
             dictionary[key] = recovered
             let dateKeys = ["timestamp", "ts", "created_at", "createdAt"]
             for dateKey in dateKeys where dictionary[dateKey] != nil {
@@ -1135,10 +1135,10 @@ final class AIStateDatabase {
         timestamp: Date
     ) throws -> String? {
         let statement = try prepare("""
-            SELECT source_id FROM detected_usage_events
-            WHERE source_id = ? AND provider = ? AND timestamp = ?
-            LIMIT 2
-            """)
+        SELECT source_id FROM detected_usage_events
+        WHERE source_id = ? AND provider = ? AND timestamp = ?
+        LIMIT 2
+        """)
         defer { sqlite3_finalize(statement) }
         try bind(sourceID, to: 1, in: statement)
         try bind(provider.rawValue, to: 2, in: statement)
@@ -1152,12 +1152,12 @@ final class AIStateDatabase {
         timestamp: Date
     ) throws -> String? {
         let statement = try prepare("""
-            SELECT source_id FROM detected_usage_events
-            WHERE source_id LIKE ? AND source_id NOT LIKE ?
-                AND provider = ? AND timestamp = ?
-            ORDER BY source_id
-            LIMIT 2
-            """)
+        SELECT source_id FROM detected_usage_events
+        WHERE source_id LIKE ? AND source_id NOT LIKE ?
+            AND provider = ? AND timestamp = ?
+        ORDER BY source_id
+        LIMIT 2
+        """)
         defer { sqlite3_finalize(statement) }
         try bind(prefix + "%", to: 1, in: statement)
         try bind(prefix + "v2-%", to: 2, in: statement)
@@ -1184,9 +1184,9 @@ final class AIStateDatabase {
 
     private func replaceDetectedUsageCursor(_ timestamp: Date) throws {
         let statement = try prepare("""
-            INSERT INTO detected_usage_cursor(id, timestamp) VALUES(1, ?)
-            ON CONFLICT(id) DO UPDATE SET timestamp = excluded.timestamp
-            """)
+        INSERT INTO detected_usage_cursor(id, timestamp) VALUES(1, ?)
+        ON CONFLICT(id) DO UPDATE SET timestamp = excluded.timestamp
+        """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, timestamp.timeIntervalSinceReferenceDate))
         try stepDone(statement)
@@ -1303,12 +1303,12 @@ final class AIStateDatabase {
     /// Evicts aggregate days and their model display rows without dropping source high-water marks.
     private func trimUsage() throws {
         let statement = try prepare("""
-            DELETE FROM usage_samples
-            WHERE position NOT IN (
-                SELECT position FROM usage_samples
-                ORDER BY timestamp DESC, position DESC LIMIT ?
-            )
-            """)
+        DELETE FROM usage_samples
+        WHERE position NOT IN (
+            SELECT position FROM usage_samples
+            ORDER BY timestamp DESC, position DESC LIMIT ?
+        )
+        """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_int64(statement, 1, Int64(maximumUsageSamples)))
         try stepDone(statement)

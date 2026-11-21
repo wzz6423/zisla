@@ -60,7 +60,7 @@ struct ManagedToolAutomaticUpdateTests {
     func dependencySettingPersistsIndependentlyAndResetDisablesUpdates() throws {
         let defaults = InMemoryToolDefaults()
         defaults.set(Data(#"{"recommendedToolsEnabled":false,"recommendedToolsAutomaticUpdatesEnabled":true,"mediaEnabled":false}"#.utf8),
-            forKey: "feature-settings-v1")
+                     forKey: "feature-settings-v1")
         let store = FeatureSettingsStore(defaults: defaults)
         #expect(!store.settings.dependencyToolsAutomaticUpdatesEnabled)
         store.settings.dependencyToolsAutomaticUpdatesEnabled = true

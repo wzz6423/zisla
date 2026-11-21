@@ -31,9 +31,9 @@ struct AutomaticPowerModeSettingsTests {
         adapter: BatteryPowerMode, battery: BatteryPowerMode
     ) throws {
         var settings = FeatureSettings(systemMonitorEnabled: false, systemCleanupPolicy: .sevenDays,
-            systemCleanupScope: .all, trashCleanupPolicy: .fifteenDays,
-            automaticPowerModeEnabled: true, powerAdapterDefaultMode: adapter,
-            batteryDefaultMode: battery, lowBatteryPowerModeEnabled: false)
+                                       systemCleanupScope: .all, trashCleanupPolicy: .fifteenDays,
+                                       automaticPowerModeEnabled: true, powerAdapterDefaultMode: adapter,
+                                       batteryDefaultMode: battery, lowBatteryPowerModeEnabled: false)
         settings.clipboardHistoryCleanupPolicy = .thirtyDays
         let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(restored == settings)
@@ -49,8 +49,8 @@ struct AutomaticPowerModeSettingsTests {
     @Test(arguments: [false, true], [false, true])
     func disabledAutomationStillPreservesEachPowerPreference(enabled: Bool, lowBatteryEnabled: Bool) throws {
         let settings = FeatureSettings(automaticPowerModeEnabled: enabled,
-            powerAdapterDefaultMode: .highPower, batteryDefaultMode: .automatic,
-            lowBatteryPowerModeEnabled: lowBatteryEnabled)
+                                       powerAdapterDefaultMode: .highPower, batteryDefaultMode: .automatic,
+                                       lowBatteryPowerModeEnabled: lowBatteryEnabled)
         let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(restored == settings)
         #expect(restored.automaticPowerModeEnabled == enabled)

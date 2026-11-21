@@ -8,7 +8,7 @@ struct RecordingPortraitKernels: BuildToolPlugin {
         let library = context.pluginWorkDirectoryURL.appendingPathComponent("RecordingPortraitKernels.metallib")
         let compiler = ProcessInfo.processInfo.environment["ZISLA_METAL_COMPILER"]
         return [.buildCommand(displayName: "Compile recording portrait kernels", executable: URL(fileURLWithPath: compiler ?? "/usr/bin/xcrun"),
-            arguments: (compiler == nil ? ["--sdk", "macosx", "metal"] : []) + ["-fcikernel", "-mmacosx-version-min=14.0",
-                source.path, "-o", library.path], inputFiles: [source], outputFiles: [library])]
+                              arguments: (compiler == nil ? ["--sdk", "macosx", "metal"] : []) + ["-fcikernel", "-mmacosx-version-min=14.0",
+                                                                                                  source.path, "-o", library.path], inputFiles: [source], outputFiles: [library])]
     }
 }

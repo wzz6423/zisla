@@ -16,11 +16,11 @@ struct ClipboardShellCommandRunnerTests {
             try #require(gateDescriptor >= 0)
             defer { close(gateDescriptor) }
             try Data("""
-                #!/bin/sh
-                read -r signal < "$ZISLA_TEST_GATE"
-                printf '%s' "$signal" > "$ZISLA_TEST_MARKER"
+            #!/bin/sh
+            read -r signal < "$ZISLA_TEST_GATE"
+            printf '%s' "$signal" > "$ZISLA_TEST_MARKER"
 
-                """.utf8).write(to: shell)
+            """.utf8).write(to: shell)
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shell.path)
             let completed = DispatchSemaphore(value: 0)
             try autoreleasepool {
@@ -46,14 +46,14 @@ struct ClipboardShellCommandRunnerTests {
             let workingDirectoryURL = directory.appendingPathComponent("working-directory")
             let marker = directory.appendingPathComponent("must-not-execute")
             try Data("""
-                #!/bin/sh
-                /usr/bin/printf '%s\\0' "$@" > "$ZISLA_TEST_ARGUMENTS"
-                /bin/pwd > "$ZISLA_TEST_DIRECTORY"
-                if read -r input; then exit 1; fi
-                printf 'discarded stdout'
-                printf 'discarded stderr' >&2
+            #!/bin/sh
+            /usr/bin/printf '%s\\0' "$@" > "$ZISLA_TEST_ARGUMENTS"
+            /bin/pwd > "$ZISLA_TEST_DIRECTORY"
+            if read -r input; then exit 1; fi
+            printf 'discarded stdout'
+            printf 'discarded stderr' >&2
 
-                """.utf8).write(to: shell)
+            """.utf8).write(to: shell)
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shell.path)
             let command = "printf '%s\\n' \"$(touch '\(marker.path)')\"\nprintf '%s' '$HOME'"
             let process = try ClipboardShellCommandRunner.runInBackground(
@@ -92,10 +92,10 @@ struct ClipboardShellCommandRunnerTests {
             #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
             let marker = directory.appendingPathComponent("completed")
             try Data("""
-                /usr/bin/printf '%s' "$ZSH_VERSION" > "$ZISLA_TEST_VERSION"
-                exit 0
+            /usr/bin/printf '%s' "$ZSH_VERSION" > "$ZISLA_TEST_VERSION"
+            exit 0
 
-                """.utf8).write(to: directory.appendingPathComponent(".zshenv"))
+            """.utf8).write(to: directory.appendingPathComponent(".zshenv"))
             let process = try ClipboardShellCommandRunner.runInBackground(
                 "printf unused", environment: ["ZDOTDIR": directory.path, "ZISLA_TEST_VERSION": marker.path],
                 workingDirectory: directory

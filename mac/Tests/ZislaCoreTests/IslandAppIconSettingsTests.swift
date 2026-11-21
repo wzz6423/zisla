@@ -10,16 +10,16 @@ struct IslandAppIconSettingsTests {
         #expect(FeatureSettings().islandAppIconEnabled)
         #expect(try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8)).islandAppIconEnabled)
         let original = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false,
-            menuBarAppIconEnabled: false, statusIconDestination: .menuBar, islandShowMoreInformation: false)
+                                       menuBarAppIconEnabled: false, statusIconDestination: .menuBar, islandShowMoreInformation: false)
         var payload = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
         payload.removeValue(forKey: "islandAppIconEnabled")
         #expect(try JSONDecoder().decode(FeatureSettings.self,
-            from: JSONSerialization.data(withJSONObject: payload)) == original)
+                                         from: JSONSerialization.data(withJSONObject: payload)) == original)
         for invalid in [NSNull(), "false", 0, [String](), [String: String]()] as [Any] {
             payload["islandAppIconEnabled"] = invalid
             #expect(try JSONDecoder().decode(FeatureSettings.self,
-                from: JSONSerialization.data(withJSONObject: payload)) == original,
-                "Malformed logo settings must preserve the saved menu bar and monitoring choices")
+                                             from: JSONSerialization.data(withJSONObject: payload)) == original,
+                    "Malformed logo settings must preserve the saved menu bar and monitoring choices")
         }
     }
 

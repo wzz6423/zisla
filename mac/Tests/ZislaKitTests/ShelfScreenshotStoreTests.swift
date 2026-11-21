@@ -21,7 +21,7 @@ struct ShelfScreenshotStoreTests {
                 let screenshot = try store.stashScreenshot(png: png, metadata: metadata)
                 #expect(store.add(payloads: [.text("after")]) == 1)
                 _ = try #require(store.addContextNote("backdated note",
-                    location: .desktop(displayID: "test", displayName: "Test"), addedAt: .distantPast))
+                                                      location: .desktop(displayID: "test", displayName: "Test"), addedAt: .distantPast))
                 let json = try String(contentsOf: storage, encoding: .utf8)
                 #expect(!json.contains(screenshot.id.uuidString))
                 #expect(!json.contains("capturedAt"))
@@ -75,8 +75,8 @@ struct ShelfScreenshotStoreTests {
             if screenshot {
                 try #require(sqlite3_open(databaseURL.path, &connection) == SQLITE_OK)
                 try #require(sqlite3_exec(connection,
-                    "CREATE TRIGGER reject_delete BEFORE DELETE ON screenshots BEGIN SELECT RAISE(ABORT, 'test delete denied'); END;",
-                    nil, nil, nil) == SQLITE_OK)
+                                          "CREATE TRIGGER reject_delete BEFORE DELETE ON screenshots BEGIN SELECT RAISE(ABORT, 'test delete denied'); END;",
+                                          nil, nil, nil) == SQLITE_OK)
             } else {
                 originalJSON = try Data(contentsOf: storage)
                 try FileManager.default.removeItem(at: storage)
@@ -116,7 +116,7 @@ struct ShelfScreenshotStoreTests {
                 let store = FileShelfStore(storageURL: storage)
                 try #require(store.add(payloads: [.text("retained text")]) == 1)
                 try database.insert(ShelfScreenshotRecord(id: UUID(), addedAt: .distantPast, shelfOrder: Int64.max,
-                    metadata: Self.metadata(width: 80, height: 40), png: png))
+                                                          metadata: Self.metadata(width: 80, height: 40), png: png))
             }()
             let store = FileShelfStore(storageURL: storage)
             let originalJSON = try Data(contentsOf: storage)
@@ -144,7 +144,7 @@ struct ShelfScreenshotStoreTests {
                 let store = FileShelfStore(storageURL: storage)
                 let note = try #require(store.addContextNote("original", location: .desktop(displayID: "test", displayName: "Test")))
                 try database.insert(ShelfScreenshotRecord(id: UUID(), addedAt: .distantPast, shelfOrder: Int64.max,
-                    metadata: Self.metadata(width: 80, height: 40), png: png))
+                                                          metadata: Self.metadata(width: 80, height: 40), png: png))
                 return note
             }()
             let store = FileShelfStore(storageURL: storage)
@@ -344,15 +344,15 @@ struct ShelfScreenshotStoreTests {
             try {
                 let database = ShelfScreenshotDatabase(directory: directory)
                 try database.insert(ShelfScreenshotRecord(id: secondID, addedAt: .distantPast,
-                    shelfOrder: 7, metadata: metadata, png: png))
+                                                          shelfOrder: 7, metadata: metadata, png: png))
                 try database.insert(ShelfScreenshotRecord(id: firstID, addedAt: .distantFuture,
-                    shelfOrder: 7, metadata: metadata, png: png))
+                                                          shelfOrder: 7, metadata: metadata, png: png))
             }()
             var connection: OpaquePointer?
             #expect(sqlite3_open(directory.appendingPathComponent("screenshots.sqlite").path, &connection) == SQLITE_OK)
             defer { sqlite3_close(connection) }
             #expect(sqlite3_exec(connection,
-                "UPDATE screenshots SET png = X'' WHERE id = '\(firstID.uuidString)'", nil, nil, nil) == SQLITE_OK)
+                                 "UPDATE screenshots SET png = X'' WHERE id = '\(firstID.uuidString)'", nil, nil, nil) == SQLITE_OK)
             let database = ShelfScreenshotDatabase(directory: directory)
             let records = try database.records()
             #expect(records.map(\.id) == [firstID, secondID])
@@ -385,7 +385,7 @@ struct ShelfScreenshotStoreTests {
                 #expect(sqlite3_open(databaseURL.path, &connection) == SQLITE_OK)
                 defer { sqlite3_close(connection) }
                 #expect(sqlite3_exec(connection,
-                    "UPDATE screenshots SET png = X'' WHERE id = '\(screenshots[0].id.uuidString)'", nil, nil, nil) == SQLITE_OK)
+                                     "UPDATE screenshots SET png = X'' WHERE id = '\(screenshots[0].id.uuidString)'", nil, nil, nil) == SQLITE_OK)
                 #expect(sqlite3_changes(connection) == 1)
             }
             let restored = FileShelfStore(storageURL: storage)
@@ -409,7 +409,7 @@ struct ShelfScreenshotStoreTests {
             try {
                 let database = ShelfScreenshotDatabase(directory: directory)
                 try database.insert(ShelfScreenshotRecord(id: id, addedAt: .distantPast, shelfOrder: 0,
-                    metadata: Self.metadata(width: 80, height: 40), png: imageData()))
+                                                          metadata: Self.metadata(width: 80, height: 40), png: imageData()))
             }()
             do {
                 var connection: OpaquePointer?
@@ -424,8 +424,8 @@ struct ShelfScreenshotStoreTests {
             defer { sqlite3_close(connection) }
             var query: OpaquePointer?
             #expect(sqlite3_prepare_v2(connection,
-                "EXPLAIN QUERY PLAN SELECT id, added_at, shelf_order, metadata FROM screenshots ORDER BY shelf_order, id",
-                -1, &query, nil) == SQLITE_OK)
+                                       "EXPLAIN QUERY PLAN SELECT id, added_at, shelf_order, metadata FROM screenshots ORDER BY shelf_order, id",
+                                       -1, &query, nil) == SQLITE_OK)
             defer { sqlite3_finalize(query) }
             var details: [String] = []
             var result = sqlite3_step(query)
@@ -452,9 +452,9 @@ struct ShelfScreenshotStoreTests {
             #expect(sqlite3_open(databaseURL.path, &database) == SQLITE_OK)
             defer { sqlite3_close(database) }
             #expect(sqlite3_exec(database, """
-                CREATE TRIGGER reject_insert BEFORE INSERT ON screenshots BEGIN SELECT RAISE(ABORT, 'test insert denied'); END;
-                CREATE TRIGGER reject_delete BEFORE DELETE ON screenshots BEGIN SELECT RAISE(ABORT, 'test delete denied'); END;
-                """, nil, nil, nil) == SQLITE_OK)
+            CREATE TRIGGER reject_insert BEFORE INSERT ON screenshots BEGIN SELECT RAISE(ABORT, 'test insert denied'); END;
+            CREATE TRIGGER reject_delete BEFORE DELETE ON screenshots BEGIN SELECT RAISE(ABORT, 'test delete denied'); END;
+            """, nil, nil, nil) == SQLITE_OK)
             #expect(throws: (any Error).self) { try store.stashScreenshot(png: png, metadata: metadata) }
             #expect(store.items.map(\.id) == [first.id])
             #expect(store.errorDescription?.contains("test insert denied") == true)
@@ -578,17 +578,17 @@ struct ShelfScreenshotStoreTests {
 
     private static func metadata(width: Int, height: Int) -> ShelfScreenshotMetadata {
         ShelfScreenshotMetadata(source: ScreenshotSourceSnapshot(applicationName: "Original App",
-            bundleIdentifier: "test.original", processIdentifier: 12345, capturedAt: Date(timeIntervalSince1970: 1234)),
-            isLongScreenshot: true, initialCaptureRect: CGRect(x: 20, y: 30, width: 40, height: 20),
-            captureRect: CGRect(x: 25, y: 35, width: 40, height: 20),
-            screenFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
-            displayIdentifier: 42, pixelWidth: width, pixelHeight: height)
+                                                                 bundleIdentifier: "test.original", processIdentifier: 12345, capturedAt: Date(timeIntervalSince1970: 1234)),
+                                isLongScreenshot: true, initialCaptureRect: CGRect(x: 20, y: 30, width: 40, height: 20),
+                                captureRect: CGRect(x: 25, y: 35, width: 40, height: 20),
+                                screenFrame: CGRect(x: -1920, y: 0, width: 1920, height: 1080),
+                                displayIdentifier: 42, pixelWidth: width, pixelHeight: height)
     }
 
     private func imageData(width: Int = 80, height: Int = 40, noisy: Bool = false) throws -> Data {
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         let bytes = try #require(bitmap.bitmapData)
         var random: UInt32 = 1
         func nextByte() -> UInt8 {

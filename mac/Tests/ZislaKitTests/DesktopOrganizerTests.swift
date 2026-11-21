@@ -98,26 +98,26 @@ struct DesktopOrganizerTests {
             .replacingOccurrences(of: "end tell", with: "")
             .replacingOccurrences(of: "warns before emptying of trash", with: "fixtureWarns")
             .replacingOccurrences(of: "empty trash", with: """
-                set fixtureWarnsAtEmptying to fixtureWarns
-                if \(fails ? "true" : "false") then error "Injected permission denial" number -1743
-                set fixtureItems to 0
-                """)
+            set fixtureWarnsAtEmptying to fixtureWarns
+            if \(fails ? "true" : "false") then error "Injected permission denial" number -1743
+            set fixtureItems to 0
+            """)
         #expect(!fixtureSource.contains("application \"Finder\""))
         #expect(!fixtureSource.contains("empty trash"))
         let script = try #require(NSAppleScript(source: """
-            set fixtureWarns to \(initiallyWarns ? "true" : "false")
-            set fixtureItems to \(itemCount)
-            set fixtureWarnsAtEmptying to true
-            set caughtNumber to 0
-            set caughtMessage to ""
-            try
-                \(fixtureSource)
-            on error errorMessage number errorNumber
-                set caughtNumber to errorNumber
-                set caughtMessage to errorMessage
-            end try
-            return {fixtureWarns, fixtureWarnsAtEmptying, fixtureItems, caughtNumber, caughtMessage}
-            """))
+        set fixtureWarns to \(initiallyWarns ? "true" : "false")
+        set fixtureItems to \(itemCount)
+        set fixtureWarnsAtEmptying to true
+        set caughtNumber to 0
+        set caughtMessage to ""
+        try
+            \(fixtureSource)
+        on error errorMessage number errorNumber
+            set caughtNumber to errorNumber
+            set caughtMessage to errorMessage
+        end try
+        return {fixtureWarns, fixtureWarnsAtEmptying, fixtureItems, caughtNumber, caughtMessage}
+        """))
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
         #expect(error == nil)

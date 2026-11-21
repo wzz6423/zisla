@@ -11,7 +11,7 @@ public enum TransferPasteboardPayload: Hashable, Sendable {
 public enum TransferPasteboard {
     public static let shelfDropTypes: [NSPasteboard.PasteboardType] =
         [.fileURL, .URL, .string, .png, .tiff]
-        + NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) }
+            + NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) }
 
     /// Local file URLs that currently exist, then plain text if no files are present.
     /// Text HTTP(S) strings stay as text (not coerced into downloads).

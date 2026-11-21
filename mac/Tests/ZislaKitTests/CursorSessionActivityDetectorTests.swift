@@ -27,7 +27,7 @@ struct CursorSessionActivityDetectorTests {
         try execute("INSERT INTO cursorDiskKV VALUES ('composerData:broken','not-json')", at: database)
         let before = try Data(contentsOf: database)
         let detector = CursorSessionActivityDetector(userDirectory: root, maxSessions: 2,
-            isApplicationRunning: { true }, now: { now })
+                                                     isApplicationRunning: { true }, now: { now })
         let tasks = try detector.activeTasks()
         #expect(tasks.count == 2)
         #expect(Set(tasks.map(\.title)) == ["active", "second"])
@@ -88,7 +88,7 @@ struct CursorSessionActivityDetectorTests {
         try execute("CREATE TABLE ItemTable (key TEXT, value TEXT)", at: database)
         try execute("INSERT INTO ItemTable VALUES ('allComposers','{')", at: database)
         try insert(["allComposers": [composer("valid", ["status": "generating"])]],
-            key: "composer.composerData", table: "ItemTable", at: database)
+                   key: "composer.composerData", table: "ItemTable", at: database)
         let detector = CursorSessionActivityDetector(userDirectory: root, isApplicationRunning: { true }, now: { now })
         #expect(try detector.activeTasks().map(\.title) == ["valid"])
     }
@@ -100,7 +100,7 @@ struct CursorSessionActivityDetectorTests {
         try execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)", at: database)
         try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
         try insert(composer("canonical", ["status": "aborted", "unfinishedRunAt": 1_909_999_990_000]),
-            key: "composerData:canonical", at: database)
+                   key: "composerData:canonical", at: database)
         var header: [String: Any] = [
             "type": "head", "composerId": "canonical", "name": "canonical", "isDraft": false,
             "createdAt": 1_909_999_950_000, "lastUpdatedAt": 1_909_999_990_000,
@@ -153,14 +153,14 @@ struct CursorSessionActivityDetectorTests {
         ]
         for (id, values) in examples {
             try insert(composer(id, ["type": "head", "unfinishedRunAt": 1_909_999_980_000,
-                "lastUpdatedAt": 1_909_999_999_000].merging(values) { _, new in new }),
-                key: id, table: "composerHeaders", at: database)
+                                     "lastUpdatedAt": 1_909_999_999_000].merging(values) { _, new in new }),
+                       key: id, table: "composerHeaders", at: database)
         }
         try execute("INSERT INTO composerHeaders VALUES ('broken','{')", at: database)
         try insert(composer("idle", ["type": "head"]), key: "idle", table: "composerHeaders", at: database)
         let before = try Data(contentsOf: database)
         let detector = CursorSessionActivityDetector(userDirectory: root, maxSessions: 2,
-            isApplicationRunning: { true }, now: { now })
+                                                     isApplicationRunning: { true }, now: { now })
         let tasks = try detector.activeTasks()
         #expect(tasks.map(\.title) == ["blocked", "active"])
         #expect(tasks.map(\.status) == [.blocked, .running])
@@ -177,9 +177,9 @@ struct CursorSessionActivityDetectorTests {
         let before = try Data(contentsOf: database)
         var currentTime = now
         let detector = CursorSessionActivityDetector(userDirectory: root,
-            isApplicationRunning: { true }, now: { currentTime })
+                                                     isApplicationRunning: { true }, now: { currentTime })
         let monitor = AIStateMonitor(directoryURL: root.appendingPathComponent("monitor"),
-            activityDetectors: [detector], now: { currentTime })
+                                     activityDetectors: [detector], now: { currentTime })
         defer { monitor.stop() }
         monitor.reload()
         let initial = try #require(monitor.state.tasks.first)
@@ -191,7 +191,7 @@ struct CursorSessionActivityDetectorTests {
         #expect(retained.id == initial.id && retained.status == .running)
         #expect(retained.startedAt == initial.startedAt && retained.updatedAt == currentTime)
         #expect(try CursorSessionActivityDetector(userDirectory: root,
-            isApplicationRunning: { true }, now: { currentTime }).activeTasks().isEmpty)
+                                                  isApplicationRunning: { true }, now: { currentTime }).activeTasks().isEmpty)
         #expect(try Data(contentsOf: database) == before)
 
         header.removeValue(forKey: "unfinishedRunAt")
@@ -215,7 +215,7 @@ struct CursorSessionActivityDetectorTests {
         try insert(header, key: "replace", table: "composerHeaders", at: database)
         var currentTime = now
         let detector = CursorSessionActivityDetector(userDirectory: root,
-            isApplicationRunning: { true }, now: { currentTime })
+                                                     isApplicationRunning: { true }, now: { currentTime })
         #expect(try detector.activeTasks().count == 1)
         currentTime = now.addingTimeInterval(31 * 60)
         header["unfinishedRunAt"] = 1_909_999_980_000
@@ -259,7 +259,7 @@ struct CursorSessionActivityDetectorTests {
             try insert(header, key: name, table: "composerHeaders", at: database)
             var currentTime = now
             let detector = CursorSessionActivityDetector(userDirectory: root,
-                isApplicationRunning: { true }, now: { currentTime })
+                                                         isApplicationRunning: { true }, now: { currentTime })
             #expect(try detector.activeTasks().count == 1)
             currentTime = now.addingTimeInterval(31 * 60)
             try execute("DELETE FROM composerHeaders", at: database)
@@ -283,7 +283,7 @@ struct CursorSessionActivityDetectorTests {
             var currentTime = now
             var running = true
             let detector = CursorSessionActivityDetector(userDirectory: root,
-                isApplicationRunning: { running }, now: { currentTime })
+                                                         isApplicationRunning: { running }, now: { currentTime })
             #expect(try detector.activeTasks().count == 1)
             currentTime = now.addingTimeInterval(31 * 60)
             switch failure {
@@ -306,10 +306,10 @@ struct CursorSessionActivityDetectorTests {
         let database = root.appendingPathComponent("globalStorage/state.vscdb")
         try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
         try insert(composer("stale-update", ["type": "head", "unfinishedRunAt": 1_909_999_990_000,
-            "lastUpdatedAt": 1_909_000_000_000]), key: "stale-update", table: "composerHeaders", at: database)
+                                             "lastUpdatedAt": 1_909_000_000_000]), key: "stale-update", table: "composerHeaders", at: database)
         var currentTime = now
         let detector = CursorSessionActivityDetector(userDirectory: root,
-            isApplicationRunning: { true }, now: { currentTime })
+                                                     isApplicationRunning: { true }, now: { currentTime })
         #expect(try detector.activeTasks().count == 1)
         currentTime = now.addingTimeInterval(31 * 60)
         #expect(try detector.activeTasks().isEmpty)
@@ -327,13 +327,13 @@ struct CursorSessionActivityDetectorTests {
             }
             let id = "quote' OR 1=1 --"
             try insert(composer(id, ["type": "head", "unfinishedRunAt": 1_909_999_990_000]),
-                key: "selected", table: "composerHeaders", at: first)
+                       key: "selected", table: "composerHeaders", at: first)
             try insert(composer(sameComposer ? id : "unselected", ["type": "head",
-                "unfinishedRunAt": 1_909_999_990_000, "lastUpdatedAt": 1_909_999_980_000]),
-                key: "unselected", table: "composerHeaders", at: second)
+                                                                   "unfinishedRunAt": 1_909_999_990_000, "lastUpdatedAt": 1_909_999_980_000]),
+                       key: "unselected", table: "composerHeaders", at: second)
             var currentTime = now
             let detector = CursorSessionActivityDetector(userDirectory: root, maxSessions: 1,
-                isApplicationRunning: { true }, now: { currentTime })
+                                                         isApplicationRunning: { true }, now: { currentTime })
             #expect(try detector.activeTasks().map(\.title) == [id])
             currentTime = now.addingTimeInterval(31 * 60)
             #expect(try detector.activeTasks().map(\.title) == [id])
@@ -348,16 +348,16 @@ struct CursorSessionActivityDetectorTests {
         let database = root.appendingPathComponent("globalStorage/state.vscdb")
         try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
         try insert(composer("old", ["type": "head", "unfinishedRunAt": 1_909_999_990_000]),
-            key: "old", table: "composerHeaders", at: database)
+                   key: "old", table: "composerHeaders", at: database)
         var currentTime = now
         let detector = CursorSessionActivityDetector(userDirectory: root, maxSessions: 1,
-            isApplicationRunning: { true }, now: { currentTime })
+                                                     isApplicationRunning: { true }, now: { currentTime })
         #expect(try detector.activeTasks().map(\.title) == ["old"])
         currentTime = now.addingTimeInterval(31 * 60)
         #expect(try detector.activeTasks().map(\.title) == ["old"])
         let freshMarker = currentTime.addingTimeInterval(-1).timeIntervalSince1970 * 1_000
         try insert(composer("new", ["type": "head", "unfinishedRunAt": freshMarker,
-            "lastUpdatedAt": freshMarker]), key: "new", table: "composerHeaders", at: database)
+                                    "lastUpdatedAt": freshMarker]), key: "new", table: "composerHeaders", at: database)
         #expect(try detector.activeTasks().map(\.title) == ["new"])
         try execute("DELETE FROM composerHeaders WHERE composerId = 'new'", at: database)
         #expect(try detector.activeTasks().isEmpty)
@@ -371,17 +371,17 @@ struct CursorSessionActivityDetectorTests {
             let full = secondDatabase ? root.appendingPathComponent("workspaceStorage/fixture/state.vscdb") : global
             try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: global)
             try insert(composer("same", ["type": "head", "unfinishedRunAt": 1_909_999_990_000]),
-                key: "same", table: "composerHeaders", at: global)
+                       key: "same", table: "composerHeaders", at: global)
             try execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)", at: full)
             var currentTime = now
             let detector = CursorSessionActivityDetector(userDirectory: root,
-                isApplicationRunning: { true }, now: { currentTime })
+                                                         isApplicationRunning: { true }, now: { currentTime })
             #expect(try detector.activeTasks().map(\.title) == ["same"])
             currentTime = now.addingTimeInterval(31 * 60)
             let updated = currentTime.addingTimeInterval(-1)
             try insert(composer("same", ["status": "generating", "name": "newest",
-                "unfinishedRunAt": 1_909_999_990_000, "lastUpdatedAt": updated.timeIntervalSince1970 * 1_000]),
-                key: "composerData:same", at: full)
+                                         "unfinishedRunAt": 1_909_999_990_000, "lastUpdatedAt": updated.timeIntervalSince1970 * 1_000]),
+                       key: "composerData:same", at: full)
             let task = try #require(detector.activeTasks().first)
             #expect(task.title == "newest" && task.updatedAt == updated)
             try execute("DELETE FROM cursorDiskKV", at: full)
@@ -396,10 +396,10 @@ struct CursorSessionActivityDetectorTests {
         try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
         for (id, marker) in [("valid", 1 as Any), ("boolean", true as Any), ("zero", 0 as Any), ("string", "1" as Any)] {
             try insert(composer(id, ["type": "head", "unfinishedRunAt": marker, "lastUpdatedAt": 2_000]),
-                key: id, table: "composerHeaders", at: database)
+                       key: id, table: "composerHeaders", at: database)
         }
         let detector = CursorSessionActivityDetector(userDirectory: root,
-            isApplicationRunning: { true }, now: { Date(timeIntervalSince1970: 2) })
+                                                     isApplicationRunning: { true }, now: { Date(timeIntervalSince1970: 2) })
         #expect(try detector.activeTasks().map(\.title) == ["valid"])
     }
 
@@ -408,7 +408,7 @@ struct CursorSessionActivityDetectorTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let databaseURL = root.appendingPathComponent("globalStorage/state.vscdb")
         try execute("PRAGMA journal_mode=WAL; CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)",
-            at: databaseURL)
+                    at: databaseURL)
         var database: OpaquePointer?
         #expect(sqlite3_open(databaseURL.path, &database) == SQLITE_OK)
         defer { sqlite3_close(database) }
@@ -419,7 +419,7 @@ struct CursorSessionActivityDetectorTests {
         try insert(header, key: "watched", table: "composerHeaders", at: databaseURL)
         let detector = CursorSessionActivityDetector(userDirectory: root, isApplicationRunning: { true }, now: { now })
         let monitor = AIStateMonitor(directoryURL: root.appendingPathComponent("monitor"), activityDetectors: [detector],
-            detectorRefreshInterval: 86_400, now: { now })
+                                     detectorRefreshInterval: 86_400, now: { now })
         defer { monitor.stop() }
         monitor.start()
         #expect(detector.activityFileURLs.contains(URL(fileURLWithPath: databaseURL.path + "-wal")))

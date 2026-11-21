@@ -31,7 +31,7 @@ private enum SoundPackExtendedKeyboardRows {
     ]
     static let internationalAndMedia =
         (rowsByID["extended.international"] ?? [])
-        + (rowsByID["extended.media"] ?? [])
+            + (rowsByID["extended.media"] ?? [])
 }
 
 private struct SoundPackKeyboardPresentation: Equatable {

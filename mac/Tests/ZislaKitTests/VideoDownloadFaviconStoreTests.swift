@@ -184,9 +184,9 @@ struct VideoDownloadFaviconStoreTests {
         ([UInt8]([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]), true),
         // A RIFF container that is not WEBP (e.g. wav) must be rejected.
         ([UInt8]([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]), false),
-        ([UInt8]([0x7B, 0x22, 0x61, 0x22]), false),  // {"a"
-        ([UInt8]([0x3C, 0x21, 0x44, 0x4F]), false),  // <!DO
-        ([UInt8]([0x89, 0x50]), false),  // truncated, fewer than 4 bytes
+        ([UInt8]([0x7B, 0x22, 0x61, 0x22]), false), // {"a"
+        ([UInt8]([0x3C, 0x21, 0x44, 0x4F]), false), // <!DO
+        ([UInt8]([0x89, 0x50]), false), // truncated, fewer than 4 bytes
     ])
     func recognizesImageMagicBytes(bytes: [UInt8], expected: Bool) {
         #expect(VideoDownloadFaviconStore.looksLikeImage(Data(bytes)) == expected)

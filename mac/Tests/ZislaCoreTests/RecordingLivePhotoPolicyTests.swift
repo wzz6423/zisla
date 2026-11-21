@@ -15,7 +15,7 @@ struct RecordingLivePhotoPolicyTests {
 
     @Test func trimmedAndAcceleratedLongSourcesUseTheirEditedDuration() throws {
         var project = ScreenRecordingProject(name: "Long source", videoFile: "screen.mp4", duration: 12,
-            width: 64, height: 48)
+                                             width: 64, height: 48)
         #expect(!RecordingLivePhotoPolicy.supports(duration: project.outputDuration))
         project.edits.segments = [.init(start: 2, end: 5)]
         try project.validate()
@@ -30,7 +30,7 @@ struct RecordingLivePhotoPolicyTests {
 
     @Test func delayedClipsAndOtherTracksExtendTheFinalDuration() throws {
         var project = ScreenRecordingProject(name: "Timeline", videoFile: "screen.mp4", duration: 2,
-            width: 64, height: 48)
+                                             width: 64, height: 48)
         var timeline = RecordingMultitrackTimeline.migrating(project)
         timeline.clips[0].start = 1
         project.timeline = timeline

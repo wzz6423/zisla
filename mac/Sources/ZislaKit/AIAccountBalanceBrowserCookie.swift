@@ -73,7 +73,7 @@ struct AIAccountBalanceBrowserCookieSourceResolver: Sendable {
             let root = support.appendingPathComponent("Firefox", isDirectory: true)
             let profile = try firefoxProfile(in: root)
             return AIAccountBalanceBrowserCookieSource(browser: browser,
-                databaseURL: try firstExisting([profile.appendingPathComponent("cookies.sqlite")]), keychainAccount: nil)
+                                                       databaseURL: try firstExisting([profile.appendingPathComponent("cookies.sqlite")]), keychainAccount: nil)
         }
         let directory: String
         let account: String

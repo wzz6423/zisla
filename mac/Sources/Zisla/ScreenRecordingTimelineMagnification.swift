@@ -110,7 +110,7 @@ final class ScreenRecordingTimelineMagnificationView: NSView, NSGestureRecognize
         }
         guard let anchor, phase == .began || phase == .changed || phase == .ended else { return }
         let proposed = Double(ScreenshotPinnedInteraction.scale(current: anchor.zoom,
-            magnification: magnification, range: 1...16))
+                                                                magnification: magnification, range: 1...16))
         zoom = proposed
         pendingScroll = (anchor, proposed)
         onZoom(proposed)

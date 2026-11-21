@@ -298,8 +298,8 @@ final class SystemScreenshotMonitor {
                 processIsRunning: application != nil
             ) else { return nil }
             guard
-                  let boundsDictionary = window[kCGWindowBounds as String] as? NSDictionary,
-                  let bounds = CGRect(dictionaryRepresentation: boundsDictionary as CFDictionary)
+                let boundsDictionary = window[kCGWindowBounds as String] as? NSDictionary,
+                let bounds = CGRect(dictionaryRepresentation: boundsDictionary as CFDictionary)
             else { return nil }
             return SystemScreenshotWindowCandidate(
                 ownerProcessIdentifier: processIdentifier,

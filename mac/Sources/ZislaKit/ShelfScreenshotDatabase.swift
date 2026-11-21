@@ -93,14 +93,14 @@ final class ShelfScreenshotDatabase {
             try execute("PRAGMA synchronous = FULL", on: opened)
             try execute("PRAGMA temp_store = MEMORY", on: opened)
             try execute("""
-                CREATE TABLE IF NOT EXISTS screenshots (
-                    id TEXT PRIMARY KEY NOT NULL,
-                    added_at REAL NOT NULL,
-                    shelf_order INTEGER NOT NULL,
-                    metadata BLOB NOT NULL,
-                    png BLOB NOT NULL
-                )
-                """, on: opened)
+            CREATE TABLE IF NOT EXISTS screenshots (
+                id TEXT PRIMARY KEY NOT NULL,
+                added_at REAL NOT NULL,
+                shelf_order INTEGER NOT NULL,
+                metadata BLOB NOT NULL,
+                png BLOB NOT NULL
+            )
+            """, on: opened)
             try execute("CREATE INDEX IF NOT EXISTS screenshots_shelf_order ON screenshots(shelf_order, id)", on: opened)
             try restrictPermissions()
             connection = opened
@@ -177,7 +177,7 @@ final class ShelfScreenshotDatabase {
         guard result == SQLITE_ROW else { throw failure(database) }
         let value = try listing(from: query)
         return ShelfScreenshotRecord(id: value.id, addedAt: value.addedAt, shelfOrder: value.shelfOrder,
-            metadata: value.metadata, png: try blob(4, from: query))
+                                     metadata: value.metadata, png: try blob(4, from: query))
     }
 
     private func listing(from query: OpaquePointer) throws -> ShelfScreenshotListing {
@@ -185,8 +185,8 @@ final class ShelfScreenshotDatabase {
             throw CocoaError(.fileReadCorruptFile)
         }
         return ShelfScreenshotListing(id: id, addedAt: Date(timeIntervalSince1970: sqlite3_column_double(query, 1)),
-            shelfOrder: sqlite3_column_int64(query, 2),
-            metadata: try JSONDecoder().decode(ShelfScreenshotMetadata.self, from: blob(3, from: query)))
+                                      shelfOrder: sqlite3_column_int64(query, 2),
+                                      metadata: try JSONDecoder().decode(ShelfScreenshotMetadata.self, from: blob(3, from: query)))
     }
 
     private func blob(_ column: Int32, from query: OpaquePointer) throws -> Data {

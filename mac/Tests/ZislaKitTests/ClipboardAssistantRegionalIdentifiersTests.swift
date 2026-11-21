@@ -68,15 +68,15 @@ struct ClipboardAssistantRegionalIdentifiersTests {
                                 (sample.trackingLabel, "123456789012"), (sample.phoneLabel, sample.phone)] {
             for suffix in ["&next=https://evil.example", "\u{202E}", "\n123", ";123", "\u{0}"] {
                 #expect(detect(label + ": " + number + suffix, sample: sample,
-                    kinds: [.flight, .train, .tracking, .phone]) == nil)
+                               kinds: [.flight, .train, .tracking, .phone]) == nil)
             }
         }
     }
 
     @Test func explicitInternationalPhonesMustNotBecomeSubtraction() {
         let result = ClipboardAssistantDetector.detect(text: "+86-138-0013-8000",
-            enabledKinds: Set(ClipboardAssistantKind.allCases), now: Date(timeIntervalSince1970: 1_790_035_200),
-            timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US"))
+                                                       enabledKinds: Set(ClipboardAssistantKind.allCases), now: Date(timeIntervalSince1970: 1_790_035_200),
+                                                       timeZone: TimeZone(secondsFromGMT: 0)!, locale: Locale(identifier: "en_US"))
         #expect(result?.kind == .phone)
         #expect(result?.action == .callPhone("+8613800138000"))
     }
@@ -103,7 +103,7 @@ struct ClipboardAssistantRegionalIdentifiersTests {
     ])
     func majorRegionalAirlinesSupportIATAICAOAndLeadingZeros(_ iata: String, _ icao: String) throws {
         for (text, copied) in [(iata + "0001", iata + "0001"), (iata.lowercased() + "   0123", iata + "0123"),
-                                (icao + " 0123", icao + "0123")] {
+                               (icao + " 0123", icao + "0123")] {
             let result = try #require(smart(text, country: "US"))
             #expect(result.kind == .flight)
             let expectedDigits = text.hasSuffix("0001") ? "1" : "123"
@@ -250,23 +250,23 @@ struct ClipboardAssistantRegionalIdentifiersTests {
     @Test(arguments: samples)
     func disablingEachKindRemovesItsActions(_ sample: Sample) {
         for (label, number, kind) in [(sample.flightLabel, sample.flight, ClipboardAssistantKind.flight),
-                                     (sample.trainLabel, sample.train, .train),
-                                     (sample.trackingLabel, "123456789012", .tracking),
-                                     (sample.phoneLabel, sample.phone, .phone)] {
+                                      (sample.trainLabel, sample.train, .train),
+                                      (sample.trackingLabel, "123456789012", .tracking),
+                                      (sample.phoneLabel, sample.phone, .phone)] {
             let result = detect(label + ": " + number, sample: sample,
-                kinds: Set([ClipboardAssistantKind.flight, .train, .tracking, .phone]).subtracting([kind]))
+                                kinds: Set([ClipboardAssistantKind.flight, .train, .tracking, .phone]).subtracting([kind]))
             #expect(result == nil)
         }
     }
 
     private func smart(_ text: String, country: String, kinds: Set<ClipboardAssistantKind> = [.flight, .train, .tracking]) -> ClipboardAssistantDetection? {
         ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: kinds, countryCode: country,
-            now: Date(timeIntervalSince1970: 1_790_035_200), timeZone: TimeZone(secondsFromGMT: 0)!)
+                                                        now: Date(timeIntervalSince1970: 1_790_035_200), timeZone: TimeZone(secondsFromGMT: 0)!)
     }
 
     private func detect(_ text: String, sample: Sample, kinds: Set<ClipboardAssistantKind>? = nil) -> ClipboardAssistantDetection? {
         ClipboardAssistantDetector.detect(text: text, enabledKinds: kinds ?? Set(ClipboardAssistantKind.allCases),
-            systemLanguageIdentifier: "en", now: Date(timeIntervalSince1970: 1_790_035_200),
-            timeZone: TimeZone(secondsFromGMT: 0)!, locale: sample.language.locale, countryCode: sample.country)
+                                          systemLanguageIdentifier: "en", now: Date(timeIntervalSince1970: 1_790_035_200),
+                                          timeZone: TimeZone(secondsFromGMT: 0)!, locale: sample.language.locale, countryCode: sample.country)
     }
 }

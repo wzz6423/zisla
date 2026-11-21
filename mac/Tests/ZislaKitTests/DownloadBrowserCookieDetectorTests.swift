@@ -58,7 +58,7 @@ struct DownloadBrowserCookieDetectorTests {
         #expect(sources.map(\.profileName) == ["Default", "Default", "Profile 1", "Default", "test.default-release"])
         #expect(sources.first?.ytDLPBrowser == "chrome")
         #expect(sources.last?.ytDLPBrowser == "firefox")
-        #expect(sources.allSatisfy { $0.ytDLPBrowserSpecification.contains(":" ) })
+        #expect(sources.allSatisfy { $0.ytDLPBrowserSpecification.contains(":") })
         #expect(sources.allSatisfy { !$0.ytDLPBrowserSpecification.contains("\n") })
     }
 

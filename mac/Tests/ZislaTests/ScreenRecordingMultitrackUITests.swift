@@ -23,7 +23,7 @@ struct ScreenRecordingMultitrackUITests {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let host = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
-            languageStore: AppLanguageStore(), prepareCapture: {}))
+                                                                     languageStore: AppLanguageStore(), prepareCapture: {}))
         host.sizingOptions = []
         let window = mount(host, width: width, height: 800)
         defer { window.contentView = nil; window.close() }
@@ -31,10 +31,10 @@ struct ScreenRecordingMultitrackUITests {
         #expect(element("screenRecording.mediaLibrary", in: host) != nil)
         #expect(element("screenRecording.multitrackTimeline", in: host) != nil)
         #expect(element("screenRecording.clipStart", in: host) != nil,
-            "A new recording must expose multitrack editing before timeline migration is persisted")
+                "A new recording must expose multitrack editing before timeline migration is persisted")
         #expect(element("screenRecording.detachAudio", in: host) != nil)
         #expect(labelled("导出设置", in: host) == nil,
-            "Export settings belong to the export dialog rather than the editing inspector")
+                "Export settings belong to the export dialog rather than the editing inspector")
         #expect(element("screenRecording.export", in: host) != nil && labelled("录制设置", in: host) == nil)
         let projectMenu = try #require(element("screenRecording.projectMenu", in: host))
         let undo = try #require(element("screenRecording.undo", in: host))
@@ -46,17 +46,17 @@ struct ScreenRecordingMultitrackUITests {
         }
         for (first, next) in zip(frames, frames.dropFirst()) {
             #expect(language.isRightToLeft ? first.minX > next.maxX : first.maxX < next.minX,
-                "The project menu must stay beside the title, followed by undo, redo and export in the interface direction")
+                    "The project menu must stay beside the title, followed by undo, redo and export in the interface direction")
         }
         for frame in frames {
             #expect(frame.width > 0 && frame.height > 0 && host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(frame),
-                "Toolbar controls must remain inside the studio at its minimum width")
+                    "Toolbar controls must remain inside the studio at its minimum width")
         }
         #expect(language.isRightToLeft ? frames[1].midX > host.bounds.midX : frames[1].midX < host.bounds.midX,
-            "The project menu belongs to the title side of the studio")
+                "The project menu belongs to the title side of the studio")
         let naturalExport = NSHostingView(rootView: Button(AppLocalization.text("导出录屏")) {})
         #expect(frames[4].width + 0.5 >= naturalExport.fittingSize.width,
-            "The export button must show its complete translation")
+                "The export button must show its complete translation")
         let playback = try #require(element("screenRecording.playTimeline", in: host))
         let slider = try #require(element("screenRecording.playbackPosition", in: host))
         let clock = try #require(labelled("00:00 / 00:02", in: host) as? any NSAccessibilityElementProtocol)
@@ -66,11 +66,11 @@ struct ScreenRecordingMultitrackUITests {
         }
         for (first, next) in zip(transportFrames, transportFrames.dropFirst()) {
             #expect(language.isRightToLeft ? first.minX >= next.maxX : first.maxX <= next.minX,
-                "The ratio menu must follow the playback time without overlapping the scrubber")
+                    "The ratio menu must follow the playback time without overlapping the scrubber")
         }
         for frame in transportFrames {
             #expect(frame.width > 0 && frame.height > 0 && host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(frame),
-                "Playback and aspect ratio controls must fit the minimum-width studio")
+                    "Playback and aspect ratio controls must fit the minimum-width studio")
         }
         #expect(!objects(in: host).contains { object in
             guard object.responds(to: NSSelectorFromString("accessibilityRole")),
@@ -93,7 +93,7 @@ struct ScreenRecordingMultitrackUITests {
         await settle(naturalRatio)
         let naturalWidth = try #require(element("fixture.canvasAspectRatio", in: naturalRatio)).accessibilityFrame().width
         #expect(transportFrames[3].width + 0.5 >= naturalWidth,
-            "The aspect ratio menu must show its complete selected translation")
+                "The aspect ratio menu must show its complete selected translation")
         #expect(try #require((export as? NSObject)?.value(forKey: "isAccessibilityEnabled") as? Bool))
         #expect(model.project?.timeline == nil && !model.isDirty && !model.canUndo)
         let add = try #require(element("screenRecording.multitrackAddTrack", in: host))
@@ -122,13 +122,13 @@ struct ScreenRecordingMultitrackUITests {
         var panels: [NSSavePanel] = []
         var complete: ((URL?) -> Void)?
         let model = ScreenRecordingStudioModel(projectStore: fixture.store,
-            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
-            presentExportPanel: { panel, completion in panels.append(panel); complete = completion })
+                                               renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
+                                               presentExportPanel: { panel, completion in panels.append(panel); complete = completion })
         defer { model.shutdown(); fixture.remove() }
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let host = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
-            languageStore: AppLanguageStore(), prepareCapture: {}))
+                                                                     languageStore: AppLanguageStore(), prepareCapture: {}))
         host.sizingOptions = []
         let window = mount(host, width: 960, height: 800)
         defer { window.contentView = nil; window.close() }
@@ -189,7 +189,7 @@ struct ScreenRecordingMultitrackUITests {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let host = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
-            languageStore: AppLanguageStore(), prepareCapture: {}))
+                                                                     languageStore: AppLanguageStore(), prepareCapture: {}))
         host.sizingOptions = []
         let window = mount(host, width: 960, height: 800)
         defer { window.contentView = nil; window.close() }
@@ -213,15 +213,15 @@ struct ScreenRecordingMultitrackUITests {
                 return object.value(forKey: "accessibilityValue") as? String
             }
             #expect(values.filter { $0 == AppLocalization.text(ratio.title) }.count >= 2,
-                "The transport menu and existing canvas effects picker must show the same ratio")
+                    "The transport menu and existing canvas effects picker must show the same ratio")
             let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(expected))
             #expect(decoded == expected, "The selected ratio must use the existing project format")
             let preview = try await model.exporter.preview(project: expected, directory: fixture.directory,
-                sourceTime: 0.5, maximumSize: .init(width: 256, height: 256))
+                                                           sourceTime: 0.5, maximumSize: .init(width: 256, height: 256))
             let size = try RecordingExportRenderer.outputSize(source: .init(width: project.width, height: project.height),
-                edits: expected.edits, resolution: .source)
+                                                              edits: expected.edits, resolution: .source)
             #expect(CGSize(width: preview.width, height: preview.height) == size,
-                "The selected canvas ratio must reach the shared preview and export geometry")
+                    "The selected canvas ratio must reach the shared preview and export geometry")
             model.undo()
             await settle(host)
             #expect(model.project == before && model.canRedo)
@@ -232,7 +232,7 @@ struct ScreenRecordingMultitrackUITests {
             #expect(model.project == expected && !model.canRedo)
         }
         #expect(try Data(contentsOf: sourceURL) == source && fixture.files() == ["screen.mp4"],
-            "Canvas ratio changes must not crop or rewrite the source recording")
+                "Canvas ratio changes must not crop or rewrite the source recording")
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) } && !window.isKeyWindow)
     }
 
@@ -294,7 +294,7 @@ struct ScreenRecordingMultitrackUITests {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let host = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
-            languageStore: AppLanguageStore(), prepareCapture: {}))
+                                                                     languageStore: AppLanguageStore(), prepareCapture: {}))
         host.sizingOptions = []
         let window = mount(host, width: 1_180, height: 800)
         defer { window.contentView = nil; window.close() }
@@ -334,7 +334,7 @@ struct ScreenRecordingMultitrackUITests {
         let host = NSHostingView(rootView: ScreenRecordingMultitrackTimelineView(model: model))
         host.sizingOptions = []
         let window = ScreenRecordingStudioWindow(contentRect: .init(x: -100_000, y: -100_000, width: 700, height: 240),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                                                 styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.studioModel = model
         window.contentView = host
@@ -346,16 +346,16 @@ struct ScreenRecordingMultitrackUITests {
         await settle(host)
         let original = model.project
         let key = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
-            windowNumber: window.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
-            isARepeat: false, keyCode: 8))
+                                                windowNumber: window.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
+                                                isARepeat: false, keyCode: 8))
         #expect(window.performKeyEquivalent(with: key) && editor.copies == 1 && !model.canPasteTimelineClip)
         let clip = try #require(model.selectedTimelineClip)
         let clipElement = try #require(element("screenRecording.multitrackClip." + clip.id, in: host))
         let frame = window.convertFromScreen(clipElement.accessibilityFrame())
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
             let event = try #require(NSEvent.mouseEvent(with: type, location: .init(x: frame.minX + 40, y: frame.midY),
-                modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-                eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+                                                        modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                                                        eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
             window.sendEvent(event)
         }
         await settle(host)
@@ -369,8 +369,8 @@ struct ScreenRecordingMultitrackUITests {
         #expect(!(window.firstResponder is NSTextView) && model.selectedTimelineClipID == nil)
         let track = try #require(model.selectedTimelineTrackID)
         let paste = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
-            windowNumber: window.windowNumber, context: nil, characters: "v", charactersIgnoringModifiers: "v",
-            isARepeat: false, keyCode: 9))
+                                                  windowNumber: window.windowNumber, context: nil, characters: "v", charactersIgnoringModifiers: "v",
+                                                  isARepeat: false, keyCode: 9))
         #expect(window.performKeyEquivalent(with: paste))
         #expect(model.selectedTimelineClip?.trackID == track && model.timeline?.clips.count == 2)
         model.undo()
@@ -389,7 +389,7 @@ struct ScreenRecordingMultitrackUITests {
         let host = NSHostingView(rootView: ScreenRecordingMultitrackTimelineView(model: model))
         host.sizingOptions = []
         let window = ScreenRecordingStudioWindow(contentRect: .init(x: -100_000, y: -100_000, width: 700, height: 240),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                                                 styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.studioModel = model
         window.contentView = host
@@ -401,16 +401,16 @@ struct ScreenRecordingMultitrackUITests {
         let clipElement = try #require(element("screenRecording.multitrackClip." + clip.id, in: host))
         let frame = window.convertFromScreen(clipElement.accessibilityFrame())
         let geometry = try #require(ScreenRecordingTimelineStripGeometry(segments: [.init(start: 0, end: 10)],
-            viewportWidth: frame.width, zoom: 1))
+                                                                         viewportWidth: frame.width, zoom: 1))
         func send(_ type: NSEvent.EventType, _ point: CGPoint) throws {
             let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
-                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-                eventNumber: 1, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1))
+                                                        timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                                                        eventNumber: 1, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1))
             window.sendEvent(event)
         }
         for mode in [RecordingMultitrackClipDrag.Mode.trimStart, .trimEnd, .move] {
             let start = CGPoint(x: frame.minX + (mode == .trimStart ? 6 : mode == .trimEnd ? clip.duration * geometry.pointsPerSecond - 6 : 40),
-                y: frame.midY)
+                                y: frame.midY)
             let delta = geometry.pointsPerSecond * (mode == .trimEnd ? -0.5 : 0.5)
             let end = CGPoint(x: start.x + delta, y: start.y)
             try send(.leftMouseDown, start)
@@ -437,15 +437,15 @@ struct ScreenRecordingMultitrackUITests {
         try send(.leftMouseDragged, .init(x: start.x + 30, y: start.y))
         await settle(host)
         let escape = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-            characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
+                                                   timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                                                   characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
         window.sendEvent(escape)
         await settle(host)
         try send(.leftMouseDragged, .init(x: start.x + 50, y: start.y))
         try send(.leftMouseUp, .init(x: start.x + 50, y: start.y))
         await settle(host)
         #expect(model.project == original && !model.canUndo && !window.isKeyWindow,
-            "Escape must keep later movement and release in the same gesture from changing the project")
+                "Escape must keep later movement and release in the same gesture from changing the project")
     }
 
     @Test
@@ -512,7 +512,7 @@ struct ScreenRecordingMultitrackUITests {
     private func mount(_ host: NSView, width: CGFloat, height: CGFloat) -> NSPanel {
         if let hosting = host as? NSHostingView<ScreenRecordingMultitrackTimelineView> { hosting.sizingOptions = [] }
         let window = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: width, height: height),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         window.orderFrontRegardless()
@@ -564,7 +564,7 @@ struct ScreenRecordingMultitrackUITests {
         try #require(picker.responds(to: action))
         let selection = MenuSelection(title: AppLocalization.text(ratio.title))
         NotificationCenter.default.addObserver(selection, selector: #selector(MenuSelection.began(_:)),
-            name: NSMenu.didBeginTrackingNotification, object: nil)
+                                               name: NSMenu.didBeginTrackingNotification, object: nil)
         defer { NotificationCenter.default.removeObserver(selection) }
         let selected = selection.waitForSelection {
             picker.performSelector(onMainThread: action, with: nil, waitUntilDone: true)

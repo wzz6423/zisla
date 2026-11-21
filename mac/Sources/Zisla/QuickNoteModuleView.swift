@@ -188,12 +188,12 @@ struct QuickNoteModuleView: View {
             }
 
             editorPane
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .islandGlassSurface(
-                .input,
-                cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius,
-                bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
-            )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .islandGlassSurface(
+                    .input,
+                    cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius,
+                    bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+                )
         }
         .padding(.leading, 10)
     }

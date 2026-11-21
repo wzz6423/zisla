@@ -19,11 +19,11 @@ struct ContextNoteScreenshotCaptureTests {
     func selectsTheExactCapturedWindowEvenWhenAnotherApplicationIsInFront() throws {
         let windows = [entry(id: 90, owner: 91), entry(id: 12, frame: frame.offsetBy(dx: 100, dy: 0)), entry()]
         let source = try ContextNoteScreenshotCapture.source(for: location,
-            window: .init(processIdentifier: 42, frame: frame, title: "Document"), hasPermission: { true }, windowInfo: { windows })
+                                                             window: .init(processIdentifier: 42, frame: frame, title: "Document"), hasPermission: { true }, windowInfo: { windows })
         #expect(source == .window(11, processIdentifier: 42))
         let browser = ContextNoteLocation.webPage(url: URL(string: "https://example.invalid/page")!, title: "", applicationName: "Browser")
         #expect(try ContextNoteScreenshotCapture.source(for: browser,
-            window: .init(processIdentifier: 42, frame: frame, title: ""), hasPermission: { true }, windowInfo: { windows }) == source)
+                                                        window: .init(processIdentifier: 42, frame: frame, title: ""), hasPermission: { true }, windowInfo: { windows }) == source)
     }
 
     @Test
@@ -33,8 +33,8 @@ struct ContextNoteScreenshotCaptureTests {
         var second = entry()
         second[kCGWindowName as String] = "Document"
         let source = try ContextNoteScreenshotCapture.source(for: location,
-            window: .init(processIdentifier: 42, frame: frame, title: "Document"),
-            hasPermission: { true }, windowInfo: { [first, second] })
+                                                             window: .init(processIdentifier: 42, frame: frame, title: "Document"),
+                                                             hasPermission: { true }, windowInfo: { [first, second] })
         #expect(source == .window(11, processIdentifier: 42))
     }
 
@@ -64,7 +64,7 @@ struct ContextNoteScreenshotCaptureTests {
         }
         #expect(throws: ScreenshotCaptureError.windowUnavailable) {
             try ContextNoteScreenshotCapture.source(for: location, window: window,
-                hasPermission: { true }, windowInfo: { info })
+                                                    hasPermission: { true }, windowInfo: { info })
         }
     }
 
@@ -72,12 +72,12 @@ struct ContextNoteScreenshotCaptureTests {
     func desktopUsesItsPersistentDisplayIdentityWithoutReadingApplicationWindows() throws {
         let desktop = ContextNoteLocation.desktop(displayID: "external-display", displayName: "External")
         let source = try ContextNoteScreenshotCapture.source(for: desktop, window: nil, hasPermission: { true },
-            windowInfo: { Issue.record("Desktop capture must not select an application window"); return nil },
-            displayIdentifier: { #expect($0 == "external-display"); return 7 })
+                                                             windowInfo: { Issue.record("Desktop capture must not select an application window"); return nil },
+                                                             displayIdentifier: { #expect($0 == "external-display"); return 7 })
         #expect(source == .display(7))
         #expect(throws: ScreenshotCaptureError.screenUnavailable) {
             try ContextNoteScreenshotCapture.source(for: desktop, window: nil,
-                hasPermission: { true }, displayIdentifier: { _ in nil })
+                                                    hasPermission: { true }, displayIdentifier: { _ in nil })
         }
     }
 
@@ -85,8 +85,8 @@ struct ContextNoteScreenshotCaptureTests {
     func deniedPermissionDoesNotReadWindowOrDisplayMetadata() {
         #expect(throws: ScreenshotCaptureError.permissionRequired) {
             try ContextNoteScreenshotCapture.source(for: location, window: nil, hasPermission: { false },
-                windowInfo: { Issue.record("No window metadata may be read without permission"); return nil },
-                displayIdentifier: { _ in Issue.record("No display metadata may be read without permission"); return nil })
+                                                    windowInfo: { Issue.record("No window metadata may be read without permission"); return nil },
+                                                    displayIdentifier: { _ in Issue.record("No display metadata may be read without permission"); return nil })
         }
     }
 
@@ -105,13 +105,13 @@ struct ContextNoteScreenshotCaptureTests {
     func captureWritesTheSelectedSourcesOriginalPixelsToPNG(source: ContextNoteScreenshotSource) async throws {
         let fixture = try ContextNoteScreenshotTestImage.make()
         let png = try await ContextNoteScreenshotCapture.capture(source, hasPermission: { true },
-            windowCapture: { id, pid in
-                #expect(source == .window(id, processIdentifier: pid))
-                return fixture.image
-            }, displayCapture: { id in
-                #expect(source == .display(id))
-                return fixture.image
-            })
+                                                                 windowCapture: { id, pid in
+                                                                     #expect(source == .window(id, processIdentifier: pid))
+                                                                     return fixture.image
+                                                                 }, displayCapture: { id in
+                                                                     #expect(source == .display(id))
+                                                                     return fixture.image
+                                                                 })
         let dimensions = try FileShelfStore.screenshotDimensions(png)
         #expect(dimensions.width == 80 && dimensions.height == 40)
         let bitmap = try #require(NSBitmapImageRep(data: png))
@@ -123,8 +123,8 @@ struct ContextNoteScreenshotCaptureTests {
     func permissionRevokedAfterPreparationPreventsCapturingPixels() async {
         await #expect(throws: ScreenshotCaptureError.permissionRequired) {
             try await ContextNoteScreenshotCapture.capture(.window(11, processIdentifier: 42), hasPermission: { false },
-                windowCapture: { _, _ in Issue.record("Capture must not run after permission is revoked"); throw CocoaError(.fileReadNoPermission) },
-                displayCapture: { _ in Issue.record("Capture must not run after permission is revoked"); throw CocoaError(.fileReadNoPermission) })
+                                                           windowCapture: { _, _ in Issue.record("Capture must not run after permission is revoked"); throw CocoaError(.fileReadNoPermission) },
+                                                           displayCapture: { _ in Issue.record("Capture must not run after permission is revoked"); throw CocoaError(.fileReadNoPermission) })
         }
     }
 
@@ -133,7 +133,7 @@ struct ContextNoteScreenshotCaptureTests {
         let fixture = try ContextNoteScreenshotTestImage.make()
         await #expect(throws: CocoaError(.fileWriteUnknown)) {
             try await ContextNoteScreenshotCapture.capture(.window(11, processIdentifier: 42), hasPermission: { true },
-                windowCapture: { _, _ in fixture.image }, encode: { _ in nil })
+                                                           windowCapture: { _, _ in fixture.image }, encode: { _ in nil })
         }
     }
 
@@ -141,10 +141,10 @@ struct ContextNoteScreenshotCaptureTests {
     func cancellationBeforeSystemCaptureDoesNotReadPixels() async {
         let task = Task {
             try await ContextNoteScreenshotCapture.capture(.window(11, processIdentifier: 42), hasPermission: { true },
-                windowCapture: { _, _ in
-                    Issue.record("Cancelled capture must not start reading pixels")
-                    throw CocoaError(.userCancelled)
-                })
+                                                           windowCapture: { _, _ in
+                                                               Issue.record("Cancelled capture must not start reading pixels")
+                                                               throw CocoaError(.userCancelled)
+                                                           })
         }
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
@@ -156,8 +156,8 @@ struct ContextNoteScreenshotCaptureTests {
         let gate = ContextNoteScreenshotGate()
         let task = Task {
             try await ContextNoteScreenshotCapture.capture(.window(11, processIdentifier: 42), hasPermission: { true },
-                windowCapture: { _, _ in _ = try await gate.capture(); return fixture.image },
-                encode: { _ in Issue.record("Cancelled capture must not encode pixels"); return Data() })
+                                                           windowCapture: { _, _ in _ = try await gate.capture(); return fixture.image },
+                                                           encode: { _ in Issue.record("Cancelled capture must not encode pixels"); return Data() })
         }
         await gate.waitUntilStarted()
         task.cancel()
@@ -198,7 +198,7 @@ struct ContextNoteScreenshotDraftTests {
         #expect(!draft.isCapturingScreenshot)
         #expect(draft.screenshot == nil)
         #expect(draft.screenshotError == AppLocalization.text("截图失败：%@",
-            AppLocalization.text("请在系统设置的“隐私与安全性 > 屏幕录制”中允许 zisla")))
+                                                              AppLocalization.text("请在系统设置的“隐私与安全性 > 屏幕录制”中允许 zisla")))
         #expect(draft.text == "Keep this note")
     }
 
@@ -308,7 +308,7 @@ enum ContextNoteScreenshotTestImage {
     static func make() throws -> (png: Data, image: CGImage) {
         let colorSpace = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try #require(CGContext(data: nil, width: 80, height: 40, bitsPerComponent: 8,
-            bytesPerRow: 320, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bytesPerRow: 320, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: 80, height: 40))
         let image = try #require(context.makeImage())

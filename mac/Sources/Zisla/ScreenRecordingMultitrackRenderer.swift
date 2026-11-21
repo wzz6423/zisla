@@ -23,7 +23,7 @@ struct RecordingTimelineClipIndex {
         let entries = timeline.clips.enumerated().filter {
             order[$0.element.trackID] != nil && $0.element.content.trackKind != .audio
         }
-            .sorted { $0.element.start == $1.element.start ? $0.offset < $1.offset : $0.element.start < $1.element.start }
+        .sorted { $0.element.start == $1.element.start ? $0.offset < $1.offset : $0.element.start < $1.element.start }
         transitionSources = timeline.transitionSources()
         var built: [Node] = []
         func build(_ start: Int, _ end: Int) -> Int? {
@@ -32,10 +32,10 @@ struct RecordingTimelineClipIndex {
             let left = build(start, middle)
             let right = build(middle + 1, end)
             let maximum = max(entries[middle].element.end, max(left.map { built[$0].maximumEnd } ?? 0,
-                right.map { built[$0].maximumEnd } ?? 0))
+                                                               right.map { built[$0].maximumEnd } ?? 0))
             let index = built.count
             built.append(.init(clip: entries[middle].element, order: entries[middle].offset,
-                maximumEnd: maximum, left: left, right: right))
+                               maximumEnd: maximum, left: left, right: right))
             return index
         }
         root = build(0, entries.count)
@@ -85,7 +85,7 @@ struct RecordingMultitrackPreviewScene: @unchecked Sendable {
 
     func image(project: ScreenRecordingProject, editingText: RecordingCanvasSelection? = nil) throws -> CGImage {
         let renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size, imageStore: imageStore,
-            preservesHDR: preservesHDR)
+                                                       preservesHDR: preservesHDR)
         let renderedTime = project.outputDuration > 0 ? min(time, max(0, project.outputDuration - 1.0 / 60_000)) : 0
         return try renderer.image(frames: frames.mapValues(CIImage.init(cgImage:)), at: renderedTime, editingText: editingText)
     }
@@ -129,7 +129,7 @@ final class RecordingMultitrackRenderer {
         base.edits.annotations = []
         base.edits.showCaptions = false
         recording = try RecordingExportRenderer(project: base, size: size, portraitProcessor: makePortraitProcessor(),
-            preservesHDR: preservesHDR)
+                                                preservesHDR: preservesHDR)
         context = recording.context
         base.pointers = []
         base.edits.zoomClips = []
@@ -190,7 +190,7 @@ final class RecordingMultitrackRenderer {
             if case .recording = clip.content { isRecording = true } else { isRecording = false }
             let renderer = try isRecording ? recording : videoRenderer(for: clip.content.assetID!)
             let slice = RecordingExportSlice(index: 0, sourceStart: clip.sourceStart, sourceEnd: clip.sourceEnd,
-                speed: clip.speed, outputStart: clip.start, outputEnd: clip.end)
+                                             speed: clip.speed, outputStart: clip.start, outputEnd: clip.end)
             let portrait = clip.portraitEffects ?? .init()
             var screen = frame
             let camera = frames[clip.id + ".camera"]
@@ -207,8 +207,8 @@ final class RecordingMultitrackRenderer {
                 } catch { portraitLock.unlock(); throw error }
             }
             let rendered = try renderer.render(screen: screen, camera: camera,
-                sourceTime: clip.sourceTime(at: time), slice: slice, includeBackground: false,
-                cameraEffects: clip.portraitEffects)
+                                               sourceTime: clip.sourceTime(at: time), slice: slice, includeBackground: false,
+                                               cameraEffects: clip.portraitEffects)
             // Flatten before a transition filter. The render graph still contains an infinite
             // color image, which CIDissolveTransition would sample without ever finishing.
             image = try flatten(RecordingExportRenderer.fit(rendered, from: canvas, to: rect(clip.layout), fill: false))
@@ -233,11 +233,11 @@ final class RecordingMultitrackRenderer {
         case let .annotation(id):
             guard let annotation = annotations[id] else { throw ScreenRecordingProjectError.invalidProject }
             image = try RecordingExportRenderer.annotationImage(annotation, canvas: canvas,
-                visibleCharacters: animation.visibleCharacters)
+                                                                visibleCharacters: animation.visibleCharacters)
         case let .caption(id):
             guard let caption = captions[id] else { throw ScreenRecordingProjectError.invalidProject }
             image = try RecordingExportRenderer.captionImage(caption, canvas: canvas,
-                drawsText: editingText != .caption(id), visibleCharacters: animation.visibleCharacters)
+                                                             drawsText: editingText != .caption(id), visibleCharacters: animation.visibleCharacters)
         case .audio: throw ScreenRecordingProjectError.invalidProject
         }
         return animated(image, sample: animation)
@@ -251,7 +251,7 @@ final class RecordingMultitrackRenderer {
 
     private func rect(_ layout: RecordingRect) -> CGRect {
         CGRect(x: layout.x * canvas.width, y: (1 - layout.y - layout.height) * canvas.height,
-            width: layout.width * canvas.width, height: layout.height * canvas.height)
+               width: layout.width * canvas.width, height: layout.height * canvas.height)
     }
 
     private func animated(_ layer: CIImage, sample: RecordingClipAnimationSample) -> CIImage {
@@ -260,7 +260,7 @@ final class RecordingMultitrackRenderer {
             .transformed(by: .init(scaleX: sample.scale, y: sample.scale))
             .transformed(by: .init(translationX: center.x, y: center.y))
             .transformed(by: .init(translationX: sample.offsetX * canvas.width,
-                y: -sample.offsetY * canvas.height))
+                                   y: -sample.offsetY * canvas.height))
             .applyingFilter("CIColorMatrix", parameters: [
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: sample.opacity),
             ])
@@ -285,7 +285,7 @@ final class RecordingMultitrackRenderer {
             next.scale = 0.5 + sample.progress * 0.5
             // Scale around each layer's own center first; the dissolve inputs are rasterized afterwards.
             return try crossfade(animated(outgoing, sample: previous), animated(incoming, sample: next),
-                progress: sample.progress)
+                                 progress: sample.progress)
         }
     }
 

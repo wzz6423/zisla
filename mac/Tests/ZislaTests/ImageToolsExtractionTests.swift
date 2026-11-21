@@ -59,7 +59,7 @@ struct ImageToolsExtractionTests {
             #expect(abs(kept.greenComponent - expected.greenComponent) < 0.02)
             #expect(try pixel(result, x: removedX, y: 2).alphaComponent == 0)
             #expect(try FileManager.default.contentsOfDirectory(at: output.url.deletingLastPathComponent(),
-                includingPropertiesForKeys: nil).count == 2, "Only the comparison source and finished PNG should remain")
+                                                                includingPropertiesForKeys: nil).count == 2, "Only the comparison source and finished PNG should remain")
         }
         #expect(try Data(contentsOf: fixture.input) == fixture.original)
         #expect(try Data(contentsOf: second) == original)
@@ -77,7 +77,8 @@ struct ImageToolsExtractionTests {
         let original = try Data(contentsOf: fixture.input)
         let expected = try #require(CIContext().createCGImage(
             CIImage(cgImage: image).oriented(forExifOrientation: Int32(orientation)),
-            from: CIImage(cgImage: image).oriented(forExifOrientation: Int32(orientation)).extent))
+            from: CIImage(cgImage: image).oriented(forExifOrientation: Int32(orientation)).extent
+        ))
         let model = ImageToolsModel()
         model.inputs = [fixture.input]
         let pending = model.startExtraction(service: service, mode: .foreground, extractImage: { source, operation async throws -> CGImage? in
@@ -145,7 +146,7 @@ struct ImageToolsExtractionTests {
             let destination = try #require(CGImageDestinationCreateWithURL(input as CFURL, UTType.png.identifier as CFString, 2, nil))
             for _ in 0..<2 {
                 CGImageDestinationAddImage(destination, try Fixture.image(),
-                    [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGDelayTime: 0.1]] as CFDictionary)
+                                           [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGDelayTime: 0.1]] as CFDictionary)
             }
             #expect(CGImageDestinationFinalize(destination))
         default: break
@@ -214,7 +215,7 @@ struct ImageToolsExtractionTests {
         for directory in directories { #expect(!FileManager.default.fileExists(atPath: directory.path)) }
         #expect(try Data(contentsOf: input) == original)
         let replacementPending = model.startExtraction(service: service, mode: .background,
-            extractImage: { image, _ in try masked(image, background: true) })
+                                                       extractImage: { image, _ in try masked(image, background: true) })
         let replacement = try #require(replacementPending)
         await replacement.value
         #expect(model.batch?.items.count == 1 && model.batch?.failures.isEmpty == true)
@@ -249,7 +250,7 @@ struct ImageToolsExtractionTests {
         let model = ImageToolsModel()
         model.inputs = [try fixture.svg()]
         await model.startExtraction(service: fixture.stagedService(staged), mode: .foreground,
-            extractImage: { _, _ in throw CancellationError() })?.value
+                                    extractImage: { _, _ in throw CancellationError() })?.value
         #expect(model.batch == nil && !model.isProcessing && model.message == AppLocalization.text("已取消"))
         for directory in await staged.values { #expect(!FileManager.default.fileExists(atPath: directory.path)) }
         #expect(try Data(contentsOf: fixture.input) == fixture.original)
@@ -295,7 +296,7 @@ struct ImageToolsExtractionTests {
         }
         defer { subscription.cancel() }
         let pending = model.startExtraction(service: service, mode: .foreground,
-            extractImage: { source, _ in try masked(source) })
+                                            extractImage: { source, _ in try masked(source) })
         let task = try #require(pending)
         await task.value
         #expect(model.batch == nil && !model.isProcessing && model.message == AppLocalization.text("已取消"))
@@ -353,7 +354,7 @@ struct ImageToolsExtractionTests {
         model.exportZIP(items, to: archive)
         for await busy in model.$isProcessing.values { if !busy { break } }
         let result = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/unzip"),
-            arguments: ["-p", archive.path, "images/source-png.png"], workingDirectoryURL: fixture.root)
+                                                        arguments: ["-p", archive.path, "images/source-png.png"], workingDirectoryURL: fixture.root)
         #expect(result.status == 0 && result.standardOutput == bytes)
         #expect(try Data(contentsOf: fixture.input) == fixture.original)
         model.discardResults()
@@ -425,7 +426,7 @@ struct ImageToolsExtractionTests {
                 if arguments[0] == "-a" {
                     await directories.append(work.lastPathComponent == "0" ? work.deletingLastPathComponent() : work)
                     return AIAgentProcessOutput(status: 0,
-                        standardOutput: Data("width: 16\nheight: 10\nvips-loader: svgload\n".utf8), standardError: "", didTimeout: false)
+                                                standardOutput: Data("width: 16\nheight: 10\nvips-loader: svgload\n".utf8), standardError: "", didTimeout: false)
                 }
                 if arguments[0] == "autorot" { try Data("normalized".utf8).write(to: URL(fileURLWithPath: arguments[2])) }
                 if arguments[0] == "pngsave" { try bytes.write(to: URL(fileURLWithPath: arguments[2])) }
@@ -446,9 +447,9 @@ struct ImageToolsExtractionTests {
             }
             let provider = try #require(CGDataProvider(data: Data(bytes) as CFData))
             return try #require(CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
-                bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
-                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+                                        bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+                                        provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
         }
 
         static func write(_ image: CGImage, to url: URL, properties: [CFString: Any] = [:]) throws {
@@ -461,8 +462,8 @@ struct ImageToolsExtractionTests {
             var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
             try bytes.withUnsafeMutableBytes { buffer in
                 let context = try #require(CGContext(data: buffer.baseAddress, width: image.width, height: image.height,
-                    bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+                                                     bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
                 context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
             }
             return bytes
@@ -484,11 +485,11 @@ private func masked(_ source: CGImage, background: Bool = false) throws -> CGIma
     let height = CGFloat(source.height)
     let regions = [[CGPoint(x: 0, y: 0), CGPoint(x: half, y: 0), CGPoint(x: half, y: height), CGPoint(x: 0, y: height)]]
     var mask = try #require(try ScreenshotImageExtraction.lassoMask(regions: regions,
-        imageSize: CGSize(width: source.width, height: source.height), pixelWidth: source.width, pixelHeight: source.height))
+                                                                    imageSize: CGSize(width: source.width, height: source.height), pixelWidth: source.width, pixelHeight: source.height))
     if background {
         let inverted = CIImage(cgImage: mask).applyingFilter("CIColorInvert")
         mask = try #require(CIContext().createCGImage(inverted, from: inverted.extent,
-            format: .L8, colorSpace: CGColorSpaceCreateDeviceGray()))
+                                                      format: .L8, colorSpace: CGColorSpaceCreateDeviceGray()))
     }
     return try ScreenshotImageExtraction.applying(mask: mask, to: source)
 }

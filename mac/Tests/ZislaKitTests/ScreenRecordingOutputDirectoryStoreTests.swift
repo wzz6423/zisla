@@ -67,16 +67,16 @@ struct ScreenRecordingOutputDirectoryStoreTests {
         try legacy.setDirectory(recordings)
         let legacyBookmark = try #require(defaults.data(forKey: "screen-recording-directory-bookmark"))
         let existingDownloadBookmark = try downloads.bookmarkData(options: .withSecurityScope,
-            includingResourceValuesForKeys: nil, relativeTo: nil)
+                                                                  includingResourceValuesForKeys: nil, relativeTo: nil)
         defaults.set(existingDownloadBookmark, forKey: "download-directory-bookmark")
         let shared = ScreenRecordingOutputDirectoryStore(defaults: defaults,
-            bookmarkKey: "download-directory-bookmark", pathKey: nil)
+                                                         bookmarkKey: "download-directory-bookmark", pathKey: nil)
 
         #expect(shared.directory.path == downloads.path)
         try shared.setDirectory(root)
 
         #expect(ScreenRecordingOutputDirectoryStore(defaults: defaults,
-            bookmarkKey: "download-directory-bookmark", pathKey: nil).directory.path == root.path)
+                                                    bookmarkKey: "download-directory-bookmark", pathKey: nil).directory.path == root.path)
         #expect(ScreenRecordingOutputDirectoryStore(defaults: defaults).directory.path == recordings.path)
         #expect(defaults.data(forKey: "screen-recording-directory-bookmark") == legacyBookmark)
         #expect(defaults.string(forKey: "screen-recording-directory-path") == recordings.path)
@@ -90,7 +90,7 @@ struct ScreenRecordingOutputDirectoryStoreTests {
         defaults.set("/legacy-recording-path", forKey: "screen-recording-directory-path")
 
         let shared = ScreenRecordingOutputDirectoryStore(defaults: defaults,
-            bookmarkKey: "download-directory-bookmark", pathKey: nil)
+                                                         bookmarkKey: "download-directory-bookmark", pathKey: nil)
 
         #expect(shared.directory == AppPaths.downloads)
         #expect(defaults.data(forKey: "download-directory-bookmark") == Data([0]))

@@ -20,18 +20,18 @@ struct MailIndexReaderTests {
         defer { try? FileManager.default.removeItem(at: databaseURL) }
 
         try execute("""
-            INSERT INTO mailboxes (ROWID, url) VALUES
-                (1, 'imap://work%40example.com@mail.example.com/INBOX'),
-                (2, 'imap://work%40example.com@mail.example.com/Sent');
-            INSERT INTO addresses (ROWID, address, comment) VALUES (1, 'sender@example.com', '');
-            INSERT INTO sender_addresses (address, sender) VALUES (1, 1);
-            INSERT INTO subjects (ROWID, subject) VALUES (1, '收件箱主题'), (2, '已发送主题');
-            INSERT INTO summaries (ROWID, summary) VALUES (1, '收件箱摘要');
-            INSERT INTO messages (message_id, sender, subject, summary, date_received, display_date, mailbox, read, deleted)
-            VALUES
-                (42, 1, 1, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0),
-                (43, 1, 2, NULL, 1_720_000_100, 1_720_000_100, 2, 1, 0);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES
+            (1, 'imap://work%40example.com@mail.example.com/INBOX'),
+            (2, 'imap://work%40example.com@mail.example.com/Sent');
+        INSERT INTO addresses (ROWID, address, comment) VALUES (1, 'sender@example.com', '');
+        INSERT INTO sender_addresses (address, sender) VALUES (1, 1);
+        INSERT INTO subjects (ROWID, subject) VALUES (1, '收件箱主题'), (2, '已发送主题');
+        INSERT INTO summaries (ROWID, summary) VALUES (1, '收件箱摘要');
+        INSERT INTO messages (message_id, sender, subject, summary, date_received, display_date, mailbox, read, deleted)
+        VALUES
+            (42, 1, 1, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0),
+            (43, 1, 2, NULL, 1_720_000_100, 1_720_000_100, 2, 1, 0);
+        """, at: databaseURL)
 
         let snapshot = try MailIndexReader(databaseURL: databaseURL).snapshot(accountNames: [])
 
@@ -51,22 +51,22 @@ struct MailIndexReaderTests {
         defer { try? FileManager.default.removeItem(at: databaseURL) }
 
         try execute("""
-            INSERT INTO mailboxes (ROWID, url) VALUES
-                (1, 'imap://busy%40example.com@mail.example.com/INBOX'),
-                (2, 'imap://quiet%40example.com@mail.example.com/INBOX');
-            INSERT INTO subjects (ROWID, subject) VALUES (1, 'Busy'), (2, 'Quiet');
-            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
-            VALUES
-                (101, 1, 2_000, 2_000, 1, 0, 0),
-                (102, 1, 1_999, 1_999, 1, 0, 0),
-                (103, 1, 1_998, 1_998, 1, 0, 0),
-                (104, 1, 1_997, 1_997, 1, 0, 0),
-                (105, 1, 1_996, 1_996, 1, 0, 0),
-                (106, 1, 1_995, 1_995, 1, 0, 0),
-                (107, 1, 1_994, 1_994, 1, 0, 0),
-                (108, 1, 1_993, 1_993, 1, 0, 0),
-                (201, 2, 1_000, 1_000, 2, 0, 0);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES
+            (1, 'imap://busy%40example.com@mail.example.com/INBOX'),
+            (2, 'imap://quiet%40example.com@mail.example.com/INBOX');
+        INSERT INTO subjects (ROWID, subject) VALUES (1, 'Busy'), (2, 'Quiet');
+        INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+        VALUES
+            (101, 1, 2_000, 2_000, 1, 0, 0),
+            (102, 1, 1_999, 1_999, 1, 0, 0),
+            (103, 1, 1_998, 1_998, 1, 0, 0),
+            (104, 1, 1_997, 1_997, 1, 0, 0),
+            (105, 1, 1_996, 1_996, 1, 0, 0),
+            (106, 1, 1_995, 1_995, 1, 0, 0),
+            (107, 1, 1_994, 1_994, 1, 0, 0),
+            (108, 1, 1_993, 1_993, 1, 0, 0),
+            (201, 2, 1_000, 1_000, 2, 0, 0);
+        """, at: databaseURL)
 
         let snapshot = try MailIndexReader(databaseURL: databaseURL, maxMessages: 2)
             .snapshot(accountNames: ["quiet@example.com"])
@@ -80,18 +80,18 @@ struct MailIndexReaderTests {
         defer { try? FileManager.default.removeItem(at: databaseURL) }
 
         try execute("""
-            INSERT INTO mailboxes (ROWID, url) VALUES
-                (1, 'imap://inbox-owner%40example.com@mail.example.com/Sent'),
-                (2, 'imap://owner%40example.com@inbox.mail.example.com/Sent'),
-                (3, 'imap://owner%40example.com@mail.example.com/Archive%2FINBOX');
-            INSERT INTO subjects (ROWID, subject) VALUES
-                (1, 'Account match'), (2, 'Host match'), (3, 'Encoded mailbox name');
-            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
-            VALUES
-                (301, 1, 1_000, 1_000, 1, 0, 0),
-                (302, 2, 999, 999, 2, 0, 0),
-                (303, 3, 998, 998, 3, 0, 0);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES
+            (1, 'imap://inbox-owner%40example.com@mail.example.com/Sent'),
+            (2, 'imap://owner%40example.com@inbox.mail.example.com/Sent'),
+            (3, 'imap://owner%40example.com@mail.example.com/Archive%2FINBOX');
+        INSERT INTO subjects (ROWID, subject) VALUES
+            (1, 'Account match'), (2, 'Host match'), (3, 'Encoded mailbox name');
+        INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+        VALUES
+            (301, 1, 1_000, 1_000, 1, 0, 0),
+            (302, 2, 999, 999, 2, 0, 0),
+            (303, 3, 998, 998, 3, 0, 0);
+        """, at: databaseURL)
 
         let snapshot = try MailIndexReader(databaseURL: databaseURL).snapshot(accountNames: [])
 
@@ -104,18 +104,18 @@ struct MailIndexReaderTests {
         defer { try? FileManager.default.removeItem(at: databaseURL) }
 
         try execute("""
-            INSERT INTO mailboxes (ROWID, url) VALUES
-                (1, 'imap://work%40example.com@mail.example.com/INBOX'),
-                (2, 'imap://personal%40example.com@mail.example.com/INBOX'),
-                (3, 'imap://sent-only%40example.com@mail.example.com/Sent');
-            INSERT INTO subjects (ROWID, subject) VALUES
-                (1, '工作邮件'), (2, '个人邮件'), (3, '已发送邮件');
-            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
-            VALUES
-                (11, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0),
-                (12, 2, 1_720_000_100, 1_720_000_100, 2, 1, 0),
-                (13, 3, 1_720_000_200, 1_720_000_200, 3, 1, 0);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES
+            (1, 'imap://work%40example.com@mail.example.com/INBOX'),
+            (2, 'imap://personal%40example.com@mail.example.com/INBOX'),
+            (3, 'imap://sent-only%40example.com@mail.example.com/Sent');
+        INSERT INTO subjects (ROWID, subject) VALUES
+            (1, '工作邮件'), (2, '个人邮件'), (3, '已发送邮件');
+        INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+        VALUES
+            (11, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0),
+            (12, 2, 1_720_000_100, 1_720_000_100, 2, 1, 0),
+            (13, 3, 1_720_000_200, 1_720_000_200, 3, 1, 0);
+        """, at: databaseURL)
 
         let snapshot = try MailIndexReader(databaseURL: databaseURL)
             .snapshot(accountNames: ["work@example.com"])
@@ -138,14 +138,14 @@ struct MailIndexReaderTests {
         defer { try? FileManager.default.removeItem(at: databaseURL) }
 
         try execute("""
-            INSERT INTO mailboxes (ROWID, url) VALUES
-                (1, 'imap://work%40example.com@mail.example.com/INBOX');
-            INSERT INTO subjects (ROWID, subject) VALUES (1, 'Earlier row'), (2, 'Later row');
-            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
-            VALUES
-                (10, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0),
-                (20, 2, 1_720_000_000, 1_720_000_000, 1, 0, 0);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES
+            (1, 'imap://work%40example.com@mail.example.com/INBOX');
+        INSERT INTO subjects (ROWID, subject) VALUES (1, 'Earlier row'), (2, 'Later row');
+        INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+        VALUES
+            (10, 1, 1_720_000_000, 1_720_000_000, 1, 0, 0),
+            (20, 2, 1_720_000_000, 1_720_000_000, 1, 0, 0);
+        """, at: databaseURL)
 
         let snapshot = try MailIndexReader(databaseURL: databaseURL).snapshot(accountNames: [])
 
@@ -158,15 +158,15 @@ struct MailIndexReaderTests {
         defer { try? FileManager.default.removeItem(at: databaseURL) }
 
         try execute("""
-            INSERT INTO mailboxes (ROWID, url) VALUES
-                (1, 'imap://work%40example.com@mail.example.com/INBOX');
-            INSERT INTO subjects (ROWID, subject) VALUES (1, 'One'), (2, 'Two'), (3, 'Three');
-            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
-            VALUES
-                (1, 1, 3_000, 3_000, 1, 0, 0),
-                (2, 2, 2_000, 2_000, 1, 0, 0),
-                (3, 3, 1_000, 1_000, 1, 0, 0);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES
+            (1, 'imap://work%40example.com@mail.example.com/INBOX');
+        INSERT INTO subjects (ROWID, subject) VALUES (1, 'One'), (2, 'Two'), (3, 'Three');
+        INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+        VALUES
+            (1, 1, 3_000, 3_000, 1, 0, 0),
+            (2, 2, 2_000, 2_000, 1, 0, 0),
+            (3, 3, 1_000, 1_000, 1, 0, 0);
+        """, at: databaseURL)
 
         let reader = MailIndexReader(databaseURL: databaseURL, maxMessages: 2)
         let first = try reader.snapshot(accountNames: [])
@@ -189,12 +189,12 @@ struct MailIndexReaderTests {
             return "(\(messageID), 1, \(timestamp), \(timestamp), 1, 0, 0)"
         }.joined(separator: ",\n")
         try execute("""
-            INSERT INTO mailboxes (ROWID, url) VALUES
-                (1, 'imap://work%40example.com@mail.example.com/INBOX');
-            INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
-            VALUES
-                \(values);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES
+            (1, 'imap://work%40example.com@mail.example.com/INBOX');
+        INSERT INTO messages (message_id, subject, date_received, display_date, mailbox, read, deleted)
+        VALUES
+            \(values);
+        """, at: databaseURL)
 
         let reader = MailIndexReader(databaseURL: databaseURL, maxMessages: 10)
         let first = try reader.snapshot(accountNames: [])
@@ -212,9 +212,9 @@ struct MailIndexReaderTests {
         let databaseURL = try makeMailIndex()
         defer { try? FileManager.default.removeItem(at: databaseURL) }
         try execute("""
-            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
-            INSERT INTO messages (message_id, subject, mailbox) VALUES (42, 1, 1);
-            """, at: databaseURL)
+        INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+        INSERT INTO messages (message_id, subject, mailbox) VALUES (42, 1, 1);
+        """, at: databaseURL)
 
         let snapshot = try MailIndexReader(databaseURL: databaseURL, maxMessages: maxMessages)
             .snapshot(accountNames: [])
@@ -228,23 +228,23 @@ private func makeMailIndex() throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("Zisla-mail-index-\(UUID().uuidString).db")
     try execute("""
-        CREATE TABLE mailboxes (url TEXT NOT NULL);
-        CREATE TABLE messages (
-            message_id INTEGER NOT NULL,
-            sender INTEGER,
-            subject INTEGER NOT NULL,
-            summary INTEGER,
-            date_received INTEGER,
-            display_date INTEGER,
-            mailbox INTEGER NOT NULL,
-            read INTEGER NOT NULL DEFAULT 0,
-            deleted INTEGER NOT NULL DEFAULT 0
-        );
-        CREATE TABLE sender_addresses (address INTEGER PRIMARY KEY, sender INTEGER NOT NULL);
-        CREATE TABLE addresses (address TEXT NOT NULL, comment TEXT NOT NULL);
-        CREATE TABLE subjects (subject TEXT NOT NULL);
-        CREATE TABLE summaries (summary TEXT NOT NULL);
-        """, at: url)
+    CREATE TABLE mailboxes (url TEXT NOT NULL);
+    CREATE TABLE messages (
+        message_id INTEGER NOT NULL,
+        sender INTEGER,
+        subject INTEGER NOT NULL,
+        summary INTEGER,
+        date_received INTEGER,
+        display_date INTEGER,
+        mailbox INTEGER NOT NULL,
+        read INTEGER NOT NULL DEFAULT 0,
+        deleted INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE sender_addresses (address INTEGER PRIMARY KEY, sender INTEGER NOT NULL);
+    CREATE TABLE addresses (address TEXT NOT NULL, comment TEXT NOT NULL);
+    CREATE TABLE subjects (subject TEXT NOT NULL);
+    CREATE TABLE summaries (summary TEXT NOT NULL);
+    """, at: url)
     return url
 }
 

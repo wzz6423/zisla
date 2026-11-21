@@ -54,7 +54,7 @@ struct ScreenshotExtractionTests {
         let extracted = try #require(try operation.extract(source))
         for point in [CGPoint(x: 1, y: 1), CGPoint(x: 25, y: 20), CGPoint(x: 55, y: 35)] {
             #expect(try pixel(extracted, x: Int(point.x), y: Int(point.y)).alphaComponent == 1,
-                "Overlaps of differently wound selections must remain visible")
+                    "Overlaps of differently wound selections must remain visible")
         }
         #expect(try pixel(extracted, x: 70, y: 45).alphaComponent == 0)
     }
@@ -71,7 +71,7 @@ struct ScreenshotExtractionTests {
         default: regions = [loop(CGRect(x: 5, y: 5, width: 10, height: 10))]
         }
         let operation = ScreenshotExtractionOperation(mode: .lasso,
-            imageSize: outcome == "size" ? .zero : size, regions: regions)
+                                                      imageSize: outcome == "size" ? .zero : size, regions: regions)
         if ["invalid", "nonfinite", "size"].contains(outcome) {
             #expect(throws: ScreenshotExtractionError.self) { try operation.extract(try pixels(sourceImage())) }
         } else {
@@ -87,7 +87,7 @@ struct ScreenshotExtractionTests {
         #expect(request.wasCancelled)
         #expect(throws: CancellationError.self) { try operation.extract(try pixels(sourceImage())) }
         let manual = ScreenshotExtractionOperation(mode: .lasso, imageSize: size,
-            regions: [loop(CGRect(origin: .zero, size: size))])
+                                                   regions: [loop(CGRect(origin: .zero, size: size))])
         manual.cancel()
         #expect(throws: CancellationError.self) { try manual.extract(try pixels(sourceImage())) }
     }
@@ -96,16 +96,18 @@ struct ScreenshotExtractionTests {
     func maskSizeMismatchAndCancellationCannotReturnAnImage() throws {
         let source = try pixels(sourceImage())
         let wrongMask = try #require(try ScreenshotImageExtraction.lassoMask(
-            regions: [loop(CGRect(origin: .zero, size: size))], imageSize: size, pixelWidth: 40, pixelHeight: 25))
+            regions: [loop(CGRect(origin: .zero, size: size))], imageSize: size, pixelWidth: 40, pixelHeight: 25
+        ))
         #expect(throws: ScreenshotExtractionError.self) {
             try ScreenshotImageExtraction.applying(mask: wrongMask, to: source)
         }
         #expect(throws: CancellationError.self) {
             try ScreenshotImageExtraction.lassoMask(regions: [], imageSize: size,
-                pixelWidth: 80, pixelHeight: 50, checkCancellation: { throw CancellationError() })
+                                                    pixelWidth: 80, pixelHeight: 50, checkCancellation: { throw CancellationError() })
         }
         let mask = try #require(try ScreenshotImageExtraction.lassoMask(
-            regions: [loop(CGRect(origin: .zero, size: size))], imageSize: size, pixelWidth: 80, pixelHeight: 50))
+            regions: [loop(CGRect(origin: .zero, size: size))], imageSize: size, pixelWidth: 80, pixelHeight: 50
+        ))
         #expect(throws: CancellationError.self) {
             try ScreenshotImageExtraction.applying(mask: mask, to: source, checkCancellation: { throw CancellationError() })
         }
@@ -162,7 +164,7 @@ struct ScreenshotExtractionTests {
         model.selectExtractionMode(.lasso)
         let first = ExtractionGate()
         let firstResult = model.updateExtractionRegion(loop(CGRect(x: 3, y: 3, width: 20, height: 20)), isComplete: true,
-            extractImage: { image, operation in try await first.extract(image, operation: operation) })
+                                                       extractImage: { image, operation in try await first.extract(image, operation: operation) })
         let firstTask = try #require(firstResult)
         await first.waitUntilStarted()
         model.updateExtractionRegion(loop(CGRect(x: 35, y: 20, width: 20, height: 20)), isComplete: false)
@@ -186,7 +188,7 @@ struct ScreenshotExtractionTests {
     func extractionFlattensAnnotationsExportsTransparentPNGAndIsOneUndoStep(pixelScale: Int) async throws {
         let model = ScreenshotEditorModel(image: try sourceImage(pixelScale: pixelScale))
         let annotation = ScreenshotAnnotation(kind: .brush,
-            points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4)
+                                              points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4)
         model.add(annotation)
         let before = try #require(model.pngData())
         model.selectExtractionMode(.lasso)
@@ -226,7 +228,7 @@ struct ScreenshotExtractionTests {
     func automaticModesUseTheAnnotatedSourceAndKeepCanvasSize(mode: ScreenshotExtractionMode) async throws {
         let model = ScreenshotEditorModel(image: try sourceImage(pixelScale: 2))
         model.add(ScreenshotAnnotation(kind: .brush,
-            points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4))
+                                       points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4))
         let expected = try pixels(model.renderedImage())
         let taskResult = model.selectExtractionMode(mode, extractImage: { source, operation in
             #expect(operation.mode == mode)
@@ -246,7 +248,7 @@ struct ScreenshotExtractionTests {
         let original = try sourceImage()
         let model = ScreenshotEditorModel(image: original)
         let annotation = ScreenshotAnnotation(kind: .brush,
-            points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4)
+                                              points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4)
         model.add(annotation)
         let selection = loop(CGRect(x: 3, y: 3, width: 40, height: 25))
         let extractImage: @Sendable (CGImage, ScreenshotExtractionOperation) async throws -> CGImage? = { source, operation in
@@ -322,7 +324,7 @@ struct ScreenshotExtractionTests {
         model.remove(id: annotation.id)
         model.selectExtractionMode(.foreground)
         #expect(model.image === original && model.annotations.isEmpty,
-            "Undo must restore its own source so deleting a live annotation cannot resurrect it from a later extraction")
+                "Undo must restore its own source so deleting a live annotation cannot resurrect it from a later extraction")
     }
 
     @Test
@@ -333,7 +335,7 @@ struct ScreenshotExtractionTests {
         let first = try #require(firstResult)
         await first.value
         let text = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 5, y: 20)],
-            rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old")
+                                        rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old")
         let draft = ScreenshotAnnotation(kind: .number, points: [CGPoint(x: 60, y: 30)], number: 7)
         model.add(text)
         model.beginTextDraft(id: text.id, text: "edited", isNew: false)
@@ -352,10 +354,10 @@ struct ScreenshotExtractionTests {
         let first = try #require(firstResult)
         await first.value
         let annotation = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 5, y: 20)],
-            rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old")
+                                              rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old")
         if action == "shape draft" {
             model.updatePendingAnnotationDraft(ScreenshotAnnotation(kind: .rectangle,
-                rect: CGRect(x: 5, y: 5, width: 20, height: 20)))
+                                                                    rect: CGRect(x: 5, y: 5, width: 20, height: 20)))
         } else {
             model.add(annotation)
             if action == "text draft" { model.beginTextDraft(id: annotation.id, text: "edited", isNew: false) }
@@ -375,7 +377,7 @@ struct ScreenshotExtractionTests {
         model.selectExtractionMode(.background)
         #expect(model.image === original && model.annotations == expectedAnnotations)
         #expect(model.pendingTextDraft == nil && model.pendingAnnotationDraft == nil,
-            "A cancelled request must not retain a draft that the user has discarded")
+                "A cancelled request must not retain a draft that the user has discarded")
         await gate.finish()
         await second.value
         #expect(model.image === original && model.extractionMode == nil && !model.isExtracting)
@@ -386,7 +388,7 @@ struct ScreenshotExtractionTests {
         let original = outcome == "invalid image" ? NSImage() : try sourceImage()
         let model = ScreenshotEditorModel(image: original)
         let text = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 5, y: 15)],
-            rect: CGRect(x: 5, y: 10, width: 30, height: 15), text: "old")
+                                        rect: CGRect(x: 5, y: 10, width: 30, height: 15), text: "old")
         let draft = ScreenshotAnnotation(kind: .brush, points: [CGPoint(x: 5, y: 5), CGPoint(x: 20, y: 5)])
         model.add(text, saveUndo: false)
         model.beginTextDraft(id: text.id, text: "edited", isNew: false)
@@ -432,13 +434,13 @@ struct ScreenshotExtractionTests {
             await initial.value
         }
         let text = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 5, y: 20)],
-            rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old", color: .black)
+                                        rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old", color: .black)
         let number = ScreenshotAnnotation(kind: .number, points: [CGPoint(x: 60, y: 30)], number: 7)
         model.add(text, saveUndo: false)
         model.beginTextDraft(id: text.id, text: "edited", isNew: false)
         model.updatePendingAnnotationDraft(number)
         let taskResult = model.selectExtractionMode(alreadyExtracted ? .background : .foreground,
-            extractImage: { source, _ in source })
+                                                    extractImage: { source, _ in source })
         let task = try #require(taskResult)
         await task.value
         #expect(model.annotations.isEmpty)
@@ -635,14 +637,14 @@ struct ScreenshotExtractionTests {
 
     private func sourceImage(pixelScale: Int = 1) throws -> NSImage {
         let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil,
-            pixelsWide: 80 * pixelScale, pixelsHigh: 50 * pixelScale,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                                                   pixelsWide: 80 * pixelScale, pixelsHigh: 50 * pixelScale,
+                                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
         bitmap.size = size
         for y in 0..<bitmap.pixelsHigh {
             for x in 0..<bitmap.pixelsWide {
                 bitmap.setColor(NSColor(deviceRed: CGFloat(x) / CGFloat(bitmap.pixelsWide),
-                    green: CGFloat(y) / CGFloat(bitmap.pixelsHigh), blue: 0.5, alpha: 1), atX: x, y: y)
+                                        green: CGFloat(y) / CGFloat(bitmap.pixelsHigh), blue: 0.5, alpha: 1), atX: x, y: y)
             }
         }
         let image = NSImage(size: size)
@@ -667,8 +669,8 @@ struct ScreenshotExtractionTests {
 
     nonisolated private static func transparentPixels(width: Int, height: Int) throws -> CGImage {
         let context = try #require(CGContext(data: nil, width: width, height: height,
-            bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                             bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         return try #require(context.makeImage())
     }
 
@@ -724,8 +726,8 @@ struct ScreenshotExtractionTests {
             settings = FeatureSettingsStore(defaults: defaults)
             let source = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
             controller = ScreenshotEditorWindowController(image: image, screenImage: image, screenCGImage: source,
-                screen: nil, captureRect: CGRect(origin: .zero, size: image.size), capturedApplication: nil,
-                settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false }, onClose: {})
+                                                          screen: nil, captureRect: CGRect(origin: .zero, size: image.size), capturedApplication: nil,
+                                                          settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false }, onClose: {})
             controller.window?.alphaValue = 0
             let hosting = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
             model = hosting.rootView.content.model

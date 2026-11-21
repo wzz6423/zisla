@@ -9,14 +9,14 @@ struct SideNoticeLayoutTests {
     @Test @MainActor
     func meetingCountdownUsesCompactPriorityAndCannotConsumeOrdinaryNoticeCapacity() throws {
         let meeting = IslandNotice(id: "meeting-countdown-fixture-left", title: "Team", detail: "05:00",
-            side: .left, metadata: ["eventID": "fixture"])
+                                   side: .left, metadata: ["eventID": "fixture"])
         var settings = FeatureSettings.default
         let media = IslandNotice(id: "media-active-fixture", title: "Music")
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [media, meeting], settings: settings) == .meeting)
         settings.compactStatusPriority = [.media] + settings.compactStatusPriority.filter { $0 != .media }
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [media, meeting], settings: settings) == .media)
         #expect(CompactStatusVisibilityPolicy.mustRemainVisible(notices: [meeting], activityDuration: .threeSeconds,
-            focusDuration: .threeSeconds))
+                                                                focusDuration: .threeSeconds))
         #expect(engine.presentation(for: [meeting], compactWingsEnabled: false).ordinaryNotices.isEmpty)
         let presentation = try #require(engine.compactPillPresentations(for: [meeting], settings: settings).first)
         #expect(presentation.priority == .meeting && presentation.notice == meeting && presentation.text == "05:00")
@@ -32,11 +32,11 @@ struct SideNoticeLayoutTests {
     @Test @MainActor
     func meetingPillFramesStayWithinEveryEdgeAndPreserveTheHardwareNotch() throws {
         let meeting = IslandNotice(id: "meeting-countdown-fixture", title: String(repeating: "Long title ", count: 100),
-            detail: "05:00", metadata: ["eventID": "fixture"])
+                                   detail: "05:00", metadata: ["eventID": "fixture"])
         for edge in IslandEdge.allCases {
             let screen = physicalNotchScreen()
             let settings = FeatureSettings(islandLayoutStyle: .pill,
-                islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                                           islandPlacement: IslandPlacement(mode: .custom, edge: edge))
             let frame = try #require(engine.compactBarFrame(for: screen, notices: [meeting], settings: settings))
             #expect(screen.frame.contains(frame))
             #expect((edge.isVertical ? frame.height : frame.width) <= 222)
@@ -55,7 +55,7 @@ struct SideNoticeLayoutTests {
         style: IslandLayoutStyle, winner: CompactStatusPriority
     ) throws {
         let meeting = IslandNotice(id: MeetingCountdown.noticePrefix + "priority", title: "Meeting", detail: "05:00",
-            metadata: ["eventID": "fixture"])
+                                   metadata: ["eventID": "fixture"])
         let focus = IslandNotice(id: "focus-countdown-priority", title: "Focus", detail: "00:24:57", progress: 0.5)
         let notices = [meeting, focus]
         let screen = physicalNotchScreen()
@@ -105,11 +105,11 @@ struct SideNoticeLayoutTests {
     @Test(arguments: [false, true])
     func recordingProgressUsesTheSharedCompactFrameAndPetAnchor(_ physical: Bool) throws {
         let screen = ScreenSnapshot(displayID: 42, frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 950),
-            safeAreaInsets: ScreenInsets(top: physical ? 32 : 0),
-            auxiliaryTopLeftArea: physical ? CGRect(x: 0, y: 950, width: 716, height: 32) : nil,
-            auxiliaryTopRightArea: physical ? CGRect(x: 796, y: 950, width: 716, height: 32) : nil,
-            menuBarHeightFallback: 24)
+                                    visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 950),
+                                    safeAreaInsets: ScreenInsets(top: physical ? 32 : 0),
+                                    auxiliaryTopLeftArea: physical ? CGRect(x: 0, y: 950, width: 716, height: 32) : nil,
+                                    auxiliaryTopRightArea: physical ? CGRect(x: 796, y: 950, width: 716, height: 32) : nil,
+                                    menuBarHeightFallback: 24)
         let layout = ScreenLayoutEngine().layout(for: screen)
         let notice = IslandNotice(id: "screen-recording-operation-export", title: "Output", progress: 0.5)
         var settings = FeatureSettings.default
@@ -128,9 +128,9 @@ struct SideNoticeLayoutTests {
     @Test(arguments: IslandEdge.allCases)
     func recordingOperationsUseTwoAdjacentSlotsInCustomPills(edge: IslandEdge) throws {
         let screen = ScreenSnapshot(displayID: 42, frame: CGRect(x: -1600, y: -200, width: 1600, height: 1000),
-            visibleFrame: CGRect(x: -1600, y: -200, width: 1600, height: 976))
+                                    visibleFrame: CGRect(x: -1600, y: -200, width: 1600, height: 976))
         var settings = FeatureSettings(statusIconDestination: .menuBar, islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom, edge: edge, offset: 0.75))
+                                       islandPlacement: IslandPlacement(mode: .custom, edge: edge, offset: 0.75))
         let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
         let notice = IslandNotice(id: "screen-recording-operation-export", title: "Output", progress: 0.43)
         let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
@@ -149,14 +149,14 @@ struct SideNoticeLayoutTests {
     ) throws {
         for physical in [false, true] {
             let screen = ScreenSnapshot(displayID: 42,
-                frame: CGRect(x: -1512, y: -300, width: 1512, height: 982),
-                visibleFrame: CGRect(x: -1512, y: -300, width: 1512, height: 938),
-                safeAreaInsets: ScreenInsets(top: 44),
-                auxiliaryTopLeftArea: physical ? CGRect(x: -1512, y: 638, width: 656, height: 44) : nil,
-                auxiliaryTopRightArea: physical ? CGRect(x: -656, y: 638, width: 656, height: 44) : nil)
+                                        frame: CGRect(x: -1512, y: -300, width: 1512, height: 982),
+                                        visibleFrame: CGRect(x: -1512, y: -300, width: 1512, height: 938),
+                                        safeAreaInsets: ScreenInsets(top: 44),
+                                        auxiliaryTopLeftArea: physical ? CGRect(x: -1512, y: 638, width: 656, height: 44) : nil,
+                                        auxiliaryTopRightArea: physical ? CGRect(x: -656, y: 638, width: 656, height: 44) : nil)
             let settings = FeatureSettings(mediaCompactStyle: detailedMedia ? .detailed : .compact,
-                islandLayoutStyle: .pill,
-                islandPlacement: IslandPlacement(mode: .camera, edge: savedEdge, offset: 0.23))
+                                           islandLayoutStyle: .pill,
+                                           islandPlacement: IslandPlacement(mode: .camera, edge: savedEdge, offset: 0.23))
             let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
             let notice = IslandNotice(id: detailedMedia ? "media-active-fixture" : "ai-active-fixture", title: "Fixture")
             let screenFrame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
@@ -423,7 +423,7 @@ struct SideNoticeLayoutTests {
                          style: .status, symbolName: "arrow.up.circle"),
         ]
         let settings = FeatureSettings(islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                                       islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         let sizing = try #require(engine.compactBarSizing(for: notices, settings: settings))
         let presentation = try #require(sizing.customPillPresentation)
         #expect(presentation.priority == .updateAvailable && presentation.text.isEmpty)
@@ -497,27 +497,27 @@ struct SideNoticeLayoutTests {
         let notices = [IslandNotice(id: "media-active-left", title: "Music"),
                        IslandNotice(id: "browser-download-left", title: "Download")]
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
-            settings: settings, systemMonitorAvailable: true) == .browserDownload)
+                                                                     settings: settings, systemMonitorAvailable: true) == .browserDownload)
         settings.compactStatusPriority = CompactStatusPriority.normalized([.systemMonitor, .media])
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
-            settings: settings, systemMonitorAvailable: true) == .systemMonitor)
+                                                                     settings: settings, systemMonitorAvailable: true) == .systemMonitor)
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
-            settings: settings) == .media)
+                                                                     settings: settings) == .media)
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [],
-            settings: settings, systemMonitorAvailable: true) == .systemMonitor)
+                                                                     settings: settings, systemMonitorAvailable: true) == .systemMonitor)
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [], settings: settings) == nil)
 
         settings.systemMonitorEnabled = false
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
-            settings: settings, systemMonitorAvailable: true) == .media)
+                                                                     settings: settings, systemMonitorAvailable: true) == .media)
         settings.systemMonitorEnabled = true
         settings.statusIconDestination = .menuBar
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
-            settings: settings, systemMonitorAvailable: true) == .media)
+                                                                     settings: settings, systemMonitorAvailable: true) == .media)
         settings.statusIconDestination = .island
         settings.islandPlacement = IslandPlacement()
         #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
-            settings: settings, systemMonitorAvailable: true) == .media)
+                                                                     settings: settings, systemMonitorAvailable: true) == .media)
     }
 
     @Test
@@ -530,7 +530,7 @@ struct SideNoticeLayoutTests {
         for notice in [IslandNotice(id: "focus-transition", title: "Focus"),
                        IslandNotice(id: LowBatteryNoticeController.noticeID, title: "Battery")] {
             #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [notice],
-                settings: settings, systemMonitorAvailable: true) == .transient)
+                                                                         settings: settings, systemMonitorAvailable: true) == .transient)
         }
     }
 
@@ -566,11 +566,12 @@ struct SideNoticeLayoutTests {
         let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
         let layoutFrame = try #require(engine.compactBarFrame(
             for: ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen),
-            notices: [notice], settings: settings))
+            notices: [notice], settings: settings
+        ))
         #expect(frame == layoutFrame)
         let notchWidth = ScreenLayoutEngine().layout(for: screen).topology.anchorFrame.width
         #expect(frame.width == (style == .pill
-            ? max(ScreenLayoutConfiguration.cameraPillCenterWidth, notchWidth) : notchWidth) + 240)
+                ? max(ScreenLayoutConfiguration.cameraPillCenterWidth, notchWidth) : notchWidth) + 240)
         let sizing = try #require(engine.compactBarSizing(for: [notice], settings: settings))
         #expect(sizing.progressGlowEnabled == progressEnabled)
         if style == .notch {
@@ -587,7 +588,7 @@ struct SideNoticeLayoutTests {
     func countdownPillsReserveTwoButtonsWithoutShrinkingTheTime(edge: IslandEdge) throws {
         let notice = IslandNotice(id: "focus-countdown-layout", title: "Focus", detail: "00:24:57")
         let settings = FeatureSettings(islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+                                       islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         let presentation = try #require(engine.compactBarSizing(for: [notice], settings: settings)?.customPillPresentation)
         let reference = CompactPillStatusPresentation(priority: .toolboxReminder, notice: notice, text: presentation.text)
         #expect(presentation.length(thickness: 32, edge: edge)
@@ -694,7 +695,7 @@ struct SideNoticeLayoutTests {
         )
         let presentation = engine.presentation(
             for: [
-            IslandNotice(id: "ai-active-codex", title: "Codex", side: .left)
+                IslandNotice(id: "ai-active-codex", title: "Codex", side: .left)
             ],
             compactWingsEnabled: false
         )
@@ -1178,15 +1179,15 @@ struct SideNoticeLayoutTests {
     @Test(arguments: [false, true], [IslandLayoutStyle.notch, .pill])
     func headphoneNamesExpandTheCompactFrameOnlyWhileTheNoticeIsSelected(physical: Bool, style: IslandLayoutStyle) throws {
         let screen = physical ? physicalNotchScreen() : ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
-            visibleFrame: CGRect(x: 1_512, y: -120, width: 1_440, height: 876))
+                                                                       frame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
+                                                                       visibleFrame: CGRect(x: 1_512, y: -120, width: 1_440, height: 876))
         let referenceDate = Date(timeIntervalSinceReferenceDate: 0)
         let short = IslandNotice(id: "headphone-short", title: "AirPods", createdAt: referenceDate,
-            style: .headphone, batteryLevels: [
-                NoticeBatteryLevel(label: "左", level: 100),
-                NoticeBatteryLevel(label: "右", level: 98),
-                NoticeBatteryLevel(label: "盒", level: 99),
-            ])
+                                 style: .headphone, batteryLevels: [
+                                     NoticeBatteryLevel(label: "左", level: 100),
+                                     NoticeBatteryLevel(label: "右", level: 98),
+                                     NoticeBatteryLevel(label: "盒", level: 99),
+                                 ])
         var long = short
         long.title = "三年后的 AirPods Pro 第二代"
         let settings = FeatureSettings(islandLayoutStyle: style)
@@ -1194,13 +1195,13 @@ struct SideNoticeLayoutTests {
         let shortFrame = try #require(engine.compactBarFrame(for: screen, notices: [short], settings: settings))
         let longFrame = try #require(engine.compactBarFrame(for: screen, notices: [long], settings: settings))
         #expect(longFrame.width > shortFrame.width,
-            "A longer headphone name must receive more space before the label is scaled or truncated")
+                "A longer headphone name must receive more space before the label is scaled or truncated")
         #expect(longFrame.maxY == shortFrame.maxY)
         #expect(longFrame.height == shortFrame.height)
         #expect(longFrame.midX == idle.collapsedFrame.midX)
         #expect(longFrame == engine.compactBarFrame(for: idle, notices: [long], settings: settings))
         let focus = IslandNotice(id: "focus-transition", title: "Work",
-            createdAt: referenceDate.addingTimeInterval(1))
+                                 createdAt: referenceDate.addingTimeInterval(1))
         #expect(engine.compactBarFrame(for: screen, notices: [long, focus], settings: settings)
             == engine.compactBarFrame(for: screen, notices: [focus], settings: settings),
             "A queued headphone notice must not keep another status wide")
@@ -1219,22 +1220,22 @@ struct SideNoticeLayoutTests {
     func emptyHeadphoneIdentityStillFitsThreeBatteryRingsOutsideTheNotch() throws {
         let screen = physicalNotchScreen()
         let notice = IslandNotice(id: "headphone-empty", title: "", detail: "", style: .headphone,
-            batteryLevels: (0..<3).map { NoticeBatteryLevel(label: String($0), level: 100) })
+                                  batteryLevels: (0..<3).map { NoticeBatteryLevel(label: String($0), level: 100) })
         let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
         let anchor = ScreenLayoutEngine().layout(for: screen).topology.anchorFrame
         let wingWidth = (frame.width - anchor.width) / 2
         #expect(wingWidth >= 20 * 3 + 4 * 2 + 6,
-            "Missing identity text cannot let the battery row overlap the physical notch")
+                "Missing identity text cannot let the battery row overlap the physical notch")
         #expect(wingWidth < 80, "An empty name must not reserve a minimum text column")
         #expect(frame == engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
-            notices: [notice], settings: FeatureSettings()))
+                                                notices: [notice], settings: FeatureSettings()))
     }
 
     @Test(arguments: [false, true])
     func headphoneStyleDoesNotExpandAnUnrelatedSelectedStatus(physical: Bool) throws {
         let screen = physical ? physicalNotchScreen() : ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
+                                                                       frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+                                                                       visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
         var settings = FeatureSettings()
         settings.compactStatusPriority = [.aiActivity, .transient]
         let normal = IslandNotice(id: "ai-active-fixture", title: String(repeating: "长", count: 100))
@@ -1242,31 +1243,31 @@ struct SideNoticeLayoutTests {
         headphoneStyled.style = .headphone
         let expected = try #require(engine.compactBarFrame(for: screen, notices: [normal], settings: settings))
         #expect(engine.compactBarFrame(for: screen, notices: [headphoneStyled], settings: settings) == expected,
-            "A notice's style cannot override the configured selected status")
+                "A notice's style cannot override the configured selected status")
         #expect(engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
-            notices: [headphoneStyled], settings: settings) == expected)
+                                       notices: [headphoneStyled], settings: settings) == expected)
     }
 
     @Test(arguments: [false, true], [IslandLayoutStyle.notch, .pill])
     func headphoneNamesRemainBoundedByTheScreenAndExistingCompactLimit(physical: Bool, style: IslandLayoutStyle) throws {
         let notice = IslandNotice(id: "headphone-long", title: String(repeating: "长", count: 1_000),
-            style: .headphone)
+                                  style: .headphone)
         for screenWidth in [CGFloat(180), 320, 1_512] {
             let screen = ScreenSnapshot(displayID: 42,
-                frame: CGRect(x: -screenWidth, y: -200, width: screenWidth, height: 982),
-                visibleFrame: CGRect(x: -screenWidth, y: -200, width: screenWidth, height: 950),
-                safeAreaInsets: ScreenInsets(top: physical ? 32 : 0),
-                auxiliaryTopLeftArea: physical ? CGRect(x: -screenWidth, y: 750,
-                    width: screenWidth / 2 - 40, height: 32) : nil,
-                auxiliaryTopRightArea: physical ? CGRect(x: -screenWidth / 2 + 40, y: 750,
-                    width: screenWidth / 2 - 40, height: 32) : nil)
+                                        frame: CGRect(x: -screenWidth, y: -200, width: screenWidth, height: 982),
+                                        visibleFrame: CGRect(x: -screenWidth, y: -200, width: screenWidth, height: 950),
+                                        safeAreaInsets: ScreenInsets(top: physical ? 32 : 0),
+                                        auxiliaryTopLeftArea: physical ? CGRect(x: -screenWidth, y: 750,
+                                                                                width: screenWidth / 2 - 40, height: 32) : nil,
+                                        auxiliaryTopRightArea: physical ? CGRect(x: -screenWidth / 2 + 40, y: 750,
+                                                                                 width: screenWidth / 2 - 40, height: 32) : nil)
             let settings = FeatureSettings(islandLayoutStyle: style)
             let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
             #expect(frame.width <= min(screenWidth, ScreenLayoutConfiguration.quickActionRowWidth),
-                "Even a very long device name must not expand beyond the existing compact layout limit")
+                    "Even a very long device name must not expand beyond the existing compact layout limit")
             #expect(screen.frame.contains(frame))
             #expect(frame == engine.compactBarFrame(for: ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen),
-                notices: [notice], settings: settings))
+                                                    notices: [notice], settings: settings))
         }
     }
 
@@ -1277,13 +1278,13 @@ struct SideNoticeLayoutTests {
             for reservesMenuBar in [false, true] {
                 let screenFrame = CGRect(x: 1_512, y: -120, width: 1_440, height: 900)
                 let screen = ScreenSnapshot(displayID: 7, frame: screenFrame,
-                    visibleFrame: CGRect(x: screenFrame.minX, y: screenFrame.minY, width: screenFrame.width,
-                        height: screenFrame.height - (reservesMenuBar ? menuHeight : 0)),
-                    menuBarHeightFallback: menuHeight)
+                                            visibleFrame: CGRect(x: screenFrame.minX, y: screenFrame.minY, width: screenFrame.width,
+                                                                 height: screenFrame.height - (reservesMenuBar ? menuHeight : 0)),
+                                            menuBarHeightFallback: menuHeight)
                 let idle = engine.compactBarFrame(for: screen)
                 let actual = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
                 let overlay = try #require(engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
-                    notices: [notice], settings: FeatureSettings()))
+                                                                  notices: [notice], settings: FeatureSettings()))
                 #expect(actual.height == max(36, menuHeight))
                 #expect(actual.maxY == screenFrame.maxY)
                 #expect(actual.midX == idle.midX)
@@ -1298,13 +1299,13 @@ struct SideNoticeLayoutTests {
     func headphoneRowHeightAppliesOnlyWhileItWinsOnANotchlessDisplay() throws {
         let referenceDate = Date(timeIntervalSinceReferenceDate: 0)
         let headphone = IslandNotice(id: "headphone-connection", title: "AirPods Pro", side: .left,
-            createdAt: referenceDate, style: .headphone)
+                                     createdAt: referenceDate, style: .headphone)
         let laterFocus = IslandNotice(id: "focus-transition", title: "Work", side: .left,
-            createdAt: referenceDate.addingTimeInterval(1), style: .status)
+                                      createdAt: referenceDate.addingTimeInterval(1), style: .status)
         let voice = IslandNotice(id: "voice-processing-left", title: "Processing", side: .left)
         let external = ScreenSnapshot(displayID: 7,
-            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
-            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
+                                      frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+                                      visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
         let idle = engine.compactBarFrame(for: external)
         for notices in [[laterFocus], [headphone, laterFocus], [headphone, voice]] {
             let frame = try #require(engine.compactBarFrame(for: external, notices: notices, settings: FeatureSettings()))
@@ -1325,12 +1326,12 @@ struct SideNoticeLayoutTests {
         let notice = IslandNotice(id: "headphone-connection", title: "AirPods Pro", side: .left, style: .headphone)
         for screenHeight in [CGFloat(18), 24, 30, 34, 900] {
             let screen = ScreenSnapshot(displayID: 7,
-                frame: CGRect(x: -1_440, y: -screenHeight, width: 1_440, height: screenHeight),
-                visibleFrame: CGRect(x: -1_440, y: -screenHeight, width: 1_440, height: screenHeight),
-                menuBarHeightFallback: 24)
+                                        frame: CGRect(x: -1_440, y: -screenHeight, width: 1_440, height: screenHeight),
+                                        visibleFrame: CGRect(x: -1_440, y: -screenHeight, width: 1_440, height: screenHeight),
+                                        menuBarHeightFallback: 24)
             let actual = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
             let overlay = try #require(engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
-                notices: [notice], settings: FeatureSettings()))
+                                                              notices: [notice], settings: FeatureSettings()))
             #expect(actual.height == min(36, screenHeight))
             #expect(actual.minY >= screen.frame.minY)
             #expect(actual.maxY == screen.frame.maxY)

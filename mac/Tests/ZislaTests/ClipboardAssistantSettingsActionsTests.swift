@@ -37,7 +37,7 @@ struct ClipboardAssistantSettingsActionsTests {
         #expect(order.count == ClipboardAssistantActionOrder.defaults(for: .text).count)
         #expect(Set(order) == Set(ClipboardAssistantActionOrder.defaults(for: .text)))
         #expect(ClipboardAssistantActionOrder.ordered(Self.textActions, for: .text,
-            using: settings.clipboardAssistantActionOrders).first == .share)
+                                                      using: settings.clipboardAssistantActionOrders).first == .share)
     }
 
     @Test(arguments: ClipboardAssistantKind.allCases)
@@ -64,7 +64,7 @@ struct ClipboardAssistantSettingsActionsTests {
         SettingsView.moveClipboardAssistantAction(.search, for: .text, by: 1, settings: binding)
         #expect(settings.clipboardAssistantActionOrders[.text]?.first == .saveText)
         let actions = ClipboardAssistantActionOrder.ordered(Self.textActions, for: .text,
-            using: settings.clipboardAssistantActionOrders)
+                                                            using: settings.clipboardAssistantActionOrders)
         #expect(actions.first == .saveText("fixture"))
         #expect(Set(actions.map(\.identifier)) == Set(Self.textActions.map(\.identifier)))
     }
@@ -79,7 +79,7 @@ struct ClipboardAssistantSettingsActionsTests {
         SettingsView.moveClipboardAssistantAction(.repairAndOpenApp, for: .text, by: -1, settings: binding)
         for offset in [-1, 1] {
             SettingsView.moveClipboardAssistantAction(.repairAndOpenApp, for: .appCannotOpen,
-                by: offset, settings: binding)
+                                                      by: offset, settings: binding)
         }
         #expect(settings == original)
     }
@@ -114,7 +114,7 @@ struct ClipboardAssistantSettingsActionsTests {
         #expect(settings.clipboardAssistantEnabledKinds.contains(.text))
         #expect(settings.clipboardAssistantActionOrders[.text] == savedOrder)
         #expect(ClipboardAssistantActionOrder.ordered(Self.textActions, for: .text,
-            using: settings.clipboardAssistantActionOrders).first == .share)
+                                                      using: settings.clipboardAssistantActionOrders).first == .share)
     }
 
     @Test(arguments: AppLanguage.allCases)

@@ -228,13 +228,13 @@ private final class SparkleLocalInstallHarness {
 
     private func infoValue(forKey key: String) -> String? {
         guard let data = try? Data(
-            contentsOf: installedBundleURL.appendingPathComponent("Contents/Info.plist")
-        ),
-            let plist = try? PropertyListSerialization.propertyList(
-                from: data,
-                options: [],
-                format: nil
-            ) as? [String: Any]
+                  contentsOf: installedBundleURL.appendingPathComponent("Contents/Info.plist")
+              ),
+              let plist = try? PropertyListSerialization.propertyList(
+                  from: data,
+                  options: [],
+                  format: nil
+              ) as? [String: Any]
         else {
             return nil
         }

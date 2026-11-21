@@ -42,18 +42,18 @@ enum ScreenRecordingLivePhotoExporter {
         var movieConfiguration = configuration
         movieConfiguration.format = .mov
         try await RecordingExportJob.run(project: project, directory: directory, destination: rendered,
-            configuration: movieConfiguration, checkpoint: checkpoint,
-            resolveFFmpeg: { try ScreenRecordingFFmpegTranscoder.resolveExecutable() },
-            progress: { await progress($0 * 0.75) })
+                                         configuration: movieConfiguration, checkpoint: checkpoint,
+                                         resolveFFmpeg: { try ScreenRecordingFFmpegTranscoder.resolveExecutable() },
+                                         progress: { await progress($0 * 0.75) })
         try Task.checkCancellation()
         let identifier = UUID().uuidString
         let photoTime = schedule.time(at: schedule.frameCount / 2)
         let markerDuration = min(1.0 / Double(schedule.frameRate), project.outputDuration - photoTime.seconds)
         try await writePhoto(movie: rendered, destination: pair.appendingPathComponent(photoName),
-            time: photoTime, identifier: identifier)
+                             time: photoTime, identifier: identifier)
         try await RecordingLivePhotoMovieWriter.run(input: rendered, output: pair.appendingPathComponent(videoName),
-            identifier: identifier, photoTime: photoTime, markerDuration: markerDuration,
-            duration: project.outputDuration, checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
+                                                    identifier: identifier, photoTime: photoTime, markerDuration: markerDuration,
+                                                    duration: project.outputDuration, checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
         try checkpoint(.beforeCommit)
         try Task.checkCancellation()
         _ = try await validateDestination(target, directory: directory)
@@ -153,7 +153,7 @@ private enum RecordingLivePhotoMovieWriter {
         stillTime.value = NSNumber(value: Int8(0))
         stillTime.dataType = kCMMetadataBaseDataType_SInt8 as String
         let group = AVTimedMetadataGroup(items: [stillTime], timeRange: .init(start: photoTime,
-            duration: CMTime(seconds: markerDuration, preferredTimescale: 60_000)))
+                                                                              duration: CMTime(seconds: markerDuration, preferredTimescale: 60_000)))
         guard let format = group.copyFormatDescription() else { throw RecordingLivePhotoExportError.cannotCreate }
         let metadataInput = AVAssetWriterInput(mediaType: .metadata, outputSettings: nil, sourceFormatHint: format)
         let adaptor = AVAssetWriterInputMetadataAdaptor(assetWriterInput: metadataInput)

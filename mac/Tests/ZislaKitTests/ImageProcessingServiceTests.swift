@@ -42,7 +42,7 @@ struct ImageProcessingServiceTests {
         let fixture = try Fixture()
         defer { fixture.remove() }
         let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/usr/bin/true"),
-            avifExecutableURL: fixture.root.appendingPathComponent("missing-avifenc"))
+                                             avifExecutableURL: fixture.root.appendingPathComponent("missing-avifenc"))
         await #expect(throws: ImageProcessingError.avifEngineUnavailable) {
             try await service.run([], in: fixture.root, tool: "avifenc")
         }
@@ -174,7 +174,7 @@ struct ImageProcessingServiceTests {
         let processed = ImageProcessedOutput(url: output, format: .png, summary: summary)
         let items = ["one", "two"].map {
             ImageProcessedItem(inputURL: fixture.root.appendingPathComponent("\($0)/same.png"), sourceURL: output,
-                summary: summary, outputs: [processed])
+                               summary: summary, outputs: [processed])
         }
         let directory = fixture.root.appendingPathComponent("export")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -284,7 +284,7 @@ struct ImageProcessingServiceTests {
         let source = try fixture.png()
         let summary = ImageFileSummary(width: 40, height: 20, frameCount: 1, fileSize: 100, format: .png, hasMetadata: false)
         let item = ImageProcessedItem(inputURL: source, sourceURL: source, summary: summary,
-            outputs: [ImageProcessedOutput(url: source, format: .png, summary: summary)])
+                                      outputs: [ImageProcessedOutput(url: source, format: .png, summary: summary)])
         let folder = fixture.root.appendingPathComponent("export")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let link = folder.appendingPathComponent("source-png.png")
@@ -382,7 +382,7 @@ struct ImageProcessingServiceTests {
             }
             for index in 0..<count {
                 let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                     space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
                 context.setFillColor(CGColor(red: CGFloat(index % 2), green: 0.25, blue: 0.8, alpha: 0.5))
                 context.fill(CGRect(x: 4, y: 4, width: width - 8, height: height - 8))
                 var properties = metadata

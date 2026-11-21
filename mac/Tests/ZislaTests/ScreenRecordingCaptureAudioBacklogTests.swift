@@ -202,8 +202,8 @@ struct ScreenRecordingCaptureAudioBacklogTests {
         let length = blockBytes ?? bytes
         var block: CMBlockBuffer?
         #expect(CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: length,
-                                                  blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
-                                                  offsetToData: 0, dataLength: length, flags: 0, blockBufferOut: &block) == noErr)
+                                                   blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
+                                                   offsetToData: 0, dataLength: length, flags: 0, blockBufferOut: &block) == noErr)
         var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 100),
                                         presentationTimeStamp: CMTime(seconds: time, preferredTimescale: 1_000_000),
                                         decodeTimeStamp: .invalid)

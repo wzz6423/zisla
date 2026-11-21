@@ -225,6 +225,56 @@ class AutomationWorkflowsTest < Minitest::Test
     end
   end
 
+  def test_swift_formatting_propagates_download_checksum_and_formatter_failures
+    formatting = step('ci-lint', 'Check Swift formatting')
+    environment = formatting.fetch('env')
+    assert_equal '0.64.7', environment.fetch('SWIFTFORMAT_VERSION')
+    assert_match(/\A[0-9a-f]{64}\z/, environment.fetch('SWIFTFORMAT_SHA256'))
+    File.write(File.join(@directory, 'bin/curl'), <<~'SCRIPT')
+      #!/usr/bin/env ruby
+      exit ENV.fetch('DOWNLOAD_EXIT', '0').to_i unless ENV.fetch('DOWNLOAD_EXIT', '0') == '0'
+      abort 'wrong release URL' unless ARGV.last == "https://github.com/nicklockwood/SwiftFormat/releases/download/#{ENV.fetch('SWIFTFORMAT_VERSION')}/swiftformat_linux.zip"
+      File.write(ARGV.fetch(ARGV.index('--output') + 1), 'fixture archive')
+    SCRIPT
+    File.write(File.join(@directory, 'bin/sha256sum'), <<~'SCRIPT')
+      #!/usr/bin/env ruby
+      abort 'missing release checksum' unless STDIN.read == "#{ENV.fetch('SWIFTFORMAT_SHA256')}  #{ENV.fetch('RUNNER_TEMP')}/swiftformat.zip\n"
+      exit ENV.fetch('CHECKSUM_EXIT', '0').to_i
+    SCRIPT
+    File.write(File.join(@directory, 'bin/unzip'), <<~'SCRIPT')
+      #!/usr/bin/env ruby
+      require 'fileutils'
+      temporary = ENV.fetch('RUNNER_TEMP')
+      abort 'wrong archive extraction' unless ARGV == ['-q', "#{temporary}/swiftformat.zip", '-d', temporary, 'swiftformat_linux']
+      FileUtils.cp(File.join(temporary, 'formatter-fixture'), File.join(temporary, 'swiftformat_linux'))
+    SCRIPT
+    File.write(File.join(@directory, 'formatter-fixture'), <<~'SCRIPT')
+      #!/usr/bin/env ruby
+      abort 'format check must be read-only and use the project configuration' unless ARGV == ['mac', '--config', '.swiftformat', '--cache', 'ignore', '--lint']
+      File.write(File.join(ENV.fetch('RUNNER_TEMP'), 'formatter-ran'), 'checked')
+      exit ENV.fetch('FORMATTER_EXIT', '0').to_i
+    SCRIPT
+    %w[bin/curl bin/sha256sum bin/unzip formatter-fixture].each do |path|
+      File.chmod(0o755, File.join(@directory, path))
+    end
+    cleanup = step('ci-lint', 'Remove SwiftFormat artifacts')
+    assert_equal 'always()', cleanup.fetch('if')
+
+    [{}, { 'FORMATTER_EXIT' => '1' }, { 'FORMATTER_EXIT' => '7' },
+     { 'DOWNLOAD_EXIT' => '23' }, { 'CHECKSUM_EXIT' => '9' }].each do |fault|
+      FileUtils.rm_f(File.join(@directory, 'formatter-ran'))
+      output, status = run_step(formatting, environment.merge(fault))
+      assert_equal fault.values.first.to_i, status.exitstatus, "#{fault}: #{output}"
+      assert_equal fault.keys.none? { |key| key != 'FORMATTER_EXIT' },
+                   File.exist?(File.join(@directory, 'formatter-ran')), "#{fault}: formatter execution"
+      output, status = run_step(cleanup)
+      assert status.success?, output
+      %w[swiftformat_linux swiftformat.zip].each do |filename|
+        refute File.exist?(File.join(@directory, filename)), "#{fault}: #{filename} was not removed"
+      end
+    end
+  end
+
   def test_swift_codeql_budget_leaves_time_for_the_unfinished_build_and_analysis
     job = YAML.load_file(File.join(ROOT, '.github/workflows/swift-tests.yml')).fetch('jobs').fetch('codeql')
     budget = job.fetch('timeout-minutes') * 60

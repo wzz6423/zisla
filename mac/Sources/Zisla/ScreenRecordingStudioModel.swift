@@ -31,7 +31,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published var selectedTimelineTrackID: String?
     @Published var inspectorTab = 0
     @Published private var timelineClipCopy: (projectID: UUID, clip: RecordingTimelineClip,
-        annotation: RecordingAnnotation?, caption: RecordingCaption?)?
+                                              annotation: RecordingAnnotation?, caption: RecordingCaption?)?
     @Published private(set) var selectedMediaAssetID: UUID?
     @Published private(set) var currentTime = 0.0
     @Published private(set) var playbackTime = 0.0
@@ -69,7 +69,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     private var previewRevision = 0
     private var projectRevision = 0
     private let previewContext = CIContext(options: [.cacheIntermediates: false,
-        .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
+                                                     .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
     private var recordingDirectory: URL?
     private var cancellables: Set<AnyCancellable> = []
     var hideWindow: (() -> Void)?
@@ -110,7 +110,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         self.recordingOutputDirectory = projectStore?.root ?? outputDirectoryStore.directory
         self.renderPreview = renderPreview ?? { project, directory, time in
             try await exporter.preview(project: project, directory: directory, sourceTime: time,
-                maximumSize: RecordingExportRenderer.maximumPreviewSize)
+                                       maximumSize: RecordingExportRenderer.maximumPreviewSize)
         }
         self.aiCompletion = aiCompletion ?? appModel.map { appModel in
             { project, instruction, reference in
@@ -120,13 +120,13 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 switch target {
                 case let .http(endpoint, protocolKind, model, apiKey, effort, localInference, localThinkingEnabled):
                     return try await AIChatClient().complete(endpoint: endpoint, protocolKind: protocolKind,
-                        model: model, systemPrompt: ScreenRecordingAIEditor.systemPrompt(project: project),
-                        messages: [.init(role: .user, content: instruction)], apiKey: apiKey, effort: effort,
-                        localInference: localInference, localThinkingEnabled: localThinkingEnabled).content
+                                                             model: model, systemPrompt: ScreenRecordingAIEditor.systemPrompt(project: project),
+                                                             messages: [.init(role: .user, content: instruction)], apiKey: apiKey, effort: effort,
+                                                             localInference: localInference, localThinkingEnabled: localThinkingEnabled).content
                 case let .cliProfile(accountID, model):
                     return try await appModel.aiAgent.completeWithCLIProfile(accountID: accountID,
-                        systemPrompt: ScreenRecordingAIEditor.systemPrompt(project: project),
-                        messages: [.init(role: .user, content: instruction)], model: model)
+                                                                             systemPrompt: ScreenRecordingAIEditor.systemPrompt(project: project),
+                                                                             messages: [.init(role: .user, content: instruction)], model: model)
                 }
             }
         }
@@ -411,7 +411,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 prepared = nil
                 if result.duplicateCount > 0 {
                     notices.enqueue(.init(title: AppLocalization.text("已跳过 %d 个重复素材", result.duplicateCount),
-                        side: .left, symbolName: "rectangle.on.rectangle"), expiresAfter: 3)
+                                          side: .left, symbolName: "rectangle.on.rectangle"), expiresAfter: 3)
                 }
             } catch {
                 prepared?.discard()
@@ -496,7 +496,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
             let configuration = settings.configuration
             self.exportConfiguration = configuration
             self.beginOutputNotice(title: AppLocalization.text(configuration.format.isAudioOnly ? "导出音频" : "导出录屏"),
-                destination: url, symbol: configuration.format.isAudioOnly ? "waveform" : configuration.format == .livePhoto ? "livephoto" : "film")
+                                   destination: url, symbol: configuration.format.isAudioOnly ? "waveform" : configuration.format == .livePhoto ? "livephoto" : "film")
             self.operationTask = Task { [weak self] in
                 guard let self else { return }
                 defer { isBusy = false; operationTask = nil }
@@ -526,7 +526,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         errorMessage = nil
         notices.removeAll(withIDPrefix: ScreenRecordingOperationNotice.prefix)
         let notice = IslandNotice(id: ScreenRecordingOperationNotice.prefix + UUID().uuidString,
-            title: title, detail: destination.lastPathComponent, side: .left, symbolName: symbol)
+                                  title: title, detail: destination.lastPathComponent, side: .left, symbolName: symbol)
         outputNotice = notice
         notices.enqueue(notice, expiresAfter: nil)
     }
@@ -596,14 +596,14 @@ final class ScreenRecordingStudioModel: ObservableObject {
         for annotation in replacement.edits.annotations ?? [] {
             let previous = oldAnnotations[annotation.id]
             synchronize(.annotation(annotation.id), start: annotation.start, end: annotation.end,
-                isNew: previous == nil, changed: previous.map { $0.start != annotation.start || $0.end != annotation.end } ?? false,
-                matching: indices[.annotation(annotation.id)] ?? [], timeline: &timeline)
+                        isNew: previous == nil, changed: previous.map { $0.start != annotation.start || $0.end != annotation.end } ?? false,
+                        matching: indices[.annotation(annotation.id)] ?? [], timeline: &timeline)
         }
         for caption in replacement.captions {
             let previous = oldCaptions[caption.id]
             synchronize(.caption(caption.id), start: caption.start, end: caption.end,
-                isNew: previous == nil, changed: previous.map { $0.start != caption.start || $0.end != caption.end } ?? false,
-                matching: indices[.caption(caption.id)] ?? [], timeline: &timeline)
+                        isNew: previous == nil, changed: previous.map { $0.start != caption.start || $0.end != caption.end } ?? false,
+                        matching: indices[.caption(caption.id)] ?? [], timeline: &timeline)
         }
         replacement.timeline = timeline
     }
@@ -709,7 +709,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         let end = min(overlayDuration, start + 2)
         guard start < end else { return nil }
         let annotation = RecordingAnnotation(kind: kind, start: start, end: end,
-            text: kind == .text ? AppLocalization.text("文字标注") : "")
+                                             text: kind == .text ? AppLocalization.text("文字标注") : "")
         update { $0.edits.annotations = ($0.edits.annotations ?? []) + [annotation] }
         return project?.edits.annotations?.contains(where: { $0.id == annotation.id }) == true ? annotation.id : nil
     }
@@ -766,12 +766,12 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @discardableResult
     func addTimelineText() -> UUID? {
         let annotation = RecordingAnnotation(kind: .text, start: playbackTime, end: playbackTime + 2,
-            text: AppLocalization.text("文字标注"))
+                                             text: AppLocalization.text("文字标注"))
         update { project in
             var timeline = RecordingMultitrackTimeline.migrating(project)
             let track = timeline.addTrack()
             let clip = RecordingTimelineClip(trackID: track, content: .annotation(annotation.id),
-                start: annotation.start, sourceEnd: 2)
+                                             start: annotation.start, sourceEnd: 2)
             timeline.clips.append(clip)
             project.edits.annotations = (project.edits.annotations ?? []) + [annotation]
             project.timeline = timeline
@@ -944,7 +944,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
             }
             do {
                 let replacement = try await ScreenRecordingAudioDetachment.prepare(project: snapshot, directory: folder,
-                    clipID: id, probe: probe)
+                                                                                   clipID: id, probe: probe)
                 try Task.checkCancellation()
                 guard project == snapshot, directory == folder, let replacement else { return }
                 isBusy = false
@@ -1071,7 +1071,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
         do {
             let data = try JSONSerialization.data(withJSONObject: ["version": 1,
-                "operations": [["type": "cut", "start": start, "end": end]]])
+                                                                   "operations": [["type": "cut", "start": start, "end": end]]])
             let replacement = try ScreenRecordingAIEditor.apply(response: String(decoding: data, as: UTF8.self), to: project)
             update { $0 = replacement }
         } catch { errorMessage = error.localizedDescription }
@@ -1246,7 +1246,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                             let end = min(caption.end, clip.sourceEnd)
                             guard start < end else { return nil }
                             return .init(start: clip.start + (start - clip.sourceStart) / clip.speed,
-                                end: clip.start + (end - clip.sourceStart) / clip.speed, text: caption.text)
+                                         end: clip.start + (end - clip.sourceStart) / clip.speed, text: caption.text)
                         }
                     }
                 } else { output = bounded }
@@ -1296,7 +1296,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 let end = min(segment.end, caption.end)
                 if start < end {
                     output.append(.init(start: offset + (start - segment.start) / segment.speed,
-                        end: offset + (end - segment.start) / segment.speed, text: caption.text))
+                                        end: offset + (end - segment.start) / segment.speed, text: caption.text))
                 }
             }
             offset += segment.outputDuration
@@ -1308,20 +1308,20 @@ final class ScreenRecordingStudioModel: ObservableObject {
         commitPendingCanvasText?()
         guard canEdit, let project, let aiCompletion,
               !aiInstruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-            isBusy = true
-            dismissAIEdit()
-            let instruction = aiInstruction
-            let reference = selectedAIModel
-            operationTask = Task { [weak self] in
-                guard let self else { return }
-                defer { isBusy = false; operationTask = nil }
-                do {
-                    let response = try await aiCompletion(project, instruction, reference)
-                    try Task.checkCancellation()
-                    pendingAIProject = try ScreenRecordingAIEditor.apply(response: response, to: project)
-                    pendingAIBase = project
-                } catch { if !(error is CancellationError) { errorMessage = error.localizedDescription } }
-            }
+        isBusy = true
+        dismissAIEdit()
+        let instruction = aiInstruction
+        let reference = selectedAIModel
+        operationTask = Task { [weak self] in
+            guard let self else { return }
+            defer { isBusy = false; operationTask = nil }
+            do {
+                let response = try await aiCompletion(project, instruction, reference)
+                try Task.checkCancellation()
+                pendingAIProject = try ScreenRecordingAIEditor.apply(response: response, to: project)
+                pendingAIBase = project
+            } catch { if !(error is CancellationError) { errorMessage = error.localizedDescription } }
+        }
     }
 
     func applyAIEdit() {
@@ -1438,7 +1438,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 let image = try await renderPreview(baseProject, directory, time)
                 guard !Task.isCancelled, revision == previewRevision else { return }
                 let composed = try RecordingExportRenderer.composedPreview(base: image, project: project,
-                    sourceTime: time, context: previewContext)
+                                                                           sourceTime: time, context: previewContext)
                 canvasPreview = image
                 preview = NSImage(cgImage: composed, size: NSSize(width: composed.width, height: composed.height))
             } catch {
@@ -1465,8 +1465,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
             clearTimelinePlayback()
             isShowingSourcePlayback = false
             return true
-        }
-        catch { errorMessage = error.localizedDescription; return false }
+        } catch { errorMessage = error.localizedDescription; return false }
     }
 
     func shutdown() {

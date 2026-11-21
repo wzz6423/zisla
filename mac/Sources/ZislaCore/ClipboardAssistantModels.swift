@@ -231,8 +231,8 @@ public enum ClipboardAssistantTranslate {
 public enum ClipboardAssistantDefaults {
     /// ⌘ 1; ordinary combinations are registered through the system global hotkey API.
     public static let triggerHotkey = VoiceInputHotkeyPreset(
-        keyCode: 18,              // kVK_ANSI_1
-        carbonModifiers: 0x0100,  // cmdKey
+        keyCode: 18, // kVK_ANSI_1
+        carbonModifiers: 0x0100, // cmdKey
         keyDisplayName: "1"
     )
     public static let dismissHotkey = VoiceInputHotkeyPreset(

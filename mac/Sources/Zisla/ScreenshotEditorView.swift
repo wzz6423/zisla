@@ -1818,7 +1818,7 @@ final class ScreenshotEditorModel: ObservableObject {
         var makeGraphicsContext: (CGContext) -> NSGraphicsContext? = { NSGraphicsContext(cgContext: $0, flipped: false) }
         var makeMaskContext: (Int, Int) -> CGContext? = { width, height in
             CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         }
         var makeMaskImage: (CGContext) -> CGImage? = { $0.makeImage() }
         var makeFilter: (String) -> CIFilter? = { CIFilter(name: $0) }
@@ -2598,7 +2598,7 @@ final class ScreenshotEditorModel: ObservableObject {
         commitPendingTextDraft()
         commitPendingAnnotationDraft()
         let renderedBase = try imageApplyingMosaics(adding: nil, requireCompleteRendering: requireCompleteRendering,
-                                                   preservingHDR: preservingHDR ?? preservesHDR)
+                                                    preservingHDR: preservingHDR ?? preservesHDR)
         guard let base = renderedBase.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw RenderingError.unavailable
         }
@@ -2641,9 +2641,9 @@ final class ScreenshotEditorModel: ObservableObject {
         if preservesHDR, canPreserveHDR {
             guard let source = rendered.cgImage(forProposedRect: nil, context: nil, hints: nil),
                   let encoded = Self.ciContext.createCGImage(
-                    CIImage(cgImage: source),
-                    from: CGRect(x: 0, y: 0, width: source.width, height: source.height),
-                    format: .RGBA16, colorSpace: CGColorSpace(name: CGColorSpace.itur_2100_PQ)!
+                      CIImage(cgImage: source),
+                      from: CGRect(x: 0, y: 0, width: source.width, height: source.height),
+                      format: .RGBA16, colorSpace: CGColorSpace(name: CGColorSpace.itur_2100_PQ)!
                   )
             else { return nil }
             // PNG cannot store extended floating-point samples. PQ preserves HDR in its integer range.
@@ -2667,7 +2667,7 @@ final class ScreenshotEditorModel: ObservableObject {
 
     func imageApplyingMosaics(adding draft: ScreenshotAnnotation?, preservingHDR: Bool? = nil) -> NSImage {
         (try? imageApplyingMosaics(adding: draft, requireCompleteRendering: false,
-                                  preservingHDR: preservingHDR ?? preservesHDR))
+                                   preservingHDR: preservingHDR ?? preservesHDR))
             ?? sourceImage(preservingHDR: preservingHDR ?? preservesHDR)
     }
 
@@ -2792,7 +2792,7 @@ final class ScreenshotEditorModel: ObservableObject {
             let path = CGMutablePath()
             path.addLines(between: annotation.points)
             let coverage = path.copy(strokingWithWidth: max(12, annotation.lineWidth * 5),
-                lineCap: .round, lineJoin: .round, miterLimit: 10).boundingBoxOfPath
+                                     lineCap: .round, lineJoin: .round, miterLimit: 10).boundingBoxOfPath
             return !coverage.intersection(imageBounds).isEmpty
         }
     }
@@ -3223,7 +3223,7 @@ final class ScreenshotEditorModel: ObservableObject {
                 }
                 if let combined = output.makeImage(),
                    let preserved = ScreenshotImageRendering.preservingHeadroom(combined,
-                       from: ScreenshotImageRendering.isHDR(firstCGImage) ? firstCGImage : secondCGImage) {
+                                                                               from: ScreenshotImageRendering.isHDR(firstCGImage) ? firstCGImage : secondCGImage) {
                     return NSImage(cgImage: preserved, size: size)
                 }
             }
@@ -3853,7 +3853,7 @@ final class ScreenshotRecognitionWarmUp {
         guard let context = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8,
                                       bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
-              let image = context.makeImage() else { return }
+            let image = context.makeImage() else { return }
         _ = try ScreenshotRecognitionOperation().recognize(image)
     }) {
         guard task == nil else { return }
@@ -4448,7 +4448,7 @@ enum ScreenshotRecognitionFormatter {
                    !value.unicodeScalars.allSatisfy(CharacterSet.decimalDigits.contains),
                    let previous = run.last,
                    rows[previous].centerY - rows[row].centerY
-                        <= max(rows[previous].averageHeight, rows[row].averageHeight) * 2.2 {
+                   <= max(rows[previous].averageHeight, rows[row].averageHeight) * 2.2 {
                     run.append(row)
                 } else {
                     mergeVerticalLabelRun(&cells, column: column, rows: run, merges: &merges)
@@ -4577,8 +4577,8 @@ enum ScreenshotXLSXExporter {
         let mergeXML = mergeReferences.isEmpty
             ? ""
             : "<mergeCells count=\"\(mergeReferences.count)\">"
-                + mergeReferences.map { "<mergeCell ref=\"\($0)\"/>" }.joined()
-                + "</mergeCells>"
+            + mergeReferences.map { "<mergeCell ref=\"\($0)\"/>" }.joined()
+            + "</mergeCells>"
         let dimension = "A1:\(cellReference(row: rowCount - 1, column: columnCount - 1))"
         return """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -5202,28 +5202,28 @@ struct ScreenshotEditorView: View {
 
     var body: some View {
         annotationStyleObservedContent
-        .onChange(of: model.arrowStyle) { _, newValue in
-            guard let annotationID = selectionState.selectedAnnotationID else { return }
-            model.applySelectedStyle(to: annotationID, arrowStyle: newValue)
-        }
-        .onChange(of: model.fontSize) { _, newValue in
-            guard let annotationID = selectionState.selectedAnnotationID else { return }
-            model.applySelectedStyle(to: annotationID, fontSize: newValue)
-        }
-        .onChange(of: model.pixelateStrength) { _, newValue in
-            applyObscureStrength(newValue, ifSelectedRegionUses: .pixelate)
-        }
-        .onChange(of: model.blurStrength) { _, newValue in
-            applyObscureStrength(newValue, ifSelectedRegionUses: .blur)
-        }
-        .onChange(of: model.mosaicBlurStrength) { _, newValue in
-            applyObscureBlurStrength(newValue, ifSelectedRegionUses: .pixelate)
-        }
-        .background {
-            if #available(macOS 15.0, *) {
-                ClipboardSystemTranslationView(bridge: model.systemTranslation)
+            .onChange(of: model.arrowStyle) { _, newValue in
+                guard let annotationID = selectionState.selectedAnnotationID else { return }
+                model.applySelectedStyle(to: annotationID, arrowStyle: newValue)
             }
-        }
+            .onChange(of: model.fontSize) { _, newValue in
+                guard let annotationID = selectionState.selectedAnnotationID else { return }
+                model.applySelectedStyle(to: annotationID, fontSize: newValue)
+            }
+            .onChange(of: model.pixelateStrength) { _, newValue in
+                applyObscureStrength(newValue, ifSelectedRegionUses: .pixelate)
+            }
+            .onChange(of: model.blurStrength) { _, newValue in
+                applyObscureStrength(newValue, ifSelectedRegionUses: .blur)
+            }
+            .onChange(of: model.mosaicBlurStrength) { _, newValue in
+                applyObscureBlurStrength(newValue, ifSelectedRegionUses: .pixelate)
+            }
+            .background {
+                if #available(macOS 15.0, *) {
+                    ClipboardSystemTranslationView(bridge: model.systemTranslation)
+                }
+            }
     }
 
     private var editorStateObservedContent: some View {
@@ -5291,24 +5291,24 @@ struct ScreenshotEditorView: View {
 
     private var annotationStyleObservedContent: some View {
         editorStateObservedContent
-        .onChange(of: model.color) { _, newValue in
-            guard let annotationID = selectionState.selectedAnnotationID else { return }
-            model.applySelectedStyle(to: annotationID, color: newValue)
-        }
-        .onChange(of: model.lineWidth) { _, newValue in
-            guard let annotationID = selectionState.selectedAnnotationID else { return }
-            model.applySelectedStyle(to: annotationID, lineWidth: newValue)
-        }
-        .onChange(of: model.highlighterShowsMarkers) { _, newValue in
-            guard let annotationID = selectionState.selectedAnnotationID else { return }
-            model.applySelectedStyle(to: annotationID, highlighterShowsMarkers: newValue)
-        }
-        .onChange(of: model.annotations) { _, newValue in
-            guard let selectedID = selectionState.selectedAnnotationID,
-                  let annotation = newValue.first(where: { $0.id == selectedID && $0.kind == .highlighter })
-            else { return }
-            model.highlighterShowsMarkers = annotation.highlighterShowsMarkers
-        }
+            .onChange(of: model.color) { _, newValue in
+                guard let annotationID = selectionState.selectedAnnotationID else { return }
+                model.applySelectedStyle(to: annotationID, color: newValue)
+            }
+            .onChange(of: model.lineWidth) { _, newValue in
+                guard let annotationID = selectionState.selectedAnnotationID else { return }
+                model.applySelectedStyle(to: annotationID, lineWidth: newValue)
+            }
+            .onChange(of: model.highlighterShowsMarkers) { _, newValue in
+                guard let annotationID = selectionState.selectedAnnotationID else { return }
+                model.applySelectedStyle(to: annotationID, highlighterShowsMarkers: newValue)
+            }
+            .onChange(of: model.annotations) { _, newValue in
+                guard let selectedID = selectionState.selectedAnnotationID,
+                      let annotation = newValue.first(where: { $0.id == selectedID && $0.kind == .highlighter })
+                else { return }
+                model.highlighterShowsMarkers = annotation.highlighterShowsMarkers
+            }
     }
 
     private var toolbarOnlyContent: some View {
@@ -5813,12 +5813,12 @@ struct ScreenshotEditorView: View {
                     color: annotation.color,
                     fontSize: annotation.fontSize * geometry.scale
                 )
-                    .frame(
-                        width: canvasBounds.width,
-                        height: canvasBounds.height
-                    )
-                    .position(geometry.canvasPoint(from: bounds.center))
-                    .rotationEffect(.radians(Double(annotation.rotation)))
+                .frame(
+                    width: canvasBounds.width,
+                    height: canvasBounds.height
+                )
+                .position(geometry.canvasPoint(from: bounds.center))
+                .rotationEffect(.radians(Double(annotation.rotation)))
             }
         case .mosaic:
             EmptyView()
@@ -5899,15 +5899,15 @@ struct ScreenshotEditorView: View {
             onCancel: cancelInlineText,
             onTextChange: updateInlineTextDraft
         )
-            .frame(width: canvasRect.width, height: height)
-            .position(x: canvasRect.midX, y: canvasRect.minY + height / 2)
-            .onChange(of: inlineTextFocused) { _, isFocused in
-                selectionState.isInlineTextEditing = isFocused && inlineTextID != nil
-                if !isFocused { commitInlineText() }
-            }
-            .onAppear {
-                DispatchQueue.main.async { inlineTextFocused = true }
-            }
+        .frame(width: canvasRect.width, height: height)
+        .position(x: canvasRect.midX, y: canvasRect.minY + height / 2)
+        .onChange(of: inlineTextFocused) { _, isFocused in
+            selectionState.isInlineTextEditing = isFocused && inlineTextID != nil
+            if !isFocused { commitInlineText() }
+        }
+        .onAppear {
+            DispatchQueue.main.async { inlineTextFocused = true }
+        }
     }
 
     private func inlineTextPreview(_ annotation: ScreenshotAnnotation) -> ScreenshotAnnotation {
@@ -6531,7 +6531,7 @@ struct ScreenshotEditorView: View {
                 cornerRadius: ScreenshotToolbarLayout.cornerRadius,
                 style: .continuous
             )
-                .stroke(.white.opacity(ScreenshotToolbarLayout.borderOpacity), lineWidth: 1)
+            .stroke(.white.opacity(ScreenshotToolbarLayout.borderOpacity), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.12), radius: 4, y: 1)
     }
@@ -6578,12 +6578,12 @@ struct ScreenshotEditorView: View {
 
     private var toolbarDragHandle: some View {
         ScreenshotToolbarDragDots()
-        .frame(
-            width: ScreenshotToolbarLayout.dragHandleWidth,
-            height: ScreenshotToolbarLayout.controlHeight
-        )
-        .contentShape(Rectangle())
-        .allowsHitTesting(false)
+            .frame(
+                width: ScreenshotToolbarLayout.dragHandleWidth,
+                height: ScreenshotToolbarLayout.controlHeight
+            )
+            .contentShape(Rectangle())
+            .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -7621,8 +7621,8 @@ struct ScreenshotPinnedImageView: View {
                 cornerRadius: ScreenshotPinnedLayout.toolbarCornerRadius,
                 style: .continuous
             )
-                .stroke(.white.opacity(ScreenshotPinnedLayout.toolbarBorderOpacity), lineWidth: 1)
-                .allowsHitTesting(false)
+            .stroke(.white.opacity(ScreenshotPinnedLayout.toolbarBorderOpacity), lineWidth: 1)
+            .allowsHitTesting(false)
         }
         .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
     }
@@ -8051,8 +8051,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private var isLongCaptureInProgress = false
     private var longCaptureSessionID = 0
     #if DEBUG
-    /// Number of frames written by the current session's debug dump. See `dumpLongCaptureFrame`.
-    private var longCaptureFrameIndex = 0
+        /// Number of frames written by the current session's debug dump. See `dumpLongCaptureFrame`.
+        private var longCaptureFrameIndex = 0
     #endif
     private var longCaptureCaptureWorkItem: DispatchWorkItem?
     private var longCaptureRangeWindow: ScreenshotLongCaptureRangeWindow?
@@ -8244,10 +8244,10 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             return true
         }
         guard !isPinnedImagePresentation,
-                  let tool = ScreenshotTool.allCases.first(where: {
-                      settings.screenshotToolHotkeys[$0.rawValue].map(matches) ?? false
-                  })
-            else { return false }
+              let tool = ScreenshotTool.allCases.first(where: {
+                  settings.screenshotToolHotkeys[$0.rawValue].map(matches) ?? false
+              })
+        else { return false }
         model.commitPendingTextDraft()
         model.commitPendingAnnotationDraft()
         if model.tool != tool {
@@ -8340,7 +8340,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                         cropSDRImage: { [weak self] rect in
                             guard let self else { return nil }
                             return ScreenshotCaptureService.image(from: screenCGImage, cropInScreenPoints: rect,
-                                screenSize: screenImage.size)
+                                                                  screenSize: screenImage.size)
                         }
                     ),
                     onClose: { [weak self] in self?.close() },
@@ -8437,7 +8437,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         return min(max(min(
             1,
             visibleSize.width / max(imageSize.width, 1),
-                max(0, visibleSize.height - ScreenshotPinnedLayout.footerHeight(toolbarVisible: pinnedToolbarVisible))
+            max(0, visibleSize.height - ScreenshotPinnedLayout.footerHeight(toolbarVisible: pinnedToolbarVisible))
                 / max(imageSize.height, 1)
         ), pinnedScaleRange.lowerBound), pinnedScaleRange.upperBound)
     }
@@ -8607,10 +8607,10 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         do {
             let dimensions = try FileShelfStore.screenshotDimensions(data)
             let metadata = ShelfScreenshotMetadata(source: sourceSnapshot,
-                isLongScreenshot: model.hasLongCaptureResult || model.isLongCapturePreviewing,
-                initialCaptureRect: initialCaptureRect, captureRect: captureRect,
-                screenFrame: capturedScreenFrame, displayIdentifier: capturedDisplayIdentifier,
-                pixelWidth: dimensions.width, pixelHeight: dimensions.height)
+                                                   isLongScreenshot: model.hasLongCaptureResult || model.isLongCapturePreviewing,
+                                                   initialCaptureRect: initialCaptureRect, captureRect: captureRect,
+                                                   screenFrame: capturedScreenFrame, displayIdentifier: capturedDisplayIdentifier,
+                                                   pixelWidth: dimensions.width, pixelHeight: dimensions.height)
             try onStash(data, metadata)
             close()
             return true
@@ -8693,8 +8693,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         if !isContinuing {
             model.beginLongCapturePreview()
             #if DEBUG
-            Self.resetLongCaptureDump()
-            longCaptureFrameIndex = 0
+                Self.resetLongCaptureDump()
+                longCaptureFrameIndex = 0
             #endif
         }
         isLongCaptureInProgress = true
@@ -8907,51 +8907,51 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     }
 
     #if DEBUG
-    /// Clears the frame dump left by the previous session. A long-capture bug can only be reproduced by a
-    /// human scrolling a real page, so the last session's frames are kept on disk: that turns "the result
-    /// looks wrong" into the exact frames and decisions that produced it.
-    private static func resetLongCaptureDump() {
-        guard let directory = longCaptureDumpDirectory else { return }
-        try? FileManager.default.removeItem(at: directory)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    }
-
-    private static func dumpLongCaptureFrame(
-        _ image: NSImage,
-        index: Int,
-        didAppend: Bool,
-        status: String
-    ) {
-        guard let directory = longCaptureDumpDirectory,
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        else { return }
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let name = String(
-            format: "frame-%03d-%@.png",
-            index,
-            didAppend ? "appended" : "skipped"
-        )
-        if let data = NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:]) {
-            try? data.write(to: directory.appendingPathComponent(name))
+        /// Clears the frame dump left by the previous session. A long-capture bug can only be reproduced by a
+        /// human scrolling a real page, so the last session's frames are kept on disk: that turns "the result
+        /// looks wrong" into the exact frames and decisions that produced it.
+        private static func resetLongCaptureDump() {
+            guard let directory = longCaptureDumpDirectory else { return }
+            try? FileManager.default.removeItem(at: directory)
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
-        let record = "\(name) size=\(cgImage.width)x\(cgImage.height) status=\(status)\n"
-        let logURL = directory.appendingPathComponent("session.log")
-        if let handle = try? FileHandle(forWritingTo: logURL) {
-            handle.seekToEndOfFile()
-            handle.write(Data(record.utf8))
-            try? handle.close()
-        } else {
-            try? Data(record.utf8).write(to: logURL)
-        }
-    }
 
-    private static var longCaptureDumpDirectory: URL? {
-        FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first?
-            .appendingPathComponent("zisla-debug", isDirectory: true)
-            .appendingPathComponent("long-capture", isDirectory: true)
-    }
+        private static func dumpLongCaptureFrame(
+            _ image: NSImage,
+            index: Int,
+            didAppend: Bool,
+            status: String
+        ) {
+            guard let directory = longCaptureDumpDirectory,
+                  let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+            else { return }
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let name = String(
+                format: "frame-%03d-%@.png",
+                index,
+                didAppend ? "appended" : "skipped"
+            )
+            if let data = NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:]) {
+                try? data.write(to: directory.appendingPathComponent(name))
+            }
+            let record = "\(name) size=\(cgImage.width)x\(cgImage.height) status=\(status)\n"
+            let logURL = directory.appendingPathComponent("session.log")
+            if let handle = try? FileHandle(forWritingTo: logURL) {
+                handle.seekToEndOfFile()
+                handle.write(Data(record.utf8))
+                try? handle.close()
+            } else {
+                try? Data(record.utf8).write(to: logURL)
+            }
+        }
+
+        private static var longCaptureDumpDirectory: URL? {
+            FileManager.default
+                .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                .first?
+                .appendingPathComponent("zisla-debug", isDirectory: true)
+                .appendingPathComponent("long-capture", isDirectory: true)
+        }
     #endif
 
     private func scheduleLongCapture(screen: NSScreen, sessionID: Int, after delay: TimeInterval) {
@@ -9008,15 +9008,15 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     direction: self.model.longCaptureDirection
                 )
                 #if DEBUG
-                // Long capture is the one place where a bug can only be reproduced by a human scrolling a
-                // real page. Keeping the last session's frames on disk turns "it looks wrong" into data.
-                self.longCaptureFrameIndex += 1
-                Self.dumpLongCaptureFrame(
-                    nextImage,
-                    index: self.longCaptureFrameIndex,
-                    didAppend: didAppend,
-                    status: self.model.statusMessage ?? ""
-                )
+                    // Long capture is the one place where a bug can only be reproduced by a human scrolling a
+                    // real page. Keeping the last session's frames on disk turns "it looks wrong" into data.
+                    self.longCaptureFrameIndex += 1
+                    Self.dumpLongCaptureFrame(
+                        nextImage,
+                        index: self.longCaptureFrameIndex,
+                        didAppend: didAppend,
+                        status: self.model.statusMessage ?? ""
+                    )
                 #endif
                 if didAppend {
                     self.updateLongCapturePreviewFrame(on: screen)

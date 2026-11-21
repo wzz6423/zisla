@@ -69,7 +69,7 @@ struct IslandPlacementTests {
                 #expect(edge.isVertical == [.left, .right].contains(edge))
                 for step in 0...20 {
                     let original = IslandPlacement(mode: mode, edge: edge, offset: Double(step) / 20,
-                        inwardDistance: Double(step) * 20)
+                                                   inwardDistance: Double(step) * 20)
                     let data = try JSONEncoder().encode(original)
                     #expect(try JSONDecoder().decode(IslandPlacement.self, from: data) == original)
                 }
@@ -87,9 +87,9 @@ struct IslandPlacementTests {
         for _ in 0..<128 {
             seed = seed &* 6364136223846793005 &+ 1442695040888963407
             let original = IslandPlacement(mode: IslandPlacementMode.allCases[Int(seed % 2)],
-                edge: IslandEdge.allCases[Int((seed >> 8) % 4)],
-                offset: Double(seed >> 16) / Double(UInt64.max >> 16) * 5 - 2,
-                inwardDistance: Double(seed % 1_000) - 100)
+                                           edge: IslandEdge.allCases[Int((seed >> 8) % 4)],
+                                           offset: Double(seed >> 16) / Double(UInt64.max >> 16) * 5 - 2,
+                                           inwardDistance: Double(seed % 1_000) - 100)
             let encoded = try JSONEncoder().encode(original)
             let decoded = try JSONDecoder().decode(IslandPlacement.self, from: encoded)
             #expect(decoded == original)

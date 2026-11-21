@@ -99,11 +99,11 @@ struct SystemMetricsHistoryPanelTests {
         history.isReleasedWhenClosed = false
         let host: NSWindow? = switch origin {
         case "settings": SettingsWindow(
-            contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false
-        )
+                contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false
+            )
         case "island": NSPanel(
-            contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false
-        )
+                contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false
+            )
         default: nil
         }
         host?.isReleasedWhenClosed = false

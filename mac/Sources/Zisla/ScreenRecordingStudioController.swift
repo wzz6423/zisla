@@ -46,24 +46,24 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
     private var captureControlsPresented = false
     private var recordingProjectID: UUID?
     private lazy var cameraPreview = ScreenRecordingCameraPreviewController(capture: model.capture,
-        changeSize: { [weak self] in self?.model.recordingCameraSize = $0 },
-        changeCornerRadius: { [weak self] radius in
-            self?.model.recordingCameraCornerRadius = radius
-        })
+                                                                            changeSize: { [weak self] in self?.model.recordingCameraSize = $0 },
+                                                                            changeCornerRadius: { [weak self] radius in
+                                                                                self?.model.recordingCameraCornerRadius = radius
+                                                                            })
     private lazy var captureBar: ScreenRecordingCaptureBarController = {
         let model = self.model
         return ScreenRecordingCaptureBarController(model: model, languageStore: languageStore,
-            selectRegion: { [weak self] in self?.selectRegion() },
-            start: { [weak self] in self?.startCapture() },
-            openStudio: { [weak self] in self?.present() },
-            cancel: { [weak self] in self?.dismissCaptureControls() })
+                                                   selectRegion: { [weak self] in self?.selectRegion() },
+                                                   start: { [weak self] in self?.startCapture() },
+                                                   openStudio: { [weak self] in self?.present() },
+                                                   cancel: { [weak self] in self?.dismissCaptureControls() })
     }()
 
     init(appModel: AppModel) {
         model = ScreenRecordingStudioModel(appModel: appModel)
         languageStore = appModel.languageStore
         let window = ScreenRecordingStudioWindow(contentRect: NSRect(x: 0, y: 0, width: 1_160, height: 740),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+                                                 styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.studioModel = model
         window.isReleasedWhenClosed = false
         window.title = AppLocalization.text("录屏工作室")
@@ -72,7 +72,7 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         super.init(window: window)
         window.delegate = self
         window.contentView = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
-            languageStore: appModel.languageStore, prepareCapture: { [weak self] in self?.presentCaptureControls() }))
+                                                                               languageStore: appModel.languageStore, prepareCapture: { [weak self] in self?.presentCaptureControls() }))
         model.hideWindow = { [weak window] in window?.orderOut(nil) }
         model.showWindow = { [weak self] in self?.captureOperationFinished() }
         appModel.languageStore.$language.dropFirst().sink { [weak window] _ in
@@ -171,11 +171,10 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         let configuration = model.configuration
         if configuration.camera {
             cameraPreview.present(configuration: .init(cameraSize: model.recordingCameraSize,
-                cameraAspectRatio: model.recordingCameraAspectRatio,
-                cameraCornerRadius: model.recordingCameraCornerRadius,
-                cameraBorder: model.recordingCameraBorder))
-        }
-        else { cameraPreview.hide() }
+                                                       cameraAspectRatio: model.recordingCameraAspectRatio,
+                                                       cameraCornerRadius: model.recordingCameraCornerRadius,
+                                                       cameraBorder: model.recordingCameraBorder))
+        } else { cameraPreview.hide() }
     }
 
     private func refreshCameraPreview() {
@@ -220,7 +219,7 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         let targetFrame: CGRect? = windowTarget.flatMap { source in
             primaryScreen.flatMap { primary in
                 ScreenRecordingCaptureBarGeometry.targetFrame(configuration: model.configuration,
-                    sources: [source], screenFrames: screenFrames, primaryScreenFrame: primary.frame)
+                                                              sources: [source], screenFrames: screenFrames, primaryScreenFrame: primary.frame)
             }
         }
         let targetScreen: NSScreen? = targetFrame.flatMap { target -> NSScreen? in

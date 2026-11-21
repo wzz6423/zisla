@@ -54,9 +54,9 @@ struct AIAccountBalanceParserTests {
     /// Ambiguous feature IDs, incomplete windows, and excessive entry counts must invalidate the whole response.
     @Test func codexAdditionalInvalidDuplicateMissingAndOverBudgetInputsFailClosed() throws {
         let rows = [#"{"metered_feature":"spark","limit_name":"Spark","rate_limit":{"primary_window":{"used_percent":"NaN","limit_window_seconds":18000}}}"#,
-            #"{"limit_name":"Spark","rate_limit":{"primary_window":{"used_percent":1}}}"#,
-            #"{"metered_feature":"codex","limit_name":"Main","rate_limit":null}"#,
-            #"{"metered_feature":"spark","limit_name":"Spark","rate_limit":{"primary_window":{"limit_window_seconds":18000}}}"#]
+                    #"{"limit_name":"Spark","rate_limit":{"primary_window":{"used_percent":1}}}"#,
+                    #"{"metered_feature":"codex","limit_name":"Main","rate_limit":null}"#,
+                    #"{"metered_feature":"spark","limit_name":"Spark","rate_limit":{"primary_window":{"limit_window_seconds":18000}}}"#]
         for row in rows {
             #expect(throws: AIAccountBalanceError.invalidResponse) { try parse("{\"additional_rate_limits\":[" + row + "]}", .codex) }
         }
@@ -100,8 +100,8 @@ struct AIAccountBalanceParserTests {
         let free = try parse(#"{"current_usage":{"token_spend":{"limit_in_cents":0},"edit_predictions":{"used":0,"limit":100}}}"#, .zed)
         #expect(free.count == 1 && free.first?.kind == .predictions && free.first?.severity == .normal)
         for (provider, response) in [(AIProvider.coder, #"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100}}}}"#),
-            (.trae, #"{"is_credits_billing":true,"usage_summary":{"total_amount":100}}"#),
-            (.zed, #"{"current_usage":{"token_spend":{"limit_in_cents":1000}}}"#)] {
+                                     (.trae, #"{"is_credits_billing":true,"usage_summary":{"total_amount":100}}"#),
+                                     (.zed, #"{"current_usage":{"token_spend":{"limit_in_cents":1000}}}"#)] {
             #expect(throws: AIAccountBalanceError.invalidResponse) { try parse(response, provider) }
         }
     }
@@ -109,12 +109,12 @@ struct AIAccountBalanceParserTests {
     /// Malformed or absent provider fields must fail instead of publishing a plausible zero-valued quota.
     @Test func malformedUnknownPartialAndMissingQuotasNeverBecomeZero() throws {
         let fixtures: [(AIProvider, String)] = [(.claude, #"{"five_hour":{"utilization":true}}"#),
-            (.codex, #"{"rate_limit":{"primary_window":{"used_percent":101}}}"#),
-            (.gemini, #"{"buckets":[{"modelId":"fixture","remainingFraction":1.1}]}"#),
-            (.kimi, #"{"usage":{"limit":100},"limits":[]}"#), (.cursor, #"{"individualUsage":{"plan":{"limit":1000,"breakdown":{"total":1000}}}}"#),
-            (.zed, #"{"plan":{"usage":{"edit_predictions":{"used":1,"limit":null}}}}"#),
-            (.workbuddy, #"{"data":{"Accounts":[{"Status":0,"CycleCapacitySizePrecise":100,"CycleCapacityRemainPrecise":20},{"Status":0,"CycleCapacitySizePrecise":100}]}}"#),
-            (.opencode, #"{"usage":{"rolling":{"percent":0}}}"#), (.muse, #"{"schemaVersion":1,"allowance":null}"#)]
+                                                (.codex, #"{"rate_limit":{"primary_window":{"used_percent":101}}}"#),
+                                                (.gemini, #"{"buckets":[{"modelId":"fixture","remainingFraction":1.1}]}"#),
+                                                (.kimi, #"{"usage":{"limit":100},"limits":[]}"#), (.cursor, #"{"individualUsage":{"plan":{"limit":1000,"breakdown":{"total":1000}}}}"#),
+                                                (.zed, #"{"plan":{"usage":{"edit_predictions":{"used":1,"limit":null}}}}"#),
+                                                (.workbuddy, #"{"data":{"Accounts":[{"Status":0,"CycleCapacitySizePrecise":100,"CycleCapacityRemainPrecise":20},{"Status":0,"CycleCapacitySizePrecise":100}]}}"#),
+                                                (.opencode, #"{"usage":{"rolling":{"percent":0}}}"#), (.muse, #"{"schemaVersion":1,"allowance":null}"#)]
         for (provider, response) in fixtures { #expect(throws: (any Error).self) { try parse(response, provider) } }
         for provider in [AIProvider.claude, .codex, .gemini, .kimi, .cursor, .zcode, .zed, .workbuddy, .opencode, .muse] {
             for response in ["{}", "[]", "{", #"{"quota":0,"private":"fixture-secret"}"#] {
@@ -137,12 +137,12 @@ struct AIAccountBalanceParserTests {
     /// A unified account requires current-window observations even when legacy fields contain a tempting zero usage.
     @Test func unifiedCursorUsesPublishedCurrentWindowsInsteadOfStaleLegacyZero() throws {
         let root: [String: Any] = ["membershipType": "unified_pro", "limitType": "user",
-            "individualUsage": ["plan": ["used": 0, "limit": 2000]]]
+                                   "individualUsage": ["plan": ["used": 0, "limit": 2000]]]
         #expect(throws: AIAccountBalanceError.noQuota) { try AIAccountBalanceParser.cursor(root, now: now) }
         let windows = try AIAccountBalanceParser.cursor(root, now: now,
-            sand: ["usagePercent": 90, "hasNonZeroIncludedLimit": true],
-            unified: ["availability": "available", "monthlyUsage": ["usedCents": 800, "limitCents": 1000,
-                "periodStart": "2030-01-01T00:00:00Z", "resetsAt": "2031-01-01T00:00:00Z"]])
+                                                        sand: ["usagePercent": 90, "hasNonZeroIncludedLimit": true],
+                                                        unified: ["availability": "available", "monthlyUsage": ["usedCents": 800, "limitCents": 1000,
+                                                                                                                "periodStart": "2030-01-01T00:00:00Z", "resetsAt": "2031-01-01T00:00:00Z"]])
         #expect(windows.map(\.remainingPercent) == [10, 20])
         #expect(!windows.contains { $0.id == "plan" })
     }

@@ -430,7 +430,7 @@ public struct PDFProcessingService: Sendable {
 
         let staging = outputURL.deletingLastPathComponent().appendingPathComponent(".zisla-pdf-images-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false,
-            attributes: [.posixPermissions: 0o700])
+                                                attributes: [.posixPermissions: 0o700])
         let stagedOutput = staging.appendingPathComponent("images.pdf")
         do {
             do {

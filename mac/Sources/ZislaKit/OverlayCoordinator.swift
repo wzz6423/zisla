@@ -257,11 +257,10 @@ public final class OverlayCoordinator: NSObject {
         }
 
         if let activeDisplayID,
-            !layouts.contains(where: { $0.displayID == activeDisplayID })
-        {
+           !layouts.contains(where: { $0.displayID == activeDisplayID }) {
             self.activeDisplayID =
                 preferredLayout(at: NSEvent.mouseLocation)?.displayID
-                ?? layouts.first?.displayID
+                    ?? layouts.first?.displayID
         }
 
         reportActiveLayout()
@@ -269,7 +268,7 @@ public final class OverlayCoordinator: NSObject {
             if activeDisplayID == nil {
                 activeDisplayID =
                     preferredLayout(at: NSEvent.mouseLocation)?.displayID
-                    ?? layouts.first?.displayID
+                        ?? layouts.first?.displayID
             }
             presentCurrentLayout()
         }
@@ -365,7 +364,7 @@ public final class OverlayCoordinator: NSObject {
         }
 
         guard isVisible,
-            let activeLayout = layout(for: activeDisplayID)
+              let activeLayout = layout(for: activeDisplayID)
         else {
             return
         }
@@ -421,8 +420,7 @@ public final class OverlayCoordinator: NSObject {
         // Only a reveal that starts away from the island needs the grace; when the pointer already
         // covers it the normal exit rules apply from the first sample.
         if let expandedFrame = layout(for: activeDisplayID)?.expandedFrame,
-            contains(point, in: expandedFrame)
-        {
+           contains(point, in: expandedFrame) {
             endPointerEntryGrace()
         } else {
             beginPointerEntryGrace()
@@ -854,8 +852,8 @@ public final class OverlayCoordinator: NSObject {
                 return
             }
             guard let self,
-                !Task.isCancelled,
-                panelCollapseGeneration.isCurrent(token)
+                  !Task.isCancelled,
+                  panelCollapseGeneration.isCurrent(token)
             else { return }
             self.panelCollapseTask = nil
             self.stop()
@@ -873,7 +871,7 @@ public final class OverlayCoordinator: NSObject {
         pointerRevalidationTask = Task { @MainActor [weak self] in
             await Task.yield()
             guard let self, !Task.isCancelled,
-                reducer.state.visibility == .expanded || reducer.state.visibility == .pinned
+                  reducer.state.visibility == .expanded || reducer.state.visibility == .pinned
             else { return }
             pointerRevalidationTask = nil
             handlePointer(at: NSEvent.mouseLocation)
@@ -900,9 +898,9 @@ public final class OverlayCoordinator: NSObject {
                 return
             }
             guard let self,
-                !Task.isCancelled,
-                pointerEntryGraceGeneration.isCurrent(token),
-                awaitsPointerEntry
+                  !Task.isCancelled,
+                  pointerEntryGraceGeneration.isCurrent(token),
+                  awaitsPointerEntry
             else { return }
             pointerEntryGraceTask = nil
             awaitsPointerEntry = false
@@ -923,7 +921,7 @@ public final class OverlayCoordinator: NSObject {
         guard activeDisplayID == nil else { return }
         activeDisplayID =
             preferredLayout(at: NSEvent.mouseLocation)?.displayID
-            ?? layouts.first?.displayID
+                ?? layouts.first?.displayID
     }
 
     public func selectActiveDisplay(at point: CGPoint) {
@@ -954,9 +952,9 @@ public final class OverlayCoordinator: NSObject {
 
     private func presentCurrentLayout() {
         guard !isScreenLocked,
-            !isScreenshotActive,
-            !isHoverActivationSuspended,
-            let layout = layout(for: activeDisplayID)
+              !isScreenshotActive,
+              !isHoverActivationSuspended,
+              let layout = layout(for: activeDisplayID)
         else { return }
         // After repositioning to a different screen, don't let a pending collapse task on the old screen prematurely hide the shared panel.
         cancelPendingPanelCollapse()
@@ -988,13 +986,13 @@ public final class OverlayCoordinator: NSObject {
 
     private func updatePersistentPanels(forcePresent: Bool = false) {
         guard !isScreenLocked,
-            !isScreenshotActive,
-            !isHoverActivationSuspended,
-            !isVoiceRecording,
-            !isTransientNoticePresented,
-            isPersistentContentVisible,
-            let persistentContentViewProvider,
-            let persistentPanelFrameProvider
+              !isScreenshotActive,
+              !isHoverActivationSuspended,
+              !isVoiceRecording,
+              !isTransientNoticePresented,
+              isPersistentContentVisible,
+              let persistentContentViewProvider,
+              let persistentPanelFrameProvider
         else {
             hidePersistentPanels()
             return

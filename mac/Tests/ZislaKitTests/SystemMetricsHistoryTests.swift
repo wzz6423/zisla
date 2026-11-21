@@ -836,9 +836,9 @@ struct SystemMetricsHistoryDatabaseTests {
         database.removeAll()
         #expect(store.stats.count == 2)
         #expect(sqlite3_exec(inspection, """
-            CREATE TRIGGER reject_record BEFORE INSERT ON metrics
-            BEGIN SELECT RAISE(ABORT, 'injected recording failure'); END;
-            """, nil, nil, nil) == SQLITE_OK)
+        CREATE TRIGGER reject_record BEFORE INSERT ON metrics
+        BEGIN SELECT RAISE(ABORT, 'injected recording failure'); END;
+        """, nil, nil, nil) == SQLITE_OK)
         store.append(record(at: 180))
         #expect(store.stats == .empty, "A successfully read empty archive must replace the cached summary")
     }
@@ -892,13 +892,13 @@ struct SystemMetricsHistoryDatabaseTests {
         let inspection = try #require(connection)
         defer { sqlite3_close(inspection) }
         #expect(sqlite3_exec(inspection, """
-            CREATE TRIGGER fail_write BEFORE INSERT ON metric_fans
-            WHEN NEW.rpm = -1 BEGIN SELECT RAISE(ABORT, 'injected write failure'); END;
-            CREATE TRIGGER fail_clear BEFORE DELETE ON metrics
-            BEGIN SELECT RAISE(ABORT, 'injected clear failure'); END;
-            CREATE TRIGGER fail_clear_fans BEFORE DELETE ON metric_fans
-            BEGIN SELECT RAISE(ABORT, 'injected clear failure'); END;
-            """, nil, nil, nil) == SQLITE_OK)
+        CREATE TRIGGER fail_write BEFORE INSERT ON metric_fans
+        WHEN NEW.rpm = -1 BEGIN SELECT RAISE(ABORT, 'injected write failure'); END;
+        CREATE TRIGGER fail_clear BEFORE DELETE ON metrics
+        BEGIN SELECT RAISE(ABORT, 'injected clear failure'); END;
+        CREATE TRIGGER fail_clear_fans BEFORE DELETE ON metric_fans
+        BEGIN SELECT RAISE(ABORT, 'injected clear failure'); END;
+        """, nil, nil, nil) == SQLITE_OK)
 
         store.append(record(at: 120, fanRPMs: [-1]))
         #expect(store.stats == originalStats)
@@ -962,9 +962,9 @@ struct SystemMetricsHistoryDatabaseTests {
         let inspection = try #require(connection)
         defer { sqlite3_close(inspection) }
         #expect(sqlite3_exec(inspection, """
-            CREATE TRIGGER fail_fan_write BEFORE INSERT ON metric_fans
-            WHEN NEW.rpm = -1 BEGIN SELECT RAISE(ABORT, 'injected fan write failure'); END;
-            """, nil, nil, nil) == SQLITE_OK)
+        CREATE TRIGGER fail_fan_write BEFORE INSERT ON metric_fans
+        WHEN NEW.rpm = -1 BEGIN SELECT RAISE(ABORT, 'injected fan write failure'); END;
+        """, nil, nil, nil) == SQLITE_OK)
 
         for timestamp in [120.0, 60] {
             database.appendRecord(record(at: timestamp, fanRPMs: [-1]), capacity: nil)

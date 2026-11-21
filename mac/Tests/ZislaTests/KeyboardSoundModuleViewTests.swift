@@ -39,7 +39,7 @@ struct KeyboardSoundModuleViewTests {
         .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let window = NSWindow(contentRect: .init(x: -100_000, y: -100_000, width: size.width * 2, height: size.height),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -55,15 +55,15 @@ struct KeyboardSoundModuleViewTests {
         let moduleFrame = try #require(frames.first { $0.midX < bounds.midX })
         let referenceFrame = try #require(frames.first { $0.midX > bounds.midX })
         #expect(abs(moduleFrame.midX - (bounds.minX + size.width / 2)) < 1,
-            "The missing-data title must be horizontally centered: \(moduleFrame)")
+                "The missing-data title must be horizontally centered: \(moduleFrame)")
         #expect(abs(moduleFrame.midY - referenceFrame.midY) < 1,
-            "The missing-data title must match the shared empty state's vertical center: \(moduleFrame), \(referenceFrame)")
+                "The missing-data title must match the shared empty state's vertical center: \(moduleFrame), \(referenceFrame)")
         #expect(bounds.insetBy(dx: -1, dy: -1).contains(moduleFrame))
         #expect(!window.isVisible)
     }
 
     @Test(arguments: [(Int64(0), false), (42, false), (0, true), (42, true)],
-        [String?.none, "1", "0", "", "true", "01", " 1", "1 "])
+          [String?.none, "1", "0", "", "true", "01", " 1", "1 "])
     @MainActor
     func typingStatsAppearAndDisappearWithoutLeavingScrollContent(
         scenario: (characterCount: Int64, isDebugBuild: Bool), overrideValue: String?
@@ -92,13 +92,13 @@ struct KeyboardSoundModuleViewTests {
         let environment = overrideValue.map { ["ZISLA_DEBUG_IGNORE_KEYBOARD_STATS": $0] } ?? [:]
         let content = { (snapshot: KeyboardTypingStatsSummary?) in
             KeyboardSoundModuleView.content(summary: snapshot, voiceStatistics: nil,
-                environment: environment, isDebugBuild: isDebugBuild)
+                                            environment: environment, isDebugBuild: isDebugBuild)
                 .frame(width: 720, height: 401)
         }
         let host = NSHostingView(rootView: content(nil))
         host.sizingOptions = []
         let window = NSWindow(contentRect: .init(x: -100_000, y: -100_000, width: 720, height: 401),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -117,9 +117,9 @@ struct KeyboardSoundModuleViewTests {
             }
             let showsDashboard = snapshot != nil && !(isDebugBuild && overrideValue == "1")
             #expect(hasEmptyTitle == !showsDashboard,
-                "Only unavailable statistics or an exact debug opt-in must show the empty state")
+                    "Only unavailable statistics or an exact debug opt-in must show the empty state")
             #expect(hasScrollArea == showsDashboard,
-                "Only a displayed statistics dashboard must own a scroll area")
+                    "Only a displayed statistics dashboard must own a scroll area")
             if showsDashboard {
                 #expect(objects.contains {
                     value($0, "accessibilityLabel") as? String == AppLocalization.text("今日按键")
@@ -127,7 +127,7 @@ struct KeyboardSoundModuleViewTests {
                 #expect(objects.contains {
                     value($0, "accessibilityValue") as? String == characterCount.formatted(.number)
                 },
-                    "Zero and populated summaries must retain their recorded counts")
+                "Zero and populated summaries must retain their recorded counts")
             }
         }
         #expect(summary.todayCharacterCount == characterCount)
@@ -184,7 +184,7 @@ struct KeyboardSoundModuleViewTests {
         .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 360, height: 920),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.contentView = host
         defer { panel.contentView = nil; panel.close() }
@@ -210,7 +210,7 @@ struct KeyboardSoundModuleViewTests {
         for menu in menus {
             let element = try #require(menu as? any NSAccessibilityElementProtocol)
             #expect(abs(element.accessibilityFrame().height - referenceMenu.accessibilityFrame().height) < 0.5,
-                "Every keyboard selector must match the native medium height")
+                    "Every keyboard selector must match the native medium height")
         }
         let switches = controls.filter {
             value($0, "accessibilitySubrole") as? String == "AXToggle"
@@ -232,7 +232,7 @@ struct KeyboardSoundModuleViewTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let library = SoundPackLibrary(rootURL: directory.appendingPathComponent("packs"), bundledPackRootURL: nil)
         let editor = SoundPackEditorModel(library: library, initialSelectionID: "fixture",
-            temporaryCacheParentURL: directory, onLibraryDidChange: { _ in }, previewAudioAt: { _ in })
+                                          temporaryCacheParentURL: directory, onLibraryDidChange: { _ in }, previewAudioAt: { _ in })
         await editor.createBlank()
         if perKey {
             editor.mappingMode = .perKey
@@ -249,7 +249,7 @@ struct KeyboardSoundModuleViewTests {
         })
         host.sizingOptions = []
         let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 1_240, height: 900),
-            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         panel.contentView = host
         defer { panel.contentView = nil; panel.close() }
@@ -369,7 +369,7 @@ struct KeyboardSoundModuleViewTests {
         let name = String(repeating: "Long application name ", count: 12)
         let buckets = scenario.hasInput ? (0..<12).map { index in
             KeyboardTypingStatsTrendPoint(id: index, start: date.addingTimeInterval(Double(index) * 300),
-                characterCount: Int64(index * 1_000))
+                                          characterCount: Int64(index * 1_000))
         } : []
         let summary = scenario.hasSummary ? KeyboardTypingStatsSummary(
             generatedAt: date, lastInputAt: scenario.hasInput ? date : nil,
@@ -386,8 +386,8 @@ struct KeyboardSoundModuleViewTests {
             )] : [],
             history: scenario.hasInput ? (0..<14).map { index in
                 KeyboardTypingStatsDaySummary(id: "day-\(index)",
-                    date: date.addingTimeInterval(-Double(index) * 86_400),
-                    characterCount: Int64(index * 1_000), peakCharactersPerSecond: 123, activeMinuteBuckets: 300)
+                                              date: date.addingTimeInterval(-Double(index) * 86_400),
+                                              characterCount: Int64(index * 1_000), peakCharactersPerSecond: 123, activeMinuteBuckets: 300)
             } : [],
             timelineRange: "1h", recentBuckets: buckets,
             applicationTimelines: scenario.hasInput
@@ -405,7 +405,7 @@ struct KeyboardSoundModuleViewTests {
         .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: scenario.width, height: 160),
-            styleMask: .borderless, backing: .buffered, defer: false)
+                              styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -436,35 +436,35 @@ struct KeyboardSoundModuleViewTests {
             window.setContentSize(CGSize(width: scenario.width, height: height))
             await settle()
             #expect(document.frame.width <= scroll.contentView.bounds.width + 0.5,
-                "Statistics must fit the viewport at \(scenario.width)×\(height) in \(language.rawValue)")
+                    "Statistics must fit the viewport at \(scenario.width)×\(height) in \(language.rawValue)")
             for delta: CGFloat in [-80, 80] {
                 var shifted = scroll.contentView.bounds
                 shifted.origin.x += delta
                 #expect(abs(scroll.contentView.constrainBoundsRect(shifted).minX
-                    - scroll.contentView.bounds.minX) < 0.5,
-                    "Horizontal trackpad movement must not shift keyboard statistics")
+                            - scroll.contentView.bounds.minX) < 0.5,
+                "Horizontal trackpad movement must not shift keyboard statistics")
             }
             #expect(scroll.horizontalScrollElasticity == .none)
             if scenario.hasSummary && height == 160 {
                 try #require(document.frame.height > scroll.contentView.bounds.height)
                 scroll.contentView.scroll(to: CGPoint(x: 0,
-                    y: document.frame.height - scroll.contentView.bounds.height))
+                                                      y: document.frame.height - scroll.contentView.bounds.height))
                 scroll.reflectScrolledClipView(scroll.contentView)
                 await settle()
                 #expect(scroll.contentView.bounds.minY > 0,
-                    "Vertical scrolling must still reach the complete keyboard statistics")
+                        "Vertical scrolling must still reach the complete keyboard statistics")
                 let heatmap = try #require(accessibilityObjects(host).first {
                     value($0, "accessibilityLabel") as? String == AppLocalization.text("键盘按键热力图")
                 } as? any NSAccessibilityElementProtocol)
                 let frame = document.convert(window.convertFromScreen(heatmap.accessibilityFrame()), from: nil)
                 #expect(frame.minX >= -0.5 && frame.maxX <= scroll.contentView.bounds.width + 0.5,
-                    "The full keyboard heatmap must stay inside the horizontal viewport")
+                        "The full keyboard heatmap must stay inside the horizontal viewport")
                 #expect(frame.maxY <= scroll.contentView.bounds.maxY + 0.5,
-                    "Vertical scrolling must reveal the bottom of the complete keyboard heatmap")
+                        "Vertical scrolling must reveal the bottom of the complete keyboard heatmap")
                 let scroller = try #require(scroll.verticalScroller)
                 let track = window.convertToScreen(scroller.convert(scroller.bounds, to: nil))
                 #expect(!heatmap.accessibilityFrame().intersects(track),
-                    "The vertical scrollbar must not cover the keyboard heatmap")
+                        "The vertical scrollbar must not cover the keyboard heatmap")
             }
         }
         #expect(!window.isVisible && !window.isKeyWindow)

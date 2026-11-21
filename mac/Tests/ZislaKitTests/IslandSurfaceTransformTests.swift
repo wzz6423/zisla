@@ -78,9 +78,9 @@ struct IslandSurfaceTransformTests {
         )
         #expect(
             IslandSurfaceTransform.fittingSize(
-            contentSize: CGSize(width: 1_060, height: 524),
-            availableSize: CGSize(width: -1, height: 524)
-        ) == CGSize(width: 0, height: 524)
+                contentSize: CGSize(width: 1_060, height: 524),
+                availableSize: CGSize(width: -1, height: 524)
+            ) == CGSize(width: 0, height: 524)
         )
     }
 

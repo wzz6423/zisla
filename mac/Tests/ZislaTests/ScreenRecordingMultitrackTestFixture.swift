@@ -65,8 +65,8 @@ final class RecordingMultitrackTestFixture {
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: Int(size.width), AVVideoHeightKey: Int(size.height),
             AVVideoColorPropertiesKey: [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2],
+                                        AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                                        AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2],
         ])
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -84,7 +84,7 @@ final class RecordingMultitrackTestFixture {
             try #require(CVPixelBufferPoolCreatePixelBuffer(nil, try #require(adaptor.pixelBufferPool), &buffer) == kCVReturnSuccess)
             let color = colors[min(colors.count - 1, index * colors.count / count)]
             context.render(CIImage(color: color).cropped(to: CGRect(origin: .zero, size: size)), to: try #require(buffer),
-                bounds: CGRect(origin: .zero, size: size), colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                           bounds: CGRect(origin: .zero, size: size), colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
             try #require(adaptor.append(try #require(buffer), withPresentationTime: .init(value: Int64(index), timescale: 8)))
         }
         input.markAsFinished()
@@ -98,8 +98,8 @@ final class RecordingMultitrackTestFixture {
         var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try bytes.withUnsafeMutableBytes { pointer in
             let context = try #require(CGContext(data: pointer.baseAddress, width: image.width, height: image.height,
-                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                                                 bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         }
         let offset = (y * image.width + x) * 4
@@ -128,7 +128,7 @@ final class RecordingMultitrackTestFixture {
                     while let sample = output.copyNextSampleBuffer() {
                         let source = CIImage(cvPixelBuffer: try #require(sample.imageBuffer))
                         frames.append((sample.presentationTimeStamp.seconds,
-                            try #require(context.createCGImage(source, from: source.extent))))
+                                       try #require(context.createCGImage(source, from: source.extent))))
                     }
                     #expect(reader.status == .completed && reader.error == nil, "The entire timeline must decode without dropped media")
                     continuation.resume(returning: frames)

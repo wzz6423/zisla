@@ -17,7 +17,7 @@ public final class ScreenRecordingOutputDirectoryStore {
         var stale = false
         if let bookmark = defaults.data(forKey: bookmarkKey),
            let resolved = try? URL(resolvingBookmarkData: bookmark,
-               options: [.withSecurityScope, .withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale) {
+                                   options: [.withSecurityScope, .withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale) {
             directory = resolved.standardizedFileURL
         } else if let pathKey, let path = defaults.string(forKey: pathKey), !path.isEmpty {
             directory = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
@@ -38,7 +38,7 @@ public final class ScreenRecordingOutputDirectoryStore {
                 throw CocoaError(.fileWriteInvalidFileName)
             }
             let bookmark = try directory.bookmarkData(options: .withSecurityScope,
-                includingResourceValuesForKeys: nil, relativeTo: nil)
+                                                      includingResourceValuesForKeys: nil, relativeTo: nil)
             defaults.set(bookmark, forKey: bookmarkKey)
             if let pathKey { defaults.set(directory.path, forKey: pathKey) }
             scopedDirectory?.stopAccessingSecurityScopedResource()

@@ -375,7 +375,8 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         let centerFrame = CGRect(origin: point, size: .zero)
         let gap = Self.clampedInwardDistance(
             Self.edgeDistance(of: centerFrame, in: frame, edge: edge) - thickness / 2,
-            thickness: thickness, edge: edge, bounds: layout.placementBounds, screenFrame: frame)
+            thickness: thickness, edge: edge, bounds: layout.placementBounds, screenFrame: frame
+        )
         let minimumGap = Self.edgeDistance(of: layout.placementBounds, in: frame, edge: edge)
         placement.inwardDistance = gap == minimumGap ? 0 : Double(gap)
         return placement
@@ -434,7 +435,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
             // Preserve the top edge of the previous 40pt pill while trimming its bottom.
             let top = screen.frame.maxY - menuBarHeight / 2 + 20
             anchor.origin.y = clampedOrigin(top - anchor.height,
-                length: anchor.height, minimum: bounds.minY, maximum: bounds.maxY)
+                                            length: anchor.height, minimum: bounds.minY, maximum: bounds.maxY)
         }
         anchor = Self.compactPillFrame(
             anchor, edge: edge, bounds: bounds,
@@ -505,7 +506,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
                 let minimumLength = centerWidth + SideNoticeLayoutEngine.compactStatusWingWidth * 2
                 let contentLength = expandsForDetailedStatus ? ScreenLayoutConfiguration.cameraPillMaximumWidth
                     : compactStatusLength.map { min(ScreenLayoutConfiguration.cameraPillMaximumWidth, max(minimumLength, $0)) }
-                        ?? frame.width
+                    ?? frame.width
                 desiredLength = max(minimumLength, contentLength)
             }
         } else if placementMode == .custom, let compactStatusLength {
@@ -528,7 +529,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         if placementMode == .custom {
             let thickness = edge.isVertical ? frame.width : frame.height
             let gap = Self.clampedInwardDistance(inwardDistance, thickness: thickness,
-                edge: edge, bounds: bounds, screenFrame: screenFrame)
+                                                 edge: edge, bounds: bounds, screenFrame: screenFrame)
             switch edge {
             case .top: frame.origin.y = screenFrame.maxY - gap - frame.height
             case .bottom: frame.origin.y = screenFrame.minY + gap
@@ -541,7 +542,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
             // The reserved screen region may cover more than the camera aperture.
             let depth = screenFrame.maxY - physicalOcclusionFrame.minY
             let clearance = min(Self.edgeDistance(of: bounds, in: screenFrame, edge: edge),
-                max(0, frame.height * 3 - depth))
+                                max(0, frame.height * 3 - depth))
             let top = min(bounds.maxY, max(bounds.minY, physicalOcclusionFrame.minY - clearance))
             frame.size.height = min(frame.height, top - bounds.minY)
             frame.origin.y = top - frame.height
@@ -627,7 +628,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
 
     private func physicalNotchFrame(for screen: ScreenSnapshot) -> CGRect? {
         guard let leftArea = screen.auxiliaryTopLeftArea,
-            let rightArea = screen.auxiliaryTopRightArea
+              let rightArea = screen.auxiliaryTopRightArea
         else {
             return nil
         }

@@ -65,8 +65,8 @@ struct UpdateSection: View {
                     L10n.format("发现新版本 %@", release.version.description),
                     systemImage: "sparkles"
                 )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(KeyboardVisualStyle.accentStrong)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(KeyboardVisualStyle.accentStrong)
                 Button {
                     openURL(release.releaseURL)
                 } label: {
@@ -83,8 +83,8 @@ struct UpdateSection: View {
                     L10n.format("已是最新版 %@", version.description),
                     systemImage: "checkmark.circle.fill"
                 )
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+                .foregroundStyle(.secondary)
+                .font(.caption)
             case let .installedVersionIsNewer(latestVersion):
                 Label(
                     L10n.format(
@@ -199,45 +199,45 @@ private extension View {
 }
 
 #if DEBUG
-private let previewRelease = try! ReleaseSummary(
-    tagName: "v0.4.0",
-    releaseURL: URL(string: "https://github.com/wzz6423/zisla/releases/tag/v0.4.0")!,
-    publishedAt: Date()
-)
-
-#Preview("首次授权") {
-    UpdateSection(
-        controller: .preview(
-            state: .idle(cached: nil),
-            preference: .undecided
-        )
+    private let previewRelease = try! ReleaseSummary(
+        tagName: "v0.4.0",
+        releaseURL: URL(string: "https://github.com/wzz6423/zisla/releases/tag/v0.4.0")!,
+        publishedAt: Date()
     )
-    .padding()
-    .frame(width: 340)
-}
 
-#Preview("发现更新") {
-    UpdateSection(
-        controller: .preview(
-            state: .completed(
-                UpdateCheckSnapshot(
-                    result: .updateAvailable(previewRelease),
-                    checkedAt: Date()
+    #Preview("首次授权") {
+        UpdateSection(
+            controller: .preview(
+                state: .idle(cached: nil),
+                preference: .undecided
+            )
+        )
+        .padding()
+        .frame(width: 340)
+    }
+
+    #Preview("发现更新") {
+        UpdateSection(
+            controller: .preview(
+                state: .completed(
+                    UpdateCheckSnapshot(
+                        result: .updateAvailable(previewRelease),
+                        checkedAt: Date()
+                    )
                 )
             )
         )
-    )
-    .padding()
-    .frame(width: 340)
-}
+        .padding()
+        .frame(width: 340)
+    }
 
-#Preview("离线") {
-    UpdateSection(
-        controller: .preview(
-            state: .failed(.offline, cached: nil)
+    #Preview("离线") {
+        UpdateSection(
+            controller: .preview(
+                state: .failed(.offline, cached: nil)
+            )
         )
-    )
-    .padding()
-    .frame(width: 340)
-}
+        .padding()
+        .frame(width: 340)
+    }
 #endif

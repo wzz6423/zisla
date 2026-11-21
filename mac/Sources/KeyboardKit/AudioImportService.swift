@@ -46,7 +46,7 @@ actor AudioImportService {
         self.limits = limits
         self.workingDirectory = workingDirectory
             ?? fileManager.temporaryDirectory
-                .appendingPathComponent("SimuBoardAudioImports", isDirectory: true)
+            .appendingPathComponent("SimuBoardAudioImports", isDirectory: true)
         self.ffmpegExecutableOverride = ffmpegExecutableOverride
         self.ffmpegTimeoutSeconds = ffmpegTimeoutSeconds.isFinite
             && ffmpegTimeoutSeconds > 0
