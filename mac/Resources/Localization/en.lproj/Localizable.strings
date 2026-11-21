@@ -15,6 +15,7 @@
 "低额度提醒" = "Low quota alerts";
 "供应商未提供已验证的本地额度查询接口" = "The provider has no verified local quota API";
 "其他位置常驻额度" = "Pin quota at other positions";
+"常驻额度信息" = "Persistent quota information";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Alert when remaining quota is at or below 20%, including exhaustion";
 "可用预算" = "Available budget";
 "可用额度" = "Available quota";
@@ -96,6 +97,7 @@
 "设置" = "Settings";
 "通用" = "General";
 "工作流" = "Workflow";
+"系统信息" = "System Information";
 "信息" = "Info";
 "模型" = "Models";
 "宠物" = "Pet";
@@ -2749,6 +2751,9 @@
 "onboarding.unmute" = "Unmute";
 "onboarding.manual" = "Enable in System Settings";
 "onboarding.unavailable" = "Unavailable on this system";
+"onboarding.unknown" = "Permission status could not be determined";
+"onboarding.partially_granted" = "Partially allowed";
+"permission.drag_app.body" = "Drag this icon into the app list in System Settings.";
 "onboarding.introduction.title" = "Meet zisla";
 "onboarding.introduction.body" = "Keep everyday information and tools within reach.";
 "onboarding.feature.island.title" = "Your everyday assistant at the top of the screen";
@@ -2782,7 +2787,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "For viewing the battery levels of connected devices.";
 "onboarding.permission.automation.title" = "Automation";
-"onboarding.permission.automation.body" = "For controlling supported media apps and performing actions across apps. macOS confirms permission for each target app.";
+"onboarding.permission.automation.body" = "For controlling supported media apps and performing actions across apps. Status is checked for currently running target apps; macOS confirms permission for each app separately.";
 "onboarding.permission.files.title" = "File Access";
 "onboarding.permission.files.body" = "Select the files or folders you need, and macOS will grant the corresponding access permissions.";
 "onboarding.ready.title" = "You’re ready";
@@ -3383,6 +3388,7 @@
 "依赖组件" = "Dependency Components";
 "管理下载与文档转换所需组件。" = "Manage components required for downloads and document conversion.";
 "更改 %@ 的保存位置" = "Change save location for %@";
+"恢复默认位置" = "Restore Default Locations";
 
 "本地优先的原生笔记应用" = "Local-first native notes app";
 "AI 会话工作目录" = "AI session workspaces";
@@ -3400,6 +3406,7 @@
 "输入 %@ · 输出 %@" = "Input %@ · Output %@";
 "AI 模型用量" = "AI Model Usage";
 
+"用量历史" = "Usage History";
 "AI 用量历史" = "AI Usage History";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Export all AI usage history as an xlsx spreadsheet";
 "已清空 AI 用量历史" = "AI usage history cleared";
@@ -3756,3 +3763,16 @@
 "清理失败：%@" = "Cleanup failed: %@";
 "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Cleanup failed. For details, go to Settings > System Monitor and Cleanup.";
 "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Cleanup partially failed. For details, go to Settings > System Monitor and Cleanup.";
+
+"从默认浏览器导入" = "Import from default browser";
+"正在读取默认浏览器 Cookie" = "Reading default browser cookies";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Cannot identify the default browser. Paste cookies manually.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Cookie import is unavailable for the default browser. Paste cookies manually.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "No cookies found for this website. Sign in using the default browser or paste cookies manually.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Cannot read default browser cookies. Paste cookies manually or check access permissions.";
+"按应用" = "By app";
+"搜索内容或应用" = "Search content or apps";
+
+"重复安装 · 版本 %@ · %@ · 保留：%@" = "Duplicate installation · Version %@ · %@ · Keep: %@";
+"更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Update leftover · Old version %@ · %@ · Current version: %@";
+"应用副本或当前版本状态已变化，已保留目标" = "The application copy or current version has changed. The item was kept.";

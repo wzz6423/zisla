@@ -32,6 +32,44 @@ struct PermissionsSettingsViewTests {
     }
 
     @Test
+    func grantedSystemPermissionsRefreshAfterRevocationAndRecovery() async throws {
+        let fixture = Fixture()
+        defer { fixture.close() }
+        let permissions: [OnboardingPermissionID] = [.systemAudio, .automation, .files, .fullDiskAccess]
+        for permission in permissions { fixture.statuses[permission] = .granted }
+        await fixture.layout()
+        for permission in permissions { #expect(fixture.button(permission) == nil) }
+
+        for permission in permissions { fixture.statuses[permission] = .denied }
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        await fixture.layout()
+        for permission in permissions {
+            #expect(fixture.status(permission) == .denied)
+            try await fixture.press(permission)
+        }
+        #expect(fixture.opened == permissions.map(\.settingsURL))
+
+        for permission in permissions { fixture.statuses[permission] = .granted }
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        await fixture.layout()
+        for permission in permissions { #expect(fixture.button(permission) == nil) }
+        #expect(fixture.requests.isEmpty)
+    }
+
+    @Test(arguments: [OnboardingPermissionStatus.unknown, .partiallyGranted])
+    func undeterminedAndPartialSystemPermissionsKeepTheirSettingsAction(status: OnboardingPermissionStatus) async throws {
+        let fixture = Fixture()
+        defer { fixture.close() }
+        fixture.statuses[.automation] = status
+        await fixture.layout()
+        #expect(fixture.displayedText().contains(AppLocalization.string(status.localizationKey, language: .english)))
+        try await fixture.press(.automation)
+        #expect(fixture.opened == [OnboardingPermissionID.automation.settingsURL])
+        #expect(fixture.status(.automation) == status)
+        #expect(fixture.requests.isEmpty)
+    }
+
+    @Test
     func buttonsSerializeRequestsAndUseSystemSettingsAfterDenial() async throws {
         let fixture = Fixture()
         defer { fixture.close() }

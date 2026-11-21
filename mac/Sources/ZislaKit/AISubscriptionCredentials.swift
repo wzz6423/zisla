@@ -57,6 +57,10 @@ struct AISubscriptionCredentials: Sendable {
     }
 
     static func decryptCursorToken(_ encrypted: Data, password: String) -> String? {
+        decryptChromiumData(encrypted, password: password).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    static func decryptChromiumData(_ encrypted: Data, password: String) -> Data? {
         guard encrypted.starts(with: Data("v10".utf8)), encrypted.count > 3,
               (encrypted.count - 3).isMultiple(of: kCCBlockSizeAES128) else { return nil }
         let salt = Data("saltysalt".utf8)
@@ -91,7 +95,7 @@ struct AISubscriptionCredentials: Sendable {
         }
         guard status == kCCSuccess else { return nil }
         output.count = count
-        return String(data: output, encoding: .utf8)
+        return output
     }
 
     static func readKeychainWithoutPrompt(

@@ -642,6 +642,221 @@ struct ManagedToolServiceTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func homebrewFailureKeepsTheActualErrorFromEitherOutputStream(errorOnStandardError: Bool) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("brew-error-\(UUID())")
+        let suite = "brew-error-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let warning = """
+        Warning: The following taps are not trusted:
+          carvel-dev/carvel
+        Homebrew is currently ignoring formulae, casks and commands from these taps.
+        """
+        let failure = """
+        ==> Downloading bottle manifests
+        \u{001B}[31mError: Failed to download resource "pipx"\u{001B}[0m
+        Download failed: https://example.com/pipx
+        curl: (35) TLS connect error
+        ==> Fetching downloads for: pipx
+        Error: Failed to download resource "pipx"
+        curl: (35) TLS connect error
+        """
+        let executable = try Self.homebrewFixture(
+            directory: directory,
+            standardOutput: errorOnStandardError ? warning : failure,
+            standardError: errorOnStandardError ? failure : warning
+        )
+        let service = ManagedToolService(defaults: defaults, homebrewExecutable: executable, executableResolver: { _ in nil })
+
+        await service.install(.pipx)
+
+        #expect(service.states[.pipx]?.errorMessage == AppLocalization.text(
+            "Homebrew 执行失败：%@", "Error: Failed to download resource \"pipx\"\ncurl: (35) TLS connect error"
+        ))
+        #expect(service.states[.pipx]?.phase == .idle)
+        #expect(service.states[.pipx]?.isInstalled == false)
+        #expect(service.states[.uv]?.errorMessage == nil)
+    }
+
+    @Test(arguments: [
+        (diagnostics: "", standardOutput: false, expected: ""),
+        (diagnostics: "Permission denied", standardOutput: false, expected: "Permission denied"),
+        (diagnostics: "Warning: A required tap is not trusted\n  example/tools", standardOutput: false,
+         expected: "Warning: A required tap is not trusted\nexample/tools"),
+        (diagnostics: "Connection refused", standardOutput: true, expected: "Connection refused"),
+        (diagnostics: "\r\n  Permission denied\r\n\r\n", standardOutput: false, expected: "Permission denied"),
+        (diagnostics: "  Permission denied\n\nPermission denied\n Retry later\nExtra diagnostics", standardOutput: false,
+         expected: "Permission denied\nRetry later"),
+    ])
+    func homebrewFailureFallsBackToDiagnosticsOrExitStatus(sample: (diagnostics: String, standardOutput: Bool, expected: String)) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("brew-fallback-\(UUID())")
+        let suite = "brew-fallback-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let executable = try Self.homebrewFixture(
+            directory: directory,
+            standardOutput: sample.standardOutput ? sample.diagnostics : "",
+            standardError: sample.standardOutput ? "" : sample.diagnostics
+        )
+        let service = ManagedToolService(defaults: defaults, homebrewExecutable: executable, executableResolver: { _ in nil })
+        await service.checkLatest(.uv)
+        let reason = sample.expected.isEmpty
+            ? AppLocalization.text("%@ 退出码 %ld", "brew", 1)
+            : sample.expected
+        #expect(service.states[.uv]?.errorMessage == AppLocalization.text("Homebrew 执行失败：%@", reason))
+        #expect(service.states[.uv]?.phase == .idle)
+    }
+
+    @Test
+    func homebrewFailureKeepsDiagnosticsBeyondTheCapturePrefix() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("brew-long-error-\(UUID())")
+        let suite = "brew-long-error-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let executable = try Self.homebrewFixture(
+            directory: directory, standardOutput: "",
+            standardError: String(repeating: "==> Downloading bottle manifests\n", count: 4096)
+                + "Error: Failed to download resource \"uv\"\ncurl: (35) TLS connect error\n"
+        )
+        let service = ManagedToolService(defaults: defaults, homebrewExecutable: executable, executableResolver: { _ in nil })
+        await service.install(.uv)
+        #expect(service.states[.uv]?.errorMessage == AppLocalization.text(
+            "Homebrew 执行失败：%@", "Error: Failed to download resource \"uv\"\ncurl: (35) TLS connect error"
+        ))
+    }
+
+    @Test
+    func homebrewLaunchFailureUsesTheHomebrewErrorCategory() async throws {
+        let suite = "brew-launch-error-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let executable = FileManager.default.temporaryDirectory.appendingPathComponent("missing-brew-\(UUID())")
+        let service = ManagedToolService(defaults: defaults, homebrewExecutable: executable, executableResolver: { _ in nil })
+        await service.checkLatest(.uv)
+        let message = try #require(service.states[.uv]?.errorMessage)
+        #expect(message.hasPrefix(AppLocalization.text("Homebrew 执行失败：%@", "")))
+        #expect(!message.contains(AppLocalization.text("安装后无法执行：%@", "")))
+        #expect(service.states[.uv]?.phase == .idle)
+    }
+
+    @Test
+    func homebrewMetadataSuccessIgnoresWarningsAndClearsThePreviousFailure() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("brew-recovery-\(UUID())")
+        let suite = "brew-recovery-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let executable = try Self.homebrewFixture(directory: directory, standardOutput: "", standardError: "Error: Connection refused")
+        let service = ManagedToolService(defaults: defaults, homebrewExecutable: executable, executableResolver: { _ in nil })
+        await service.checkLatest(.uv)
+        let failure = try #require(service.states[.uv]?.errorMessage)
+        await service.checkLatest(.uv, quietly: true)
+        #expect(service.states[.uv]?.errorMessage == failure)
+
+        _ = try Self.homebrewFixture(
+            directory: directory, standardOutput: #"{"formulae":[{"name":"uv","versions":{"stable":"0.9.5"}}]}"#,
+            standardError: "Warning: The following taps are not trusted:\n  example/tools", status: 0
+        )
+        #expect(await service.checkLatest(.uv) == "0.9.5")
+        #expect(service.states[.uv]?.errorMessage == nil)
+        #expect(service.states[.uv]?.latestVersion == "0.9.5")
+        #expect(service.states[.uv]?.phase == .idle)
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func homebrewFailureLabelsAreTranslatedForEveryLanguage(language: AppLanguage) throws {
+        let resources = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+        let table = try #require(NSDictionary(contentsOf: resources) as? [String: String])
+        for key in ["Homebrew 执行失败：%@", "%@ 退出码 %ld"] {
+            let translated = try #require(table[key], "Missing Homebrew error translation for \(language.rawValue)")
+            #expect(!translated.isEmpty)
+            #expect(AppLocalization.string(key, language: language) == translated)
+            if language != .simplifiedChinese { #expect(translated != key) }
+        }
+        #expect(AppLocalization.format("Homebrew 执行失败：%@", locale: language.locale, ["TLS failure"])
+            .contains("TLS failure"))
+        let exitStatus = AppLocalization.format("%@ 退出码 %ld", locale: language.locale, ["brew", 17])
+        #expect(exitStatus.contains("brew") && exitStatus.contains("17"))
+    }
+
+    #if DEBUG
+    @Test
+    func debugRecommendedToolErrorsAppearImmediatelyAndBlockLiveHomebrew() async throws {
+        let suite = "brew-debug-error-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let service = ManagedToolService(
+            defaults: defaults, executableResolver: { _ in nil },
+            homebrewRunner: { _, _ in
+                Issue.record("Simulated tool failures must not execute live Homebrew commands")
+                return ""
+            },
+            environment: ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": "1"]
+        )
+        for tool in [ManagedTool.pipx, .uv] {
+            let expected = AppLocalization.text(
+                "Homebrew 执行失败：%@",
+                "Error: Failed to download resource \"\(tool.displayName)\"\ncurl: (35) TLS connect error"
+            )
+            #expect(service.states[tool]?.errorMessage == expected)
+            await service.checkLatest(tool, quietly: true)
+            #expect(service.states[tool]?.errorMessage == expected)
+            await service.install(tool)
+            #expect(service.states[tool]?.errorMessage == expected)
+            #expect(service.states[tool]?.phase == .idle)
+            #expect(service.states[tool]?.isInstalled == false)
+        }
+        #expect(service.states[.fzf]?.errorMessage == nil)
+        #expect(defaults.data(forKey: "managed-tool-state-cache-v1") == nil)
+    }
+
+    @Test(arguments: [[:], ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": ""], ["ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS": "0"]])
+    func disabledDebugRecommendedToolErrorsUseNormalHomebrew(environment: [String: String]) async throws {
+        let suite = "brew-debug-disabled-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let service = ManagedToolService(
+            defaults: defaults, executableResolver: { _ in nil },
+            homebrewRunner: { _, _ in #"{"formulae":[{"name":"uv","versions":{"stable":"0.9.5"}}]}"# },
+            environment: environment
+        )
+        #expect(service.states[.uv]?.errorMessage == nil)
+        #expect(await service.checkLatest(.uv) == "0.9.5")
+        #expect(service.states[.uv]?.errorMessage == nil)
+    }
+    #endif
+
+    private static func homebrewFixture(directory: URL, standardOutput: String, standardError: String, status: Int = 1) throws -> URL {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(standardOutput.utf8).write(to: directory.appendingPathComponent("stdout"))
+        try Data(standardError.utf8).write(to: directory.appendingPathComponent("stderr"))
+        let executable = directory.appendingPathComponent("brew")
+        try Data("""
+        #!/bin/sh
+        fixture_directory="$(/usr/bin/dirname "$0")"
+        /bin/cat "$fixture_directory/stderr" >&2
+        /bin/cat "$fixture_directory/stdout"
+        exit \(status)
+
+        """.utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        return executable
+    }
+
     @Test
     func updateIsOnlyReportedWhenBothVersionsAreKnown() {
         var state = ManagedToolState()

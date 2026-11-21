@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreImage
+import VideoToolbox
 import CoreMedia
 import CoreVideo
 import Foundation
@@ -431,8 +432,8 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
 }
 
 enum ScreenRecordingCaptureEncoding {
-    static func codec(width: Int, height: Int) -> AVVideoCodecType {
-        width > 4_096 || height > 4_096 ? .hevc : .h264
+    static func codec(width: Int, height: Int, preservesHDR: Bool = false) -> AVVideoCodecType {
+        preservesHDR || width > 4_096 || height > 4_096 ? .hevc : .h264
     }
 }
 
@@ -471,15 +472,21 @@ final class ScreenRecordingNativeAssetWriter: ScreenRecordingCaptureAssetWriter,
                 dimensions = (Int(value.width) / 2 * 2, Int(value.height) / 2 * 2)
             } else { dimensions = (width, height) }
             guard dimensions.0 > 0, dimensions.1 > 0 else { throw ScreenRecordingCaptureError.writerUnavailable }
-            let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-                AVVideoCodecKey: ScreenRecordingCaptureEncoding.codec(width: dimensions.0, height: dimensions.1),
+            let preservesHDR = CMSampleBufferGetFormatDescription(firstSample).map(RecordingHDR.isHDR) == true
+            var compression: [String: Any] = [
+                AVVideoAverageBitRateKey: min(80_000_000, max(2_000_000, dimensions.0 * dimensions.1 * frameRate / 6)),
+                AVVideoExpectedSourceFrameRateKey: frameRate,
+                AVVideoAllowFrameReorderingKey: false,
+            ]
+            if preservesHDR { compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main10_AutoLevel }
+            var settings: [String: Any] = [
+                AVVideoCodecKey: ScreenRecordingCaptureEncoding.codec(width: dimensions.0, height: dimensions.1, preservesHDR: preservesHDR),
                 AVVideoWidthKey: dimensions.0, AVVideoHeightKey: dimensions.1,
-                AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: min(80_000_000, max(2_000_000, dimensions.0 * dimensions.1 * frameRate / 6)),
-                    AVVideoExpectedSourceFrameRateKey: frameRate,
-                    AVVideoAllowFrameReorderingKey: false,
-                ],
-            ])
+                AVVideoCompressionPropertiesKey: compression,
+            ]
+            if preservesHDR { settings[AVVideoColorPropertiesKey] = RecordingHDR.colorProperties }
+            let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings,
+                sourceFormatHint: CMSampleBufferGetFormatDescription(firstSample))
             input.expectsMediaDataInRealTime = true
             guard asset.canAdd(input) else { throw ScreenRecordingCaptureError.writerUnavailable }
             asset.add(input)

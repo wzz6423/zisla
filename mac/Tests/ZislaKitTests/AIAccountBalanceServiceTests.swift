@@ -180,8 +180,8 @@ struct AIAccountBalanceServiceTests {
             credential.isWebsiteCookie = [.coder, .trae, .zed].contains(provider)
             return credential
         })
-        #expect(try await service.accountBalances(for: [.coder], qoderRegion: .china).first?.status == .available)
-        #expect(try await service.accountBalances(for: [.coder], qoderRegion: .global).first?.status == .available)
+        #expect(try await service.accountBalances(for: [.coder], qoderRegions: [.china]).first?.status == .available)
+        #expect(try await service.accountBalances(for: [.coder], qoderRegions: [.global]).first?.status == .available)
         #expect(BalanceURLProtocol.requests.prefix(2).map { $0.url?.host } == ["qoder.com.cn", "qoder.com"])
         #expect(try await service.accountBalances(for: [.trae]).first?.status == .available)
         let entitlement = try #require(BalanceURLProtocol.requests.first { $0.url?.path.hasSuffix("user_current_entitlement_list") == true })
@@ -192,6 +192,92 @@ struct AIAccountBalanceServiceTests {
         let zed = try await service.accountBalances(for: [.zed])
         #expect(zed.first?.status == .credentialsExpired)
         #expect(!BalanceURLProtocol.requests.contains { $0.url?.path == "/client/users/me" }, "An expired website session must not fall back to another account")
+    }
+
+    @Test func bothQoderRegionsQueryIndependentHostsAndKeepStableDistinctResults() async throws {
+        let (events, continuation) = AsyncStream<Int>.makeStream()
+        let global = #"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":90}}}}"#
+        let china = #"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":30}}}}"#
+        let path = "/api/v2/me/usages/big_model_credits"
+        BalanceURLProtocol.configure(["https://qoder.com" + path: [.json(global)],
+            "https://qoder.com.cn" + path: [.json(china)]], held: true, event: { continuation.yield($0) })
+        defer { BalanceURLProtocol.release(); continuation.finish() }
+        let service = makeService(credentials: { provider, _, region in
+            #expect(provider == .coder)
+            var credential = AIAccountBalanceCredential(token: "session=fixture-" + region.rawValue,
+                region: region == .china ? "cn" : "global")
+            credential.isWebsiteCookie = true
+            return credential
+        })
+        let task = Task {
+            defer { continuation.yield(-1) }
+            return try await service.accountBalances(for: [.coder], qoderRegions: [.global, .china])
+        }
+        var iterator = events.makeAsyncIterator()
+        for _ in 0..<2 {
+            guard let event = await iterator.next(), event > 0 else { break }
+        }
+        #expect(BalanceURLProtocol.requests.count == 2, "Both Qoder region requests must start independently")
+        #expect(Set(BalanceURLProtocol.requests.compactMap { $0.url?.host }) == ["qoder.com", "qoder.com.cn"])
+        for request in BalanceURLProtocol.requests {
+            let region = request.url?.host == "qoder.com.cn" ? "china" : "global"
+            #expect(request.value(forHTTPHeaderField: "Cookie") == "session=fixture-" + region)
+        }
+        BalanceURLProtocol.release()
+        let rows = try await task.value
+        #expect(rows.map(\.qoderRegion) == [.global, .china], "Completion order must not change the region ordering")
+        #expect(rows.map { $0.windows.first?.remainingPercent } == [10, 70])
+        #expect(rows.allSatisfy { $0.status == .available && $0.updatedAt == now })
+        #expect(Set(rows.map(\.id)).count == 2 && Set(rows.map(\.noticeID)).count == 2)
+        #expect(rows.map { $0.providerTitle(language: .english) } == ["Qoder · Global", "Qoder · China"])
+        #expect(!String(describing: rows).contains("session=fixture-"))
+    }
+
+    @Test func qoderRegionFailureAndRecoveryDoNotReplaceTheOtherRegion() async throws {
+        let path = "/api/v2/me/usages/big_model_credits"
+        let quota = #"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":90}}}}"#
+        BalanceURLProtocol.configure(["https://qoder.com" + path: [.init(status: 401)],
+            "https://qoder.com.cn" + path: [.json(quota)]])
+        let service = makeService(credentials: { _, _, region in
+            AIAccountBalanceCredential(token: "session=fixture-secret", region: region == .china ? "cn" : "global")
+        })
+        let failed = try await service.accountBalances(for: [.coder], qoderRegions: [.global, .china])
+        #expect(failed.map(\.qoderRegion) == [.global, .china])
+        #expect(failed.map(\.status) == [.credentialsExpired, .available])
+        #expect(failed[0].windows.isEmpty && failed[1].windows.first?.remainingPercent == 10)
+        BalanceURLProtocol.configure(["https://qoder.com" + path: [.json(quota)],
+            "https://qoder.com.cn" + path: [.json(quota)]])
+        let recovered = try await service.accountBalances(for: [.coder], qoderRegions: [.global, .china])
+        #expect(recovered.map(\.id) == failed.map(\.id))
+        #expect(recovered.allSatisfy { $0.status == .available })
+    }
+
+    @Test func emptyQoderRegionsReadNoQoderCredentialsAndLeaveOtherProvidersSelected() async throws {
+        BalanceURLProtocol.configure([:])
+        let service = makeService(credentials: { provider, _, region in
+            #expect(provider != .coder, "No Qoder region selection must prevent every Qoder credential read")
+            #expect(region == .global, "Qoder region choices must not route TRAE or Zed credentials")
+            return nil
+        })
+        #expect(try await service.accountBalances(for: [.coder], qoderRegions: []).isEmpty)
+        for regions in [Set<AIAccountBalanceQoderRegion>(), [.china], [.global, .china]] {
+            let rows = try await service.accountBalances(for: [.trae, .zed], qoderRegions: regions)
+            #expect(Set(rows.flatMap(\.providers)) == [.trae, .zed])
+            #expect(rows.allSatisfy { $0.qoderRegion == nil })
+        }
+        let rows = try await service.accountBalances(for: [.coder, .trae, .zed], qoderRegions: [])
+        #expect(Set(rows.flatMap(\.providers)) == [.trae, .zed])
+        #expect(BalanceURLProtocol.requests.isEmpty)
+    }
+
+    @Test func missingQoderCredentialsKeepSeparateRegionPlaceholders() async throws {
+        BalanceURLProtocol.configure([:])
+        let rows = try await makeService(credentials: { _, _, _ in nil })
+            .accountBalances(for: [.coder], qoderRegions: [.global, .china])
+        #expect(rows.map(\.id) == ["coder:global", "coder:china"])
+        #expect(rows.map(\.qoderRegion) == [.global, .china])
+        #expect(rows.allSatisfy { $0.status == .additionalCredentialsRequired && $0.windows.isEmpty })
+        #expect(BalanceURLProtocol.requests.isEmpty)
     }
 
     /// Unified Cursor must use current endpoints; WorkBuddy's version fallback must not retry authentication failure.
@@ -313,9 +399,10 @@ private final class BalanceURLProtocol: URLProtocol, @unchecked Sendable {
         let (hold, count, event) = Self.lock.withLock {
             Self.recorded.append(recordedRequest)
             Self.active += 1; Self.maximum = max(Self.maximum, Self.active)
-            var queue = Self.responses[request.url!.path] ?? []
+            let responseKey = Self.responses[request.url!.absoluteString] == nil ? request.url!.path : request.url!.absoluteString
+            var queue = Self.responses[responseKey] ?? []
             response = queue.isEmpty ? .init(error: .unsupportedURL) : queue.removeFirst()
-            Self.responses[request.url!.path] = queue
+            Self.responses[responseKey] = queue
             if Self.held { Self.pending.append(self) }
             return (Self.held, Self.recorded.count, Self.event)
         }

@@ -584,6 +584,7 @@ public enum DiskCleanupError: Error, LocalizedError, Equatable, Sendable {
     case notAFileURL
     case analysisOnlyCandidate
     case sessionWorkspaceProtected
+    case applicationInstallationChanged
 
     public var errorDescription: String? {
         switch self {
@@ -591,6 +592,7 @@ public enum DiskCleanupError: Error, LocalizedError, Equatable, Sendable {
         case .notAFileURL: "仅支持本地文件路径"
         case .analysisOnlyCandidate: "该项目仅用于分析，不能移入废纸篓"
         case .sessionWorkspaceProtected: AppLocalization.text("会话仍保留或无法确认删除状态，已保留工作目录")
+        case .applicationInstallationChanged: AppLocalization.text("应用副本或当前版本状态已变化，已保留目标")
         }
     }
 }
@@ -621,12 +623,15 @@ public protocol SystemMonitorFileManaging: Sendable {
     func contents(atPath path: String) -> Data?
     func readPrefix(at url: URL, maximumBytes: Int) -> Data?
     func sha256Digest(at url: URL) -> Data?
+    func applicationExecutablePaths() -> Set<String>?
     /// Returns the volume's total capacity and available space (including purgeable space, matching macOS System Settings).
     /// The default implementation uses URLResourceValues; a test mock may return nil to fall back to attributesOfFileSystem.
     func volumeCapacity(for url: URL) -> (total: UInt64, available: UInt64)?
 }
 
 public extension SystemMonitorFileManaging {
+    func applicationExecutablePaths() -> Set<String>? { nil }
+
     func readPrefix(at url: URL, maximumBytes: Int) -> Data? {
         contents(atPath: url.path).map { Data($0.prefix(maximumBytes)) }
     }
@@ -665,6 +670,15 @@ final class DefaultSystemMonitorFileManager: SystemMonitorFileManaging, @uncheck
 
     func fileExists(atPath path: String) -> Bool {
         fileManager.fileExists(atPath: path)
+    }
+
+    func applicationExecutablePaths() -> Set<String>? {
+        guard let output = SystemDiskCleanup.readOnlyCommand(executable: "/bin/ps", arguments: ["-axo", "comm="]) else {
+            return nil
+        }
+        return Set(output.split(whereSeparator: \.isNewline).map {
+            String($0).trimmingCharacters(in: .whitespaces)
+        })
     }
 
     func readPrefix(at url: URL, maximumBytes: Int) -> Data? {
@@ -3005,9 +3019,9 @@ public enum SystemDiskCleanup {
         fileManager: SystemMonitorFileManaging
     ) -> [DiskCleanupCandidate] {
         let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
+        var result = ApplicationInstallationCleanup(fileManager: fileManager).candidates()
         let installed = installedBundleIdentifiers(fileManager: fileManager, home: home)
-        guard !installed.isEmpty else { return [] }
-        var result: [DiskCleanupCandidate] = []
+        guard !installed.isEmpty else { return result }
         for relativeRoot in applicationResidualRoots {
             let root = home.appendingPathComponent(relativeRoot, isDirectory: true)
             guard fileManager.fileExists(atPath: root.path),
@@ -3323,7 +3337,7 @@ public enum SystemDiskCleanup {
         return result
     }
 
-    private static func readOnlyCommand(executable: String, arguments: [String]) -> String? {
+    static func readOnlyCommand(executable: String, arguments: [String]) -> String? {
         guard FileManager.default.isExecutableFile(atPath: executable) else { return nil }
         let process = Process()
         let output = Pipe()
@@ -3444,6 +3458,7 @@ public enum SystemDiskCleanup {
                 guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: allowed) else { return }
 
                 if isDirectory(standardized, fileManager: fileManager) {
+                    guard standardized.pathExtension.lowercased() != "app" else { return }
                     enumerateFilesRecursively(
                         at: standardized,
                         fileManager: fileManager,
@@ -3531,15 +3546,17 @@ public enum SystemDiskCleanup {
                 failures.append(DiskCleanupFailure(url: candidate.url, message: DiskCleanupError.sessionWorkspaceProtected.localizedDescription))
                 continue
             }
-            guard candidatePathIsEligibleForTrash(
-                candidate,
-                fileManager: fileManager,
-                installedResidualOwners: installedResidualOwners
-            ) else {
+            let isInstallation = candidate.kind == .applicationResidual
+                && (candidate.url.pathExtension.lowercased() == "app"
+                    || candidate.url.deletingLastPathComponent().lastPathComponent == "Versions")
+            let eligible = isInstallation
+                ? ApplicationInstallationCleanup(fileManager: fileManager).candidates().contains { $0.url == candidate.url }
+                : candidatePathIsEligibleForTrash(candidate, fileManager: fileManager, installedResidualOwners: installedResidualOwners)
+            guard eligible else {
                 failures.append(
                     DiskCleanupFailure(
                         url: candidate.url,
-                        message: DiskCleanupError.pathOutsideAllowedRoots.localizedDescription
+                        message: (isInstallation ? DiskCleanupError.applicationInstallationChanged : .pathOutsideAllowedRoots).localizedDescription
                     )
                 )
                 continue

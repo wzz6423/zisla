@@ -482,7 +482,7 @@ struct SettingsView: View {
 
     private var workflowContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("工作流模块") {
+            settingsGroup("系统信息") {
                 settingRow(
                     symbol: "music.note.list",
                     title: "播放来源",
@@ -1193,66 +1193,6 @@ struct SettingsView: View {
                 settingsGroup("AI 与语音") {
                     featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
                     rowDivider
-                    featureToggle("低额度提醒", detail: "剩余额度不高于 20% 时提醒，耗尽后也会提醒", symbol: "gauge.with.dots.needle.67percent", keyPath: \.aiAccountBalanceNoticeEnabled)
-                        .disabled(!model.settingsStore.settings.aiProgressEnabled
-                            || !model.settingsStore.settings.sideNoticesEnabled)
-                    rowDivider
-                    settingRow(symbol: "rectangle.topthird.inset.filled", title: "收起态额度样式", detail: "完整样式最多显示两行真实额度") {
-                        Picker("", selection: Binding(
-                            get: { model.settingsStore.settings.aiAccountBalanceCompactStyle },
-                            set: { model.settingsStore.settings.aiAccountBalanceCompactStyle = $0 }
-                        )) {
-                            ForEach(MediaCompactStyle.allCases, id: \.self) { style in AppLocalizedText(style.title).tag(style) }
-                        }
-                        .labelsHidden().pickerStyle(.menu).keepsIntrinsicWidth()
-                    }
-                    rowDivider
-                    featureToggle("其他位置常驻额度", detail: "选择灵动岛其他位置时显示额度，多个账户自动轮播", symbol: "pin", keyPath: \.aiAccountBalancePinnedInCustomIsland)
-                        .disabled(!model.settingsStore.settings.aiProgressEnabled
-                            || !model.settingsStore.settings.sideNoticesEnabled)
-                    rowDivider
-                    DisclosureGroup(AppLocalization.text("各供应商额度")) {
-                        ForEach(AIProvider.allCases, id: \.self) { provider in
-                            HStack(spacing: 14) {
-                                AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: provider,
-                                    language: model.languageStore.language)
-                                Toggle(AppLocalization.text("监控额度"), isOn: balanceProviderBinding(provider, monitored: true))
-                                    .toggleStyle(.switch).fixedSize()
-                                    .disabled(!AIAccountBalanceCatalog.supportsBalanceQuery(provider))
-                                Toggle(AppLocalization.text("展示额度"), isOn: balanceProviderBinding(provider, monitored: false))
-                                    .toggleStyle(.switch).fixedSize()
-                                    .disabled(!AIAccountBalanceCatalog.supportsBalanceQuery(provider))
-                            }
-                            .font(.system(size: 11)).padding(.vertical, 4)
-                        }
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .disabled(!model.settingsStore.settings.aiProgressEnabled)
-                    rowDivider
-                    DisclosureGroup(AppLocalization.text("网站额度凭据")) {
-                        AppLocalizedText("打开账户页，在开发者工具的 Network 中复制额度请求的 Cookie 请求头")
-                            .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        settingRow(symbol: "globe", title: "Qoder 监控地区", detail: "仅查询所选地区，已保存的其他地区凭据会保留") {
-                            Picker("", selection: Binding(
-                                get: { model.settingsStore.settings.aiAccountBalanceQoderRegion },
-                                set: { model.settingsStore.settings.aiAccountBalanceQoderRegion = $0 }
-                            )) {
-                                ForEach(AIAccountBalanceQoderRegion.allCases, id: \.self) { region in AppLocalizedText(region.title).tag(region) }
-                            }
-                            .labelsHidden().pickerStyle(.menu).keepsIntrinsicWidth()
-                        }
-                        ForEach(AIAccountBalanceWebsite.allCases) { website in
-                            AIAccountBalanceCookieInput(website: website, didChange: {
-                                model.aiMonitor.refreshAccountBalancesAfterCredentialChange()
-                            })
-                        }
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .disabled(!model.settingsStore.settings.aiProgressEnabled)
-                    rowDivider
-                    featureToggle("AI 任务结果扫光", detail: "任务成功时绿色、失败时红色渐变光带从左向右扫过一次", symbol: "arrow.right", keyPath: \.aiTaskResultSweepEnabled)
-                        .disabled(!model.settingsStore.settings.aiProgressEnabled)
-                    rowDivider
                     featureToggle("语音输入", detail: "开启后可通过全局快捷键触发语音输入", symbol: "mic.fill", keyPath: \.voiceInputEnabled)
                 }
 
@@ -1297,168 +1237,169 @@ struct SettingsView: View {
                 }
             }
 
-            if input.selection == .features || input.selection == .recording {
+            if input.selection == .features {
+                settingsGroup("截图与录屏") {
+                    featureToggle(
+                        AppLocalization.text("启用截图"),
+                        detail: "",
+                        symbol: "camera.viewfinder",
+                        keyPath: \.screenshotEnabled
+                    )
+                    rowDivider
+                    featureToggle("启用录屏", detail: "",
+                        symbol: "record.circle", keyPath: \.screenRecordingEnabled)
+                }
+            }
+
+            if input.selection == .recording {
                 settingsGroup("录屏") {
                     featureToggle("启用录屏", detail: "",
                         symbol: "record.circle", keyPath: \.screenRecordingEnabled)
-                    if input.selection == .recording {
+                    rowDivider
+                    settingRow(symbol: "rectangle.stack", title: "录屏工作室", detail: "") {
+                        Button(AppLocalization.text("打开")) { model.presentScreenRecording() }
+                    }
+                    ForEach(RecordingShortcutAction.allCases) { action in
                         rowDivider
-                        settingRow(symbol: "rectangle.stack", title: "录屏工作室", detail: "") {
-                            Button(AppLocalization.text("打开")) { model.presentScreenRecording() }
+                        settingRow(symbol: "keyboard", title: action.title, detail: "") {
+                            HotkeyRecorder(hotkey: Binding(
+                                get: { model.settingsStore.settings.screenRecordingHotkey(for: action) },
+                                set: { if let value = $0 { updateRecordingHotkey(value, action: action) } }
+                            ))
                         }
-                        ForEach(RecordingShortcutAction.allCases) { action in
-                            rowDivider
-                            settingRow(symbol: "keyboard", title: action.title, detail: "") {
-                                HotkeyRecorder(hotkey: Binding(
-                                    get: { model.settingsStore.settings.screenRecordingHotkey(for: action) },
-                                    set: { if let value = $0 { updateRecordingHotkey(value, action: action) } }
-                                ))
-                            }
+                    }
+                    rowDivider
+                    settingRow(title: "恢复默认快捷键", detail: "") {
+                        Button(AppLocalization.text("恢复默认快捷键")) {
+                            model.settingsStore.settings.screenRecordingHotkeys.removeAll()
+                            recordingHotkeyValidationMessage = nil
                         }
+                    }
+                    if let message = recordingHotkeyValidationMessage ?? currentRecordingHotkeyConflict {
                         rowDivider
-                        settingRow(title: "恢复默认快捷键", detail: "") {
-                            Button(AppLocalization.text("恢复默认快捷键")) {
-                                model.settingsStore.settings.screenRecordingHotkeys.removeAll()
-                                recordingHotkeyValidationMessage = nil
-                            }
-                        }
-                        if let message = recordingHotkeyValidationMessage ?? currentRecordingHotkeyConflict {
-                            rowDivider
-                            Label(message, systemImage: "exclamationmark.triangle.fill")
-                                .font(.caption).foregroundStyle(Color.zislaWarning)
-                        }
+                        Label(message, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(Color.zislaWarning)
                     }
                 }
             }
 
-            if input.selection == .features || input.selection == .screenshot {
+            if input.selection == .screenshot {
                 settingsGroup("截图") {
-                    if input.selection == .features {
-                        featureToggle(
-                            AppLocalization.text("启用截图"),
-                            detail: "",
-                            symbol: "camera.viewfinder",
-                            keyPath: \.screenshotEnabled
-                        )
-                    } else {
-                        settingRow(
-                            symbol: "camera.fill",
-                            title: "截图快捷键",
-                            detail: ""
-                        ) {
-                            HotkeyRecorder(
-                                hotkey: Binding(
-                                    get: { model.settingsStore.settings.screenshotHotkey },
-                                    set: { newValue in
-                                        guard let newValue else { return }
-                                        updateScreenshotHotkey(newValue, action: .capture)
-                                    }
-                                )
+                    settingRow(
+                        symbol: "camera.fill",
+                        title: "截图快捷键",
+                        detail: ""
+                    ) {
+                        HotkeyRecorder(
+                            hotkey: Binding(
+                                get: { model.settingsStore.settings.screenshotHotkey },
+                                set: { newValue in
+                                    guard let newValue else { return }
+                                    updateScreenshotHotkey(newValue, action: .capture)
+                                }
                             )
-                        }
-                        rowDivider
-                        settingRow(
-                            symbol: "rectangle.on.rectangle",
-                            title: "长截图",
-                            detail: ""
-                        ) {
-                            HotkeyRecorder(
-                                hotkey: Binding(
-                                    get: { model.settingsStore.settings.screenshotLongHotkey },
-                                    set: { newValue in
-                                        guard let newValue else { return }
-                                        updateScreenshotHotkey(newValue, action: .longCapture)
-                                    }
-                                )
-                            )
-                        }
-                        rowDivider
-                        featureToggle(
-                            AppLocalization.text("显示钉图控制条"),
-                            detail: "隐藏后仍支持快捷键、手势和鼠标操作",
-                            symbol: "rectangle.bottomhalf.inset.filled",
-                            keyPath: \.screenshotPinnedToolbarVisible
                         )
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "rectangle.on.rectangle",
+                        title: "长截图",
+                        detail: ""
+                    ) {
+                        HotkeyRecorder(
+                            hotkey: Binding(
+                                get: { model.settingsStore.settings.screenshotLongHotkey },
+                                set: { newValue in
+                                    guard let newValue else { return }
+                                    updateScreenshotHotkey(newValue, action: .longCapture)
+                                }
+                            )
+                        )
+                    }
+                    rowDivider
+                    featureToggle(
+                        AppLocalization.text("显示钉图控制条"),
+                        detail: "隐藏后仍支持快捷键、手势和鼠标操作",
+                        symbol: "rectangle.bottomhalf.inset.filled",
+                        keyPath: \.screenshotPinnedToolbarVisible
+                    )
+                    rowDivider
+                    settingRow(
+                        symbol: "cursorarrow.motionlines",
+                        title: "鼠标操作",
+                        detail: "按住图片拖动位置；拖动四角调整大小",
+                        detailLineLimit: 2,
+                        isNested: true
+                    ) {
+                        EmptyView()
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "hand.draw.fill",
+                        title: "触控板手势",
+                        detail: "双指捏合缩放；双指上滑增加不透明度，下滑降低不透明度",
+                        detailLineLimit: 2,
+                        isNested: true
+                    ) {
+                        EmptyView()
+                    }
+                    if let message = screenshotHotkeyValidationMessage ?? currentScreenshotHotkeyConflict {
                         rowDivider
-                        settingRow(
-                            symbol: "cursorarrow.motionlines",
-                            title: "鼠标操作",
-                            detail: "按住图片拖动位置；拖动四角调整大小",
-                            detailLineLimit: 2,
-                            isNested: true
-                        ) {
-                            EmptyView()
-                        }
-                        rowDivider
-                        settingRow(
-                            symbol: "hand.draw.fill",
-                            title: "触控板手势",
-                            detail: "双指捏合缩放；双指上滑增加不透明度，下滑降低不透明度",
-                            detailLineLimit: 2,
-                            isNested: true
-                        ) {
-                            EmptyView()
-                        }
-                        if let message = screenshotHotkeyValidationMessage ?? currentScreenshotHotkeyConflict {
-                            rowDivider
-                            Label(message, systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Color.zislaWarning)
-                                .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-                        }
+                        Label(message, systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.zislaWarning)
+                            .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
                     }
                 }
-                if input.selection == .screenshot {
-                    settingsGroup("工具") {
-                        settingRow(symbol: "pin.fill", title: "钉图快捷键", detail: "") {
-                            HotkeyRecorder(hotkey: Binding(
-                                get: { model.settingsStore.settings.screenshotPinHotkey },
-                                set: { if let value = $0 { updateScreenshotHotkey(value, action: .pin) } }
-                            ))
-                        }
-                        rowDivider
-                        settingRow(symbol: "tray.and.arrow.down", title: "暂存", detail: "") {
-                            HotkeyRecorder(hotkey: Binding(
-                                get: { model.settingsStore.settings.screenshotStashHotkey },
-                                set: { if let value = $0 { updateScreenshotHotkey(value, action: .stash) } }
-                            ))
-                        }
-                        rowDivider
-                        ForEach(ScreenshotTool.allCases) { tool in
-                            settingRow(
-                                symbol: tool.symbol,
-                                title: tool.title,
-                                detail: ""
-                            ) {
-                                HotkeyRecorder(
-                                    hotkey: Binding(
-                                        get: { model.settingsStore.settings.screenshotToolHotkeys[tool.rawValue] },
-                                        set: { newValue in
-                                            guard let newValue else { return }
-                                            updateScreenshotHotkey(newValue, action: .tool(tool))
-                                        }
-                                    )
+                settingsGroup("工具") {
+                    settingRow(symbol: "pin.fill", title: "钉图快捷键", detail: "") {
+                        HotkeyRecorder(hotkey: Binding(
+                            get: { model.settingsStore.settings.screenshotPinHotkey },
+                            set: { if let value = $0 { updateScreenshotHotkey(value, action: .pin) } }
+                        ))
+                    }
+                    rowDivider
+                    settingRow(symbol: "tray.and.arrow.down", title: "暂存", detail: "") {
+                        HotkeyRecorder(hotkey: Binding(
+                            get: { model.settingsStore.settings.screenshotStashHotkey },
+                            set: { if let value = $0 { updateScreenshotHotkey(value, action: .stash) } }
+                        ))
+                    }
+                    rowDivider
+                    ForEach(ScreenshotTool.allCases) { tool in
+                        settingRow(
+                            symbol: tool.symbol,
+                            title: tool.title,
+                            detail: ""
+                        ) {
+                            HotkeyRecorder(
+                                hotkey: Binding(
+                                    get: { model.settingsStore.settings.screenshotToolHotkeys[tool.rawValue] },
+                                    set: { newValue in
+                                        guard let newValue else { return }
+                                        updateScreenshotHotkey(newValue, action: .tool(tool))
+                                    }
                                 )
-                            }
-                            if tool != ScreenshotTool.allCases.last {
-                                rowDivider
-                            }
+                            )
                         }
-                        rowDivider
-                        settingRow(symbol: "rectangle.on.rectangle", title: "长截图", detail: "") {
-                            HotkeyRecorder(hotkey: Binding(
-                                get: { model.settingsStore.settings.screenshotEditorLongHotkey },
-                                set: { if let value = $0 { updateScreenshotHotkey(value, action: .editorLongCapture) } }
-                            ))
+                        if tool != ScreenshotTool.allCases.last {
+                            rowDivider
                         }
-                        rowDivider
-                        ForEach(ScreenshotEditorWindow.fixedShortcuts, id: \.title) { shortcut in
-                            settingRow(symbol: shortcut.symbol, title: shortcut.title, detail: "") {
-                                Text(shortcut.displayName)
-                                    .font(.system(size: 10, design: .monospaced))
-                            }
-                            if shortcut.title != "重做" { rowDivider }
+                    }
+                    rowDivider
+                    settingRow(symbol: "rectangle.on.rectangle", title: "长截图", detail: "") {
+                        HotkeyRecorder(hotkey: Binding(
+                            get: { model.settingsStore.settings.screenshotEditorLongHotkey },
+                            set: { if let value = $0 { updateScreenshotHotkey(value, action: .editorLongCapture) } }
+                        ))
+                    }
+                    rowDivider
+                    ForEach(ScreenshotEditorWindow.fixedShortcuts, id: \.title) { shortcut in
+                        settingRow(symbol: shortcut.symbol, title: shortcut.title, detail: "") {
+                            Text(shortcut.displayName)
+                                .font(.system(size: 10, design: .monospaced))
                         }
+                        if shortcut.title != "重做" { rowDivider }
                     }
                 }
             }
@@ -1775,12 +1716,107 @@ struct SettingsView: View {
         }
     }
 
-    /// AI reporting actions precede tools without retaining history in the island's task state.
+    private var aiAccountBalanceSettings: some View {
+        let websites = AIAccountBalanceWebsite.selected(for: settingsStore.settings.aiAccountBalanceMonitoredProviders,
+            qoderRegions: settingsStore.settings.aiAccountBalanceQoderRegions)
+        return settingsGroup("AI 进度与用量") {
+            featureToggle("低额度提醒", detail: "", symbol: "gauge.with.dots.needle.67percent", keyPath: \.aiAccountBalanceNoticeEnabled)
+                .disabled(!model.settingsStore.settings.aiProgressEnabled
+                    || !model.settingsStore.settings.sideNoticesEnabled)
+            rowDivider
+            settingRow(symbol: "rectangle.topthird.inset.filled", title: "收起态额度样式", detail: "") {
+                Picker("", selection: Binding(
+                    get: { model.settingsStore.settings.aiAccountBalanceCompactStyle },
+                    set: { model.settingsStore.settings.aiAccountBalanceCompactStyle = $0 }
+                )) {
+                    ForEach(MediaCompactStyle.allCases, id: \.self) { style in AppLocalizedText(style.title).tag(style) }
+                }
+                .labelsHidden().pickerStyle(.menu).keepsIntrinsicWidth()
+            }
+            if settingsStore.settings.supportsStatusIconsInIsland {
+                rowDivider
+                featureToggle("常驻额度信息", detail: "", symbol: "pin", keyPath: \.aiAccountBalancePinnedInCustomIsland)
+                    .disabled(!model.settingsStore.settings.aiProgressEnabled
+                        || !model.settingsStore.settings.sideNoticesEnabled)
+            }
+            rowDivider
+            DisclosureGroup(AppLocalization.text("各供应商额度")) {
+                ForEach(AIProvider.allCases, id: \.self) { provider in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 14) {
+                            if provider == .coder {
+                                Text(AIAccountBalanceCatalog.providerName(provider))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: provider,
+                                    language: model.languageStore.language)
+                            }
+                            Toggle(AppLocalization.text("监控额度"), isOn: balanceProviderBinding(provider, monitored: true))
+                                .toggleStyle(.switch).fixedSize()
+                                .disabled(!AIAccountBalanceCatalog.supportsBalanceQuery(provider))
+                            Toggle(AppLocalization.text("展示额度"), isOn: balanceProviderBinding(provider, monitored: false))
+                                .toggleStyle(.switch).fixedSize()
+                                .disabled(!AIAccountBalanceCatalog.supportsBalanceQuery(provider))
+                        }
+                        if provider == .coder {
+                            ForEach(AIAccountBalanceQoderRegion.allCases, id: \.self) { region in
+                                Toggle(isOn: Self.qoderRegionBinding(region, settings: $settingsStore.settings)) {
+                                    if settingsStore.settings.aiAccountBalanceMonitoredProviders.contains(.coder)
+                                        && settingsStore.settings.aiAccountBalanceQoderRegions.contains(region) {
+                                        AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: .coder,
+                                            language: model.languageStore.language, qoderRegion: region)
+                                    } else {
+                                        AppLocalizedText(region.title)
+                                    }
+                                }
+                                .toggleStyle(.checkbox)
+                                .disabled(!settingsStore.settings.aiAccountBalanceMonitoredProviders.contains(.coder))
+                                .padding(.leading, 16)
+                            }
+                        }
+                    }
+                    .font(.system(size: 11)).padding(.vertical, 4)
+                }
+            }
+            .padding(.leading, 30).padding(.trailing, 4).padding(.vertical, 10)
+            .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string("各供应商额度", locale: locale)))
+            .disabled(!model.settingsStore.settings.aiProgressEnabled)
+            if !websites.isEmpty {
+                rowDivider
+                DisclosureGroup(AppLocalization.text("网站额度凭据")) {
+                    AppLocalizedText("打开账户页，在开发者工具的 Network 中复制额度请求的 Cookie 请求头")
+                        .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    ForEach(websites) { website in
+                        AIAccountBalanceCookieInput(input: model.aiAccountBalanceCookieInputs[website]!, didChange: {
+                            model.aiMonitor.refreshAccountBalancesAfterCredentialChange()
+                        })
+                    }
+                }
+                .padding(.leading, 30).padding(.trailing, 4).padding(.vertical, 10)
+                .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string("网站额度凭据", locale: locale)))
+                .disabled(!model.settingsStore.settings.aiProgressEnabled)
+            }
+            rowDivider
+            featureToggle("AI 任务结果扫光", detail: "任务成功时绿色、失败时红色渐变光带从左向右扫过一次", symbol: "arrow.right", keyPath: \.aiTaskResultSweepEnabled)
+                .disabled(!model.settingsStore.settings.aiProgressEnabled)
+            rowDivider
+            VStack(alignment: .leading, spacing: 0) {
+                settingRow(symbol: "chart.xyaxis.line", title: "用量历史", detail: "") {
+                    EmptyView()
+                }
+                AIUsageHistorySettingsActions(controller: aiUsageHistory, showHistory: aiUsageHistoryPresentation.present)
+                    .padding(.leading, 46).padding(.trailing, 4).padding(.bottom, 10)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string("用量历史", locale: locale)))
+        }
+    }
+
     private var aiContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("AI 用量历史") {
-                AIUsageHistorySettingsActions(controller: aiUsageHistory, showHistory: aiUsageHistoryPresentation.present)
-            }
+            aiAccountBalanceSettings
             settingsGroup("CLI 与 Skills") {
                 AIAgentModuleView(model: model, configurationScope: .tools)
                     .task {
@@ -2897,6 +2933,16 @@ struct SettingsView: View {
                             [AppLocalization.string(location.title, locale: locale)]))
                 }
             }
+            HStack {
+                Spacer()
+                Button(AppLocalization.text("恢复默认位置")) {
+                    model.saveLocations.resetToDefaults()
+                }
+                .buttonStyle(.bordered)
+                .keepsIntrinsicWidth()
+                .settingsSearchAnchor(.row(AppLocalization.string("恢复默认位置", locale: locale)))
+            }
+            .padding(.top, 12)
         }
     }
 
@@ -3069,10 +3115,12 @@ struct SettingsView: View {
 
     private func recommendedToolRow(_ tool: ManagedTool) -> some View {
         let state = model.managedTools.states[tool] ?? ManagedToolState()
+        let detail = managedToolDetail(tool, state: state)
         return settingRow(
             symbol: recommendedToolSymbol(for: tool),
             title: tool.displayName,
-            detail: managedToolDetail(tool, state: state)
+            detail: detail,
+            detailLineLimit: 2
         ) {
             HStack(spacing: 8) {
                 if case .downloading(let fraction) = state.phase, fraction > 0 {
@@ -3097,6 +3145,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .help(detail)
     }
 
     private func recommendationActionButton(
@@ -3495,8 +3544,15 @@ struct SettingsView: View {
         })
     }
 
+    static func qoderRegionBinding(_ region: AIAccountBalanceQoderRegion, settings: Binding<FeatureSettings>) -> Binding<Bool> {
+        Binding(get: { settings.wrappedValue.aiAccountBalanceQoderRegions.contains(region) }, set: { selected in
+            if selected { settings.wrappedValue.aiAccountBalanceQoderRegions.insert(region) }
+            else { settings.wrappedValue.aiAccountBalanceQoderRegions.remove(region) }
+        })
+    }
+
     private func lidClosePreviewRow() -> some View {
-        settingRow(symbol: "play.circle", title: "预览动画", detail: "") {
+        settingRow(title: "预览动画", detail: "", isNested: true) {
             Button {
                 NotificationCenter.default.post(name: .lidCloseAnimationPreview, object: nil)
             } label: {
@@ -4892,7 +4948,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .info: "灵动岛布局"
         case .dailyBriefing: "每日简报"
         case .notifications: "通知与关怀"
-        case .workflow: "工作流"
+        case .workflow: "系统信息"
         case .mail: "邮件"
         case .ai: "AI"
         case .voice: "语音"

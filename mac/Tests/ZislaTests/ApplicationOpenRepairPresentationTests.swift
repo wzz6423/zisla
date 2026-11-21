@@ -79,7 +79,10 @@ struct ApplicationOpenRepairPresentationTests {
         let pasteboard = NSPasteboard(name: .init("dev.zisla.tests.repair.\(UUID().uuidString)"))
         defer { pasteboard.releaseGlobally() }
         var captured: [ClipboardHistoryContent] = []
-        let monitor = ClipboardHistoryMonitor(pasteboard: pasteboard) { captured.append($0) }
+        let monitor = ClipboardHistoryMonitor(
+            pasteboard: pasteboard, workspaceNotificationCenter: NotificationCenter(),
+            sourceAppProvider: { _ in nil }, sourceAppResolver: { _ in nil }
+        ) { content, _ in captured.append(content) }
         monitor.setEnabled(true)
         defer { monitor.setEnabled(false) }
         #expect(FileShelfPasteboard.writeFileURLs([fixture.app], to: pasteboard))

@@ -15,6 +15,7 @@
 "低额度提醒" = "Alertas de cota baixa";
 "供应商未提供已验证的本地额度查询接口" = "O provedor não oferece uma API local de cota verificada";
 "其他位置常驻额度" = "Fixar cota em outras posições";
+"常驻额度信息" = "Informações permanentes de cota";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Alertar quando restarem 20% ou menos, inclusive ao esgotar";
 "可用预算" = "Orçamento disponível";
 "可用额度" = "Cota disponível";
@@ -92,6 +93,7 @@
 "设置" = "Ajustes";
 "通用" = "Geral";
 "工作流" = "Fluxo de Trabalho";
+"系统信息" = "Informações do sistema";
 "信息" = "Informações";
 "模型" = "Modelos";
 "宠物" = "Pet";
@@ -2750,6 +2752,9 @@
 "onboarding.unmute" = "Ativar som";
 "onboarding.manual" = "Ative nos Ajustes do Sistema";
 "onboarding.unavailable" = "Indisponível neste sistema";
+"onboarding.unknown" = "Não foi possível determinar o estado da permissão";
+"onboarding.partially_granted" = "Parcialmente permitido";
+"permission.drag_app.body" = "Arraste este ícone para a lista de apps nos Ajustes do Sistema.";
 "onboarding.introduction.title" = "Conheça o zisla";
 "onboarding.introduction.body" = "Tenha informações e ferramentas do dia a dia sempre à mão.";
 "onboarding.feature.island.title" = "Seu assistente diário no topo da tela";
@@ -2783,7 +2788,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Para ver o nível de bateria dos dispositivos conectados.";
 "onboarding.permission.automation.title" = "Automação";
-"onboarding.permission.automation.body" = "Para controlar apps de mídia compatíveis e realizar ações entre apps. O macOS confirma a permissão para cada app de destino.";
+"onboarding.permission.automation.body" = "Para controlar apps de mídia compatíveis e realizar ações entre apps. O estado é verificado para os apps de destino em execução; o macOS confirma a permissão de cada app separadamente.";
 "onboarding.permission.files.title" = "Acesso a Arquivos";
 "onboarding.permission.files.body" = "Selecione os arquivos ou pastas que precisa usar, e o macOS concederá as permissões de acesso correspondentes.";
 "onboarding.ready.title" = "Tudo pronto";
@@ -3384,6 +3389,7 @@
 "依赖组件" = "Componentes necessários";
 "管理下载与文档转换所需组件。" = "Gerenciar os componentes necessários para downloads e conversão de documentos.";
 "更改 %@ 的保存位置" = "Alterar o local de salvamento de %@";
+"恢复默认位置" = "Restaurar locais padrão";
 
 "本地优先的原生笔记应用" = "Aplicativo nativo de notas que prioriza o armazenamento local";
 "AI 会话工作目录" = "Pastas de trabalho das sessões de IA";
@@ -3401,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Entrada %@ · Saída %@";
 "AI 模型用量" = "Uso de modelos de IA";
 
+"用量历史" = "Histórico de uso";
 "AI 用量历史" = "Histórico de uso de IA";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Exportar todo o histórico de uso de IA como uma planilha xlsx";
 "已清空 AI 用量历史" = "Histórico de uso de IA apagado";
@@ -3757,3 +3764,16 @@
 "清理失败：%@" = "Falha na limpeza: %@";
 "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "A limpeza falhou. Veja os detalhes em Ajustes > Monitor e Limpeza do Sistema.";
 "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "A limpeza falhou parcialmente. Veja os detalhes em Ajustes > Monitor e Limpeza do Sistema.";
+
+"从默认浏览器导入" = "Importar do navegador padrão";
+"正在读取默认浏览器 Cookie" = "Lendo cookies do navegador padrão";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Não foi possível identificar o navegador padrão. Cole os cookies manualmente.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "A importação de cookies do navegador padrão não está disponível. Cole-os manualmente.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Nenhum cookie encontrado para este site. Entre na conta pelo navegador padrão ou cole os cookies manualmente.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Não foi possível ler os cookies do navegador padrão. Cole-os manualmente ou verifique as permissões de acesso.";
+"按应用" = "Por aplicativo";
+"搜索内容或应用" = "Pesquisar conteúdo ou aplicativos";
+
+"重复安装 · 版本 %@ · %@ · 保留：%@" = "Instalação duplicada · Versão %@ · %@ · Manter: %@";
+"更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Resíduos de atualização · Versão antiga %@ · %@ · Versão atual: %@";
+"应用副本或当前版本状态已变化，已保留目标" = "A cópia do aplicativo ou a versão atual mudou. O item foi mantido.";

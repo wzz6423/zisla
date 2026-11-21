@@ -1,3 +1,4 @@
+import NaturalLanguage
 import SwiftUI
 import Translation
 import ZislaKit
@@ -55,6 +56,33 @@ final class ClipboardSystemTranslationBridge: ObservableObject {
         guard let request else { return }
         complete(id: request.id, result: .failure(CancellationError()))
     }
+
+    @available(macOS 15.0, *)
+    static func installedConfiguration(
+        for request: Request,
+        statusForText: (String, Locale.Language) async throws -> LanguageAvailability.Status = {
+            try await LanguageAvailability().status(for: $0, to: $1)
+        },
+        statusForLanguages: (Locale.Language, Locale.Language) async -> LanguageAvailability.Status = {
+            await LanguageAvailability().status(from: $0, to: $1)
+        }
+    ) async throws -> TranslationSession.Configuration {
+        let target = Locale.Language(identifier: request.targetLanguage)
+        let status: LanguageAvailability.Status
+        var source: Locale.Language?
+        do {
+            status = try await statusForText(request.text, target)
+        } catch {
+            guard TranslationError.unableToIdentifyLanguage ~= error,
+                  let language = NLLanguageRecognizer.dominantLanguage(for: request.text) else { throw error }
+            let identifiedSource = Locale.Language(identifier: language.rawValue)
+            source = identifiedSource
+            status = await statusForLanguages(identifiedSource, target)
+        }
+        try Task.checkCancellation()
+        guard status == .installed else { throw ClipboardTranslationError.unavailable }
+        return TranslationSession.Configuration(source: source, target: target)
+    }
 }
 
 @available(macOS 15.0, *)
@@ -80,14 +108,7 @@ private struct InstalledTranslationView: View {
             .frame(width: 0, height: 0)
             .task {
                 do {
-                    let target = Locale.Language(identifier: request.targetLanguage)
-                    let status = try await LanguageAvailability().status(for: request.text, to: target)
-                    try Task.checkCancellation()
-                    guard status == .installed else {
-                        bridge.complete(id: request.id, result: .failure(ClipboardTranslationError.unavailable))
-                        return
-                    }
-                    configuration = TranslationSession.Configuration(target: target)
+                    configuration = try await ClipboardSystemTranslationBridge.installedConfiguration(for: request)
                 } catch {
                     bridge.complete(id: request.id, result: .failure(error))
                 }

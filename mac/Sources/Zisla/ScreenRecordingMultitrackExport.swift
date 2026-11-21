@@ -7,6 +7,7 @@ import ZislaCore
 protocol RecordingExportFrameProviding: AnyObject {
     var canvas: CGRect { get }
     var context: CIContext { get }
+    var preservesHDR: Bool { get }
     func render(at time: CMTime) throws -> CIImage
     func cancel()
 }
@@ -19,13 +20,14 @@ final class RecordingLegacyExportFrames: RecordingExportFrameProviding {
     private let voiceMedia: RecordingVoiceMedia
     var canvas: CGRect { renderer.canvas }
     var context: CIContext { renderer.context }
+    var preservesHDR: Bool { renderer.preservesHDR }
 
     init(media: RecordingExportMedia, renderer: RecordingExportRenderer) throws {
         self.renderer = renderer
         timeline = media.timeline
         voiceMedia = media.voiceMedia
-        primary = try RecordingExportFrameReader(media: media.video)
-        camera = try media.camera.map(RecordingExportFrameReader.init)
+        primary = try RecordingExportFrameReader(media: media.video, preservesHDR: renderer.preservesHDR)
+        camera = try media.camera.map { try RecordingExportFrameReader(media: $0) }
     }
 
     func render(at time: CMTime) throws -> CIImage {
@@ -47,11 +49,15 @@ final class RecordingMultitrackExportFrames: RecordingExportFrameProviding {
     private var readers: [CMPersistentTrackID: Reader] = [:]
     var canvas: CGRect { renderer.canvas }
     var context: CIContext { renderer.context }
+    var preservesHDR: Bool { renderer.preservesHDR }
 
-    init(media: RecordingMultitrackMedia, project: ScreenRecordingProject, directory: URL, size: CGSize) throws {
+    init(media: RecordingMultitrackMedia, project: ScreenRecordingProject, directory: URL, size: CGSize,
+         preservesHDR: Bool = false) throws {
         self.media = media
-        renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size)
-        for track in media.videoTracks { readers[track.trackID] = try Reader(composition: media.composition, track: track) }
+        renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size, preservesHDR: preservesHDR)
+        for track in media.videoTracks {
+            readers[track.trackID] = try Reader(composition: media.composition, track: track, preservesHDR: preservesHDR)
+        }
     }
 
     func render(at time: CMTime) throws -> CIImage {
@@ -74,10 +80,10 @@ final class RecordingMultitrackExportFrames: RecordingExportFrameProviding {
         var current: CVPixelBuffer?
         var next: CMSampleBuffer?
 
-        init(composition: AVMutableComposition, track: AVMutableCompositionTrack) throws {
+        init(composition: AVMutableComposition, track: AVMutableCompositionTrack, preservesHDR: Bool) throws {
             reader = try AVAssetReader(asset: composition)
             output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferPixelFormatTypeKey as String: preservesHDR ? RecordingHDR.pixelFormat : kCVPixelFormatType_32BGRA,
             ])
             output.alwaysCopiesSampleData = false
             guard reader.canAdd(output) else { throw ScreenRecordingExportError.unavailableMedia }
@@ -126,7 +132,8 @@ enum RecordingMultitrackExportJob {
         let media = try await RecordingMultitrackMedia.prepare(project: project, directory: directory)
         let size = try RecordingExportRenderer.outputSize(source: CGSize(width: project.width, height: project.height),
             edits: project.edits, resolution: configuration.resolution)
-        let frames = try RecordingMultitrackExportFrames(media: media, project: project, directory: directory, size: size)
+        let frames = try RecordingMultitrackExportFrames(media: media, project: project, directory: directory, size: size,
+            preservesHDR: media.preservesHDR && configuration.format.supportsHDR)
         defer { frames.cancel() }
         let staging = target.deletingLastPathComponent().appendingPathComponent(".zisla-recording-export-\(UUID())", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
@@ -145,7 +152,7 @@ enum RecordingMultitrackExportJob {
             if let executable {
                 try await ScreenRecordingFFmpegTranscoder.run(input: rendered, output: temporary,
                     format: configuration.format, duration: media.duration, executable: executable,
-                    checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
+                    preservesHDR: frames.preservesHDR, checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
             }
         } else if configuration.format == .gif {
             let writer = try RecordingExportGIFWriter(url: temporary, size: size, frameRate: schedule.frameRate,

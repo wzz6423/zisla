@@ -1,6 +1,9 @@
 import AppKit
 
 public enum ClipboardHistoryPasteboard {
+    static let sourceAppType = NSPasteboard.PasteboardType("org.nspasteboard.source")
+    static let sourceAppMarkerType = NSPasteboard.PasteboardType("dev.wzz.zisla.clipboard-source-app")
+
     public static func readContent(from pasteboard: NSPasteboard = .general) -> ClipboardHistoryContent? {
         guard Set(pasteboard.types ?? []).isDisjoint(with: ignoredTypes) else { return nil }
         if let fileURL = FileShelfPasteboard.readFileURLs(from: pasteboard).first,
@@ -19,6 +22,24 @@ public enum ClipboardHistoryPasteboard {
             return content.isStorable ? content : nil
         }
         return nil
+    }
+
+    static func readSourceApp(from pasteboard: NSPasteboard) -> ClipboardSourceApp? {
+        guard let fields = pasteboard.propertyList(forType: sourceAppMarkerType) as? [String: String],
+              let bundleIdentifier = fields["bundleIdentifier"], !bundleIdentifier.isEmpty,
+              let name = fields["name"], !name.isEmpty else { return nil }
+        return ClipboardSourceApp(bundleIdentifier: bundleIdentifier, name: name)
+    }
+
+    @discardableResult
+    public static func write(
+        _ item: ClipboardHistoryItem,
+        to pasteboard: NSPasteboard = .general
+    ) -> Bool {
+        guard write(item.content, to: pasteboard) else { return false }
+        // An empty marker distinguishes historical unknown sources from a new copy in the foreground app.
+        let fields = item.sourceApp.map { ["bundleIdentifier": $0.bundleIdentifier, "name": $0.name] } ?? [:]
+        return pasteboard.setPropertyList(fields, forType: sourceAppMarkerType)
     }
 
     @discardableResult

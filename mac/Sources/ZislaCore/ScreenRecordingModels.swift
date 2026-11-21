@@ -77,13 +77,14 @@ public struct RecordingCaptureConfiguration: Equatable, Sendable {
     public var portraitEffects: RecordingPortraitEffects
     public var voiceEffects: RecordingVoiceEffects
     public var monitorMicrophone: Bool
+    public var preservesHDR: Bool
 
     public init(mode: RecordingCaptureMode = .display, sourceID: UInt32 = 0,
                 region: RecordingRect? = nil, systemAudio: Bool = true,
                 microphone: Bool = false, camera: Bool = false,
                 microphoneID: String? = nil, cameraID: String? = nil, frameRate: Int = 30,
                 portraitEffects: RecordingPortraitEffects = .init(), voiceEffects: RecordingVoiceEffects = .init(),
-                monitorMicrophone: Bool = false) {
+                monitorMicrophone: Bool = false, preservesHDR: Bool = false) {
         self.mode = mode
         self.sourceID = sourceID
         self.region = region
@@ -96,6 +97,7 @@ public struct RecordingCaptureConfiguration: Equatable, Sendable {
         self.portraitEffects = portraitEffects
         self.voiceEffects = voiceEffects
         self.monitorMicrophone = monitorMicrophone
+        self.preservesHDR = preservesHDR
     }
 }
 
@@ -352,6 +354,12 @@ public enum RecordingExportFormat: String, Codable, CaseIterable, Sendable {
         }
     }
     public var isVideo: Bool { !isAudioOnly && self != .gif && self != .livePhoto }
+    public var supportsHDR: Bool {
+        switch self {
+        case .mp4, .mov, .m4v, .mkv, .webm, .ts: true
+        default: false
+        }
+    }
     public var requiresFFmpeg: Bool {
         switch self {
         case .mkv, .webm, .avi, .wmv, .flv, .mpeg, .ts, .threeGP, .mp3, .ogg, .opus: true

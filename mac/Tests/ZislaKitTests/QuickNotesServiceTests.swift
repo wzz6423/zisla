@@ -208,6 +208,107 @@ struct QuickNotesServiceTests {
         #expect(service.selectedNote == nil)
     }
 
+    @Test(arguments: [false, true])
+    func adjacentSelectionFollowsDisplayedOrderAndStopsAtBothEnds(welcomeDismissed: Bool) async throws {
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = QuickNotesService(welcomeDismissalDefaults: defaults)
+        if welcomeDismissed {
+            await service.delete(id: try #require(service.welcomeNote).id)
+        }
+        let first = NotesAppBridge.NoteSummary(id: "first", title: "First", modifiedAt: Date(timeIntervalSince1970: 3))
+        let middle = NotesAppBridge.NoteSummary(id: "middle", title: "Middle", modifiedAt: Date(timeIntervalSince1970: 2))
+        let last = NotesAppBridge.NoteSummary(id: "last", title: "Last", modifiedAt: Date(timeIntervalSince1970: 1), isPasswordProtected: true)
+        service.applyFetchedNotes([last, first, middle])
+        service.select(id: middle.id)
+
+        service.selectAdjacent(in: .previous)
+        #expect(service.selectedID == first.id)
+        service.selectAdjacent(in: .previous)
+        let topID = service.welcomeNote?.id ?? first.id
+        #expect(service.selectedID == topID)
+        service.selectAdjacent(in: .previous)
+        #expect(service.selectedID == topID, "Moving above the first displayed item must not wrap")
+
+        service.select(id: middle.id)
+        service.selectAdjacent(in: .next)
+        #expect(service.selectedID == last.id, "Locked notes remain selectable")
+        service.selectAdjacent(in: .next)
+        #expect(service.selectedID == last.id, "Moving below the last displayed item must not wrap")
+        service.selectAdjacent(in: .previous)
+        #expect(service.selectedID == middle.id)
+        #expect(service.notes == [first, middle, last], "Navigation must not reorder or edit notes")
+    }
+
+    @Test
+    func adjacentSelectionPreservesMissingSelectionsAndSingleItemBoundaries() async throws {
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = QuickNotesService(welcomeDismissalDefaults: defaults)
+        service.applyFetchedNotes([])
+        let welcomeID = try #require(service.welcomeNote).id
+        for direction in [QuickNotesService.SelectionDirection.previous, .next] {
+            service.selectAdjacent(in: direction)
+            #expect(service.selectedID == welcomeID)
+        }
+        await service.delete(id: welcomeID)
+        for selection: String? in [nil, "missing"] {
+            service.selectedID = selection
+            service.selectAdjacent(in: .previous)
+            service.selectAdjacent(in: .next)
+            #expect(service.selectedID == selection)
+        }
+
+        service.selectedID = nil
+        let only = NotesAppBridge.NoteSummary(id: "only", title: "Only", modifiedAt: .distantPast)
+        service.applyFetchedNotes([only])
+        for selection: String? in [nil, "missing", only.id] {
+            service.selectedID = selection
+            service.selectAdjacent(in: .previous)
+            service.selectAdjacent(in: .next)
+            #expect(service.selectedID == selection)
+        }
+        #expect(service.notes == [only])
+        let second = NotesAppBridge.NoteSummary(id: "second", title: "Second", modifiedAt: Date(timeIntervalSince1970: 1))
+        service.applyFetchedNotes([only, second])
+        for selection: String? in [nil, "missing"] {
+            service.selectedID = selection
+            service.selectAdjacent(in: .previous)
+            service.selectAdjacent(in: .next)
+            #expect(service.selectedID == selection, "Navigation needs an existing selection even when neighbors are available")
+        }
+    }
+
+    @Test
+    func adjacentSelectionCanLeaveANoteWhoseBodyFailedToLoad() async throws {
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let service = QuickNotesService(welcomeDismissalDefaults: defaults, operations: .init(
+            listNotes: { .success([]) },
+            readNote: { id in
+                id == "first" ? .failure(.failed("injected read failure")) : .success(.init(plainText: id, bodyHTML: "<div>\(id)</div>"))
+            },
+            writeNote: { _, _ in Issue.record("Navigation must not write note content"); return .success(()) },
+            createNote: { _, _ in .success("created") },
+            deleteNote: { _ in .success(()) }
+        ))
+        let first = NotesAppBridge.NoteSummary(id: "first", title: "First", modifiedAt: Date(timeIntervalSince1970: 2))
+        let second = NotesAppBridge.NoteSummary(id: "second", title: "Second", modifiedAt: Date(timeIntervalSince1970: 1))
+        service.applyFetchedNotes([second, first])
+        service.select(id: first.id)
+        #expect(await service.loadNote() == nil)
+        #expect(service.errorMessage == "injected read failure")
+
+        service.selectAdjacent(in: .next)
+        #expect(service.selectedID == second.id)
+        #expect(await service.loadNote()?.plainText == second.id)
+        #expect(!service.isLoadingNote)
+        #expect(service.notes == [first, second])
+    }
+
     @Test
     func refreshListsSummariesWithoutReadingRegularNoteBodies() async throws {
         let loads = ControlledImmediateNoteLoads()
@@ -260,13 +361,14 @@ struct QuickNotesServiceTests {
     func preservesPendingSaveWhenLoadingAnotherNote() async throws {
         let writes = ControlledNoteWrites()
         let service = makeService(writes: writes, saveDelay: .milliseconds(1))
-        let first = NotesAppBridge.NoteSummary(id: "first", title: "第一条", modifiedAt: .now)
-        let second = NotesAppBridge.NoteSummary(id: "second", title: "第二条", modifiedAt: .now)
+        let first = NotesAppBridge.NoteSummary(id: "first", title: "第一条", modifiedAt: Date(timeIntervalSince1970: 2))
+        let second = NotesAppBridge.NoteSummary(id: "second", title: "第二条", modifiedAt: Date(timeIntervalSince1970: 1))
         service.applyFetchedNotes([first, second])
         service.select(id: first.id)
 
         service.scheduleSave(id: first.id, html: "first body")
-        service.select(id: second.id)
+        service.selectAdjacent(in: .next)
+        #expect(service.selectedID == second.id)
         _ = await service.loadNote()
 
         let firstWriteStarted = await writes.waitForCallCount(1)
@@ -407,16 +509,18 @@ struct QuickNotesServiceTests {
         let writes = ControlledNoteWrites()
         let loads = ControlledNoteLoads()
         let service = makeService(writes: writes, loads: loads, saveDelay: .milliseconds(1))
-        let first = NotesAppBridge.NoteSummary(id: "first", title: "第一条", modifiedAt: .now)
-        let second = NotesAppBridge.NoteSummary(id: "second", title: "第二条", modifiedAt: .now)
+        let first = NotesAppBridge.NoteSummary(id: "first", title: "第一条", modifiedAt: Date(timeIntervalSince1970: 2))
+        let second = NotesAppBridge.NoteSummary(id: "second", title: "第二条", modifiedAt: Date(timeIntervalSince1970: 1))
         service.applyFetchedNotes([first, second])
         service.select(id: first.id)
 
         let earlierLoad = Task { await service.loadNote() }
         #expect(await loads.waitForCallCount(1))
 
-        service.select(id: second.id)
-        service.select(id: first.id)
+        service.selectAdjacent(in: .next)
+        #expect(service.selectedID == second.id)
+        service.selectAdjacent(in: .previous)
+        #expect(service.selectedID == first.id)
         let currentLoad = Task { await service.loadNote() }
         #expect(await loads.waitForCallCount(1))
 

@@ -15,6 +15,7 @@
 "低额度提醒" = "Waarschuwingen bij laag quotum";
 "供应商未提供已验证的本地额度查询接口" = "De aanbieder heeft geen geverifieerde lokale quotum-API";
 "其他位置常驻额度" = "Quotum vastzetten op andere posities";
+"常驻额度信息" = "Permanente quotuminformatie";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Waarschuwen bij 20% of minder resterend quotum, ook wanneer het op is";
 "可用预算" = "Beschikbaar budget";
 "可用额度" = "Beschikbaar quotum";
@@ -92,6 +93,7 @@
 "设置" = "Instellingen";
 "通用" = "Algemeen";
 "工作流" = "Workflow";
+"系统信息" = "Systeeminformatie";
 "信息" = "Info";
 "模型" = "Modellen";
 "宠物" = "Huisdier";
@@ -2750,6 +2752,9 @@
 "onboarding.unmute" = "Geluid inschakelen";
 "onboarding.manual" = "Inschakelen in Systeeminstellingen";
 "onboarding.unavailable" = "Niet beschikbaar op dit systeem";
+"onboarding.unknown" = "De machtigingsstatus kon niet worden bepaald";
+"onboarding.partially_granted" = "Gedeeltelijk toegestaan";
+"permission.drag_app.body" = "Sleep dit pictogram naar de applijst in Systeeminstellingen.";
 "onboarding.introduction.title" = "Maak kennis met zisla";
 "onboarding.introduction.body" = "Houd alledaagse informatie en hulpmiddelen altijd binnen handbereik.";
 "onboarding.feature.island.title" = "Uw dagelijkse assistent bovenaan het scherm";
@@ -2783,7 +2788,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Voor het bekijken van het batterijniveau van verbonden apparaten.";
 "onboarding.permission.automation.title" = "Automatisering";
-"onboarding.permission.automation.body" = "Voor het bedienen van ondersteunde media-apps en het uitvoeren van acties tussen apps. macOS bevestigt de toestemming voor elke doel-app.";
+"onboarding.permission.automation.body" = "Voor het bedienen van ondersteunde media-apps en het uitvoeren van acties tussen apps. De status wordt gecontroleerd voor doel-apps die momenteel actief zijn; macOS bevestigt de toestemming voor elke app afzonderlijk.";
 "onboarding.permission.files.title" = "Bestandstoegang";
 "onboarding.permission.files.body" = "Selecteer de bestanden of mappen die u nodig hebt. macOS verleent de bijbehorende toegangsrechten.";
 "onboarding.ready.title" = "Alles is klaar";
@@ -3384,6 +3389,7 @@
 "依赖组件" = "Vereiste componenten";
 "管理下载与文档转换所需组件。" = "Beheer de componenten die nodig zijn voor downloads en documentconversie.";
 "更改 %@ 的保存位置" = "Opslaglocatie voor %@ wijzigen";
+"恢复默认位置" = "Standaardlocaties herstellen";
 
 "本地优先的原生笔记应用" = "Native notitie-app die lokale opslag vooropstelt";
 "AI 会话工作目录" = "Werkmappen van AI-sessies";
@@ -3401,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Invoer %@ · Uitvoer %@";
 "AI 模型用量" = "AI-modelgebruik";
 
+"用量历史" = "Gebruiksgeschiedenis";
 "AI 用量历史" = "AI-gebruiksgeschiedenis";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Exporteer de volledige AI-gebruiksgeschiedenis als xlsx-spreadsheet";
 "已清空 AI 用量历史" = "AI-gebruiksgeschiedenis gewist";
@@ -3757,3 +3764,16 @@
 "清理失败：%@" = "Opschonen mislukt: %@";
 "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Opschonen is mislukt. Bekijk de details in Instellingen > Systeemmonitor en opschonen.";
 "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Opschonen is gedeeltelijk mislukt. Bekijk de details in Instellingen > Systeemmonitor en opschonen.";
+
+"从默认浏览器导入" = "Importeren uit standaardbrowser";
+"正在读取默认浏览器 Cookie" = "Cookies van de standaardbrowser lezen";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "De standaardbrowser kan niet worden vastgesteld. Plak de cookies handmatig.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Cookies importeren uit de standaardbrowser wordt niet ondersteund. Plak ze handmatig.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Geen cookies voor deze website gevonden. Meld u aan in de standaardbrowser of plak de cookies handmatig.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "De cookies van de standaardbrowser kunnen niet worden gelezen. Plak ze handmatig of controleer de toegangsrechten.";
+"按应用" = "Per app";
+"搜索内容或应用" = "Zoeken in inhoud of apps";
+
+"重复安装 · 版本 %@ · %@ · 保留：%@" = "Dubbele installatie · Versie %@ · %@ · Behouden: %@";
+"更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Update-restanten · Oude versie %@ · %@ · Huidige versie: %@";
+"应用副本或当前版本状态已变化，已保留目标" = "De app-kopie of de huidige versie is gewijzigd. Het item is behouden.";

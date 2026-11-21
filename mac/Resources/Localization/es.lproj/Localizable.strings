@@ -15,6 +15,7 @@
 "低额度提醒" = "Alertas de cuota baja";
 "供应商未提供已验证的本地额度查询接口" = "El proveedor no ofrece una API local de cuota verificada";
 "其他位置常驻额度" = "Fijar cuota en otras posiciones";
+"常驻额度信息" = "Información permanente de cuota";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Avisar cuando quede un 20% o menos, incluso al agotarse";
 "可用预算" = "Presupuesto disponible";
 "可用额度" = "Cuota disponible";
@@ -92,6 +93,7 @@
 "设置" = "Ajustes";
 "通用" = "General";
 "工作流" = "Flujo de Trabajo";
+"系统信息" = "Información del sistema";
 "信息" = "Información";
 "模型" = "Modelos";
 "宠物" = "Mascota";
@@ -2750,6 +2752,9 @@
 "onboarding.unmute" = "Activar sonido";
 "onboarding.manual" = "Activar en Ajustes del Sistema";
 "onboarding.unavailable" = "No disponible en este sistema";
+"onboarding.unknown" = "No se pudo determinar el estado del permiso";
+"onboarding.partially_granted" = "Permitido parcialmente";
+"permission.drag_app.body" = "Arrastra este icono a la lista de apps en Ajustes del Sistema.";
 "onboarding.introduction.title" = "Conoce zisla";
 "onboarding.introduction.body" = "Ten siempre a mano la información y las herramientas que usas a diario.";
 "onboarding.feature.island.title" = "Tu asistente diario en la parte superior de la pantalla";
@@ -2783,7 +2788,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Para consultar el nivel de batería de los dispositivos conectados.";
 "onboarding.permission.automation.title" = "Automatización";
-"onboarding.permission.automation.body" = "Para controlar aplicaciones multimedia compatibles y realizar acciones entre aplicaciones. macOS confirma el permiso para cada aplicación de destino.";
+"onboarding.permission.automation.body" = "Para controlar apps multimedia compatibles y realizar acciones entre apps. El estado se comprueba para las apps de destino en ejecución; macOS confirma el permiso de cada app por separado.";
 "onboarding.permission.files.title" = "Acceso a archivos";
 "onboarding.permission.files.body" = "Selecciona los archivos o carpetas que necesites y macOS concederá los permisos de acceso correspondientes.";
 "onboarding.ready.title" = "Todo listo";
@@ -3384,6 +3389,7 @@
 "依赖组件" = "Componentes necesarios";
 "管理下载与文档转换所需组件。" = "Gestionar los componentes necesarios para las descargas y la conversión de documentos.";
 "更改 %@ 的保存位置" = "Cambiar la ubicación de guardado de %@";
+"恢复默认位置" = "Restaurar ubicaciones predeterminadas";
 
 "本地优先的原生笔记应用" = "Aplicación nativa de notas que prioriza el almacenamiento local";
 "AI 会话工作目录" = "Carpetas de trabajo de sesiones de IA";
@@ -3401,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Entrada %@ · Salida %@";
 "AI 模型用量" = "Uso de modelos de IA";
 
+"用量历史" = "Historial de uso";
 "AI 用量历史" = "Historial de uso de IA";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Exportar todo el historial de uso de IA como una hoja de cálculo xlsx";
 "已清空 AI 用量历史" = "Historial de uso de IA borrado";
@@ -3757,3 +3764,16 @@
 "清理失败：%@" = "Error al limpiar: %@";
 "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "La limpieza ha fallado. Consulta los detalles en Ajustes > Monitor del Sistema y Limpieza.";
 "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "La limpieza ha fallado parcialmente. Consulta los detalles en Ajustes > Monitor del Sistema y Limpieza.";
+
+"从默认浏览器导入" = "Importar del navegador predeterminado";
+"正在读取默认浏览器 Cookie" = "Leyendo cookies del navegador predeterminado";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "No se puede identificar el navegador predeterminado. Pegue las cookies manualmente.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "No se admite la importación de cookies del navegador predeterminado. Péguelas manualmente.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "No se encontraron cookies para este sitio. Inicie sesión en el navegador predeterminado o pegue las cookies manualmente.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "No se pueden leer las cookies del navegador predeterminado. Péguelas manualmente o revise los permisos de acceso.";
+"按应用" = "Por aplicación";
+"搜索内容或应用" = "Buscar contenido o aplicaciones";
+
+"重复安装 · 版本 %@ · %@ · 保留：%@" = "Instalación duplicada · Versión %@ · %@ · Conservar: %@";
+"更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Restos de actualización · Versión antigua %@ · %@ · Versión actual: %@";
+"应用副本或当前版本状态已变化，已保留目标" = "La copia de la aplicación o la versión actual ha cambiado. Se ha conservado el elemento.";

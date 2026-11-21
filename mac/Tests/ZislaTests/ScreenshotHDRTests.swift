@@ -484,8 +484,8 @@ struct ScreenshotHDRTests {
         #expect(store.items.count == 1 && retainedData == data)
     }
 
-    @Test
-    func editorInitializesBothRangesAndResizingUsesTheFrozenHDRFrame() throws {
+    @Test(arguments: [false, true])
+    func editorInitializesBothRangesAndResizingUsesTheFrozenHDRFrame(hasHDR: Bool) async throws {
         let suite = "zisla-hdr-editor-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -495,17 +495,42 @@ struct ScreenshotHDRTests {
         let hdr = try Self.hdrImage(width: 80, height: 60)
         let sdr = try #require(ScreenshotImageRendering.sdrImage(from: hdr))
         let screenSize = screen.frame.size
+        let screenImage = NSImage(cgImage: sdr, size: screenSize)
         let rect = CGRect(x: 0, y: 0, width: screenSize.width / 2, height: screenSize.height / 2)
         let image = try #require(ScreenshotCaptureService.image(from: sdr, cropInScreenPoints: rect, screenSize: screenSize))
         let controller = ScreenshotEditorWindowController(image: image,
-            screenImage: NSImage(cgImage: sdr, size: screenSize), screenCGImage: sdr, hdrScreenCGImage: hdr,
+            screenImage: screenImage, screenCGImage: sdr, hdrScreenCGImage: hasHDR ? hdr : nil,
             screen: screen, captureRect: rect, capturedApplication: nil, settingsStore: settings,
             onStash: { _, _ in }, onClose: {})
         defer { controller.close() }
         let host = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
         let editor = host.rootView.content
-        #expect(editor.model.canPreserveHDR && !editor.model.preservesHDR && editor.model.sdrImage === image)
+        #expect(editor.model.canPreserveHDR == hasHDR && !editor.model.preservesHDR)
+        #expect(editor.model.sdrImage === (hasHDR ? image : nil))
         let configuration = try #require(editor.overlayConfiguration)
+        let background = try #require(configuration.backgroundImage.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(ScreenshotImageRendering.isHDR(background) == hasHDR)
+        #expect(try Self.pixel(background, x: 40, y: 30) == Self.pixel(hasHDR ? hdr : sdr, x: 40, y: 30),
+            "Confirming a selection must retain the frozen screen's light levels even while HDR export is disabled")
+        let backdrops = Self.backingViews(in: host)
+        #expect(!backdrops.isEmpty)
+        for backdrop in backdrops {
+            if hasHDR {
+                let contents = try #require(backdrop.hdrLayer.contents) as! CGImage
+                #expect(!backdrop.hdrLayer.isHidden && backdrop.image == nil)
+                #expect(try Self.pixel(contents, x: 40, y: 30)[0] == 4,
+                    "The full-screen and selected-area backdrops must present HDR through the native layer")
+            } else {
+                #expect(backdrop.hdrLayer.isHidden && backdrop.hdrLayer.contents == nil)
+                #expect(backdrop.image === screenImage)
+            }
+        }
+        let defaultExport = try #require(editor.model.renderedImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(!ScreenshotImageRendering.isHDR(defaultExport), "A bright frozen preview must not enable HDR export")
         let nextRect = CGRect(x: 0, y: 0, width: screenSize.width / 4, height: screenSize.height / 4)
         let next = try #require(configuration.cropImage(nextRect))
         let nextSDR = try #require(configuration.cropSDRImage?(nextRect))
@@ -513,10 +538,11 @@ struct ScreenshotHDRTests {
         editor.model.preservesHDR = true
         let output = try #require(editor.model.renderedImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(output.width == 20 && output.height == 15)
-        #expect(try Self.pixel(output, x: 10, y: 7)[0] == 4)
+        let selectedHighlight = try Self.pixel(output, x: 10, y: 7)[0]
+        #expect(hasHDR ? selectedHighlight == 4 : selectedHighlight <= 1.001)
         editor.model.beginLongCapturePreview()
         #expect(controller.longCaptureToolbarFrame(on: screen).width == ScreenshotToolbarLayout.viewportWidth(
-            availableWidth: screen.visibleFrame.width, controlCount: ScreenshotToolbarLayout.controlCount + 1),
+            availableWidth: screen.visibleFrame.width, controlCount: ScreenshotToolbarLayout.controlCount + (hasHDR ? 1 : 0)),
             "The floating long-capture toolbar must reserve a slot for its HDR control")
         editor.model.replaceCapture(with: nextSDR, translatingAnnotationsBy: .zero)
         #expect(controller.longCaptureToolbarFrame(on: screen).width == ScreenshotToolbarLayout.viewportWidth(
@@ -524,26 +550,50 @@ struct ScreenshotHDRTests {
             "SDR toolbars must not reserve an absent HDR control")
     }
 
-    @Test
-    func selectionCarriesTheFrozenHDRFrameAndCancellationDropsPreparedCaptures() async throws {
+    @Test(arguments: [false, true])
+    func selectionCarriesTheFrozenHDRFrameAndCancellationDropsPreparedCaptures(hasHDR: Bool) async throws {
         let screen = try #require(NSScreen.screens.first)
         let hdr = try Self.hdrImage(width: 320, height: 240)
         let sdr = try #require(ScreenshotImageRendering.sdrImage(from: hdr))
         let screenImage = NSImage(cgImage: sdr, size: screen.frame.size)
         var panels: [ScreenshotSelectionPanel] = []
         var result: ScreenshotCaptureResult?
-        let controller = ScreenshotSelectionController(captureScreen: { _ in (screenImage, sdr, hdr) },
+        let controller = ScreenshotSelectionController(captureScreen: { _ in (screenImage, sdr, hasHDR ? hdr : nil) },
             presentPanels: { panels = $0 }, snapTargets: { _ in [] })
+        defer { controller.cancel() }
         controller.onCaptured = { result = $0 }
         await controller.start(on: screen)
         let host = try #require(panels.first?.contentView as? NSHostingView<ScreenshotSelectionView>)
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let preview = try #require(host.rootView.image?.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(ScreenshotImageRendering.isHDR(preview) == hasHDR)
+        #expect(try Self.pixel(preview, x: 160, y: 120) == Self.pixel(hasHDR ? hdr : sdr, x: 160, y: 120),
+            "Entering screenshot selection must preserve the frozen HDR screen's original light levels")
+        #expect(host.rootView.cgImage === sdr, "Color sampling must retain the SDR representation")
+        let backdrops = Self.backingViews(in: host)
+        #expect(!backdrops.isEmpty)
+        for backdrop in backdrops {
+            if hasHDR {
+                let contents = try #require(backdrop.hdrLayer.contents) as! CGImage
+                #expect(!backdrop.hdrLayer.isHidden && backdrop.image == nil)
+                #expect(try Self.pixel(contents, x: 160, y: 120)[0] == 4,
+                    "The selection entry must activate native HDR presentation before the first drag")
+            } else {
+                #expect(backdrop.hdrLayer.isHidden && backdrop.hdrLayer.contents == nil)
+                #expect(backdrop.image === screenImage)
+            }
+        }
         host.rootView.onSelection(CGRect(x: 10, y: 10, width: 200, height: 120))
-        #expect(result?.hdrScreenCGImage === hdr && result?.screenCGImage === sdr)
+        #expect(result?.hdrScreenCGImage === (hasHDR ? hdr : nil) && result?.screenCGImage === sdr)
+        #expect(result?.screenImage === screenImage)
         #expect(controller.selectionWindowCount == 0)
 
         var cancelled: ScreenshotSelectionController!
         var presentations = 0
-        cancelled = ScreenshotSelectionController(captureScreen: { _ in (screenImage, sdr, hdr) },
+        cancelled = ScreenshotSelectionController(captureScreen: { _ in (screenImage, sdr, hasHDR ? hdr : nil) },
             presentPanels: { _ in presentations += 1 }, snapTargets: { _ in [] })
         cancelled.onSelectionWillPresent = { cancelled.cancel() }
         await cancelled.start(on: screen)
@@ -596,6 +646,10 @@ struct ScreenshotHDRTests {
 
     private func press(_ control: NSObject) {
         control.performSelector(onMainThread: NSSelectorFromString("accessibilityPerformPress"), with: nil, waitUntilDone: true)
+    }
+
+    private static func backingViews(in view: NSView) -> [ScreenshotBackingImageView] {
+        (view as? ScreenshotBackingImageView).map { [$0] } ?? view.subviews.flatMap { backingViews(in: $0) }
     }
 
     private static let linearSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!

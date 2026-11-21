@@ -15,6 +15,7 @@
 "低额度提醒" = "Cảnh báo hạn mức thấp";
 "供应商未提供已验证的本地额度查询接口" = "Nhà cung cấp chưa có API hạn mức cục bộ đã được xác minh";
 "其他位置常驻额度" = "Ghim hạn mức ở vị trí khác";
+"常驻额度信息" = "Thông tin hạn mức luôn hiển thị";
 "剩余额度不高于 20% 时提醒，耗尽后也会提醒" = "Cảnh báo khi còn 20% hoặc thấp hơn, kể cả khi hết";
 "可用预算" = "Ngân sách khả dụng";
 "可用额度" = "Hạn mức khả dụng";
@@ -92,6 +93,7 @@
 "设置" = "Cài đặt";
 "通用" = "Chung";
 "工作流" = "Quy trình";
+"系统信息" = "Thông tin hệ thống";
 "信息" = "Thông tin";
 "模型" = "Mô hình";
 "宠物" = "Thú cưng";
@@ -2750,6 +2752,9 @@
 "onboarding.unmute" = "Bật âm thanh";
 "onboarding.manual" = "Cần bật trong Cài đặt hệ thống";
 "onboarding.unavailable" = "Không khả dụng trên hệ thống này";
+"onboarding.unknown" = "Không thể xác định trạng thái quyền";
+"onboarding.partially_granted" = "Đã cho phép một phần";
+"permission.drag_app.body" = "Kéo biểu tượng này vào danh sách ứng dụng trong Cài đặt hệ thống.";
 "onboarding.introduction.title" = "Làm quen với zisla";
 "onboarding.introduction.body" = "Luôn có sẵn thông tin và công cụ thường dùng trong tầm tay.";
 "onboarding.feature.island.title" = "Trợ lý hằng ngày ở phía trên màn hình";
@@ -2783,7 +2788,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Để xem mức pin của các thiết bị đã kết nối.";
 "onboarding.permission.automation.title" = "Tự động hóa";
-"onboarding.permission.automation.body" = "Để điều khiển các ứng dụng đa phương tiện được hỗ trợ và thực hiện thao tác giữa các ứng dụng. macOS xác nhận quyền riêng cho từng ứng dụng đích.";
+"onboarding.permission.automation.body" = "Để điều khiển ứng dụng đa phương tiện được hỗ trợ và thực hiện thao tác giữa các ứng dụng. Trạng thái được kiểm tra cho các ứng dụng đích đang chạy; macOS xác nhận quyền riêng cho từng ứng dụng.";
 "onboarding.permission.files.title" = "Truy cập tệp";
 "onboarding.permission.files.body" = "Chọn tệp hoặc thư mục cần sử dụng, macOS sẽ cấp quyền truy cập tương ứng.";
 "onboarding.ready.title" = "Đã sẵn sàng";
@@ -3384,6 +3389,7 @@
 "依赖组件" = "Thành phần phụ thuộc";
 "管理下载与文档转换所需组件。" = "Quản lý các thành phần cần thiết để tải xuống và chuyển đổi tài liệu.";
 "更改 %@ 的保存位置" = "Đổi vị trí lưu cho %@";
+"恢复默认位置" = "Khôi phục vị trí mặc định";
 
 "本地优先的原生笔记应用" = "Ứng dụng ghi chú gốc ưu tiên lưu trữ cục bộ";
 "AI 会话工作目录" = "Thư mục làm việc của phiên AI";
@@ -3401,6 +3407,7 @@
 "输入 %@ · 输出 %@" = "Đầu vào %@ · Đầu ra %@";
 "AI 模型用量" = "Mức sử dụng mô hình AI";
 
+"用量历史" = "Lịch sử sử dụng";
 "AI 用量历史" = "Lịch sử sử dụng AI";
 "把全部 AI 用量历史导出为 xlsx 表格" = "Xuất toàn bộ lịch sử sử dụng AI thành bảng tính xlsx";
 "已清空 AI 用量历史" = "Đã xóa lịch sử sử dụng AI";
@@ -3757,3 +3764,16 @@
 "清理失败：%@" = "Dọn dẹp thất bại: %@";
 "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Dọn dẹp thất bại. Xem chi tiết tại Cài đặt > Giám sát Hệ thống và Dọn dẹp.";
 "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看" = "Một phần thao tác dọn dẹp thất bại. Xem chi tiết tại Cài đặt > Giám sát Hệ thống và Dọn dẹp.";
+
+"从默认浏览器导入" = "Nhập từ trình duyệt mặc định";
+"正在读取默认浏览器 Cookie" = "Đang đọc cookie từ trình duyệt mặc định";
+"无法识别默认浏览器，请手动粘贴 Cookie" = "Không thể xác định trình duyệt mặc định. Hãy dán cookie thủ công.";
+"默认浏览器暂不支持 Cookie 导入，请手动粘贴" = "Chưa hỗ trợ nhập cookie từ trình duyệt mặc định. Hãy dán thủ công.";
+"未找到当前网站的 Cookie，请在默认浏览器登录或手动粘贴" = "Không tìm thấy cookie của trang web này. Hãy đăng nhập bằng trình duyệt mặc định hoặc dán cookie thủ công.";
+"无法读取默认浏览器 Cookie，请手动粘贴或检查访问权限" = "Không thể đọc cookie từ trình duyệt mặc định. Hãy dán thủ công hoặc kiểm tra quyền truy cập.";
+"按应用" = "Theo ứng dụng";
+"搜索内容或应用" = "Tìm nội dung hoặc ứng dụng";
+
+"重复安装 · 版本 %@ · %@ · 保留：%@" = "Cài đặt trùng lặp · Phiên bản %@ · %@ · Giữ lại: %@";
+"更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Tệp còn lại sau cập nhật · Phiên bản cũ %@ · %@ · Phiên bản hiện tại: %@";
+"应用副本或当前版本状态已变化，已保留目标" = "Bản sao ứng dụng hoặc phiên bản hiện tại đã thay đổi. Mục được giữ lại.";

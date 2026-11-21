@@ -891,7 +891,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var aiAccountBalancePinnedInCustomIsland: Bool
     public var aiAccountBalanceMonitoredProviders: Set<AIProvider>
     public var aiAccountBalanceDisplayedProviders: Set<AIProvider>
-    public var aiAccountBalanceQoderRegion: AIAccountBalanceQoderRegion
+    public var aiAccountBalanceQoderRegions: Set<AIAccountBalanceQoderRegion>
     public var compactStatusPriority: [CompactStatusPriority]
     public var moduleOrder: [IslandModuleOrder]
     /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.).
@@ -1067,9 +1067,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         aiAccountBalanceNoticeEnabled: Bool = true,
         aiAccountBalanceCompactStyle: MediaCompactStyle = .compact,
         aiAccountBalancePinnedInCustomIsland: Bool = false,
-        aiAccountBalanceMonitoredProviders: Set<AIProvider> = Set(AIProvider.allCases),
-        aiAccountBalanceDisplayedProviders: Set<AIProvider> = Set(AIProvider.allCases),
-        aiAccountBalanceQoderRegion: AIAccountBalanceQoderRegion = .global,
+        aiAccountBalanceMonitoredProviders: Set<AIProvider> = [],
+        aiAccountBalanceDisplayedProviders: Set<AIProvider> = [],
+        aiAccountBalanceQoderRegions: Set<AIAccountBalanceQoderRegion> = [.global],
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
         moduleOrder: [IslandModuleOrder] = IslandModuleOrder.defaultOrder,
         notificationsMuted: Bool = false,
@@ -1226,7 +1226,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.aiAccountBalancePinnedInCustomIsland = aiAccountBalancePinnedInCustomIsland
         self.aiAccountBalanceMonitoredProviders = aiAccountBalanceMonitoredProviders
         self.aiAccountBalanceDisplayedProviders = aiAccountBalanceDisplayedProviders
-        self.aiAccountBalanceQoderRegion = aiAccountBalanceQoderRegion
+        self.aiAccountBalanceQoderRegions = aiAccountBalanceQoderRegions
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
         self.moduleOrder = IslandModuleOrder.normalized(moduleOrder)
         self.notificationsMuted = notificationsMuted
@@ -1400,7 +1400,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case aiTaskResultSweepEnabled
         case aiAccountBalanceNoticeEnabled, aiAccountBalanceCompactStyle, aiAccountBalancePinnedInCustomIsland
         case aiAccountBalanceMonitoredProviders, aiAccountBalanceDisplayedProviders
-        case aiAccountBalanceQoderRegion
+        case aiAccountBalanceQoderRegions
         case compactStatusPriority
         case moduleOrder
         case notificationsMuted
@@ -1457,6 +1457,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
 
     private enum LegacyCodingKeys: String, CodingKey {
         case automaticUpdatesEnabled
+        case aiAccountBalanceQoderRegion
     }
 
     /// Missing keys identify legacy settings; persisted migration markers protect later user choices.
@@ -1737,8 +1738,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             .map { Set($0.compactMap(AIProvider.init(rawValue:))) } ?? defaults.aiAccountBalanceMonitoredProviders
         aiAccountBalanceDisplayedProviders = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceDisplayedProviders)
             .map { Set($0.compactMap(AIProvider.init(rawValue:))) } ?? defaults.aiAccountBalanceDisplayedProviders
-        aiAccountBalanceQoderRegion = try container.decodeIfPresent(String.self, forKey: .aiAccountBalanceQoderRegion)
-            .flatMap(AIAccountBalanceQoderRegion.init(rawValue:)) ?? defaults.aiAccountBalanceQoderRegion
+        if let regions = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceQoderRegions) {
+            aiAccountBalanceQoderRegions = Set(regions.compactMap(AIAccountBalanceQoderRegion.init(rawValue:)))
+        } else if let region = try decoder.container(keyedBy: LegacyCodingKeys.self)
+            .decodeIfPresent(String.self, forKey: .aiAccountBalanceQoderRegion) {
+            aiAccountBalanceQoderRegions = Set([region].compactMap(AIAccountBalanceQoderRegion.init(rawValue:)))
+        } else {
+            aiAccountBalanceQoderRegions = defaults.aiAccountBalanceQoderRegions
+        }
         compactStatusPriority = CompactStatusPriority.normalized(
             try container.decodeIfPresent([CompactStatusPriority].self, forKey: .compactStatusPriority)
                 ?? defaults.compactStatusPriority

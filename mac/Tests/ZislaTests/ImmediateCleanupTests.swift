@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 import SQLite3
@@ -71,6 +72,45 @@ struct ImmediateCleanupTests {
         #expect(controller.errors.count == (opened ? 1 : 2))
         #expect(notices.last == AppLocalization.text("清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"))
         #expect(notices.allSatisfy { $0?.contains("fixture file") != true })
+    }
+
+    @Test
+    func cleanupPermissionUsesTheSameDraggableApplicationHelperAsPermissionSettings() async throws {
+        let fixture = try ImmediateCleanupFixture()
+        defer { fixture.removeFiles() }
+        let applicationURL = fixture.directory.appendingPathComponent("zisla.app")
+        try FileManager.default.createDirectory(at: applicationURL, withIntermediateDirectories: true)
+        let center = NotificationCenter()
+        var opened: [URL] = []
+        var timers: [(Timer, @Sendable (Timer) -> Void)] = []
+        var uptime: TimeInterval = 0
+        let assistant = PermissionSettingsAssistant(applicationURL: applicationURL, openURL: { opened.append($0); return true },
+            icon: { _ in NSImage(size: CGSize(width: 32, height: 32)) },
+            placement: { (CGRect(x: 100, y: 100, width: 600, height: 600), CGRect(x: 0, y: 0, width: 1600, height: 1000)) },
+            orderFront: { _ in }, timerFactory: { interval, callback in
+                let timer = Timer(timeInterval: interval, repeats: true, block: callback)
+                timers.append((timer, callback))
+                return timer
+            }, uptime: { uptime }, workspaceNotificationCenter: center)
+        defer { assistant.dismiss() }
+        let permissions = OnboardingPermissionCoordinator(dependencies: .init(read: { _, reply in reply(.unknown) },
+            request: { _, _ in Issue.record("Full Disk Access uses System Settings") }, cancel: {}, openSettings: { assistant.openSettings($0) }))
+        let controller = ImmediateCleanupController(operation: { _ in
+            .init(didSucceed: false, errors: ["fixture permission failure"], permissions: [.fullDiskAccess])
+        }, onMessage: { _ in }, requestPermission: { permissions.openSettings(for: $0) })
+        controller.start(settings: FeatureSettings(systemCleanupPolicy: .sevenDays))
+        await (try #require(controller.task)).value
+        #expect(opened == [OnboardingPermissionID.fullDiskAccess.settingsURL])
+        let (timer, callback) = try #require(timers.first)
+        callback(timer)
+        uptime = 0.5
+        callback(timer)
+        let panel = try #require(assistant.panel)
+        let stack = try #require(panel.contentView?.subviews.compactMap { $0 as? NSStackView }.first)
+        let image = try #require(stack.arrangedSubviews.compactMap { $0 as? FileShelfDraggingView }.first)
+        #expect(image.payload == .file(applicationURL))
+        #expect(image.sourceOperationMask(for: .outsideApplication) == .copy)
+        #expect(!panel.canBecomeKey && !panel.isVisible)
     }
 
     @Test

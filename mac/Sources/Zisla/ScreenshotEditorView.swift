@@ -1,6 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 import CoreImage
+import CoreML
 import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
@@ -2055,6 +2056,7 @@ final class ScreenshotEditorModel: ObservableObject {
         _ mode: ScreenshotRecognitionMode,
         targetLanguage: String = AppLocalization.currentLanguage.translateTargetCode,
         translationService: ClipboardTranslationService = .live(),
+        makeTranslationFailureAlert: @escaping @MainActor () -> NSAlert = { NSAlert() },
         chooseTableDestination: @escaping @MainActor () async -> URL? = { nil },
         recognizeImage: @escaping @Sendable (CGImage, ScreenshotRecognitionOperation) async throws -> [ScreenshotRecognizedFragment] = {
             try await ScreenshotRecognitionWarmUp.shared.recognize($0, operation: $1)
@@ -2125,7 +2127,9 @@ final class ScreenshotEditorModel: ObservableObject {
                             )
                         } catch {
                             guard isCurrentRecognition(operation) else { return }
-                            statusMessage = AppLocalization.text("翻译失败，请重试或使用浏览器翻译")
+                            statusMessage = nil
+                            guard !Task.isCancelled else { return }
+                            presentTranslationFailure(error, operation: operation, alert: makeTranslationFailureAlert())
                             return
                         }
                         guard isCurrentRecognition(operation) else { return }
@@ -2136,6 +2140,19 @@ final class ScreenshotEditorModel: ObservableObject {
             }
         }
         return recognitionTask
+    }
+
+    func presentTranslationFailure(
+        _ error: any Error,
+        operation: ScreenshotRecognitionOperation,
+        alert: NSAlert = NSAlert()
+    ) {
+        alert.messageText = AppLocalization.text("翻译")
+        let summary = AppLocalization.text("翻译失败，请重试或使用浏览器翻译")
+        alert.informativeText = error is ClipboardTranslationError ? summary : summary + "\n\n" + error.localizedDescription
+        ScreenshotDialogPresentation.present(alert, buttonTitles: ["关闭"], shouldPresent: {
+            self.isCurrentRecognition(operation)
+        }) { _ in }
     }
 
     func presentRecognitionResult(
@@ -2153,6 +2170,7 @@ final class ScreenshotEditorModel: ObservableObject {
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
+        textView.textColor = .labelColor
         textView.isHorizontallyResizable = false
         textView.textContainer?.containerSize = NSSize(
             width: contentWidth,
@@ -2182,20 +2200,8 @@ final class ScreenshotEditorModel: ObservableObject {
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.scrollerStyle = .overlay
-        ThinScrollChrome.apply(to: scrollView)
-
-        let resultContainer = NSVisualEffectView(frame: scrollView.frame)
-        resultContainer.material = .sidebar
-        resultContainer.blendingMode = .withinWindow
-        resultContainer.state = .active
-        resultContainer.appearance = NSAppearance(named: .aqua)
-        resultContainer.wantsLayer = true
-        resultContainer.layer?.cornerRadius = 8
-        resultContainer.layer?.masksToBounds = true
-        scrollView.frame = resultContainer.bounds.insetBy(dx: 1, dy: 1)
-        scrollView.autoresizingMask = [.width, .height]
-        resultContainer.addSubview(scrollView)
-        alert.accessoryView = resultContainer
+        ThinScrollChrome.apply(to: scrollView, scrollerStyle: .overlay)
+        alert.accessoryView = scrollView
         let copyResult: @MainActor () -> Void = {
             self.statusMessage = copyText(result)
                 ? AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
@@ -3676,18 +3682,26 @@ enum ScreenshotToolbarLayout {
         contentWidth(forControlCount: controlCount)
     }
 
-    static func contentWidth(forControlCount count: Int) -> CGFloat {
+    static func contentWidth(forControlCount count: Int, statusMessage: String? = nil) -> CGFloat {
         horizontalPadding * 2
             + dragHandleWidth
             + CGFloat(count) * controlWidth
             + CGFloat(count) * spacing
+            + (statusMessage.map { statusWidth(for: $0) + spacing } ?? 0)
+    }
+
+    static func statusWidth(for message: String) -> CGFloat {
+        min(240, ceil((message as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: 11)
+        ]).width))
     }
 
     static func viewportWidth(
         availableWidth: CGFloat,
-        controlCount: Int = controlCount
+        controlCount: Int = controlCount,
+        statusMessage: String? = nil
     ) -> CGFloat {
-        min(contentWidth(forControlCount: controlCount), max(0, availableWidth - 24))
+        min(contentWidth(forControlCount: controlCount, statusMessage: statusMessage), max(0, availableWidth - 24))
     }
 
     /// Every label the 60pt cells host, in the same order `toolbar(viewportWidth:popoverEdge:)` builds
@@ -3874,7 +3888,16 @@ final class ScreenshotRecognitionOperation: @unchecked Sendable {
         if lock.withLock({ isCancelled }) { throw CancellationError() }
     }
 
-    func recognize(_ image: CGImage) throws -> [ScreenshotRecognizedFragment] {
+    func recognize(
+        _ image: CGImage,
+        perform: (CGImage, VNRecognizeTextRequest) throws -> [ScreenshotRecognizedFragment] = { image, request in
+            try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+            return (request.results ?? []).compactMap { observation in
+                guard let candidate = observation.topCandidates(1).first else { return nil }
+                return ScreenshotRecognizedFragment(text: candidate.string, boundingBox: observation.boundingBox)
+            }
+        }
+    ) throws -> [ScreenshotRecognizedFragment] {
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
         if let supportedLanguages = try? request.supportedRecognitionLanguages() {
@@ -3883,11 +3906,39 @@ final class ScreenshotRecognitionOperation: @unchecked Sendable {
             if !validLanguages.isEmpty { request.recognitionLanguages = validLanguages }
         }
         try checkCancellation()
-        try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
-        return (request.results ?? []).compactMap { observation in
-            guard let candidate = observation.topCandidates(1).first else { return nil }
-            return ScreenshotRecognizedFragment(text: candidate.string, boundingBox: observation.boundingBox)
+        let result = Result { try perform(image, request) }
+        try checkCancellation()
+        switch result {
+        case let .success(fragments) where !fragments.isEmpty:
+            return fragments
+        case let .failure(error):
+            let visionError = error as NSError
+            if error is CancellationError || (visionError.domain == VNErrorDomain
+                && visionError.code == VNErrorCode.requestCancelled.rawValue) {
+                throw CancellationError()
+            }
+        default: break
         }
+        // Accurate OCR can fail or return no text when the Neural Engine cannot load its model.
+        let devices = try? request.supportedComputeStageDevices
+        try checkCancellation()
+        guard let cpu = devices?[.main]?.first(where: {
+            if case .cpu = $0 { return true }
+            return false
+        }) else { return try result.get() }
+        let previousDevice = request.computeDevice(for: .main)
+        defer { request.setComputeDevice(previousDevice, for: .main) }
+        request.setComputeDevice(cpu, for: .main)
+        try checkCancellation()
+        let retry = Result { try perform(image, request) }
+        try checkCancellation()
+        if case let .failure(error) = retry {
+            let visionError = error as NSError
+            if visionError.domain == VNErrorDomain && visionError.code == VNErrorCode.requestCancelled.rawValue {
+                throw CancellationError()
+            }
+        }
+        return try retry.get()
     }
 }
 
@@ -4870,6 +4921,7 @@ enum ScreenshotDialogPresentation {
 
     static func present(
         _ alert: NSAlert,
+        buttonTitles: [String] = ["复制", "关闭"],
         shouldPresent: @escaping @MainActor () -> Bool = { true },
         onPresent: @escaping @MainActor () -> Void = {},
         completionHandler: @escaping @MainActor (NSApplication.ModalResponse) -> Void
@@ -4878,8 +4930,10 @@ enum ScreenshotDialogPresentation {
         RunLoop.main.perform(inModes: [.common]) {
             MainActor.assumeIsolated {
                 guard shouldPresent() else { return }
-                alert.addButton(withTitle: AppLocalization.text("复制"))
-                alert.addButton(withTitle: AppLocalization.text("关闭")).keyEquivalent = "\u{1b}"
+                for title in buttonTitles {
+                    let button = alert.addButton(withTitle: AppLocalization.text(title))
+                    if title == "关闭" { button.keyEquivalent = "\u{1b}" }
+                }
                 prepare(alert.window)
                 // AppKit resets the alert's level while runModal() makes it key.
                 let observer = NotificationCenter.default.addObserver(
@@ -5291,7 +5345,8 @@ struct ScreenshotEditorView: View {
             let toolbarSize = CGSize(
                 width: ScreenshotToolbarLayout.viewportWidth(
                     availableWidth: proxy.size.width,
-                    controlCount: toolbarControlCount
+                    controlCount: toolbarControlCount,
+                    statusMessage: model.statusMessage
                 ),
                 height: ScreenshotToolbarLayout.height
             )
@@ -5323,7 +5378,8 @@ struct ScreenshotEditorView: View {
             let toolbarSize = CGSize(
                 width: ScreenshotToolbarLayout.viewportWidth(
                     availableWidth: proxy.size.width,
-                    controlCount: toolbarControlCount
+                    controlCount: toolbarControlCount,
+                    statusMessage: model.statusMessage
                 ),
                 height: ScreenshotToolbarLayout.height
             )
@@ -5349,14 +5405,14 @@ struct ScreenshotEditorView: View {
             )
 
             ZStack(alignment: .topLeading) {
-                ScreenshotBackingImage(image: configuration.backgroundImage)
+                ScreenshotBackingImage(image: configuration.backgroundImage, preservesHDR: true)
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .allowsHitTesting(false)
 
                 Color.black.opacity(0.44)
                     .allowsHitTesting(false)
 
-                ScreenshotBackingImage(image: configuration.backgroundImage)
+                ScreenshotBackingImage(image: configuration.backgroundImage, preservesHDR: true)
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .mask {
                         RoundedRectangle(cornerRadius: selectionCornerRadius, style: .circular)
@@ -5394,7 +5450,6 @@ struct ScreenshotEditorView: View {
                     bounds: proxy.size,
                     cornerRadius: model.cornerRadius
                 )
-
             }
             .background(Color.black)
         }
@@ -6406,6 +6461,13 @@ struct ScreenshotEditorView: View {
                     iconButton("arrow.uturn.forward", title: AppLocalization.text("重做")) { model.redo() }
                 }
                 recognitionMenu
+                if let message = model.statusMessage {
+                    Text(message)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                        .frame(width: ScreenshotToolbarLayout.statusWidth(for: message), alignment: .leading)
+                        .help(message)
+                }
                 if mode == .screenshot {
                     iconButton(
                         model.isLongCapturePreviewing
@@ -6452,7 +6514,7 @@ struct ScreenshotEditorView: View {
                 iconButton("xmark", title: AppLocalization.text("关闭")) { onClose() }
             }
             .frame(
-                width: ScreenshotToolbarLayout.contentWidth(forControlCount: toolbarControlCount)
+                width: ScreenshotToolbarLayout.contentWidth(forControlCount: toolbarControlCount, statusMessage: model.statusMessage)
                     - ScreenshotToolbarLayout.horizontalPadding * 2,
                 height: ScreenshotToolbarLayout.height
             )
@@ -8272,7 +8334,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     selectionState: annotationSelectionState,
                     settingsStore: shortcutSettings,
                     overlayConfiguration: ScreenshotEditorOverlayConfiguration(
-                        backgroundImage: screenImage,
+                        backgroundImage: hdrScreenCGImage.map { NSImage(cgImage: $0, size: screenImage.size) } ?? screenImage,
                         initialSelection: captureRect,
                         cropImage: { [weak self] rect in self?.updateCaptureRect(rect) },
                         cropSDRImage: { [weak self] rect in
@@ -8787,7 +8849,8 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         let visibleFrame = screen.visibleFrame.insetBy(dx: 12, dy: 12)
         let width = ScreenshotToolbarLayout.viewportWidth(
             availableWidth: screen.visibleFrame.width,
-            controlCount: controlCount
+            controlCount: controlCount,
+            statusMessage: model.statusMessage
         )
         let selectionFrame = ScreenshotLongCaptureRangeGeometry.windowFrame(
             selection: captureRect,

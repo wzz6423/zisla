@@ -18,11 +18,22 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         let title = AppLocalization.string("保存位置", language: language)
         let results = SettingsSearchIndex.results(for: title, settings: settings, locale: language.locale)
             .filter { $0.section == .saveLocations }
-        #expect(Set(results.map(\.title)) == Set(["下载", "PDF 工具", "图片工具", "截图", "录屏", "快捷操作", "每日简报"]))
+        #expect(Set(results.map(\.title)) == Set(["下载", "PDF 工具", "图片工具", "截图", "录屏", "快捷操作", "每日简报", "恢复默认位置"]))
         for result in results {
             #expect(result.anchor.localized(locale: language.locale)
                 == .row(AppLocalization.string(result.title, language: language)))
         }
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func resetSearchReachesTheSaveLocationAction(language: AppLanguage) throws {
+        var settings = FeatureSettings.default
+        settings.downloaderEnabled = false
+        let query = AppLocalization.string("恢复默认位置", language: language)
+        let result = try #require(SettingsSearchIndex.results(for: query, settings: settings, locale: language.locale)
+            .first { $0.title == "恢复默认位置" })
+        #expect(result.section == .saveLocations)
+        #expect(result.anchor.localized(locale: language.locale) == .row(query))
     }
 
     @Test @MainActor
@@ -111,11 +122,34 @@ struct ScreenRecordingOutputDirectorySettingsTests {
     }
 
     @Test
+    func saveLocationPageHasOneResetButtonForAllLocations() throws {
+        let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"),
+                                encoding: .utf8)
+        let start = try #require(source.range(of: "private var saveLocationsContent: some View {"))
+        let end = try #require(source.range(of: "private var downloadContent: some View {"))
+        let content = String(source[start.lowerBound..<end.lowerBound])
+        let loop = try #require(content.range(of: "ForEach(SaveLocation.allCases)"))
+        let button = try #require(content.range(of: "Button(AppLocalization.text(\"恢复默认位置\"))"),
+                                  "The save-location page must offer one reset action")
+        #expect(content.components(separatedBy: "Button(AppLocalization.text(\"恢复默认位置\"))").count == 2)
+        let bodyStart = try #require(content[loop.upperBound...].firstIndex(of: "{"))
+        var depth = 1
+        let loopEnd = try #require(content[content.index(after: bodyStart)...].firstIndex { character in
+            depth += character == "{" ? 1 : character == "}" ? -1 : 0
+            return depth == 0
+        })
+        #expect(button.lowerBound > loopEnd, "The reset button must sit outside the per-location loop")
+        #expect(content.contains("model.saveLocations.resetToDefaults()"))
+        #expect(content.contains(".settingsSearchAnchor(.row(AppLocalization.string(\"恢复默认位置\", locale: locale)))"),
+                "The reset action must be reachable through settings search")
+    }
+
+    @Test
     func recordingSettingsKeepTheStudioAndShortcutsWithoutADirectoryPicker() throws {
         let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"),
                                 encoding: .utf8)
-        let start = try #require(source.range(of: "if input.selection == .features || input.selection == .recording {"))
-        let end = try #require(source.range(of: "if input.selection == .features || input.selection == .screenshot {",
+        let start = try #require(source.range(of: "if input.selection == .recording {"))
+        let end = try #require(source.range(of: "if input.selection == .screenshot {",
                                            range: start.upperBound..<source.endIndex))
         let recording = source[start.lowerBound..<end.lowerBound]
         #expect(recording.contains("title: \"录屏工作室\""))
@@ -137,7 +171,7 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         let expression = try NSRegularExpression(pattern: #"(?:settingsGroup|AppLocalization\.(?:text|format))\("([^"]+)""#)
         let directKeys = expression.matches(in: content, range: NSRange(content.startIndex..., in: content))
             .map { String(content[Range($0.range(at: 1), in: content)!]) }
-        #expect(directKeys.count == 3, "The visible save-location controls must be scanned for localization")
+        #expect(directKeys.contains("恢复默认位置"), "The reset button must be scanned for localization")
         let keys = directKeys + SaveLocation.allCases.map(\.title) + [
             SettingsSection.saveLocations.title, SettingsSection.saveLocations.subtitle,
             SettingsSection.download.subtitle,
@@ -162,6 +196,9 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         #expect(AppLocalization.string("默认保存位置", language: .arabic) == "مواقع الحفظ الافتراضية")
         #expect(AppLocalization.format("更改 %@ 的保存位置", locale: AppLanguage.english.locale, ["Screenshots"])
             == "Change save location for Screenshots")
+        #expect(AppLocalization.string("恢复默认位置", language: .english) == "Restore Default Locations")
+        #expect(AppLocalization.string("恢复默认位置", language: .traditionalChinese) == "恢復預設位置")
+        #expect(AppLocalization.string("恢复默认位置", language: .arabic) == "استعادة المواقع الافتراضية")
     }
 
     private static var packageRoot: URL {

@@ -531,6 +531,14 @@ final class AppModel: ObservableObject {
   let settingsStore = FeatureSettingsStore()
   let languageStore = AppLanguageStore()
   let aiMonitor = AIStateMonitor()
+  let aiAccountBalanceCookieInputs = AppModel.makeAccountBalanceCookieInputs()
+
+  static func makeAccountBalanceCookieInputs(
+    makeInput: (AIAccountBalanceWebsite) -> AIAccountBalanceCookieInputModel = { AIAccountBalanceCookieInputModel(website: $0) }
+  ) -> [AIAccountBalanceWebsite: AIAccountBalanceCookieInputModel] {
+    Dictionary(uniqueKeysWithValues: AIAccountBalanceWebsite.allCases.map { ($0, makeInput($0)) })
+  }
+
   let notices = SideNoticeQueue()
   let aiResultSweep = AIResultSweepController()
   let media = NowPlayingService()
@@ -810,11 +818,11 @@ final class AppModel: ObservableObject {
           settings: self.settingsStore.settings, language: language)
       }
       .store(in: &cancellables)
-    clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
+    clipboardHistoryMonitor.onContentCaptured = { [weak self] content, sourceApp in
       guard let self else { return }
       self.dailyBriefing.recordActivity(.clipboardCaptured)
       if self.settingsStore.settings.clipboardHistoryEnabled {
-        _ = self.clipboardHistory.record(content)
+        _ = self.clipboardHistory.record(content, sourceApp: sourceApp)
       }
       self.handleCapturedClipboardContent(content)
     }
@@ -1979,7 +1987,7 @@ final class AppModel: ObservableObject {
   }
 
   func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
-    guard ClipboardHistoryPasteboard.write(item.content) else {
+    guard ClipboardHistoryPasteboard.write(item) else {
       transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
@@ -3389,7 +3397,7 @@ final class AppModel: ObservableObject {
     clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
     if settings.aiProgressEnabled {
       aiMonitor.configureAccountBalanceProviders(settings.aiAccountBalanceMonitoredProviders,
-        qoderRegion: settings.aiAccountBalanceQoderRegion)
+        qoderRegions: settings.aiAccountBalanceQoderRegions)
       aiMonitor.start()
       if selectedModule == .aiMonitor {
         aiMonitor.loadUsageHistory()

@@ -14,6 +14,31 @@ public enum AIAccountBalanceWebsite: String, CaseIterable, Identifiable, Sendabl
         case .zed: URL(string: "https://dashboard.zed.dev/")!
         }
     }
+
+    var cookieRequestURLs: [URL] {
+        switch self {
+        case .qoder: [URL(string: "https://qoder.com/api/v2/me/usages/big_model_credits")!]
+        case .qoderChina: [URL(string: "https://qoder.com.cn/api/v2/me/usages/big_model_credits")!]
+        case .trae: [URL(string: "https://api.trae.cn/cloudide/api/v3/common/GetUserToken")!,
+                     URL(string: "https://api.trae.cn/trae/api/v2/pay/user_current_entitlement_list")!]
+        case .zed: [URL(string: "https://cloud.zed.dev/frontend/billing/usage")!]
+        }
+    }
+
+    var cookieDomain: String {
+        switch self { case .qoder: "qoder.com"; case .qoderChina: "qoder.com.cn"; case .trae: "trae.cn"; case .zed: "zed.dev" }
+    }
+
+    public static func selected(for monitoredProviders: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>) -> [Self] {
+        allCases.filter { website in
+            guard monitoredProviders.contains(website.provider) else { return false }
+            return switch website {
+            case .qoder: qoderRegions.contains(.global)
+            case .qoderChina: qoderRegions.contains(.china)
+            case .trae, .zed: true
+            }
+        }
+    }
 }
 
 public struct AIAccountBalanceCookieStore: Sendable {

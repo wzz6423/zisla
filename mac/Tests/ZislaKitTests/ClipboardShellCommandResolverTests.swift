@@ -86,6 +86,43 @@ struct ClipboardShellCommandResolverTests {
         }
     }
 
+    @Test(arguments: ["/bin/zsh", "/bin/bash"])
+    func resolvesHereDocumentsWithoutExecutingTheirPayloads(shell: String) async throws {
+        try await withShell(shell) { directory, environment in
+            let output = directory.appendingPathComponent("verify.py")
+            let marker = directory.appendingPathComponent("must-not-exist")
+            let command = """
+            cat > '\(output.path)' <<'VERIFY_REVIEW'
+            from pathlib import Path
+            print('<<NESTED')
+            $(/usr/bin/touch '\(marker.path)')
+            `/usr/bin/touch '\(marker.path)'`
+            VERIFY_REVIEW
+            stat -f '%N %z' noto-*.otf
+            """
+            #expect(await ClipboardShellCommandResolver.resolve(command, environment: environment, workingDirectory: directory) == command)
+            #expect(await ClipboardShellCommandResolver.resolve(command + "\nmissing-command", environment: environment, workingDirectory: directory) == nil)
+            #expect(await ClipboardShellCommandResolver.resolve(command.replacingOccurrences(of: "cat >", with: "missing-command >"), environment: environment, workingDirectory: directory) == nil)
+            #expect(!FileManager.default.fileExists(atPath: output.path))
+            #expect(!FileManager.default.fileExists(atPath: marker.path))
+        }
+    }
+
+    @Test(arguments: ["/bin/zsh", "/bin/bash"])
+    func resolvesCopiedHereDocumentLineEscapesWithoutExecutingThem(shell: String) async throws {
+        try await withShell(shell) { directory, environment in
+            let output = directory.appendingPathComponent("verify.py")
+            for backslashes in 1...3 {
+                let suffix = String(repeating: "\\", count: backslashes)
+                let command = ["cat > '\(output.path)' <<'PY'", "$(/usr/bin/touch '\(output.path)')", "&#x20;   print('hello')", "PY", "stat -f '%N %z' noto-*.otf"]
+                    .map { $0 + suffix }.joined(separator: "\n")
+                #expect(await ClipboardShellCommandResolver.resolve(command, environment: environment, workingDirectory: directory) == command)
+                #expect(await ClipboardShellCommandResolver.resolve(command + "\nmissing-command", environment: environment, workingDirectory: directory) == nil)
+                #expect(!FileManager.default.fileExists(atPath: output.path))
+            }
+        }
+    }
+
     @Test
     func missingShellAndPrematureStartupExitDoNotClaimRecognition() async throws {
         try await withShell("/bin/zsh") { directory, environment in
