@@ -80,6 +80,86 @@ struct ScreenRecordingHDRTests {
         #expect(color.allSatisfy { abs($0 - 3) < 0.1 }, "The capture must convert source primaries and YCbCr matrices correctly: \(color)")
     }
 
+    @Test(arguments: [false, true], [false, true])
+    func captureNormalizesHDRBeforeCreatingTheEncoderAndPreservesFrameTiming(localDisplay: Bool, hlg: Bool) async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: fixture.directory)
+        let output = HDRCaptureTestAsset()
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, preservesHDR: true),
+                                                  width: 64, height: 48, onFailure: { Issue.record("HDR conversion must not fail: \($0)") },
+                                                  factory: { _, _, first in output.first = first; return output })
+        let first = try Self.sample(time: 100, localDisplay: localDisplay, hlg: hlg)
+        writer.receive(first)
+        writer.receive(try Self.sample(time: 100.125, localDisplay: localDisplay, hlg: hlg))
+        await writer.flush()
+        #expect(try await writer.waitForFirstFrame() == 100)
+        let hinted = try #require(output.first)
+        let written = try #require(output.samples.first)
+        let pixels = try #require(written.imageBuffer)
+        #expect(CVPixelBufferGetPixelFormatType(pixels) == RecordingHDR.pixelFormat,
+                "The encoder must receive canonical ten-bit pixels without a driver color conversion")
+        let format = try #require(hinted.formatDescription)
+        #expect(CMFormatDescriptionGetMediaSubType(format) == RecordingHDR.pixelFormat)
+        #expect(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_ColorPrimaries) as? String
+            == kCVImageBufferColorPrimaries_ITU_R_2020 as String)
+        #expect(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_YCbCrMatrix) as? String
+            == kCVImageBufferYCbCrMatrix_ITU_R_2020 as String)
+        #expect(CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_TransferFunction) as? String
+            == kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String)
+        #expect(output.samples.map(\.presentationTimeStamp.seconds) == [0, 0.125])
+        #expect(output.samples.allSatisfy { $0.duration == first.buffer.duration })
+        #expect(hinted.imageBuffer === written.imageBuffer, "The format hint and first encoded frame must describe the same pixels")
+        if !localDisplay && !hlg { #expect(pixels === first.buffer.imageBuffer, "Canonical HDR input must keep its existing pixel storage") }
+        var values = [Float](repeating: 0, count: 8)
+        values.withUnsafeMutableBytes { bytes in
+            for (index, point) in [CGPoint(x: 32, y: 24), CGPoint(x: 8, y: 8)].enumerated() {
+                CIContext().render(CIImage(cvPixelBuffer: pixels), toBitmap: bytes.baseAddress!.advanced(by: index * 16), rowBytes: 16,
+                                   bounds: .init(x: point.x, y: point.y, width: 1, height: 1), format: .RGBAf,
+                                   colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
+            }
+        }
+        var original = [Float](repeating: 0, count: 8)
+        original.withUnsafeMutableBytes { bytes in
+            for (index, point) in [CGPoint(x: 32, y: 24), CGPoint(x: 8, y: 8)].enumerated() {
+                CIContext().render(CIImage(cvPixelBuffer: first.buffer.imageBuffer!), toBitmap: bytes.baseAddress!.advanced(by: index * 16), rowBytes: 16,
+                                   bounds: .init(x: point.x, y: point.y, width: 1, height: 1), format: .RGBAf,
+                                   colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
+            }
+        }
+        #expect(values[0] > 3.8 && abs(values[4] - 3) < 0.1, "Canonicalization must preserve linear HDR luminance and saturated colors: \(values)")
+        #expect(zip(values, original).allSatisfy { abs($0 - $1) < 0.1 }, "PQ and HLG color conversion must retain the source's linear samples")
+        await writer.seal(at: 100.25)
+        #expect(try await writer.finish() == 0.25)
+        await writer.cancel()
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func HDRFramesWithoutImageDataFailBeforeAllocatingAnEncoder() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: fixture.directory)
+        let output = HDRCaptureTestAsset()
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false), width: 64, height: 48,
+                                                  onFailure: { _ in }, factory: { _, _, first in output.first = first; return output })
+        var format: CMVideoFormatDescription?
+        try #require(CMVideoFormatDescriptionCreate(allocator: nil, codecType: RecordingHDR.pixelFormat, width: 64, height: 48,
+                                                    extensions: [kCMFormatDescriptionExtension_TransferFunction: kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ] as CFDictionary,
+                                                    formatDescriptionOut: &format) == noErr)
+        var buffer: CMSampleBuffer?
+        var timing = CMSampleTimingInfo(duration: .init(value: 1, timescale: 30), presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+        try #require(CMSampleBufferCreateReady(allocator: nil, dataBuffer: nil, formatDescription: try #require(format), sampleCount: 1,
+                                               sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                               sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &buffer) == noErr)
+        writer.receive(.init(buffer: try #require(buffer), kind: .screen, hostTime: 100))
+        await writer.flush()
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) { try await writer.waitForFirstFrame() }
+        #expect(output.first == nil && output.samples.isEmpty)
+        await writer.cancel()
+        #expect(files.discard() == nil)
+    }
+
     @available(macOS 15.0, *)
     @Test(arguments: [false, true])
     func pausedAndPlayingPreviewsKeepHDRAndDoNotChangeSourceMedia(multitrack: Bool) async throws {
@@ -581,7 +661,7 @@ struct ScreenRecordingHDRTests {
         }
     }
 
-    private static func sample(time: Double, localDisplay: Bool) throws -> ScreenRecordingCaptureSample {
+    private static func sample(time: Double, localDisplay: Bool, hlg: Bool = false) throws -> ScreenRecordingCaptureSample {
         var buffer: CVPixelBuffer?
         try #require(CVPixelBufferCreate(nil, 64, 48,
                                          localDisplay ? kCVPixelFormatType_444YpCbCr10BiPlanarFullRange : kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange,
@@ -589,11 +669,14 @@ struct ScreenRecordingHDRTests {
         let pixels = try #require(buffer)
         CVBufferSetAttachment(pixels, kCVImageBufferColorPrimariesKey,
                               localDisplay ? kCVImageBufferColorPrimaries_P3_D65 : kCVImageBufferColorPrimaries_ITU_R_2020, .shouldPropagate)
-        CVBufferSetAttachment(pixels, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ, .shouldPropagate)
+        CVBufferSetAttachment(pixels, kCVImageBufferTransferFunctionKey,
+                              hlg ? kCVImageBufferTransferFunction_ITU_R_2100_HLG : kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ, .shouldPropagate)
         CVBufferSetAttachment(pixels, kCVImageBufferYCbCrMatrixKey,
                               localDisplay ? kCVImageBufferYCbCrMatrix_ITU_R_709_2 : kCVImageBufferYCbCrMatrix_ITU_R_2020, .shouldPropagate)
         CIContext().render(CIImage(cgImage: try image()), to: pixels, bounds: .init(x: 0, y: 0, width: 64, height: 48),
-                           colorSpace: CGColorSpace(name: localDisplay ? CGColorSpace.displayP3_PQ : CGColorSpace.itur_2100_PQ))
+                           colorSpace: CGColorSpace(name: hlg
+                               ? (localDisplay ? CGColorSpace.displayP3_HLG : CGColorSpace.itur_2100_HLG)
+                               : (localDisplay ? CGColorSpace.displayP3_PQ : CGColorSpace.itur_2100_PQ)))
         var format: CMVideoFormatDescription?
         try #require(CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: pixels,
                                                                   formatDescriptionOut: &format) == noErr)
@@ -604,4 +687,13 @@ struct ScreenRecordingHDRTests {
                                                               formatDescription: try #require(format), sampleTiming: &timing, sampleBufferOut: &sample) == noErr)
         return .init(buffer: try #require(sample), kind: .screen, hostTime: time)
     }
+}
+
+private final class HDRCaptureTestAsset: ScreenRecordingCaptureAssetWriter {
+    var first: CMSampleBuffer?
+    var samples: [CMSampleBuffer] = []
+
+    func append(_ sample: CMSampleBuffer, kind: ScreenRecordingSampleKind) throws -> Bool { samples.append(sample); return true }
+    func finish(at time: Double, completion: @escaping @Sendable (Result<Void, Error>) -> Void) { completion(.success(())) }
+    func cancel() {}
 }
