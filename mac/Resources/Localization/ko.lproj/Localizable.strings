@@ -2750,6 +2750,9 @@
 "onboarding.unmute" = "소리 켜기";
 "onboarding.manual" = "시스템 설정에서 활성화 필요";
 "onboarding.unavailable" = "현재 시스템에서 사용할 수 없음";
+"onboarding.unknown" = "권한 상태를 확인할 수 없음";
+"onboarding.partially_granted" = "일부 허용됨";
+"permission.drag_app.body" = "이 아이콘을 시스템 설정의 앱 목록으로 드래그하세요.";
 "onboarding.introduction.title" = "zisla 알아보기";
 "onboarding.introduction.body" = "자주 쓰는 정보와 도구를 언제든 가까이 두세요.";
 "onboarding.feature.island.title" = "화면 상단의 일상 도우미";
@@ -2783,7 +2786,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "연결된 기기의 배터리 잔량을 확인하는 데 사용합니다.";
 "onboarding.permission.automation.title" = "자동화";
-"onboarding.permission.automation.body" = "지원되는 미디어 앱 제어 및 앱 간 작업에 사용합니다. macOS에서 대상 앱별로 권한을 확인합니다.";
+"onboarding.permission.automation.body" = "지원되는 미디어 앱 제어 및 앱 간 작업에 사용합니다. 현재 실행 중인 대상 앱의 상태를 확인하며, macOS가 앱별로 권한을 확인합니다.";
 "onboarding.permission.files.title" = "파일 접근";
 "onboarding.permission.files.body" = "사용할 파일이나 폴더를 선택하면 macOS에서 해당 접근 권한을 부여합니다.";
 "onboarding.ready.title" = "준비 완료";

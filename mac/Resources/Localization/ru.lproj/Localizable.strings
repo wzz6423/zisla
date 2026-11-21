@@ -2746,6 +2746,9 @@
 "onboarding.unmute" = "Включить звук";
 "onboarding.manual" = "Включите в Системных настройках";
 "onboarding.unavailable" = "Недоступно в этой системе";
+"onboarding.unknown" = "Не удалось определить статус разрешения";
+"onboarding.partially_granted" = "Разрешено частично";
+"permission.drag_app.body" = "Перетащите этот значок в список приложений в Системных настройках.";
 "onboarding.introduction.title" = "Знакомство с zisla";
 "onboarding.introduction.body" = "Привычная информация и инструменты всегда под рукой.";
 "onboarding.feature.island.title" = "Ваш повседневный помощник в верхней части экрана";
@@ -2779,7 +2782,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Для просмотра уровня заряда подключённых устройств.";
 "onboarding.permission.automation.title" = "Автоматизация";
-"onboarding.permission.automation.body" = "Для управления поддерживаемыми медиаприложениями и действий между приложениями. macOS подтверждает разрешение отдельно для каждого целевого приложения.";
+"onboarding.permission.automation.body" = "Для управления поддерживаемыми медиаприложениями и выполнения действий между приложениями. Статус проверяется для запущенных целевых приложений; macOS подтверждает разрешение для каждого приложения отдельно.";
 "onboarding.permission.files.title" = "Доступ к файлам";
 "onboarding.permission.files.body" = "Выберите нужные файлы или папки, и macOS предоставит соответствующие права доступа.";
 "onboarding.ready.title" = "Всё готово";

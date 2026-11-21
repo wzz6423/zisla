@@ -2750,6 +2750,9 @@
 "onboarding.unmute" = "Activar sonido";
 "onboarding.manual" = "Activar en Ajustes del Sistema";
 "onboarding.unavailable" = "No disponible en este sistema";
+"onboarding.unknown" = "No se pudo determinar el estado del permiso";
+"onboarding.partially_granted" = "Permitido parcialmente";
+"permission.drag_app.body" = "Arrastra este icono a la lista de apps en Ajustes del Sistema.";
 "onboarding.introduction.title" = "Conoce zisla";
 "onboarding.introduction.body" = "Ten siempre a mano la información y las herramientas que usas a diario.";
 "onboarding.feature.island.title" = "Tu asistente diario en la parte superior de la pantalla";
@@ -2783,7 +2786,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "Para consultar el nivel de batería de los dispositivos conectados.";
 "onboarding.permission.automation.title" = "Automatización";
-"onboarding.permission.automation.body" = "Para controlar aplicaciones multimedia compatibles y realizar acciones entre aplicaciones. macOS confirma el permiso para cada aplicación de destino.";
+"onboarding.permission.automation.body" = "Para controlar apps multimedia compatibles y realizar acciones entre apps. El estado se comprueba para las apps de destino en ejecución; macOS confirma el permiso de cada app por separado.";
 "onboarding.permission.files.title" = "Acceso a archivos";
 "onboarding.permission.files.body" = "Selecciona los archivos o carpetas que necesites y macOS concederá los permisos de acceso correspondientes.";
 "onboarding.ready.title" = "Todo listo";

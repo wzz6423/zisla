@@ -2749,6 +2749,9 @@
 "onboarding.unmute" = "音声をオン";
 "onboarding.manual" = "システム設定で有効にしてください";
 "onboarding.unavailable" = "このシステムでは利用できません";
+"onboarding.unknown" = "アクセス許可の状態を確認できません";
+"onboarding.partially_granted" = "一部許可済み";
+"permission.drag_app.body" = "このアイコンをシステム設定のアプリ一覧にドラッグしてください。";
 "onboarding.introduction.title" = "zisla を知る";
 "onboarding.introduction.body" = "よく使う情報やツールを、いつでも手の届くところに。";
 "onboarding.feature.island.title" = "画面上部の毎日のアシスタント";
@@ -2782,7 +2785,7 @@
 "onboarding.permission.bluetooth.title" = "Bluetooth";
 "onboarding.permission.bluetooth.body" = "接続されているデバイスのバッテリー残量の表示に使用します。";
 "onboarding.permission.automation.title" = "オートメーション";
-"onboarding.permission.automation.body" = "対応するメディアアプリの制御やアプリ間の操作に使用します。macOS が対象アプリごとにアクセス許可を確認します。";
+"onboarding.permission.automation.body" = "対応するメディアアプリの制御やアプリ間の操作に使用します。現在実行中の対象アプリの状態を確認し、macOS がアプリごとにアクセス許可を確認します。";
 "onboarding.permission.files.title" = "ファイルアクセス";
 "onboarding.permission.files.body" = "使用するファイルやフォルダを選択すると、macOS が必要なアクセス権を付与します。";
 "onboarding.ready.title" = "準備ができました";
