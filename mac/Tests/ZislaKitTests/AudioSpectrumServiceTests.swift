@@ -105,6 +105,173 @@ struct AudioSpectrumServiceTests {
         #expect(!capture.isCapturing)
     }
 
+    @Test(arguments: [false, true]) @MainActor
+    func missingFramesClearAudibilityWhileOutputIORemainsActive(visualizationEnabled: Bool) async {
+        let capture = FakeAudioSpectrumCapture()
+        let clock = AudioAudibilityTestClock()
+        let service = AudioSpectrumService(
+            capture: capture,
+            now: { clock.time },
+            scheduleAudibilityCheck: clock.schedule
+        )
+        defer { service.stop() }
+        let source = AudioPlaybackSource(
+            id: "idle-video-player", processIdentifiers: [2_000_101],
+            bundleIdentifier: nil, applicationName: "Youku", iconData: nil, isFrontmost: true
+        )
+        let iconCache = ApplicationIconDataCache(
+            genericIcons: [], waitForRetry: { throw CancellationError() },
+            applicationURL: { _ in nil }, fileIcon: { _ in nil }, runningApplication: { _ in nil }
+        )
+        func playbackSnapshot() -> NowPlayingSnapshot? {
+            let nowPlaying = NowPlayingService(
+                loadLyrics: { _, _, _ in LyricsSearchResult(lyrics: nil, artistName: nil) },
+                systemAudioIsAudible: service.isAudible, iconCache: iconCache
+            )
+            nowPlaying.resolveSnapshot(from: [source])
+            return nowPlaying.snapshot
+        }
+        service.setVisualizationEnabled(visualizationEnabled)
+        service.startMonitoring(hasActivePlayback: true)
+        clock.time = 10
+        clock.check()
+        #expect(!service.isAudible, "运行输出 I/O 没有声音时，不能显示正在播放")
+        #expect(playbackSnapshot() == nil)
+
+        capture.emitAudibleFrame(at: 0)
+        await drainMainActor()
+        #expect(service.isAudible)
+        #expect(playbackSnapshot()?.title == source.applicationName)
+        clock.time = 10.44
+        clock.check()
+        #expect(service.isAudible, "短音频间隙不能立即结束播放")
+        clock.time = 11
+        clock.check()
+
+        #expect(!service.isAudible, "暂停后不再交付音频帧时，旧声音证据也必须过期")
+        #expect(playbackSnapshot() == nil, "输出来源保留时，过期声音也必须清除媒体回退标题")
+        #expect(service.levels.allSatisfy { $0 == 0 })
+        #expect(capture.isCapturing, "暂停但保持输出 I/O 时，必须继续发现恢复播放")
+        capture.emitAudibleFrame(at: 0)
+        await drainMainActor()
+        service.startMonitoring(hasActivePlayback: true)
+        #expect(service.isAudible)
+        #expect(playbackSnapshot()?.title == source.applicationName)
+        #expect(capture.startCount == 1)
+    }
+
+    @Test @MainActor
+    func silentFramesAndAudibleRefreshesUseTheSameHoldInterval() async {
+        let capture = FakeAudioSpectrumCapture()
+        let clock = AudioAudibilityTestClock()
+        let service = AudioSpectrumService(
+            capture: capture,
+            now: { clock.time },
+            scheduleAudibilityCheck: clock.schedule
+        )
+        defer { service.stop() }
+        service.startMonitoring(hasActivePlayback: true)
+        capture.emitAudibleFrame(at: 0)
+        await drainMainActor()
+        clock.time = 0.44
+        capture.emitSilentFrame(at: 0)
+        await drainMainActor()
+        #expect(service.isAudible)
+
+        clock.time = 0.45
+        capture.emitSilentFrame(at: 0)
+        await drainMainActor()
+        #expect(!service.isAudible, "静音帧必须沿用既有 0.45 秒有效期")
+        #expect(service.levels.allSatisfy { $0 == 0 })
+
+        clock.time = 1
+        capture.emitAudibleFrame(at: 0)
+        await drainMainActor()
+        clock.time = 1.4
+        capture.emitAudibleFrame(at: 0)
+        await drainMainActor()
+        clock.time = 1.6
+        clock.check()
+        #expect(service.isAudible, "连续声音必须续期，不能按第一次有声时间过期")
+    }
+
+    @Test @MainActor
+    func cancelledAudibilityChecksCannotClearAReplacementCapture() async {
+        let capture = FakeAudioSpectrumCapture()
+        let clock = AudioAudibilityTestClock()
+        let service = AudioSpectrumService(
+            capture: capture,
+            now: { clock.time },
+            scheduleAudibilityCheck: clock.schedule
+        )
+        defer { service.stop() }
+        service.startMonitoring(hasActivePlayback: true)
+        #expect(clock.scheduledCheck != nil)
+        service.stop()
+        #expect(clock.cancelled == [0])
+        #expect(clock.scheduledCheck == nil, "停止后必须释放复核任务的取消闭包")
+        service.startMonitoring(hasActivePlayback: true)
+        capture.emitAudibleFrame(at: 1)
+        await drainMainActor()
+        clock.time = 1
+        clock.check(at: 0)
+        #expect(service.isAudible, "已取消的旧复核不能清除新会话的声音")
+        clock.check(at: 1)
+        #expect(!service.isAudible)
+        service.stop()
+        #expect(clock.cancelled == [0, 1])
+    }
+
+    @Test @MainActor
+    func captureFailureCancelsAudibilityChecksAndRetryRestoresMonitoring() async {
+        let capture = FakeAudioSpectrumCapture()
+        let clock = AudioAudibilityTestClock()
+        let service = AudioSpectrumService(
+            capture: capture,
+            now: { clock.time },
+            scheduleAudibilityCheck: clock.schedule
+        )
+        defer { service.stop() }
+        service.startMonitoring(hasActivePlayback: true)
+        capture.emitAudibleFrame(at: 0)
+        await drainMainActor()
+        capture.fail(at: 0)
+        await drainMainActor()
+        #expect(!service.isAudible)
+        #expect(service.levels.allSatisfy { $0 == 0 })
+        #expect(clock.cancelled == [0])
+        #expect(clock.scheduledCheck == nil, "采集失败后必须释放复核任务的取消闭包")
+
+        service.startMonitoring(hasActivePlayback: true)
+        capture.emitAudibleFrame(at: 1)
+        await drainMainActor()
+        clock.time = 1
+        clock.check(at: 0)
+        #expect(service.isAudible)
+        clock.check(at: 1)
+        #expect(!service.isAudible)
+        #expect(capture.startCount == 2)
+    }
+
+    @Test @MainActor
+    func releasingSpectrumServiceCancelsAudibilityCheckAndCapture() {
+        let capture = FakeAudioSpectrumCapture()
+        let clock = AudioAudibilityTestClock()
+        var service: AudioSpectrumService? = AudioSpectrumService(
+            capture: capture,
+            now: { clock.time },
+            scheduleAudibilityCheck: clock.schedule
+        )
+        service?.startMonitoring(hasActivePlayback: true)
+        weak let released = service
+        service = nil
+
+        #expect(released == nil)
+        #expect(clock.cancelled == [0])
+        #expect(clock.scheduledCheck == nil)
+        #expect(!capture.isCapturing)
+    }
+
     @Test @MainActor
     func currentCaptureFailureAllowsRetryWhileStaleFailureCannotStopNewGeneration() async {
         let capture = FakeAudioSpectrumCapture()
@@ -216,8 +383,36 @@ private final class FakeAudioSpectrumCapture: AudioSpectrumCapturing, @unchecked
         frames[index](AudioSpectrumFrame(levels: Array(repeating: 0.5, count: 7), rootMeanSquare: 0.1))
     }
 
+    func emitSilentFrame(at index: Int) {
+        frames[index](AudioSpectrumFrame(levels: Array(repeating: 0, count: 7), rootMeanSquare: 0))
+    }
+
     func fail(at index: Int) {
         if index == failures.count - 1 { isCapturing = false }
         failures[index]()
+    }
+}
+
+@MainActor
+private final class AudioAudibilityTestClock {
+    final class ScheduledCheck {}
+
+    var time: TimeInterval = 0
+    private var checks: [@MainActor @Sendable () -> Void] = []
+    private(set) var cancelled: Set<Int> = []
+    private(set) weak var scheduledCheck: ScheduledCheck?
+
+    func schedule(_ check: @escaping @MainActor @Sendable () -> Void) -> @MainActor () -> Void {
+        let index = checks.count
+        checks.append(check)
+        let scheduled = ScheduledCheck()
+        scheduledCheck = scheduled
+        return { [scheduled] in
+            _ = withExtendedLifetime(scheduled) { self.cancelled.insert(index) }
+        }
+    }
+
+    func check(at index: Int = 0) {
+        checks[index]()
     }
 }

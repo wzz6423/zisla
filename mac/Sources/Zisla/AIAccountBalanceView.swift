@@ -293,12 +293,11 @@ struct CompactAIAccountBalanceBar: View {
     }
 
     private func quotaSeverity(key: String) -> AIAccountQuotaSeverity? {
-        let severity = notice.metadata?[key].flatMap(Int.init).flatMap(AIAccountQuotaSeverity.init(rawValue:))
-        return severity == .critical ? .warning : severity
+        notice.metadata?[key].flatMap(Int.init).flatMap(AIAccountQuotaSeverity.init(rawValue:))
     }
 
     private func textColor(index: Int) -> Color {
         let severity = quotaSeverity(key: "quotaLineSeverity\(index)") ?? severity
-        return severity == .exhausted ? .red : severity.balanceColor
+        return severity.balanceColor
     }
 }
