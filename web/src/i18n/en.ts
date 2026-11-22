@@ -88,13 +88,13 @@ export const en: SiteContent = {
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it. Optionally delete history older than 7, 15 or 30 days while keeping favourites; automatic deletion is off by default.',
+          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it. Optionally delete history older than 7, 15 or 30 days while keeping favourites; automatic deletion is off by default. Search and group history by source application.',
         points: ['History inside the island', 'Filter by type', 'Quick Notes and favourites'],
       },
       aiMonitor: {
         name: 'AI monitor',
         caption:
-          'Aggregates AI tasks and status from CLIs, desktop apps and IDEs. Numeric usage powers token trends and a contribution heatmap; select a date for input, output and total tokens by provider and model. View, export all history as .xlsx or clear it in Settings. Check real account allowances, reset times and low-quota notices, including 5h/7d windows and Cursor USD budgets when available. Prompt and reply text is not read. Remaining-quota rings also appear across compact island layouts.',
+          'Aggregates AI tasks and status from CLIs, desktop apps and IDEs. Numeric usage powers token trends and a contribution heatmap; select a date for input, output and total tokens by provider and model. View, export all history as .xlsx or clear it in Settings. Check real account allowances, reset times and low-quota notices, including 5h/7d windows and Cursor USD budgets when available. Prompt and reply text is not read. Remaining-quota rings also appear across compact island layouts. Choose account regions independently; daily usage records and remaining-quota colours stay consistent across layouts.',
         points: ['Tasks across AI tools', 'Model history and .xlsx export', 'Account allowances and reset times'],
       },
       keyboardSound: {
@@ -124,12 +124,12 @@ export const en: SiteContent = {
       quickNotes: {
         name: 'Quick Notes',
         caption:
-          'Backed by the system Notes app: view, edit, create and delete notes with live Markdown preview, and jump straight to the first nine notes with Command+1 through 9. Drafts are written back to Notes automatically. Preview handwritten attachments and edit the text before or after them while preserving the originals.',
+          'Backed by the system Notes app: view, edit, create and delete notes with live Markdown preview, and jump straight to the first nine notes with Command+1 through 9. Drafts are written back to Notes automatically. Preview handwritten attachments and edit the text before or after them while preserving the originals. Use Command-arrow keys to navigate notes. Pasted text follows the native body typography.',
         points: ['Data lives in Notes', 'Markdown editor', 'Drafts saved back automatically'],
       },
       volumeMixer: {
         name: 'Application volume mixer',
-        caption: 'Adjust volume and mute separately for apps that are playing audio. Available on macOS 14.4 or later, with System Audio Recording permission.',
+        caption: 'Adjust volume and mute separately for apps that are playing audio. Available on macOS 14.4 or later, with System Audio Recording permission. Volume settings are remembered per application, and stale audio sources disappear when playback stops.',
         points: ['Volume per app', 'Mute separately', 'macOS 14.4+'],
       },
       toolbox: {
@@ -141,7 +141,7 @@ export const en: SiteContent = {
       system: {
         name: 'System status',
         caption:
-          'Monitor CPU, GPU, memory, disk, network, fans and available NVMe SMART temperature. View minute-level history for any date range, export .xlsx or clear it in Settings. Check battery health, cycle count, temperature, capacity and nearby device levels, plus public IPv4 and IPv6. Choose automatic power modes for plugged-in and battery use, with optional Low Power Mode at 20% or below. Charge to 100% immediately when macOS offers it. Review caches, logs, preference leftovers and orphaned AI workspaces before moving them to Trash; optional cleanup runs every 7, 15 or 30 days. Scheduled cleanup is off by default; choose trusted items only or all actionable items, including those needing review.',
+          'Monitor CPU, GPU, memory, disk, network, fans and available NVMe SMART temperature. View minute-level history for any date range, export .xlsx or clear it in Settings. Check battery health, cycle count, temperature, capacity and nearby device levels, plus public IPv4 and IPv6. Choose automatic power modes for plugged-in and battery use, with optional Low Power Mode at 20% or below. Charge to 100% immediately when macOS offers it. Review caches, logs, preference leftovers and orphaned AI workspaces before moving them to Trash; optional cleanup runs every 7, 15 or 30 days. Scheduled cleanup is off by default; choose trusted items only or all actionable items, including those needing review. Run cleanup in the background with island progress and results. Find duplicate application installations and leftovers from application updates.',
         points: ['Chip-level monitoring', 'History charts and .xlsx export', 'Review before moving to Trash'],
       },
     },
@@ -178,12 +178,12 @@ export const en: SiteContent = {
       },
       recording: {
         title: 'Record and edit in the recording studio',
-        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks with animations, zooms and captions. Adjust portrait smoothing, brightness, face and body slimming, choose voice effects, and add smooth cursor trails in your colour. Play the edited result in the studio. Choose original, 16:9, 9:16, 1:1 or 4:3; export video, GIF, Live Photo or audio, with FFmpeg needed for some formats. Preview optional AI edits before applying them. Recording has its own folder in Settings → Save Location.',
+        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks with animations, zooms and captions. Adjust portrait smoothing, brightness, face and body slimming, choose voice effects, and add smooth cursor trails in your colour. Play the edited result in the studio. Choose original, 16:9, 9:16, 1:1 or 4:3; export video, GIF, Live Photo or audio, with FFmpeg needed for some formats. Preview optional AI edits before applying them. Recording has its own folder in Settings → Save Location. Record HDR on supported devices.',
         detail: 'Portrait and voice effects · Coloured cursor trails · Multitrack playback and export',
       },
       permissions: {
         title: 'System permissions in one place',
-        description: 'Review permission status in Settings → Permissions, start supported requests or open the relevant System Settings page. The same permission list is available during first-launch onboarding; manual permissions are labelled accordingly.',
+        description: 'Review permission status in Settings → Permissions, start supported requests or open the relevant System Settings page. The same permission list is available during first-launch onboarding; manual permissions are labelled accordingly. Permission status refreshes after access is granted. An application drag helper assists permissions that require adding the app.',
         detail: 'Permission status · Requests and settings links · Shared with onboarding',
       },
       imageTools: {
@@ -205,13 +205,13 @@ export const en: SiteContent = {
       windowPreviews: {
         title: 'Preview a window. Click to switch.',
         description:
-          'Preview windows from the Dock or while switching with Command-Tab, then click a card to activate its window. New configurations enable this feature; manage it and its permissions in Settings.',
+          'Preview windows from the Dock or while switching with Command-Tab, then click a card to activate its window. New configurations enable this feature; manage it and its permissions in Settings. Closed and duplicate windows are filtered out, and Dock previews stay hidden while context menus are open.',
         detail: 'Dock and Command-Tab · Click to switch windows · Configurable in Settings',
       },
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
         description:
-          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the screenshot folder set in Settings → Save Location. Pinned screenshots stay in place when capturing again. Use slow automatic scrolling for long captures, and capture HDR screenshots on supported devices.',
+          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the screenshot folder set in Settings → Save Location. Pinned screenshots stay in place when capturing again. Use slow automatic scrolling for long captures, and capture HDR screenshots on supported devices. Window snapping includes the settings window.',
         detail: 'Highlight and extract · OCR, translation and copy · Rounded corners and .xlsx',
       },
       voice: {
@@ -235,7 +235,7 @@ export const en: SiteContent = {
       copyAssistant: {
         title: 'Quick Actions and smart next steps',
         description:
-          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0. Saved text and images use the separate Quick Actions folder in Settings → Save Location. When an app will not open, Quick Actions can check its integrity, signature and macOS security policy, then remove quarantine flags and open it after the checks pass. Reorder actions for each recognised type in Settings → Quick Actions. Currency amounts support regional symbols and prefixed currency codes.',
+          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0. Saved text and images use the separate Quick Actions folder in Settings → Save Location. When an app will not open, Quick Actions can check its integrity, signature and macOS security policy, then remove quarantine flags and open it after the checks pass. Reorder actions for each recognised type in Settings → Quick Actions. Currency amounts support regional symbols and prefixed currency codes. Command detection supports here-documents.',
         detail: 'On-device recognition · Live currency conversion · Command+N by default',
       },
       aiManagement: {
@@ -340,6 +340,17 @@ export const en: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.24': [
+        'Clipboard History can search and group entries by source application. Quick Actions recognizes commands containing here-documents.',
+        'System cleanup can run in the background with island progress and results. Disk Cleanup finds duplicate application installations and leftovers from application updates.',
+        'Save Locations can restore all output folders to their defaults. Settings groups and page order are reorganized.',
+        'Record HDR on supported devices. Screenshot text recognition, translation and HDR previews are restored; window snapping includes the settings window.',
+        'Quick Notes supports Command-arrow navigation. Pasted text keeps the native body typography.',
+        'AI quota settings support independent regions. Daily usage history and remaining-quota colours stay consistent across expanded cards and compact notices. Cancelled Kimi turns clear errors, and subscription refresh cancels before reading credentials.',
+        'Window previews filter closed and duplicate windows, honor window identity during fallback, and stay hidden while Dock context menus are open.',
+        'Media monitoring refreshes stale sources and expires audio activity after samples stop. Application volume settings persist; audio fades follow decoded sample time. Keyboard audio and statistics handle missing playback and empty data.',
+        'Permission changes refresh after access is granted, with an application drag helper for setup. Recommended-tool failures remain readable.',
+      ],
       'v0.1.23': [
         'Image tools add nine local operations: compression, five-format conversion, resize and crop, smallest-format comparison, rotation and mirroring, watermarks, mosaic and blur, text and table recognition, and background removal. Batch and ZIP export plus separate PDF and image-tool save folders are available.',
         'Audio tools add 27 local operations for conversion, editing, splitting, joining, mixing, audio extraction, LUFS normalisation, effects, channels and tags. Processing requires FFmpeg and ffprobe; choose an export file or folder.',
@@ -451,7 +462,7 @@ export const en: SiteContent = {
       storage: {
         question: 'Where does zisla store its data?',
         answer:
-          'Local data lives in ~/Library/Application Support/zisla/. Typing stats are kept separately in ~/Library/Application Support/zisla/typing-stats.sqlite3. Quick Notes uses the system Notes app. Settings → Save Location provides independent folders for downloads, PDF tools, image tools, screenshots, recordings, Quick Actions and daily briefings. Existing chosen locations are preserved on upgrade; each folder can then be changed independently.',
+          'Local data lives in ~/Library/Application Support/zisla/. Typing stats are kept separately in ~/Library/Application Support/zisla/typing-stats.sqlite3. Quick Notes uses the system Notes app. Settings → Save Location provides independent folders for downloads, PDF tools, image tools, screenshots, recordings, Quick Actions and daily briefings. Existing chosen locations are preserved on upgrade; each folder can then be changed independently. Restore all save folders to their defaults in one action.',
       },
     },
   },

@@ -89,13 +89,13 @@ export const nl = createCatalog({
       clipboard: {
         name: 'Klembord',
         caption:
-          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het. Je kunt geschiedenis ouder dan 7, 15 of 30 dagen automatisch verwijderen en favorieten behouden. Automatisch verwijderen staat standaard uit.',
+          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het. Je kunt geschiedenis ouder dan 7, 15 of 30 dagen automatisch verwijderen en favorieten behouden. Automatisch verwijderen staat standaard uit. Zoek en groepeer de geschiedenis op bronapplicatie.',
         points: ['Geschiedenis in het eiland', 'Filteren op type', 'Snelle notities en favorieten'],
       },
       aiMonitor: {
         name: 'AI-monitor',
         caption:
-          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst. Ook compacte eilandweergaven tonen het resterende tegoed in ringen.',
+          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst. Ook compacte eilandweergaven tonen het resterende tegoed in ringen. Kies accountregio’s afzonderlijk; dagelijkse gebruiksgegevens en kleuren voor resterende quota blijven gelijk in alle indelingen.',
         points: ['Taken uit meerdere AI-tools', 'Modelgeschiedenis en .xlsx-export', 'Accountquota en resettijden'],
       },
       keyboardSound: {
@@ -125,12 +125,12 @@ export const nl = createCatalog({
       quickNotes: {
         name: 'Snelle notities',
         caption:
-          'Gebruikt de systeemapp Notities om notities te bekijken, bewerken, maken en verwijderen met live Markdown-voorbeeld, en met Command+1 tot 9 meteen naar de eerste negen notities te springen. Concepten worden automatisch teruggeschreven. Bekijk handgeschreven bijlagen en bewerk de tekst ervoor of erna, met behoud van de originelen.',
+          'Gebruikt de systeemapp Notities om notities te bekijken, bewerken, maken en verwijderen met live Markdown-voorbeeld, en met Command+1 tot 9 meteen naar de eerste negen notities te springen. Concepten worden automatisch teruggeschreven. Bekijk handgeschreven bijlagen en bewerk de tekst ervoor of erna, met behoud van de originelen. Navigeer tussen notities met Command en de pijltjestoetsen. Geplakte tekst volgt de standaardtypografie van de hoofdtekst.',
         points: ['Gegevens in Notities', 'Markdown-editor', 'Concepten automatisch opgeslagen'],
       },
       volumeMixer: {
         name: 'Volumemixer per app',
-        caption: 'Pas het volume en dempen apart aan voor apps die geluid afspelen. Vereist macOS 14.4 of nieuwer en toestemming voor opname van systeemaudio.',
+        caption: 'Pas het volume en dempen apart aan voor apps die geluid afspelen. Vereist macOS 14.4 of nieuwer en toestemming voor opname van systeemaudio. Volume-instellingen worden per applicatie onthouden en verouderde audiobronnen verdwijnen wanneer het afspelen stopt.',
         points: ['Volume per toepassing', 'Apart dempen', 'macOS 14.4+'],
       },
       toolbox: {
@@ -142,7 +142,7 @@ export const nl = createCatalog({
       system: {
         name: 'Systeemstatus',
         caption:
-          'Bewaakt CPU, GPU, geheugen, schijf, netwerk, ventilatoren en beschikbare NVMe-SMART-temperatuur. Bekijk geschiedenis per minuut voor een datumbereik, exporteer .xlsx of wis het in Instellingen. Controleer batterijconditie, cycli, temperatuur, capaciteit, apparaten in de buurt en openbare IPv4/IPv6. Kies automatische energiemodi voor netstroom en batterij, optioneel met energiebesparing bij 20% of minder. Laad direct tot 100% wanneer macOS dat aanbiedt. Controleer caches, logs, achtergebleven voorkeuren en verweesde AI-werkruimten voor je ze naar de prullenmand verplaatst; optioneel opruimen kan elke 7, 15 of 30 dagen. Gepland opruimen staat standaard uit; kies alleen vertrouwde items of alle verwerkbare items, ook die nog beoordeeld moeten worden.',
+          'Bewaakt CPU, GPU, geheugen, schijf, netwerk, ventilatoren en beschikbare NVMe-SMART-temperatuur. Bekijk geschiedenis per minuut voor een datumbereik, exporteer .xlsx of wis het in Instellingen. Controleer batterijconditie, cycli, temperatuur, capaciteit, apparaten in de buurt en openbare IPv4/IPv6. Kies automatische energiemodi voor netstroom en batterij, optioneel met energiebesparing bij 20% of minder. Laad direct tot 100% wanneer macOS dat aanbiedt. Controleer caches, logs, achtergebleven voorkeuren en verweesde AI-werkruimten voor je ze naar de prullenmand verplaatst; optioneel opruimen kan elke 7, 15 of 30 dagen. Gepland opruimen staat standaard uit; kies alleen vertrouwde items of alle verwerkbare items, ook die nog beoordeeld moeten worden. Voer opruimen op de achtergrond uit met voortgang en resultaten in het eiland. Vind dubbele appinstallaties en resten van applicatie-updates.',
         points: ['Monitoring op chipniveau', 'Geschiedenisgrafieken en .xlsx-export', 'Controleren vóór verplaatsen naar prullenmand'],
       },
     },
@@ -180,12 +180,12 @@ export const nl = createCatalog({
       },
       recording: {
         title: 'Opnemen en bewerken in de studio',
-        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen met animaties, zoom en ondertitels. Pas huidverzachting, helderheid, versmalling van gezicht en lichaam, stemeffecten en vloeiende cursorsporen in je eigen kleur aan. Speel de bewerking af in de studio. Kies origineel, 16:9, 9:16, 1:1 of 4:3; exporteer video, GIF, Live Photo of audio. Sommige formaten vereisen FFmpeg. Bekijk optionele AI-plannen voordat je ze toepast. De opnamemap kies je apart onder Instellingen → Opslaglocatie.',
+        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen met animaties, zoom en ondertitels. Pas huidverzachting, helderheid, versmalling van gezicht en lichaam, stemeffecten en vloeiende cursorsporen in je eigen kleur aan. Speel de bewerking af in de studio. Kies origineel, 16:9, 9:16, 1:1 of 4:3; exporteer video, GIF, Live Photo of audio. Sommige formaten vereisen FFmpeg. Bekijk optionele AI-plannen voordat je ze toepast. De opnamemap kies je apart onder Instellingen → Opslaglocatie. Neem HDR op met ondersteunde apparaten.',
         detail: 'Portret- en stemeffecten · Gekleurde cursorsporen · Meersporenweergave en export',
       },
       permissions: {
         title: 'Systeemtoestemmingen op één plek',
-        description: 'Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. Het eerste welkomstscherm gebruikt dezelfde lijst en markeert handmatige instellingen.',
+        description: 'Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. Het eerste welkomstscherm gebruikt dezelfde lijst en markeert handmatige instellingen. De status van machtigingen wordt vernieuwd nadat toegang is verleend. Een sleephulp helpt bij machtigingen waarvoor de app moet worden toegevoegd.',
         detail: 'Toestemmingsstatus · Aanvragen en links · Gedeeld met het welkom',
       },
       imageTools: {
@@ -207,13 +207,13 @@ export const nl = createCatalog({
       windowPreviews: {
         title: 'Bekijk een venster, wissel met een klik',
         description:
-          'Bekijk vensters vanuit het Dock of met Command-Tab en klik op een kaart om dat venster te activeren. Nieuwe configuraties schakelen dit in; beheer de functie en toestemming in Instellingen.',
+          'Bekijk vensters vanuit het Dock of met Command-Tab en klik op een kaart om dat venster te activeren. Nieuwe configuraties schakelen dit in; beheer de functie en toestemming in Instellingen. Gesloten en dubbele vensters worden weggefilterd; Dock-voorbeelden blijven verborgen zolang contextmenu’s open zijn.',
         detail: 'Dock en Command-Tab · Klik om te wisselen · Instelbaar',
       },
       capture: {
         title: 'Schermafbeeldingen, scrollcaptures en vastzetten',
         description:
-          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de screenshotmap onder Instellingen → Opslaglocatie. Vastgezette afbeeldingen blijven bij nieuwe captures staan. Gebruik langzaam automatisch scrollen voor lange schermafbeeldingen; ondersteunde apparaten kunnen HDR vastleggen.',
+          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de screenshotmap onder Instellingen → Opslaglocatie. Vastgezette afbeeldingen blijven bij nieuwe captures staan. Gebruik langzaam automatisch scrollen voor lange schermafbeeldingen; ondersteunde apparaten kunnen HDR vastleggen. Het uitlijnen op vensters omvat ook het instellingenvenster.',
         detail: 'Markeren en extraheren · Herkennen, vertalen en kopiëren · Ronde hoeken en .xlsx',
       },
       voice: {
@@ -237,7 +237,7 @@ export const nl = createCatalog({
       copyAssistant: {
         title: 'Snelle acties en volgende stappen',
         description:
-          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0. Opgeslagen tekst en afbeeldingen gebruiken de aparte map voor snelle acties onder Instellingen → Opslaglocatie. Als een app niet opent, kunnen Snelle acties de integriteit, handtekening en het macOS-beveiligingsbeleid controleren. Na geslaagde controles kunnen ze quarantainekenmerken verwijderen en de app openen. Wijzig de actievolgorde per herkend type in Instellingen → Snelle acties. Bedragen ondersteunen regionale valutasymbolen en valutacodes met een voorvoegsel.',
+          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0. Opgeslagen tekst en afbeeldingen gebruiken de aparte map voor snelle acties onder Instellingen → Opslaglocatie. Als een app niet opent, kunnen Snelle acties de integriteit, handtekening en het macOS-beveiligingsbeleid controleren. Na geslaagde controles kunnen ze quarantainekenmerken verwijderen en de app openen. Wijzig de actievolgorde per herkend type in Instellingen → Snelle acties. Bedragen ondersteunen regionale valutasymbolen en valutacodes met een voorvoegsel. Commandodetectie ondersteunt here-documenten.',
         detail: 'Optionele schakelaar · Lokale herkenning · Command+N standaard',
       },
       aiManagement: {
@@ -323,6 +323,17 @@ export const nl = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.24': [
+        'De klembordgeschiedenis kan items op bronapplicatie doorzoeken en groeperen. Snelle acties herkent commando’s met here-documenten.',
+        'Systeemopruiming kan op de achtergrond draaien met voortgang en resultaten in het eiland. Schijfopruiming vindt dubbele appinstallaties en resten van applicatie-updates.',
+        'Opslaglocaties kan alle uitvoermappen terugzetten naar de standaardlocaties. De groepen en paginavolgorde van de instellingen zijn opnieuw ingedeeld.',
+        'Neem HDR op met ondersteunde apparaten. Tekstherkenning, vertaling en HDR-voorbeelden van schermafbeeldingen zijn hersteld; uitlijnen op vensters omvat het instellingenvenster.',
+        'Snelle notities ondersteunt navigatie met Command en de pijltjestoetsen. Geplakte tekst behoudt de standaardtypografie van de hoofdtekst.',
+        'Instellingen voor AI-quota ondersteunen afzonderlijke regio’s. Dagelijkse gebruiksgeschiedenis en kleuren voor resterende quota blijven gelijk in uitgevouwen kaarten en compacte meldingen. Geannuleerde Kimi-beurten wissen fouten en het vernieuwen van abonnementen wordt geannuleerd voordat inloggegevens worden gelezen.',
+        'Venstervoorbeelden filteren gesloten en dubbele vensters, respecteren de vensteridentiteit bij terugval en blijven verborgen zolang Dock-contextmenu’s open zijn.',
+        'Mediamonitoring vernieuwt verouderde bronnen en laat audioactiviteit vervallen wanneer er geen samples meer zijn. Volume-instellingen per app blijven bewaard; audiofades volgen de tijd van gedecodeerde samples. Toetsenbordaudio en statistieken verwerken ontbrekend afspelen en lege gegevens.',
+        'Veranderingen in machtigingen worden vernieuwd nadat toegang is verleend, met een sleephulp voor apps tijdens het instellen. Fouten van aanbevolen hulpmiddelen blijven leesbaar.',
+      ],
       'v0.1.23': [
         'Afbeeldingsgereedschap voegt negen lokale bewerkingen toe: compressie, conversie tussen vijf formaten, schalen en bijsnijden, vergelijking van het kleinste formaat, draaien en spiegelen, watermerken, mozaïek en vervagen, tekst- en tabelherkenning en achtergrond verwijderen. Batch- en ZIP-export en aparte opslagmappen voor PDF- en afbeeldingsgereedschap zijn beschikbaar.',
         'Audiogereedschap voegt 27 lokale bewerkingen toe voor conversie, montage, splitsen, samenvoegen, mixen, audio-extractie, LUFS-normalisatie, effecten, kanalen en tags. FFmpeg en ffprobe zijn vereist; kies een exportbestand of map.',
@@ -407,7 +418,7 @@ export const nl = createCatalog({
       network: { question: 'Gaat zisla online?', answer: 'Weer, ondertekende updatecontroles, downloads die je start en optionele externe spraakbewerking gebruiken indien nodig het netwerk. Linkherkenning gebeurt lokaal. Een lokaal model corrigeert de tekst na de transcriptie; de spraakherkenning van Apple kan nog steeds het netwerk gebruiken, afhankelijk van de taal en de systeemondersteuning. Ingeschakelde AI-tegoedcontrole raadpleegt ook de diensten van de geselecteerde aanbieders.' },
       multiDisplay: { question: 'Ondersteunt zisla meerdere schermen?', answer: 'Ja: meerdere schermen, Spaces en gewone apps op volledig scherm; uitklappen neemt nooit de focus.' },
       intel: { question: 'Kan ik zisla op een Intel-Mac gebruiken?', answer: 'Er kan een Intel-build bestaan, maar compatibiliteit is niet gegarandeerd. De huidige ondersteunde configuratie is Apple Silicon.' },
-      storage: { question: 'Waar slaat zisla gegevens op?', answer: 'Lokale gegevens staan in ~/Library/Application Support/zisla/. Typestatistieken staan apart in ~/Library/Application Support/zisla/typing-stats.sqlite3. Snelle notities gebruiken de Notities-app van het systeem. Instellingen → Opslaglocatie biedt aparte mappen voor downloads, PDF- en afbeeldingsgereedschap, screenshots, opnamen, snelle acties en dagoverzichten. Bijwerken behoudt eerder gekozen locaties; daarna kan elke map apart worden gewijzigd.' },
+      storage: { question: 'Waar slaat zisla gegevens op?', answer: 'Lokale gegevens staan in ~/Library/Application Support/zisla/. Typestatistieken staan apart in ~/Library/Application Support/zisla/typing-stats.sqlite3. Snelle notities gebruiken de Notities-app van het systeem. Instellingen → Opslaglocatie biedt aparte mappen voor downloads, PDF- en afbeeldingsgereedschap, screenshots, opnamen, snelle acties en dagoverzichten. Bijwerken behoudt eerder gekozen locaties; daarna kan elke map apart worden gewijzigd. Zet alle opslagmappen met één actie terug naar hun standaardlocatie.' },
     },
   },
   developers: {

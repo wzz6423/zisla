@@ -88,13 +88,13 @@ export const fr: SiteContent = {
       clipboard: {
         name: 'Presse-papiers',
         caption:
-          'Consultez l’historique du presse-papiers dans la Dynamic Island et filtrez par image, URL, chemin et type de fichier, et voyez quand chaque élément a été copié. Envoyez un élément vers les notes rapides, épinglez-le en favori ou supprimez-le. Vous pouvez supprimer automatiquement l’historique de plus de 7, 15 ou 30 jours en conservant les favoris. La suppression automatique est désactivée par défaut.',
+          'Consultez l’historique du presse-papiers dans la Dynamic Island et filtrez par image, URL, chemin et type de fichier, et voyez quand chaque élément a été copié. Envoyez un élément vers les notes rapides, épinglez-le en favori ou supprimez-le. Vous pouvez supprimer automatiquement l’historique de plus de 7, 15 ou 30 jours en conservant les favoris. La suppression automatique est désactivée par défaut. Recherchez et regroupez les éléments de l’historique par application source.',
         points: ['Historique dans l’île', 'Filtre par type', 'Notes rapides et favoris'],
       },
       aiMonitor: {
         name: 'Suivi IA',
         caption:
-          'Rassemble les tâches et l’état des CLI IA, apps de bureau et IDE. Les données chiffrées fiables alimentent les tendances de tokens et la carte des contributions ; choisissez une date pour voir les tokens d’entrée, de sortie et totaux par fournisseur et modèle. Consultez l’historique dans les réglages, exportez-le entièrement en .xlsx ou effacez-le. Affiche les quotas réels, leur réinitialisation et les alertes de quota faible, dont les fenêtres 5h/7d et les budgets Cursor en dollars lorsqu’ils sont disponibles. Ne lit pas le texte des invites ni des réponses. Les présentations compactes affichent aussi les quotas restants sous forme d’anneaux.',
+          'Rassemble les tâches et l’état des CLI IA, apps de bureau et IDE. Les données chiffrées fiables alimentent les tendances de tokens et la carte des contributions ; choisissez une date pour voir les tokens d’entrée, de sortie et totaux par fournisseur et modèle. Consultez l’historique dans les réglages, exportez-le entièrement en .xlsx ou effacez-le. Affiche les quotas réels, leur réinitialisation et les alertes de quota faible, dont les fenêtres 5h/7d et les budgets Cursor en dollars lorsqu’ils sont disponibles. Ne lit pas le texte des invites ni des réponses. Les présentations compactes affichent aussi les quotas restants sous forme d’anneaux. Choisissez les régions des comptes indépendamment ; les relevés quotidiens et les couleurs du quota restant concordent dans toutes les présentations.',
         points: ['Tâches de plusieurs outils IA', 'Historique par modèle et export .xlsx', 'Quotas et dates de réinitialisation'],
       },
       keyboardSound: {
@@ -132,7 +132,7 @@ export const fr: SiteContent = {
       quickNotes: {
         name: 'Notes rapides',
         caption:
-          'Adossé à l’app Notes du système : consultez, modifiez, créez et supprimez des notes avec un aperçu Markdown en direct, et rejoignez d’un geste les neuf premières notes avec Command+1 à 9. Les brouillons sont réécrits dans Notes automatiquement. Prévisualisez les pièces jointes manuscrites et modifiez le texte qui les précède ou les suit en conservant les originaux.',
+          'Adossé à l’app Notes du système : consultez, modifiez, créez et supprimez des notes avec un aperçu Markdown en direct, et rejoignez d’un geste les neuf premières notes avec Command+1 à 9. Les brouillons sont réécrits dans Notes automatiquement. Prévisualisez les pièces jointes manuscrites et modifiez le texte qui les précède ou les suit en conservant les originaux. Naviguez entre les notes avec Command et les flèches. Le texte collé reprend la typographie native du corps de texte.',
         points: [
           'Les données restent dans Notes',
           'Éditeur Markdown',
@@ -141,7 +141,7 @@ export const fr: SiteContent = {
       },
       volumeMixer: {
         name: 'Mixeur de volume par application',
-        caption: 'Réglez séparément le volume et la sourdine des apps qui diffusent du son. Nécessite macOS 14.4 ou ultérieur et l’autorisation d’enregistrement audio du système.',
+        caption: 'Réglez séparément le volume et la sourdine des apps qui diffusent du son. Nécessite macOS 14.4 ou ultérieur et l’autorisation d’enregistrement audio du système. Les réglages de volume sont mémorisés par application ; les sources audio périmées disparaissent à l’arrêt de la lecture.',
         points: ['Volume par app', 'Sourdine séparée', 'macOS 14.4+'],
       },
       toolbox: {
@@ -157,7 +157,7 @@ export const fr: SiteContent = {
       system: {
         name: 'État du système',
         caption:
-          'Surveille CPU, GPU, mémoire, disque, réseau, ventilateurs et température NVMe SMART disponible. Consultez l’historique à la minute sur une période choisie, exportez-le en .xlsx ou effacez-le dans les réglages. Vérifiez santé, cycles, température et capacité de la batterie, charge des appareils proches et IPv4/IPv6 publiques. Choisissez des modes d’alimentation automatiques sur secteur ou batterie, avec économie d’énergie à 20 % ou moins en option. Chargez immédiatement à 100 % lorsque macOS le permet. Vérifiez caches, journaux, préférences résiduelles et espaces IA orphelins avant de les mettre à la Corbeille ; le nettoyage peut aussi être planifié tous les 7, 15 ou 30 jours. Le nettoyage planifié est désactivé par défaut ; choisissez les éléments fiables seuls ou tous les éléments traitables, y compris ceux à vérifier.',
+          'Surveille CPU, GPU, mémoire, disque, réseau, ventilateurs et température NVMe SMART disponible. Consultez l’historique à la minute sur une période choisie, exportez-le en .xlsx ou effacez-le dans les réglages. Vérifiez santé, cycles, température et capacité de la batterie, charge des appareils proches et IPv4/IPv6 publiques. Choisissez des modes d’alimentation automatiques sur secteur ou batterie, avec économie d’énergie à 20 % ou moins en option. Chargez immédiatement à 100 % lorsque macOS le permet. Vérifiez caches, journaux, préférences résiduelles et espaces IA orphelins avant de les mettre à la Corbeille ; le nettoyage peut aussi être planifié tous les 7, 15 ou 30 jours. Le nettoyage planifié est désactivé par défaut ; choisissez les éléments fiables seuls ou tous les éléments traitables, y compris ceux à vérifier. Exécutez le nettoyage en arrière-plan et consultez sa progression et ses résultats dans l’île. Repérez les applications installées en double et les fichiers laissés par leurs mises à jour.',
         points: [
           'Surveillance au niveau de la puce',
           'Graphiques d’historique et export .xlsx',
@@ -198,12 +198,12 @@ export const fr: SiteContent = {
       },
       recording: {
         title: 'Enregistrer et monter dans le studio',
-        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes, avec animations, zooms et sous-titres. Réglez le lissage de la peau, la luminosité, l’affinement du visage et du corps, les effets vocaux et des traînées fluides du curseur dans la couleur choisie. Lisez le montage dans le studio. Formats : original, 16:9, 9:16, 1:1 ou 4:3 ; export vidéo, GIF, Live Photo ou audio, avec FFmpeg pour certains formats. Prévisualisez les propositions IA facultatives avant application. Le dossier d’enregistrement se règle séparément dans Réglages → Emplacement de sauvegarde.',
+        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes, avec animations, zooms et sous-titres. Réglez le lissage de la peau, la luminosité, l’affinement du visage et du corps, les effets vocaux et des traînées fluides du curseur dans la couleur choisie. Lisez le montage dans le studio. Formats : original, 16:9, 9:16, 1:1 ou 4:3 ; export vidéo, GIF, Live Photo ou audio, avec FFmpeg pour certains formats. Prévisualisez les propositions IA facultatives avant application. Le dossier d’enregistrement se règle séparément dans Réglages → Emplacement de sauvegarde. Enregistrez en HDR sur les appareils compatibles.',
         detail: 'Effets de portrait et de voix · Traînées colorées du curseur · Lecture et export multipistes',
       },
       permissions: {
         title: 'Les autorisations au même endroit',
-        description: 'Consultez les états dans Réglages → Autorisations, lancez les demandes prises en charge ou ouvrez la page système correspondante. L’accueil initial utilise la même liste et indique les réglages manuels.',
+        description: 'Consultez les états dans Réglages → Autorisations, lancez les demandes prises en charge ou ouvrez la page système correspondante. L’accueil initial utilise la même liste et indique les réglages manuels. L’état des autorisations se met à jour après l’octroi de l’accès. Une aide au glisser-déposer facilite l’ajout de l’application quand il est nécessaire.',
         detail: 'État des autorisations · Demandes et liens · Commun avec l’accueil',
       },
       imageTools: {
@@ -225,13 +225,13 @@ export const fr: SiteContent = {
       windowPreviews: {
         title: 'Voir une fenêtre, cliquer pour y passer',
         description:
-          'Prévisualisez les fenêtres depuis le Dock ou avec Command-Tab, puis cliquez sur une carte pour activer la fenêtre. Les nouvelles configurations activent cette fonction ; gérez-la et ses autorisations dans les réglages.',
+          'Prévisualisez les fenêtres depuis le Dock ou avec Command-Tab, puis cliquez sur une carte pour activer la fenêtre. Les nouvelles configurations activent cette fonction ; gérez-la et ses autorisations dans les réglages. Les fenêtres fermées ou en double sont filtrées ; les aperçus du Dock restent masqués quand un menu contextuel est ouvert.',
         detail: 'Dock et Command-Tab · Changer de fenêtre en un clic · Réglable',
       },
       capture: {
         title: 'Captures, captures défilantes et épinglage',
         description:
-          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue s’ouvre dans le dossier de captures défini dans Réglages → Emplacement de sauvegarde. Les captures épinglées restent en place lors d’une nouvelle capture. Utilisez le défilement automatique lent pour les captures longues et capturez en HDR sur les appareils compatibles.',
+          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue s’ouvre dans le dossier de captures défini dans Réglages → Emplacement de sauvegarde. Les captures épinglées restent en place lors d’une nouvelle capture. Utilisez le défilement automatique lent pour les captures longues et capturez en HDR sur les appareils compatibles. L’accrochage aux fenêtres inclut la fenêtre des réglages de zisla.',
         detail: 'Surlignage et extraction · Reconnaissance, traduction et copie · Coins arrondis et .xlsx',
       },
       voice: {
@@ -255,7 +255,7 @@ export const fr: SiteContent = {
       copyAssistant: {
         title: 'Actions rapides et étapes suivantes',
         description:
-          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0. Les textes et images enregistrés utilisent le dossier indépendant des actions rapides dans Réglages → Emplacement de sauvegarde. Si une app ne s’ouvre pas, les actions rapides peuvent vérifier son intégrité, sa signature et la politique de sécurité de macOS, puis retirer les attributs de quarantaine et l’ouvrir après validation. Réordonnez les actions de chaque type reconnu dans Réglages → Actions rapides. Les montants prennent en charge les symboles régionaux et les codes de devise préfixés.',
+          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0. Les textes et images enregistrés utilisent le dossier indépendant des actions rapides dans Réglages → Emplacement de sauvegarde. Si une app ne s’ouvre pas, les actions rapides peuvent vérifier son intégrité, sa signature et la politique de sécurité de macOS, puis retirer les attributs de quarantaine et l’ouvrir après validation. Réordonnez les actions de chaque type reconnu dans Réglages → Actions rapides. Les montants prennent en charge les symboles régionaux et les codes de devise préfixés. La détection des commandes prend en charge les here-documents.',
         detail: 'Reconnaissance locale · Conversion aux taux en temps réel · Command+N par défaut',
       },
       aiManagement: {
@@ -361,6 +361,17 @@ export const fr: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.24': [
+        'L’historique du presse-papiers permet la recherche et le regroupement par application source. Les actions rapides reconnaissent les commandes contenant des here-documents.',
+        'Le nettoyage système peut s’exécuter en arrière-plan avec progression et résultats dans l’île. Le nettoyage du disque repère les applications installées en double et les fichiers laissés par les mises à jour.',
+        'Tous les dossiers de sortie peuvent être rétablis par défaut en une action. Les groupes et l’ordre des pages des réglages ont été réorganisés.',
+        'L’enregistrement HDR est disponible sur les appareils compatibles. La reconnaissance de texte, la traduction et les aperçus HDR des captures sont rétablis ; l’accrochage aux fenêtres inclut celle des réglages.',
+        'Les notes rapides se parcourent avec Command et les flèches. Le texte collé garde la typographie native du corps de texte.',
+        'Les réglages des quotas IA proposent des régions indépendantes. L’historique quotidien et les couleurs du quota restant concordent entre cartes déployées et notifications compactes. L’annulation d’un tour Kimi efface les erreurs ; une actualisation d’abonnement annulée ne lit plus les identifiants.',
+        'Les aperçus filtrent les fenêtres fermées et les doublons, respectent leur identité lors d’un recours alternatif et restent masqués pendant l’ouverture des menus contextuels du Dock.',
+        'La surveillance des médias actualise les sources périmées et termine l’activité audio quand les échantillons cessent. Le volume par application est conservé ; les fondus suivent le temps des échantillons décodés. Les sons et statistiques du clavier traitent mieux l’absence de lecture ou de données.',
+        'Les autorisations se mettent à jour après l’octroi de l’accès, avec une aide pour faire glisser l’application. Les messages d’échec des outils recommandés restent lisibles.',
+      ],
       'v0.1.23': [
         'Les outils image ajoutent neuf opérations locales : compression, conversion entre cinq formats, redimensionnement et recadrage, comparaison du format le plus léger, rotation et symétrie, filigranes, mosaïque et flou, reconnaissance de texte et de tableaux, et suppression du fond. Exportez par lots ou en ZIP et choisissez des dossiers distincts pour les outils PDF et image.',
         'Les outils audio ajoutent 27 opérations locales de conversion, montage, découpage, assemblage, mixage, extraction audio, normalisation LUFS, effets, canaux et métadonnées. FFmpeg et ffprobe sont nécessaires ; choisissez un fichier ou dossier d’export.',
@@ -472,7 +483,7 @@ export const fr: SiteContent = {
       storage: {
         question: 'Où zisla stocke-t-il ses données ?',
         answer:
-          'Les données locales se trouvent dans ~/Library/Application Support/zisla/. Les statistiques de saisie sont conservées à part dans ~/Library/Application Support/zisla/typing-stats.sqlite3. Les notes rapides utilisent l’app Notes du système. Réglages → Emplacement de sauvegarde propose des dossiers indépendants pour les téléchargements, les outils PDF et image, les captures, les enregistrements, les actions rapides et les bilans quotidiens. La mise à jour conserve les emplacements déjà choisis ; chaque dossier peut ensuite être modifié séparément.',
+          'Les données locales se trouvent dans ~/Library/Application Support/zisla/. Les statistiques de saisie sont conservées à part dans ~/Library/Application Support/zisla/typing-stats.sqlite3. Les notes rapides utilisent l’app Notes du système. Réglages → Emplacement de sauvegarde propose des dossiers indépendants pour les téléchargements, les outils PDF et image, les captures, les enregistrements, les actions rapides et les bilans quotidiens. La mise à jour conserve les emplacements déjà choisis ; chaque dossier peut ensuite être modifié séparément. Rétablissez tous les dossiers d’enregistrement par défaut en une seule action.',
       },
     },
   },

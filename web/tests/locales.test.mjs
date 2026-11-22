@@ -103,6 +103,8 @@ const updatedStrings = (content) => [
   ...['windowPreviews', 'capture', 'pet'].flatMap((id) =>
     ['description', 'detail'].map((field) =>
       [`extensions.features.${id}.${field}`, content.extensions.features[id][field]])),
+  ...['recording', 'permissions'].map((id) =>
+    [`extensions.features.${id}.description`, content.extensions.features[id].description]),
   ...['copyAssistant', 'media', 'recommendedTools', 'voice', 'browserDownloads'].map((id) =>
     [`extensions.features.${id}.description`, content.extensions.features[id].description]),
   ['meta.description', content.meta.description],
@@ -118,6 +120,7 @@ const updatedStrings = (content) => [
   ...strings(content.changelog.releaseNotes['v0.1.21'], 'changelog.releaseNotes.v0.1.21'),
   ...strings(content.changelog.releaseNotes['v0.1.22'], 'changelog.releaseNotes.v0.1.22'),
   ...strings(content.changelog.releaseNotes['v0.1.23'], 'changelog.releaseNotes.v0.1.23'),
+  ...strings(content.changelog.releaseNotes['v0.1.24'], 'changelog.releaseNotes.v0.1.24'),
   ...strings(content.film, 'film'),
 ];
 
@@ -305,6 +308,21 @@ test('current feature descriptions keep meeting, power and application-repair co
   assert.match(content.faq.items.network.answer, /AI account quota checks.*selected providers’ services/);
 });
 
+test('current release describes source grouping, cleanup, HDR and saved preferences', () => {
+  assert.match(english.showcase.modules.clipboard.caption, /Search and group history by source application/);
+  assert.match(english.showcase.modules.system.caption, /background.*island progress and results/);
+  assert.match(english.showcase.modules.system.caption, /duplicate application installations.*leftovers/);
+  assert.match(english.showcase.modules.quickNotes.caption, /Command-arrow.*native body typography/);
+  assert.match(english.showcase.modules.volumeMixer.caption, /remembered per application.*stale audio sources/);
+  assert.match(english.showcase.modules.aiMonitor.caption, /account regions independently.*daily usage records/i);
+  assert.match(english.extensions.features.recording.description, /HDR on supported devices/);
+  assert.match(english.extensions.features.permissions.description, /status refreshes after access is granted/);
+  assert.match(english.extensions.features.capture.description, /settings window/);
+  assert.match(english.extensions.features.windowPreviews.description, /duplicate windows.*context menus/);
+  assert.match(english.extensions.features.copyAssistant.description, /here-documents/);
+  assert.match(english.faq.items.storage.answer, /Restore all save folders to their defaults/);
+});
+
 test('supported AI tools retain Cursor and Muse Code identities', () => {
   const tools = site.supportedAITools();
   assert.ok(tools.includes('Cursor'));
@@ -335,6 +353,7 @@ for (const locale of siteLocales) {
     assert.equal(content.changelog.releaseNotes['v0.1.21'].length, 4);
     assert.equal(content.changelog.releaseNotes['v0.1.22'].length, 9);
     assert.equal(content.changelog.releaseNotes['v0.1.23'].length, 13);
+    assert.equal(content.changelog.releaseNotes['v0.1.24'].length, 9);
     const rendered = renderInMemory(locale);
     for (const [path, value] of updatedStrings(content)) {
       if (path.startsWith('meta.')) continue;
@@ -364,27 +383,27 @@ for (const locale of siteLocales) {
 }
 
 test('release notes render by version while historical wording remains available', () => {
-  const prepared = { version: 'v0.1.23', date: '2026-11-14', notes: ['ENGLISH FALLBACK SENTINEL'] };
+  const prepared = { version: 'v0.1.24', date: '2026-11-22', notes: ['ENGLISH FALLBACK SENTINEL'] };
   const historical = { version: 'v0.1.19', date: '2026-10-15', notes: ['HISTORICAL NOTE SENTINEL'] };
   const rendered = renderInMemory('zh-Hans', [prepared, historical]);
-  for (const note of site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.23']) {
+  for (const note of site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.24']) {
     assert.ok(rendered.html.includes(note), 'prepared Chinese release note is rendered');
   }
   assert.ok(!rendered.html.includes('ENGLISH FALLBACK SENTINEL'));
   assert.ok(rendered.html.includes('HISTORICAL NOTE SENTINEL'), 'historical notes retain their original wording');
   const current = renderInMemory('zh-Hans', [historical]);
-  assert.ok(!current.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.23'][0]),
+  assert.ok(!current.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.24'][0]),
     'prepared notes do not replace the currently published release');
   const metadataOnly = renderInMemory('zh-Hans', [{ ...prepared, notes: [] }]);
-  assert.ok(metadataOnly.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.23'][0]),
+  assert.ok(metadataOnly.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.24'][0]),
     'a release entry can use its catalog notes without duplicating English source notes');
 });
 
 
 test('latest release downloads and README match the newest changelog entry', () => {
   const latest = site.changelogEntries[0];
-  assert.equal(latest.version, 'v0.1.23');
-  assert.equal(latest.date, '2026-11-14');
+  assert.equal(latest.version, 'v0.1.24');
+  assert.equal(latest.date, '2026-11-22');
   assert.equal(site.latestRelease.version, latest.version);
   assert.equal(site.latestRelease.date, latest.date);
   const releasePage = `https://github.com/wzz6423/zisla/releases/tag/${latest.version}`;

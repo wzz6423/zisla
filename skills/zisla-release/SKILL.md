@@ -1,6 +1,6 @@
 ---
 name: zisla-release
-description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到 GitHub 和 Gitee，分别打包 x86_64、arm64 和 Universal，并验证 Sparkle 签名自动更新、双通道 appcast 与发布资产。
+description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到 GitHub 和 Gitee，分别打包 x86_64、arm64 和 Universal，生成签名 appcast 并核对双端发布资产。
 ---
 
 # zisla macOS 发版
@@ -13,13 +13,13 @@ description: 此技能用于发布 zisla 的 macOS Preview 或 Release 版本到
 - Gitee 的正式永久 feed tag 是 `update-release`，Preview 永久 feed tag 是 `preview`；GitHub 的正式 feed 使用 `latest`，Preview 使用永久 prerelease tag `preview`。两个 `preview` feed 都只保存当前 Preview 的三份 appcast，且各自指向实际版本 tag（例如 `v0.2.0-preview.1`）中本站对应架构的 ZIP。GitHub 的 `preview` 必须保持 prerelease，避免污染正式 `latest`。
 - 每个版本仍构建 `x86_64`、`arm64` 和 `universal` 三套包，三套 ZIP 都参与自动更新：每套各有一份只引用自己那套 ZIP 的 appcast，装哪套就一直更新哪套——单架构安装不会被 Universal 包换掉，装机体积优势不会在一次应用内更新后消失；Universal 安装也不会被换成单架构包，跨架构可用不会因为一次更新而失去。DMG 和校验文件只用于首次安装与 Release 页面下载，不参与应用内更新流程。
 - 每次运行 `package-release.sh` 都会在同目录生成 `appcast-gitee.xml` 和 `appcast-github.xml`，两者只引用本次构建的那一套 ZIP，分别指向 Gitee 与 GitHub。`make build-package` 因此产出三对；上传时 Universal 那对命名为 `appcast.xml`（Universal 安装请求的就是它），单架构那两对命名为 `appcast-arm64.xml` 与 `appcast-x86_64.xml`。不得手改已签名 appcast；需修改时重新运行生成工具。
-- 将“实际版本的三套 ZIP 与两端三份签名 appcast（`appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`）已上传，并且永久 feed 已指向该版本”视为自动更新发布的原子门禁；缺少某份架构 appcast 会让该架构的已安装版本在主 feed 和回退 feed 上同时得到 404；任一环节缺失即视为发版失败，不得宣称线上检查、发现更新或自动安装可用。不得以 Release API 的版本号、debug 专用逻辑或“已是最新”提示替代 Sparkle appcast 检查。若未获明确授权修复指定历史版本，不得回填或改动已发布版本及其永久 feed；默认在下一次更高版本发版时完整满足该门禁。
+- 将“实际版本的三套 ZIP 与两端三份签名 appcast（`appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`）已上传，并且永久 feed 已指向该版本”视为自动更新发布的原子门禁；缺少某份架构 appcast 会让该架构的已安装版本在主 feed 和回退 feed 上同时得到 404；任一环节缺失即视为发版失败，不得宣称线上检查、发现更新或自动安装可用。Release API 的版本号、debug 专用逻辑或“已是最新”提示均不能证明 Sparkle 更新链路通过。若未获明确授权修复指定历史版本，不得回填或改动已发布版本及其永久 feed；默认在下一次更高版本发版时完整满足该门禁。
 - GitHub 和 Gitee 都承载 Sparkle feed 与更新 ZIP。每个同版本 Release 必须在两端都上传 `x86_64`（X86）、`arm64` 和 `universal` 三套 DMG、ZIP 和 SHA-256，以及三份对应架构的已签名 appcast。
 - **三种包都必须保留**：`x86_64` 和 `arm64` 包分别只包含单一架构，`universal` 包必须同时包含两个架构；三类资产都要分别压缩、分别上传，文件名必须带对应后缀。
 - 无论安装包构建时的 `UPDATE_CHANNEL` 是什么，运行时选择 Release 或 Preview 都必须切换到对应的 Sparkle feed；自动检查和“检查更新”均遵循当前选择。切换后 Sparkle 重置下一次检查周期，手动检查立即使用新通道。
 - 使用 `CFBundleShortVersionString` 作为用户可见版本。版本 tag 一律为 `v${VERSION}`（Preview 形如 `v0.2.0-preview.1`），与签名 appcast 的默认 ZIP URL 一致；禁止使用 `release/v1.2.3` 等路径前缀 tag，那会迫使每次发布额外覆盖 `SPARKLE_GITEE_DOWNLOAD_URL_PREFIX` 和 `SPARKLE_GITHUB_DOWNLOAD_URL_PREFIX`。
 - 每次发布前验证 DMG 中只有 `zisla.app` 和 `Applications` 软链接。首次安装 Sparkle 版仍需要用户手动安装；之后的已安装 Sparkle 版本才可自动更新。
-- 正式版发布完成后必须同步 Homebrew cask：`Casks/zisla.rb` 的 `version` 与两个 `sha256` 必须分别对应本次 `arm64` 与 `x86_64` ZIP，并与官网 `latestRelease` 同版本，否则 CI 的 `Verify the Homebrew cask` 失败。cask 用 `arch` 映射按机器解析下载地址，Apple Silicon 与 Intel 各自只取对应架构的包；Sparkle 之后读同一架构的 appcast，安装不会在一次应用内更新后变成 Universal。Preview 不进 tap，避免 `brew upgrade` 把用户带到预发布版本。cask 保留 `auto_updates true`，更新链路仍归 Sparkle，Homebrew 只负责首次安装、显式升级，以及已装应用落后于 tap 时的兜底升级。tap 里的版本只能是三份 appcast 都已上传并验证通过的版本：brew 装到的用户之后靠 Sparkle 拿更新，而 `auto_updates true` 让 Homebrew 只在已装应用确实旧于 tap 时才接手（Homebrew 5.1.6 起读应用包内的版本号，更早的版本直接跳过 `auto_updates` 的 cask）。所以不含 Sparkle 或 appcast 缺失的版本必须先从 tap 移除（`Casks/zisla.rb` 曾因指向不含 Sparkle 的 0.1.6 而被撤下）。
+- 正式版发布完成后必须同步 Homebrew cask：`Casks/zisla.rb` 的 `version` 与两个 `sha256` 必须分别对应本次 `arm64` 与 `x86_64` ZIP，并与官网 `latestRelease` 同版本，否则 CI 的 `Verify the Homebrew cask` 失败。cask 用 `arch` 映射按机器解析下载地址，Apple Silicon 与 Intel 各自只取对应架构的包；Sparkle 之后读同一架构的 appcast，安装不会在一次应用内更新后变成 Universal。Preview 不进 tap，避免 `brew upgrade` 把用户带到预发布版本。cask 保留 `auto_updates true`，更新链路仍归 Sparkle，Homebrew 只负责首次安装、显式升级，以及已装应用落后于 tap 时的兜底升级。tap 里的版本只能是三份已签名 appcast 都已上传且资产清单核对通过的版本：brew 装到的用户之后靠 Sparkle 拿更新，而 `auto_updates true` 让 Homebrew 只在已装应用确实旧于 tap 时才接手（Homebrew 5.1.6 起读应用包内的版本号，更早的版本直接跳过 `auto_updates` 的 cask）。所以不含 Sparkle 或 appcast 缺失的版本必须先从 tap 移除（`Casks/zisla.rb` 曾因指向不含 Sparkle 的 0.1.6 而被撤下）。
 - 发版构建严禁使用调试变体：必须显式使用 `DEBUG_BUILD=false`，产物必须是 `zisla.app`、Bundle ID `dev.wzz.zisla`；`zisla-debug.app` 或 `dev.wzz.zisla.debug` 只能用于本地调试，不能上传。
 - 发版资源必须来自正式资源目录：`AppIcon.icns` 必须作为主图标，`AppIconNight.icns` 只能作为深色模式备用图标；调试构建使用的黑底白字图标复制方式，以及 `zisla-debug.app` 中的任何资源，都不能用于正式包或通过改名后上传。
 - 发版不得把 `make run` 生成的 `dist/zisla-debug.app` 直接压缩、改名或复制资源；必须由 `Scripts/package-release.sh` 重新构建正式包并通过身份与图标校验。
@@ -275,13 +275,9 @@ test -d "$STAGING_DIRECTORY/universal/zisla.app/Contents/Frameworks/Sparkle.fram
 codesign --verify --deep --strict "$STAGING_DIRECTORY/universal/zisla.app"
 ```
 
-上传后分别获取 Gitee 与 GitHub feed 上的三份 appcast，确认每份都返回 HTTP 200、为有效 XML、含签名，并指向对应站点、对应架构的本次 ZIP：Release 验证 Gitee `update-release/download/` 与 GitHub `latest/download/` 下的 `appcast.xml`、`appcast-arm64.xml`、`appcast-x86_64.xml`；Preview 验证两端 `releases/download/preview/` 下的同三份。任一 feed 非 200、无法解析、未签名或未指向本次对应架构 ZIP 时，停止发布并修复本次发布资产，不能以客户端版本比较作为替代。使用已安装旧 Sparkle 版应用的中国大陆公网出口与境外公网出口，分别验证 Release→Release、Preview→Preview、Release→Preview 与 Preview→Release：前者手动检查应先访问 Gitee、失败时只重试 GitHub 一次；后者应先访问 GitHub、失败时只重试 Gitee 一次；开启自动下载时应在退出或重启时完成替换。线上还没有任何含 Sparkle 的已发布版本时（0.1.6 及更早都不含），用本次包自建旧版代替，不得因为“没有旧版可装”而跳过这一步。单架构测试机更新后还要用 `lipo -archs` 确认应用仍只含本机架构，Universal 安装更新后同样用 `lipo -archs` 确认仍含两个架构，Rosetta 下运行的 x86_64 安装则应更新到 `arm64` 包。
-
-两端资产清单与六份 feed 用与 CI 同一份脚本核对，避免逐个 URL 手点漏掉某个架构：
+两端资产清单使用与 CI 同一份脚本核对：
 
 ```zsh
-# 六份 feed 各自 200、恰好一个 item、带 edSignature，且指向本站本架构的本次 ZIP。
-ruby .github/scripts/appcast-feeds.rb verify --tag "v${VERSION}" --channel "$UPDATE_CHANNEL"
 # 15 份必需资产：三套 DMG/ZIP 及其 SHA-256，加三份 appcast。源码包属于额外资产。
 gh release view "v${VERSION}" --repo wzz6423/zisla --json assets --jq '.assets[].name' \
   | ruby .github/scripts/appcast-feeds.rb verify-assets --tag "v${VERSION}"
@@ -294,29 +290,15 @@ if [[ "$UPDATE_CHANNEL" == preview ]]; then
 fi
 ```
 
-发布后 GitHub Actions 的 `Release Feeds` 会自动跑上面这套校验：`release: published` 触发，prerelease 自动走 preview 通道，永久 feed tag（`preview`、`update-release`）跳过。永久 feed 是手工发版的后续步骤，所以它最多轮询 10 次、每次间隔 60 秒，任一环节始终缺失才失败；补齐资产后用 `gh workflow run 'Release Feeds' -f tag="v${VERSION}" -f channel="$UPDATE_CHANNEL"` 重跑即可。runner 访问 Gitee 常被限流或拒绝，此时该工作流只验 GitHub 镜像并给出 warning，Gitee feed 仍必须按上面的命令人工验证过才算发版完成。
+现有 GitHub Actions 的 `Release Feeds` 在 `release: published` 时自动检查线上 feed；prerelease 使用 preview 通道，永久 feed tag（`preview`、`update-release`）跳过。该工作流独立运行，不要求为发版额外手动触发或重跑。交付时如实记录其状态。
 
-自建旧版只改版本号与 Bundle ID，因此它验的是真实私钥签出的线上 feed、应用内置的真实 `SUPublicEDKey`，以及终止旧实例后重新拉起新版这一段——这三项本地测试都覆盖不到。改 Bundle ID 是为了不污染正式实例的 Sparkle 偏好；改过 Info.plist 必须重签，否则 Sparkle 校验宿主签名时失败。
-
-```zsh
-TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/zisla-update-test.XXXXXX")"
-ditto "$RELEASE_OUTPUT_DIRECTORY/.staging/arm64/zisla.app" "$TEST_ROOT/zisla.app"
-TEST_INFO="$TEST_ROOT/zisla.app/Contents/Info.plist"
-plutil -replace CFBundleShortVersionString -string 0.0.1 "$TEST_INFO"
-plutil -replace CFBundleVersion -string 1 "$TEST_INFO"
-plutil -replace CFBundleIdentifier -string dev.wzz.zisla.updatetest "$TEST_INFO"
-codesign --force --deep --sign - "$TEST_ROOT/zisla.app"
-open "$TEST_ROOT/zisla.app"
-# 在这个实例里切换通道并手动检查更新，走完下载、验签、替换与重启。
-# 验完删除测试实例与它的偏好文件：
-# rm -rf "$TEST_ROOT" ~/Library/Preferences/dev.wzz.zisla.updatetest.plist
-```
+线上 feed HTTP 检查与隔离实例的 Sparkle 下载、验签、替换测试仅在用户明确要求时执行；通道切换、镜像回退和更新后架构检查同样按用户要求执行。未执行的检查在交付记录中标为“未验证”，不得宣称线上更新链路通过。
 
 正式版还要先完成下节的 Homebrew cask 同步（它要读 `outputs/` 里 `arm64` 与 `x86_64` ZIP 的校验文件），再在仓库根目录执行 `make clean` 删除 `outputs/`（含 `.staging/`）与本地调试产物，并清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
 
 ## 同步 Homebrew cask
 
-仅正式版执行，Preview 跳过本节。两端 Release 资产上传并通过上节验证后，在仓库根目录执行：
+仅正式版执行，Preview 跳过本节。两端 Release 资产上传、永久 feed 更新及资产清单核对完成后，在仓库根目录执行：
 
 ```zsh
 release_gate
@@ -339,7 +321,7 @@ brew livecheck --cask wzz6423/tap/zisla
 
 ## 结束发版：end commit
 
-只有两端全部资产、六份永久 feed 与自动更新验证通过，且正式版的 tap/cask/官网同步及校验完成，才允许结束；任何跳过、失败或未完成的验证都不得用 end 标记成功。正式版仅暂存 `Casks/zisla.rb`、`web/src/content.ts` 和 `web/README.md` 的发布元数据；tap 仓库由 `sync-cask` 单独提交和推送，其远端版本、校验和也须确认。Preview 不更新正式 cask、tap 或官网，但仍提交相同格式的空 end commit。
+两端全部资产上传、永久 feed 更新及资产清单核对完成，且正式版的 tap/cask/官网同步及校验完成后，才允许结束；必需发布步骤失败或未完成时不得用 end 标记成功。用户未要求的线上 feed HTTP 检查和隔离自动更新测试不作为 end 前置条件，未执行时记录“未验证”。正式版仅暂存 `Casks/zisla.rb`、`web/src/content.ts` 和 `web/README.md` 的发布元数据；tap 仓库由 `sync-cask` 单独提交和推送，其远端版本、校验和也须确认。Preview 不更新正式 cask、tap 或官网，但仍提交相同格式的空 end commit。
 
 ```zsh
 release_gate

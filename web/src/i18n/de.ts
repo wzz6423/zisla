@@ -87,13 +87,13 @@ export const de: SiteContent = {
       clipboard: {
         name: 'Zwischenablage',
         caption:
-          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp und sieh, wann jeder Eintrag kopiert wurde. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen. Optional wird Verlauf gelöscht, der älter als 7, 15 oder 30 Tage ist; Favoriten bleiben erhalten. Automatisches Löschen ist standardmäßig aus.',
+          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp und sieh, wann jeder Eintrag kopiert wurde. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen. Optional wird Verlauf gelöscht, der älter als 7, 15 oder 30 Tage ist; Favoriten bleiben erhalten. Automatisches Löschen ist standardmäßig aus. Suchen und gruppieren Sie den Verlauf nach der Quellanwendung.',
         points: ['Verlauf in der Island', 'Filter nach Typ', 'Kurznotizen und Favoriten'],
       },
       aiMonitor: {
         name: 'KI-Überblick',
         caption:
-          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen. Auch die kompakten Ansichten zeigen verbleibende Kontingente als Ringe.',
+          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen. Auch die kompakten Ansichten zeigen verbleibende Kontingente als Ringe. Wählen Sie Kontoregionen unabhängig voneinander; tägliche Nutzungswerte und Farben des verbleibenden Kontingents stimmen in allen Ansichten überein.',
         points: ['Aufgaben aus mehreren KI-Werkzeugen', 'Modellverlauf und .xlsx-Export', 'Kontingente und Rücksetzzeiten'],
       },
       keyboardSound: {
@@ -131,12 +131,12 @@ export const de: SiteContent = {
       quickNotes: {
         name: 'Kurznotizen',
         caption:
-          'Basiert auf der System-App Notizen: Notizen ansehen, bearbeiten, neu anlegen und löschen, mit Markdown-Vorschau in Echtzeit – und mit Command+1 bis 9 direkt zu den ersten neun Notizen springen. Entwürfe werden automatisch nach Notizen zurückgeschrieben. Handschriftliche Anhänge lassen sich ansehen und der Text davor oder danach bearbeiten, während die Originale erhalten bleiben.',
+          'Basiert auf der System-App Notizen: Notizen ansehen, bearbeiten, neu anlegen und löschen, mit Markdown-Vorschau in Echtzeit – und mit Command+1 bis 9 direkt zu den ersten neun Notizen springen. Entwürfe werden automatisch nach Notizen zurückgeschrieben. Handschriftliche Anhänge lassen sich ansehen und der Text davor oder danach bearbeiten, während die Originale erhalten bleiben. Navigieren Sie mit Command und den Pfeiltasten zwischen Notizen. Eingefügter Text übernimmt die native Schrift des Fließtexts.',
         points: ['Daten liegen in Notizen', 'Markdown-Editor', 'Entwürfe automatisch gesichert'],
       },
       volumeMixer: {
         name: 'Lautstärkemixer für Apps',
-        caption: 'Regeln Sie Lautstärke und Stummschaltung einzeln für Apps, die Audio abspielen. Erfordert macOS 14.4 oder neuer und die Berechtigung zur Aufnahme von Systemaudio.',
+        caption: 'Regeln Sie Lautstärke und Stummschaltung einzeln für Apps, die Audio abspielen. Erfordert macOS 14.4 oder neuer und die Berechtigung zur Aufnahme von Systemaudio. Lautstärkeeinstellungen bleiben je Anwendung gespeichert; veraltete Audioquellen verschwinden, wenn die Wiedergabe endet.',
         points: ['Lautstärke pro App', 'Einzeln stummschalten', 'macOS 14.4+'],
       },
       toolbox: {
@@ -152,7 +152,7 @@ export const de: SiteContent = {
       system: {
         name: 'Systemstatus',
         caption:
-          'Überwacht CPU, GPU, Arbeitsspeicher, Laufwerke, Netzwerk, Lüfter und verfügbare NVMe-SMART-Temperatur. Sehen Sie in den Einstellungen den minütlichen Verlauf für einen Zeitraum an, exportieren Sie .xlsx oder löschen Sie ihn. Prüfen Sie Batteriezustand, Zyklen, Temperatur, Kapazität, Geräte in der Nähe und öffentliche IPv4/IPv6. Wählen Sie automatische Energiemodi für Netz- und Batteriebetrieb, optional mit Stromsparmodus bei 20 % oder weniger. Laden Sie sofort auf 100 %, wenn macOS dies anbietet. Prüfen Sie Caches, Protokolle, Einstellungsreste und verwaiste KI-Arbeitsbereiche vor dem Verschieben in den Papierkorb; die Bereinigung kann alle 7, 15 oder 30 Tage laufen. Die geplante Bereinigung ist standardmäßig aus; wählen Sie nur vertrauenswürdige oder alle bearbeitbaren Elemente, auch solche mit Prüfbedarf.',
+          'Überwacht CPU, GPU, Arbeitsspeicher, Laufwerke, Netzwerk, Lüfter und verfügbare NVMe-SMART-Temperatur. Sehen Sie in den Einstellungen den minütlichen Verlauf für einen Zeitraum an, exportieren Sie .xlsx oder löschen Sie ihn. Prüfen Sie Batteriezustand, Zyklen, Temperatur, Kapazität, Geräte in der Nähe und öffentliche IPv4/IPv6. Wählen Sie automatische Energiemodi für Netz- und Batteriebetrieb, optional mit Stromsparmodus bei 20 % oder weniger. Laden Sie sofort auf 100 %, wenn macOS dies anbietet. Prüfen Sie Caches, Protokolle, Einstellungsreste und verwaiste KI-Arbeitsbereiche vor dem Verschieben in den Papierkorb; die Bereinigung kann alle 7, 15 oder 30 Tage laufen. Die geplante Bereinigung ist standardmäßig aus; wählen Sie nur vertrauenswürdige oder alle bearbeitbaren Elemente, auch solche mit Prüfbedarf. Führen Sie die Bereinigung im Hintergrund aus und sehen Sie Fortschritt und Ergebnis in der Insel. Finden Sie doppelte App-Installationen und Überreste von App-Updates.',
         points: [
           'Überwachung bis zum Chip',
           'Verlaufsdiagramme und .xlsx-Export',
@@ -193,12 +193,12 @@ export const de: SiteContent = {
       },
       recording: {
         title: 'Aufnehmen und bearbeiten im Studio',
-        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren mit Animationen, Zooms und Untertiteln. Passen Sie Hautglättung, Helligkeit, Gesichts- und Körperform sowie Stimmeffekte an und ergänzen Sie sanfte Cursorspuren in eigener Farbe. Spielen Sie das Ergebnis im Studio ab. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3; exportieren Sie Video, GIF, Live Photo oder Audio. Manche Formate benötigen FFmpeg. Prüfen Sie optionale KI-Vorschläge vor der Anwendung. Der Aufnahmeordner wird unter Einstellungen → Speicherort separat gewählt.',
+        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren mit Animationen, Zooms und Untertiteln. Passen Sie Hautglättung, Helligkeit, Gesichts- und Körperform sowie Stimmeffekte an und ergänzen Sie sanfte Cursorspuren in eigener Farbe. Spielen Sie das Ergebnis im Studio ab. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3; exportieren Sie Video, GIF, Live Photo oder Audio. Manche Formate benötigen FFmpeg. Prüfen Sie optionale KI-Vorschläge vor der Anwendung. Der Aufnahmeordner wird unter Einstellungen → Speicherort separat gewählt. Auf unterstützten Geräten sind HDR-Aufnahmen möglich.',
         detail: 'Porträt- und Stimmeffekte · Farbige Cursorspuren · Mehrspurwiedergabe und Export',
       },
       permissions: {
         title: 'Systemberechtigungen an einem Ort',
-        description: 'Prüfen Sie den Status unter Einstellungen → Berechtigungen, starten Sie unterstützte Anfragen oder öffnen Sie die zuständige Systemseite. Die erste Begrüßung nutzt dieselbe Liste und kennzeichnet manuelle Einstellungen.',
+        description: 'Prüfen Sie den Status unter Einstellungen → Berechtigungen, starten Sie unterstützte Anfragen oder öffnen Sie die zuständige Systemseite. Die erste Begrüßung nutzt dieselbe Liste und kennzeichnet manuelle Einstellungen. Nach erteilter Freigabe wird der Berechtigungsstatus aktualisiert. Eine Ziehhilfe erleichtert das Hinzufügen der Anwendung bei entsprechenden Berechtigungen.',
         detail: 'Berechtigungsstatus · Anfragen und Links · Auch bei der Begrüßung',
       },
       imageTools: {
@@ -220,13 +220,13 @@ export const de: SiteContent = {
       windowPreviews: {
         title: 'Fenster ansehen, per Klick wechseln',
         description:
-          'Sehen Sie Fenster vom Dock oder über Command-Tab in der Vorschau und aktivieren Sie ein Fenster per Klick auf seine Karte. Neue Konfigurationen aktivieren die Funktion; verwalten Sie sie und ihre Berechtigungen in den Einstellungen.',
+          'Sehen Sie Fenster vom Dock oder über Command-Tab in der Vorschau und aktivieren Sie ein Fenster per Klick auf seine Karte. Neue Konfigurationen aktivieren die Funktion; verwalten Sie sie und ihre Berechtigungen in den Einstellungen. Geschlossene und doppelte Fenster werden herausgefiltert; bei geöffneten Dock-Kontextmenüs bleiben die Vorschauen ausgeblendet.',
         detail: 'Dock und Command-Tab · Fenster per Klick wechseln · In Einstellungen regelbar',
       },
       capture: {
         title: 'Bildschirmfotos, Scroll-Aufnahmen und Anheften',
         description:
-          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im Screenshotordner unter Einstellungen → Speicherort. Angeheftete Screenshots bleiben bei weiteren Aufnahmen erhalten. Lange Aufnahmen unterstützen langsames automatisches Scrollen; auf kompatiblen Geräten sind HDR-Bildschirmfotos möglich.',
+          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im Screenshotordner unter Einstellungen → Speicherort. Angeheftete Screenshots bleiben bei weiteren Aufnahmen erhalten. Lange Aufnahmen unterstützen langsames automatisches Scrollen; auf kompatiblen Geräten sind HDR-Bildschirmfotos möglich. Das Einrasten an Fenstern berücksichtigt auch das Einstellungsfenster von zisla.',
         detail: 'Markieren und extrahieren · Erkennen, übersetzen und kopieren · Runde Ecken und .xlsx',
       },
       voice: {
@@ -250,7 +250,7 @@ export const de: SiteContent = {
       copyAssistant: {
         title: 'Schnellaktionen und nächste Schritte',
         description:
-          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts. IP-Abfragen und das Öffnen von Links sind getrennte Aktionen. Währungsumrechnungen erkennen lokale Untereinheiten; der Emoji-Katalog enthält Emoji 18.0. Gespeicherte Texte und Bilder verwenden den separaten Schnellaktionenordner unter Einstellungen → Speicherort. Wenn sich eine App nicht öffnen lässt, prüfen Schnellaktionen ihre Integrität, Signatur und die macOS-Sicherheitsrichtlinien. Nach bestandener Prüfung können sie Quarantänemerkmale entfernen und die App öffnen. Ändere unter Einstellungen → Schnellaktionen die Aktionsreihenfolge je erkanntem Typ. Geldbeträge unterstützen regionale Währungssymbole und vorangestellte Währungscodes.',
+          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts. IP-Abfragen und das Öffnen von Links sind getrennte Aktionen. Währungsumrechnungen erkennen lokale Untereinheiten; der Emoji-Katalog enthält Emoji 18.0. Gespeicherte Texte und Bilder verwenden den separaten Schnellaktionenordner unter Einstellungen → Speicherort. Wenn sich eine App nicht öffnen lässt, prüfen Schnellaktionen ihre Integrität, Signatur und die macOS-Sicherheitsrichtlinien. Nach bestandener Prüfung können sie Quarantänemerkmale entfernen und die App öffnen. Ändere unter Einstellungen → Schnellaktionen die Aktionsreihenfolge je erkanntem Typ. Geldbeträge unterstützen regionale Währungssymbole und vorangestellte Währungscodes. Die Befehlserkennung unterstützt Here-Dokumente.',
         detail: 'Lokale Erkennung · Live-Wechselkursumrechnung · Standard Command+N',
       },
       aiManagement: {
@@ -356,6 +356,17 @@ export const de: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.24': [
+        'Der Zwischenablageverlauf lässt sich nach Quellanwendung durchsuchen und gruppieren. Schnellaktionen erkennen Befehle mit Here-Dokumenten.',
+        'Die Systembereinigung kann im Hintergrund laufen und Fortschritt sowie Ergebnisse in der Insel anzeigen. Die Datenträgerbereinigung erkennt doppelte App-Installationen und Überreste von App-Updates.',
+        'Alle Ausgabeordner lassen sich mit einer Aktion auf ihre Standardwerte zurücksetzen. Einstellungsgruppen und Seitenreihenfolge wurden neu geordnet.',
+        'Unterstützte Geräte können HDR aufnehmen. Texterkennung, Übersetzung und HDR-Vorschauen für Screenshots funktionieren wieder; das Einrasten an Fenstern berücksichtigt die Einstellungen.',
+        'Schnellnotizen lassen sich mit Command und den Pfeiltasten durchblättern. Eingefügter Text übernimmt die native Schrift des Fließtexts.',
+        'KI-Kontingente unterstützen unabhängige Regionen. Täglicher Nutzungsverlauf und Farben des Restkontingents stimmen zwischen ausgeklappten Karten und kompakten Hinweisen überein. Abgebrochene Kimi-Runden löschen Fehler; abgebrochene Abo-Aktualisierungen lesen keine Zugangsdaten mehr.',
+        'Fenstervorschauen filtern geschlossene und doppelte Fenster, berücksichtigen bei alternativen Abrufen deren Identität und bleiben bei geöffneten Dock-Kontextmenüs ausgeblendet.',
+        'Die Medienüberwachung aktualisiert veraltete Quellen und beendet den Audiostatus, wenn keine Samples mehr eintreffen. App-Lautstärken bleiben gespeichert; Überblendungen richten sich nach der Zeit dekodierter Samples. Tastaturklänge und Statistiken behandeln fehlende Wiedergabe und leere Daten zuverlässiger.',
+        'Nach erteilter Freigabe aktualisiert sich der Berechtigungsstatus; eine Ziehhilfe unterstützt die Einrichtung. Fehlermeldungen empfohlener Werkzeuge bleiben lesbar.',
+      ],
       'v0.1.23': [
         'Bildwerkzeuge bieten neun lokale Vorgänge: Komprimierung, Konvertierung zwischen fünf Formaten, Skalierung und Zuschnitt, Vergleich des kleinsten Formats, Drehen und Spiegeln, Wasserzeichen, Mosaik und Unschärfe, Text- und Tabellenerkennung sowie Hintergrundentfernung. Stapel- und ZIP-Export sowie eigene Speicherordner für PDF- und Bildwerkzeuge sind verfügbar.',
         'Audiowerkzeuge bieten 27 lokale Vorgänge für Konvertierung, Bearbeitung, Aufteilen, Verbinden, Mischen, Audioextraktion, LUFS-Normalisierung, Effekte, Kanäle und Tags. FFmpeg und ffprobe sind erforderlich; eine Exportdatei oder ein Ordner lässt sich wählen.',
@@ -467,7 +478,7 @@ export const de: SiteContent = {
       storage: {
         question: 'Wo speichert zisla seine Daten?',
         answer:
-          'Lokale Daten liegen in ~/Library/Application Support/zisla/. Die Tippstatistik wird getrennt in ~/Library/Application Support/zisla/typing-stats.sqlite3 gespeichert. Schnellnotizen verwenden die Notizen-App des Systems. Einstellungen → Speicherort bietet separate Ordner für Downloads, PDF-Werkzeuge, Bildwerkzeuge, Screenshots, Aufnahmen, Schnellaktionen und Tagesberichte. Beim Update bleiben zuvor gewählte Speicherorte erhalten; danach lässt sich jeder Ordner unabhängig ändern.',
+          'Lokale Daten liegen in ~/Library/Application Support/zisla/. Die Tippstatistik wird getrennt in ~/Library/Application Support/zisla/typing-stats.sqlite3 gespeichert. Schnellnotizen verwenden die Notizen-App des Systems. Einstellungen → Speicherort bietet separate Ordner für Downloads, PDF-Werkzeuge, Bildwerkzeuge, Screenshots, Aufnahmen, Schnellaktionen und Tagesberichte. Beim Update bleiben zuvor gewählte Speicherorte erhalten; danach lässt sich jeder Ordner unabhängig ändern. Stellen Sie alle Speicherordner mit einer Aktion auf ihre Standardwerte zurück.',
       },
     },
   },

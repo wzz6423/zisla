@@ -89,13 +89,13 @@ export const ptBR = createCatalog({
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Consulte o histórico do clipboard dentro da ilha e filtre por imagem, URL, caminho ou tipo de arquivo e veja quando cada item foi copiado. Envie um item para Notas rápidas, fixe-o como favorito ou exclua-o. Você pode excluir automaticamente o histórico com mais de 7, 15 ou 30 dias e manter os favoritos. A exclusão automática vem desativada.',
+          'Consulte o histórico do clipboard dentro da ilha e filtre por imagem, URL, caminho ou tipo de arquivo e veja quando cada item foi copiado. Envie um item para Notas rápidas, fixe-o como favorito ou exclua-o. Você pode excluir automaticamente o histórico com mais de 7, 15 ou 30 dias e manter os favoritos. A exclusão automática vem desativada. Pesquise e agrupe o histórico pelo aplicativo de origem.',
         points: ['Histórico dentro da ilha', 'Filtro por tipo', 'Notas rápidas e favoritos'],
       },
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Reúne tarefas e estados de CLIs de IA, apps de desktop e IDEs. Dados numéricos confiáveis geram tendências de tokens e o mapa de contribuições; escolha uma data para ver tokens de entrada, saída e totais por provedor e modelo. Consulte o histórico nos Ajustes, exporte tudo em .xlsx ou apague. Mostra cotas reais, horários de redefinição e alertas de cota baixa, incluindo janelas 5h/7d e orçamentos do Cursor em dólares quando disponíveis. Não lê o texto dos prompts nem das respostas. Os layouts compactos também mostram a cota restante em anéis.',
+          'Reúne tarefas e estados de CLIs de IA, apps de desktop e IDEs. Dados numéricos confiáveis geram tendências de tokens e o mapa de contribuições; escolha uma data para ver tokens de entrada, saída e totais por provedor e modelo. Consulte o histórico nos Ajustes, exporte tudo em .xlsx ou apague. Mostra cotas reais, horários de redefinição e alertas de cota baixa, incluindo janelas 5h/7d e orçamentos do Cursor em dólares quando disponíveis. Não lê o texto dos prompts nem das respostas. Os layouts compactos também mostram a cota restante em anéis. Escolha as regiões das contas de forma independente; os registros diários e as cores da cota restante são consistentes em todos os layouts.',
         points: ['Tarefas de várias ferramentas de IA', 'Histórico por modelo e exportação .xlsx', 'Cotas e horários de redefinição'],
       },
       keyboardSound: {
@@ -125,12 +125,12 @@ export const ptBR = createCatalog({
       quickNotes: {
         name: 'Notas rápidas',
         caption:
-          'Usa o app Notas do sistema para ver, editar, criar e excluir notas com prévia Markdown ao vivo, e ir direto às primeiras nove notas com Command+1 a 9. Os rascunhos são gravados de volta automaticamente. Veja anexos manuscritos e edite o texto antes ou depois deles preservando os originais.',
+          'Usa o app Notas do sistema para ver, editar, criar e excluir notas com prévia Markdown ao vivo, e ir direto às primeiras nove notas com Command+1 a 9. Os rascunhos são gravados de volta automaticamente. Veja anexos manuscritos e edite o texto antes ou depois deles preservando os originais. Navegue entre notas com Command e as setas. O texto colado segue a tipografia nativa do corpo do texto.',
         points: ['Dados nas Notas', 'Editor Markdown', 'Rascunhos salvos automaticamente'],
       },
       volumeMixer: {
         name: 'Mixer de volume por aplicativo',
-        caption: 'Ajuste o volume e silencie separadamente os apps que reproduzem áudio. Requer macOS 14.4 ou posterior e permissão de gravação de áudio do sistema.',
+        caption: 'Ajuste o volume e silencie separadamente os apps que reproduzem áudio. Requer macOS 14.4 ou posterior e permissão de gravação de áudio do sistema. O volume é lembrado por aplicativo, e fontes de áudio desatualizadas desaparecem quando a reprodução para.',
         points: ['Volume por app', 'Silenciar separadamente', 'macOS 14.4+'],
       },
       toolbox: {
@@ -142,7 +142,7 @@ export const ptBR = createCatalog({
       system: {
         name: 'Estado do sistema',
         caption:
-          'Monitora CPU, GPU, memória, disco, rede, ventoinhas e temperatura NVMe SMART disponível. Consulte o histórico por minuto em um período, exporte .xlsx ou apague nos Ajustes. Veja saúde, ciclos, temperatura e capacidade da bateria, carga de aparelhos próximos e IPv4/IPv6 públicos. Escolha modos automáticos de energia na tomada e na bateria, com modo de baixo consumo opcional em 20% ou menos. Carregue imediatamente até 100% quando o macOS permitir. Revise caches, registros, preferências residuais e espaços de IA órfãos antes de enviá-los ao Lixo; a limpeza opcional pode ocorrer a cada 7, 15 ou 30 dias. A limpeza agendada vem desativada; escolha apenas itens confiáveis ou todos os itens processáveis, inclusive os que precisam de revisão.',
+          'Monitora CPU, GPU, memória, disco, rede, ventoinhas e temperatura NVMe SMART disponível. Consulte o histórico por minuto em um período, exporte .xlsx ou apague nos Ajustes. Veja saúde, ciclos, temperatura e capacidade da bateria, carga de aparelhos próximos e IPv4/IPv6 públicos. Escolha modos automáticos de energia na tomada e na bateria, com modo de baixo consumo opcional em 20% ou menos. Carregue imediatamente até 100% quando o macOS permitir. Revise caches, registros, preferências residuais e espaços de IA órfãos antes de enviá-los ao Lixo; a limpeza opcional pode ocorrer a cada 7, 15 ou 30 dias. A limpeza agendada vem desativada; escolha apenas itens confiáveis ou todos os itens processáveis, inclusive os que precisam de revisão. Execute a limpeza em segundo plano e acompanhe o progresso e os resultados na ilha. Encontre instalações duplicadas e arquivos deixados por atualizações de aplicativos.',
         points: ['Monitoramento no nível do chip', 'Gráficos de histórico e exportação .xlsx', 'Revise antes de mover para o Lixo'],
       },
     },
@@ -180,12 +180,12 @@ export const ptBR = createCatalog({
       },
       recording: {
         title: 'Grave e edite no estúdio',
-        description: 'Grave tela, janela ou região com áudio do sistema, microfone e câmera opcionais. Edite vídeo, áudio, imagens e texto em várias faixas com animações, zooms e legendas. Ajuste suavização da pele, brilho, afinamento de rosto e corpo, efeitos de voz e rastros suaves do cursor na cor escolhida. Reproduza a edição no estúdio. Escolha proporção original, 16:9, 9:16, 1:1 ou 4:3; exporte vídeo, GIF, Live Photo ou áudio. Alguns formatos exigem FFmpeg. Revise propostas opcionais de IA antes de aplicar. A pasta de gravação é definida separadamente em Ajustes → Local de salvamento.',
+        description: 'Grave tela, janela ou região com áudio do sistema, microfone e câmera opcionais. Edite vídeo, áudio, imagens e texto em várias faixas com animações, zooms e legendas. Ajuste suavização da pele, brilho, afinamento de rosto e corpo, efeitos de voz e rastros suaves do cursor na cor escolhida. Reproduza a edição no estúdio. Escolha proporção original, 16:9, 9:16, 1:1 ou 4:3; exporte vídeo, GIF, Live Photo ou áudio. Alguns formatos exigem FFmpeg. Revise propostas opcionais de IA antes de aplicar. A pasta de gravação é definida separadamente em Ajustes → Local de salvamento. Grave em HDR nos dispositivos compatíveis.',
         detail: 'Efeitos de retrato e voz · Rastros coloridos do cursor · Reprodução e exportação multifaixa',
       },
       permissions: {
         title: 'Permissões do sistema em um lugar',
-        description: 'Veja os estados em Ajustes → Permissões, inicie pedidos compatíveis ou abra a página correspondente do sistema. As boas-vindas iniciais usam a mesma lista e identificam permissões com configuração manual.',
+        description: 'Veja os estados em Ajustes → Permissões, inicie pedidos compatíveis ou abra a página correspondente do sistema. As boas-vindas iniciais usam a mesma lista e identificam permissões com configuração manual. O estado das permissões é atualizado após a concessão do acesso. Uma ajuda para arrastar o aplicativo facilita as permissões que exigem adicioná-lo.',
         detail: 'Estado das permissões · Pedidos e links · Compartilhado com as boas-vindas',
       },
       imageTools: {
@@ -207,13 +207,13 @@ export const ptBR = createCatalog({
       windowPreviews: {
         title: 'Veja a janela e clique para alternar',
         description:
-          'Veja janelas pelo Dock ou com Command-Tab e clique no cartão para ativar a janela. Novas configurações ativam esse recurso; gerencie-o e suas permissões nos Ajustes.',
+          'Veja janelas pelo Dock ou com Command-Tab e clique no cartão para ativar a janela. Novas configurações ativam esse recurso; gerencie-o e suas permissões nos Ajustes. Janelas fechadas ou duplicadas são filtradas; as prévias do Dock ficam ocultas enquanto um menu de contexto está aberto.',
         detail: 'Dock e Command-Tab · Trocar de janela com um clique · Configurável',
       },
       capture: {
         title: 'Capturas, rolagem e fixação',
         description:
-          'Capture, fixe ou una capturas com rolagem usando atalhos personalizáveis. Destaque áreas, extraia partes da imagem, arredonde cantos e preserve anotações ao exportar. Reconheça e copie texto, traduza e copie o resultado ou exporte tabelas reconhecidas como .xlsx. Guarde capturas na prateleira. Os ajustes verificam conflitos com voz e Ações Rápidas. A caixa de diálogo abre na pasta de capturas definida em Ajustes → Local de salvamento. Capturas fixadas permanecem ao capturar novamente. Capturas longas podem usar rolagem automática lenta; dispositivos compatíveis podem capturar HDR.',
+          'Capture, fixe ou una capturas com rolagem usando atalhos personalizáveis. Destaque áreas, extraia partes da imagem, arredonde cantos e preserve anotações ao exportar. Reconheça e copie texto, traduza e copie o resultado ou exporte tabelas reconhecidas como .xlsx. Guarde capturas na prateleira. Os ajustes verificam conflitos com voz e Ações Rápidas. A caixa de diálogo abre na pasta de capturas definida em Ajustes → Local de salvamento. Capturas fixadas permanecem ao capturar novamente. Capturas longas podem usar rolagem automática lenta; dispositivos compatíveis podem capturar HDR. A seleção automática de janelas inclui a janela de ajustes do zisla.',
         detail: 'Destaque e extração · Reconhecimento, tradução e cópia · Cantos arredondados e .xlsx',
       },
       voice: {
@@ -237,7 +237,7 @@ export const ptBR = createCatalog({
       copyAssistant: {
         title: 'Ações rápidas e próximos passos',
         description:
-          'Quando ativado, mostra uma prévia de textos, links, arquivos ou imagens copiados em uma barra separada e sugere abrir, mostrar no Finder, buscar, traduzir, calcular ou salvar, somente após sua confirmação. Abra a pasta do arquivo pelas ações rápidas após um download do navegador ou uma transferência AirDrop. Aceita pastas padrão e escolhidas no Chrome, com ativação independente do progresso dos downloads. IPs têm ações separadas para consulta e abertura do link. A conversão reconhece subunidades monetárias e o catálogo inclui Emoji 18.0. Textos e imagens salvos usam a pasta independente de Ações rápidas em Ajustes → Local de salvamento. Se um app não abrir, as Ações rápidas verificam sua integridade, assinatura e a política de segurança do macOS. Após passar nas verificações, podem remover os atributos de quarentena e abrir o app. Reordene as ações de cada tipo reconhecido em Ajustes → Ações rápidas. Valores aceitam símbolos regionais e códigos de moeda com prefixo.',
+          'Quando ativado, mostra uma prévia de textos, links, arquivos ou imagens copiados em uma barra separada e sugere abrir, mostrar no Finder, buscar, traduzir, calcular ou salvar, somente após sua confirmação. Abra a pasta do arquivo pelas ações rápidas após um download do navegador ou uma transferência AirDrop. Aceita pastas padrão e escolhidas no Chrome, com ativação independente do progresso dos downloads. IPs têm ações separadas para consulta e abertura do link. A conversão reconhece subunidades monetárias e o catálogo inclui Emoji 18.0. Textos e imagens salvos usam a pasta independente de Ações rápidas em Ajustes → Local de salvamento. Se um app não abrir, as Ações rápidas verificam sua integridade, assinatura e a política de segurança do macOS. Após passar nas verificações, podem remover os atributos de quarentena e abrir o app. Reordene as ações de cada tipo reconhecido em Ajustes → Ações rápidas. Valores aceitam símbolos regionais e códigos de moeda com prefixo. A detecção de comandos aceita here-documents.',
         detail: 'Ativação opcional · Reconhecimento local · Command+N por padrão',
       },
       aiManagement: {
@@ -336,6 +336,17 @@ export const ptBR = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.24': [
+        'O histórico da área de transferência permite pesquisar e agrupar pelo aplicativo de origem. As ações rápidas reconhecem comandos que contêm here-documents.',
+        'A limpeza do sistema pode ser executada em segundo plano, com progresso e resultados na ilha. A limpeza do disco identifica instalações duplicadas e arquivos deixados por atualizações de aplicativos.',
+        'Todas as pastas de saída podem ser restauradas ao padrão em uma ação. Os grupos e a ordem das páginas de ajustes foram reorganizados.',
+        'Dispositivos compatíveis podem gravar em HDR. O reconhecimento de texto, a tradução e as prévias HDR de capturas foram restaurados; a seleção de janelas inclui os ajustes do zisla.',
+        'As notas rápidas permitem navegar com Command e as setas. O texto colado mantém a tipografia nativa do corpo do texto.',
+        'Os ajustes de cota de IA permitem regiões independentes. O histórico diário e as cores da cota restante são consistentes entre cartões expandidos e avisos compactos. Cancelar um turno do Kimi limpa os erros; uma atualização de assinatura cancelada não lê credenciais.',
+        'As prévias filtram janelas fechadas e duplicadas, respeitam sua identidade durante métodos alternativos e ficam ocultas enquanto os menus de contexto do Dock estão abertos.',
+        'O monitoramento de mídia atualiza fontes desatualizadas e encerra a atividade de áudio quando as amostras param. O volume por aplicativo é mantido, e os fades seguem o tempo das amostras decodificadas. Sons e estatísticas do teclado tratam a ausência de reprodução e dados vazios.',
+        'As permissões são atualizadas após a concessão do acesso, com uma ajuda para arrastar o aplicativo na configuração. Falhas de ferramentas recomendadas continuam legíveis.',
+      ],
       'v0.1.23': [
         'As ferramentas de imagem ganham nove operações locais: compressão, conversão entre cinco formatos, tamanho e recorte, comparação do menor formato, rotação e espelhamento, marcas d’água, mosaico e desfoque, reconhecimento de texto e tabelas e remoção de fundo. Há exportação em lote e ZIP, com pastas separadas para ferramentas PDF e de imagem.',
         'As ferramentas de áudio ganham 27 operações locais de conversão, edição, divisão, união, mixagem, extração, normalização LUFS, efeitos, canais e etiquetas. Exigem FFmpeg e ffprobe; escolha um arquivo ou pasta de exportação.',
@@ -440,7 +451,7 @@ export const ptBR = createCatalog({
       },
       storage: {
         question: 'Onde o zisla armazena os dados?',
-        answer: 'Os dados locais ficam em ~/Library/Application Support/zisla/. As estatísticas de digitação ficam separadas em ~/Library/Application Support/zisla/typing-stats.sqlite3. As notas rápidas usam o app Notas do sistema. Ajustes → Local de salvamento oferece pastas independentes para downloads, ferramentas PDF e de imagem, capturas, gravações, ações rápidas e resumos diários. A atualização preserva os locais já escolhidos; depois, cada pasta pode ser alterada separadamente.',
+        answer: 'Os dados locais ficam em ~/Library/Application Support/zisla/. As estatísticas de digitação ficam separadas em ~/Library/Application Support/zisla/typing-stats.sqlite3. As notas rápidas usam o app Notas do sistema. Ajustes → Local de salvamento oferece pastas independentes para downloads, ferramentas PDF e de imagem, capturas, gravações, ações rápidas e resumos diários. A atualização preserva os locais já escolhidos; depois, cada pasta pode ser alterada separadamente. Restaure todas as pastas de salvamento padrão em uma única ação.',
       },
     },
   },

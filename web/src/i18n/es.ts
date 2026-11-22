@@ -89,13 +89,13 @@ export const es = createCatalog({
       clipboard: {
         name: 'Portapapeles',
         caption:
-          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo y mira cuándo se copió cada entrada. Envía una entrada a Notas rápidas, márcala como favorita o elimínala. Puedes borrar automáticamente el historial de más de 7, 15 o 30 días conservando los favoritos. El borrado automático está desactivado de forma predeterminada.',
+          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo y mira cuándo se copió cada entrada. Envía una entrada a Notas rápidas, márcala como favorita o elimínala. Puedes borrar automáticamente el historial de más de 7, 15 o 30 días conservando los favoritos. El borrado automático está desactivado de forma predeterminada. Busca y agrupa el historial por aplicación de origen.',
         points: ['Historial dentro de la isla', 'Filtrado por tipo', 'Notas rápidas y favoritos'],
       },
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Reúne tareas y estados de CLI de IA, apps de escritorio e IDE. Los datos numéricos fiables alimentan las tendencias de tokens y el mapa de contribuciones; elige una fecha para ver tokens de entrada, salida y totales por proveedor y modelo. Consulta el historial en Ajustes, expórtalo completo como .xlsx o bórralo. Muestra cuotas reales, fechas de reinicio y avisos de cuota baja, incluidas las ventanas 5h/7d y los presupuestos de Cursor en dólares cuando están disponibles. No lee el texto de prompts ni respuestas. Los diseños compactos también muestran la cuota restante en anillos.',
+          'Reúne tareas y estados de CLI de IA, apps de escritorio e IDE. Los datos numéricos fiables alimentan las tendencias de tokens y el mapa de contribuciones; elige una fecha para ver tokens de entrada, salida y totales por proveedor y modelo. Consulta el historial en Ajustes, expórtalo completo como .xlsx o bórralo. Muestra cuotas reales, fechas de reinicio y avisos de cuota baja, incluidas las ventanas 5h/7d y los presupuestos de Cursor en dólares cuando están disponibles. No lee el texto de prompts ni respuestas. Los diseños compactos también muestran la cuota restante en anillos. Elige las regiones de cada cuenta por separado; los registros diarios y los colores de la cuota restante coinciden en todos los diseños.',
         points: ['Tareas de varias herramientas de IA', 'Historial por modelo y exportación .xlsx', 'Cuotas y fechas de reinicio'],
       },
       keyboardSound: {
@@ -125,12 +125,12 @@ export const es = createCatalog({
       quickNotes: {
         name: 'Notas rápidas',
         caption:
-          'Usa la app Notas del sistema para ver, editar, crear y eliminar notas con vista previa Markdown en vivo, y saltar directamente a las primeras nueve notas con Command+1 a 9. Los borradores se escriben de nuevo en Notas automáticamente. Previsualiza adjuntos manuscritos y edita el texto anterior o posterior conservando los originales.',
+          'Usa la app Notas del sistema para ver, editar, crear y eliminar notas con vista previa Markdown en vivo, y saltar directamente a las primeras nueve notas con Command+1 a 9. Los borradores se escriben de nuevo en Notas automáticamente. Previsualiza adjuntos manuscritos y edita el texto anterior o posterior conservando los originales. Navega entre notas con Command y las flechas. El texto pegado adopta la tipografía nativa del cuerpo de texto.',
         points: ['Datos en Notas', 'Editor Markdown', 'Borradores guardados automáticamente'],
       },
       volumeMixer: {
         name: 'Mezclador de volumen por app',
-        caption: 'Ajusta el volumen y silencia por separado las apps que reproducen audio. Requiere macOS 14.4 o posterior y permiso para grabar audio del sistema.',
+        caption: 'Ajusta el volumen y silencia por separado las apps que reproducen audio. Requiere macOS 14.4 o posterior y permiso para grabar audio del sistema. El volumen se recuerda por aplicación y las fuentes de audio obsoletas desaparecen cuando se detiene la reproducción.',
         points: ['Volumen por app', 'Silenciar por separado', 'macOS 14.4+'],
       },
       toolbox: {
@@ -142,7 +142,7 @@ export const es = createCatalog({
       system: {
         name: 'Estado del sistema',
         caption:
-          'Supervisa CPU, GPU, memoria, disco, red, ventiladores y temperatura NVMe SMART disponible. Consulta el historial por minuto para un intervalo de fechas, expórtalo en .xlsx o bórralo en Ajustes. Revisa salud, ciclos, temperatura y capacidad de la batería, carga de dispositivos cercanos e IPv4/IPv6 públicas. Elige modos automáticos de energía con corriente o batería y, si quieres, bajo consumo al 20 % o menos. Carga inmediatamente al 100 % cuando macOS lo permita. Revisa cachés, registros, preferencias residuales y espacios de IA huérfanos antes de moverlos a la Papelera; la limpieza opcional puede hacerse cada 7, 15 o 30 días. La limpieza programada está desactivada por defecto; elige solo elementos fiables o todos los procesables, incluidos los que requieren revisión.',
+          'Supervisa CPU, GPU, memoria, disco, red, ventiladores y temperatura NVMe SMART disponible. Consulta el historial por minuto para un intervalo de fechas, expórtalo en .xlsx o bórralo en Ajustes. Revisa salud, ciclos, temperatura y capacidad de la batería, carga de dispositivos cercanos e IPv4/IPv6 públicas. Elige modos automáticos de energía con corriente o batería y, si quieres, bajo consumo al 20 % o menos. Carga inmediatamente al 100 % cuando macOS lo permita. Revisa cachés, registros, preferencias residuales y espacios de IA huérfanos antes de moverlos a la Papelera; la limpieza opcional puede hacerse cada 7, 15 o 30 días. La limpieza programada está desactivada por defecto; elige solo elementos fiables o todos los procesables, incluidos los que requieren revisión. Ejecuta la limpieza en segundo plano y consulta el progreso y los resultados en la isla. Detecta instalaciones duplicadas y archivos residuales de actualizaciones.',
         points: ['Monitorización a nivel de chip', 'Gráficas de historial y exportación .xlsx', 'Revisa antes de mover a la Papelera'],
       },
     },
@@ -180,12 +180,12 @@ export const es = createCatalog({
       },
       recording: {
         title: 'Graba y edita en el estudio',
-        description: 'Graba una pantalla, ventana o zona con audio del sistema, micrófono y cámara opcionales. Edita vídeo, audio, imágenes y texto en varias pistas con animaciones, zooms y subtítulos. Ajusta suavizado de piel, brillo, afinamiento de cara y cuerpo, efectos de voz y estelas suaves del cursor en el color elegido. Reproduce el montaje en el estudio. Elige proporción original, 16:9, 9:16, 1:1 o 4:3; exporta vídeo, GIF, Live Photo o audio. Algunos formatos necesitan FFmpeg. Revisa las propuestas opcionales de IA antes de aplicarlas. La carpeta de grabación se elige por separado en Ajustes → Ubicación de guardado.',
+        description: 'Graba una pantalla, ventana o zona con audio del sistema, micrófono y cámara opcionales. Edita vídeo, audio, imágenes y texto en varias pistas con animaciones, zooms y subtítulos. Ajusta suavizado de piel, brillo, afinamiento de cara y cuerpo, efectos de voz y estelas suaves del cursor en el color elegido. Reproduce el montaje en el estudio. Elige proporción original, 16:9, 9:16, 1:1 o 4:3; exporta vídeo, GIF, Live Photo o audio. Algunos formatos necesitan FFmpeg. Revisa las propuestas opcionales de IA antes de aplicarlas. La carpeta de grabación se elige por separado en Ajustes → Ubicación de guardado. Graba en HDR en dispositivos compatibles.',
         detail: 'Efectos de retrato y voz · Estelas de cursor en color · Reproducción y exportación multipista',
       },
       permissions: {
         title: 'Permisos del sistema en un lugar',
-        description: 'Consulta el estado en Ajustes → Permisos, inicia solicitudes compatibles o abre la página correspondiente del sistema. La bienvenida inicial usa la misma lista y marca los permisos que se configuran manualmente.',
+        description: 'Consulta el estado en Ajustes → Permisos, inicia solicitudes compatibles o abre la página correspondiente del sistema. La bienvenida inicial usa la misma lista y marca los permisos que se configuran manualmente. El estado de los permisos se actualiza al conceder acceso. Una ayuda para arrastrar la aplicación facilita los permisos que requieren añadirla.',
         detail: 'Estado de permisos · Solicitudes y enlaces · Compartido con la bienvenida',
       },
       imageTools: {
@@ -207,13 +207,13 @@ export const es = createCatalog({
       windowPreviews: {
         title: 'Mira la ventana y cambia con un clic',
         description:
-          'Previsualiza ventanas desde el Dock o con Command-Tab y pulsa una tarjeta para activar su ventana. Las configuraciones nuevas activan esta función; gestiona la función y sus permisos en Ajustes.',
+          'Previsualiza ventanas desde el Dock o con Command-Tab y pulsa una tarjeta para activar su ventana. Las configuraciones nuevas activan esta función; gestiona la función y sus permisos en Ajustes. Se filtran las ventanas cerradas o duplicadas y las vistas previas del Dock se ocultan mientras hay un menú contextual abierto.',
         detail: 'Dock y Command-Tab · Cambiar de ventana con un clic · Configurable',
       },
       capture: {
         title: 'Capturas, capturas con desplazamiento y fijado',
         description:
-          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo se abre en la carpeta de capturas de Ajustes → Ubicación de guardado. Las capturas fijadas permanecen al volver a capturar. Las capturas largas admiten desplazamiento automático lento; los dispositivos compatibles pueden capturar HDR.',
+          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo se abre en la carpeta de capturas de Ajustes → Ubicación de guardado. Las capturas fijadas permanecen al volver a capturar. Las capturas largas admiten desplazamiento automático lento; los dispositivos compatibles pueden capturar HDR. La selección automática de ventanas incluye la ventana de ajustes de zisla.',
         detail: 'Resaltar y extraer · Reconocer, traducir y copiar · Esquinas redondas y .xlsx',
       },
       voice: {
@@ -237,7 +237,7 @@ export const es = createCatalog({
       copyAssistant: {
         title: 'Acciones rápidas y siguientes pasos',
         description:
-          'Al activarlo, previsualiza texto, enlaces, archivos o imágenes copiados en una barra independiente y propone abrir, mostrar en Finder, buscar, traducir, calcular o guardar, solo después de tu confirmación. Abre la carpeta del archivo mediante acciones rápidas tras una descarga del navegador o una transferencia AirDrop. Admite las carpetas de Chrome predeterminadas y elegidas, con un interruptor independiente del progreso de descarga. Las IP tienen acciones separadas para consultar y abrir el enlace. La conversión reconoce unidades monetarias menores y el catálogo incluye Emoji 18.0. El texto y las imágenes guardados usan la carpeta independiente de Acciones rápidas en Ajustes → Ubicación de guardado. Si una app no se abre, las acciones rápidas comprueban su integridad, firma y la política de seguridad de macOS. Tras superar las comprobaciones, pueden quitar los atributos de cuarentena y abrirla. Reordena las acciones de cada tipo reconocido en Ajustes → Acciones rápidas. Los importes admiten símbolos regionales y códigos de moneda con prefijo.',
+          'Al activarlo, previsualiza texto, enlaces, archivos o imágenes copiados en una barra independiente y propone abrir, mostrar en Finder, buscar, traducir, calcular o guardar, solo después de tu confirmación. Abre la carpeta del archivo mediante acciones rápidas tras una descarga del navegador o una transferencia AirDrop. Admite las carpetas de Chrome predeterminadas y elegidas, con un interruptor independiente del progreso de descarga. Las IP tienen acciones separadas para consultar y abrir el enlace. La conversión reconoce unidades monetarias menores y el catálogo incluye Emoji 18.0. El texto y las imágenes guardados usan la carpeta independiente de Acciones rápidas en Ajustes → Ubicación de guardado. Si una app no se abre, las acciones rápidas comprueban su integridad, firma y la política de seguridad de macOS. Tras superar las comprobaciones, pueden quitar los atributos de cuarentena y abrirla. Reordena las acciones de cada tipo reconocido en Ajustes → Acciones rápidas. Los importes admiten símbolos regionales y códigos de moneda con prefijo. La detección de comandos admite here-documents.',
         detail: 'Activación opcional · Reconocimiento local · Command+N por defecto',
       },
       aiManagement: {
@@ -336,6 +336,17 @@ export const es = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.24': [
+        'El historial del portapapeles permite buscar y agrupar por aplicación de origen. Las acciones rápidas reconocen comandos que contienen here-documents.',
+        'La limpieza del sistema puede ejecutarse en segundo plano con progreso y resultados en la isla. La limpieza del disco detecta instalaciones duplicadas y residuos de actualizaciones de aplicaciones.',
+        'Todas las carpetas de salida se pueden restaurar a sus valores predeterminados con una acción. Se reorganizan los grupos y el orden de las páginas de ajustes.',
+        'Los dispositivos compatibles pueden grabar en HDR. Se recuperan el reconocimiento de texto, la traducción y las vistas previas HDR de capturas; la selección de ventanas incluye los ajustes de zisla.',
+        'Las notas rápidas admiten navegación con Command y las flechas. El texto pegado conserva la tipografía nativa del cuerpo de texto.',
+        'Los ajustes de cuota de IA admiten regiones independientes. El historial diario y los colores de cuota restante coinciden entre tarjetas expandidas y avisos compactos. Cancelar un turno de Kimi borra sus errores; una actualización de suscripción cancelada no lee credenciales.',
+        'Las vistas previas filtran ventanas cerradas y duplicadas, respetan su identidad al usar métodos alternativos y se ocultan mientras están abiertos los menús contextuales del Dock.',
+        'La monitorización de medios actualiza fuentes obsoletas y finaliza la actividad de audio cuando dejan de llegar muestras. Se conserva el volumen por aplicación y los fundidos siguen el tiempo de las muestras decodificadas. Los sonidos y estadísticas del teclado gestionan la ausencia de reproducción y los datos vacíos.',
+        'Los permisos se actualizan al conceder acceso, con una ayuda para arrastrar la aplicación durante la configuración. Los errores de las herramientas recomendadas siguen siendo legibles.',
+      ],
       'v0.1.23': [
         'Las herramientas de imagen añaden nueve operaciones locales: compresión, conversión entre cinco formatos, tamaño y recorte, comparación del formato más pequeño, giro y reflejo, marcas de agua, mosaico y desenfoque, reconocimiento de texto y tablas, y eliminación de fondo. Admiten exportación por lotes o ZIP y carpetas independientes para PDF e imagen.',
         'Las herramientas de audio añaden 27 operaciones locales de conversión, edición, división, unión, mezcla, extracción, normalización LUFS, efectos, canales y etiquetas. Requieren FFmpeg y ffprobe; elige un archivo o carpeta de exportación.',
@@ -440,7 +451,7 @@ export const es = createCatalog({
       },
       storage: {
         question: '¿Dónde guarda zisla sus datos?',
-        answer: 'Los datos locales están en ~/Library/Application Support/zisla/. Las estadísticas de escritura se guardan aparte en ~/Library/Application Support/zisla/typing-stats.sqlite3. Las notas rápidas usan la app Notas del sistema. Ajustes → Ubicación de guardado ofrece carpetas independientes para descargas, herramientas PDF e imagen, capturas, grabaciones, acciones rápidas y resúmenes diarios. La actualización conserva las ubicaciones elegidas y luego permite cambiar cada carpeta por separado.',
+        answer: 'Los datos locales están en ~/Library/Application Support/zisla/. Las estadísticas de escritura se guardan aparte en ~/Library/Application Support/zisla/typing-stats.sqlite3. Las notas rápidas usan la app Notas del sistema. Ajustes → Ubicación de guardado ofrece carpetas independientes para descargas, herramientas PDF e imagen, capturas, grabaciones, acciones rápidas y resúmenes diarios. La actualización conserva las ubicaciones elegidas y luego permite cambiar cada carpeta por separado. Restaura todas las carpetas de guardado predeterminadas con una sola acción.',
       },
     },
   },
