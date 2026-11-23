@@ -201,19 +201,8 @@ struct SettingsView: View {
                 if input.isSearching {
                     searchResultsContent
                 } else {
-                    HStack {
-                        AppLocalizedText(input.selection.title)
-                            .font(.system(size: 23, weight: .semibold))
-                        if input.selection == .scheduledCleanup {
-                            Spacer()
-                            Button(AppLocalization.string("立即清理", locale: locale)) {
-                                immediateCleanup.start(settings: settingsStore.settings)
-                            }
-                            .buttonStyle(.bordered)
-                            .keepsIntrinsicWidth()
-                            .disabled(immediateCleanup.isRunning || !ImmediateCleanupController.canCleanNow(settings: settingsStore.settings))
-                        }
-                    }
+                    AppLocalizedText(input.selection.title)
+                        .font(.system(size: 23, weight: .semibold))
                     DeferredMount {
                         AnyView(selectedContent)
                             .id(input.selection)

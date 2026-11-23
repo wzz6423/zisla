@@ -3754,6 +3754,7 @@
 "自动更新依赖组件" = "Mettre à jour automatiquement les dépendances";
 "每天更新已安装的依赖组件" = "Mettre à jour chaque jour les dépendances installées";
 "（默认）" = "(Par défaut)";
+"清理垃圾" = "Nettoyer les fichiers inutiles";
 "立即清理" = "Nettoyer maintenant";
 "正在清理" = "Nettoyage en cours";
 "清理完成" = "Nettoyage terminé";

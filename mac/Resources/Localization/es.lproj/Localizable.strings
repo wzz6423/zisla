@@ -3758,6 +3758,7 @@
 "自动更新依赖组件" = "Actualizar dependencias automáticamente";
 "每天更新已安装的依赖组件" = "Actualizar diariamente las dependencias instaladas";
 "（默认）" = "(Predeterminado)";
+"清理垃圾" = "Limpiar archivos basura";
 "立即清理" = "Limpiar ahora";
 "正在清理" = "Limpiando";
 "清理完成" = "Limpieza completada";
