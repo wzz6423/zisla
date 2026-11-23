@@ -13,6 +13,44 @@ import ZislaCore
 @MainActor
 @Suite(.serialized)
 struct ScreenshotHDRTests {
+    @Test(arguments: [false, true])
+    func nativePreviewFitsSmallerFramesAndPreservesUnspecifiedDimensions(preservesHDR: Bool) async throws {
+        let source = try Self.hdrImage()
+        let pixels = preservesHDR ? source : try #require(ScreenshotImageRendering.sdrImage(from: source))
+        let image = NSImage(cgImage: pixels, size: CGSize(width: 32, height: 24))
+        for (width, height, expected) in [(CGFloat(16), CGFloat(12), CGSize(width: 16, height: 12)),
+                                          (CGFloat(16), nil, CGSize(width: 16, height: 24)),
+                                          (nil, CGFloat(12), CGSize(width: 32, height: 12)),
+                                          (nil, nil, image.size)] {
+            let host = NSHostingView(rootView:
+                ScreenshotBackingImage(image: image, preservesHDR: true, opacity: 0.6)
+                    .frame(width: width, height: height))
+            #expect(host.fittingSize == expected)
+            let window = NSWindow(contentRect: CGRect(origin: .zero, size: expected),
+                                  styleMask: .borderless, backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.alphaValue = 0
+            window.contentView = host
+            defer { window.contentView = nil; window.close() }
+            for _ in 0..<3 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            let backing = try #require(Self.backingViews(in: host).first)
+            #expect(backing.bounds.size == expected,
+                    "Native image content must accept smaller frames and keep natural dimensions on unspecified axes")
+            if preservesHDR {
+                #expect(backing.hdrLayer.frame == backing.bounds && !backing.hdrLayer.isHidden)
+                let contents = try #require(backing.hdrLayer.contents) as! CGImage
+                #expect(try Self.pixel(contents, x: 16, y: 12)[0] == 4)
+                #expect(abs(backing.hdrLayer.opacity - 0.6) < 0.001)
+            } else {
+                #expect(backing.image === image && backing.alphaValue == 0.6)
+                #expect(backing.hdrLayer.isHidden && backing.hdrLayer.contents == nil)
+            }
+        }
+    }
+
     @Test
     func nativePreviewPreservesTheDisplayReferredFrameWithoutAnotherToneCurve() throws {
         let source = try Self.hdrGradient(headroom: 8)

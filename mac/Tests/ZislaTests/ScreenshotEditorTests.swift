@@ -1918,6 +1918,94 @@ struct ScreenshotEditorTests {
         #expect(window.frame.origin == CGPoint(x: origin.x + 24, y: origin.y - 18))
     }
 
+    @Test(arguments: [false, true])
+    func pinnedMagnificationAndCornerResizeScaleImageContent(toolbarVisible: Bool) async throws {
+        let image = try #require(makeGradientImage(width: 320, height: 200))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let controller = ScreenshotEditorWindowController(
+            image: image, screenImage: image, screenCGImage: cgImage, screen: nil,
+            captureRect: CGRect(x: 20, y: 20, width: 160, height: 100), capturedApplication: nil,
+            onClose: {}, pinnedToolbarVisible: toolbarVisible
+        )
+        defer { controller.close() }
+        controller.setPinned(true)
+        let window = try #require(controller.window)
+        window.alphaValue = 0
+        let host = try #require(window.contentView)
+        func layout() async {
+            for _ in 0..<3 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+        }
+        await layout()
+        let pointer = try #require(findSubview(ScreenshotPointerInteractionNSView.self, in: host))
+        let backing = try #require(findSubview(ScreenshotBackingImageView.self, in: host))
+        #expect(backing.bounds.size == image.size)
+
+        if toolbarVisible {
+            let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+            defer { releaseAccessibility() }
+            await layout()
+            func button(_ title: String, in object: NSObject) -> NSObject? {
+                func value(_ key: String) -> Any? {
+                    object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
+                }
+                let labels = ["accessibilityTitle", "accessibilityLabel"].compactMap { value($0) as? String }
+                if value("accessibilityRole") as? String == NSAccessibility.Role.button.rawValue,
+                   labels.contains(title) { return object }
+                for child in value("accessibilityChildren") as? [NSObject] ?? [] {
+                    if let match = button(title, in: child) { return match }
+                }
+                return nil
+            }
+            func press(_ control: NSObject) {
+                control.performSelector(onMainThread: NSSelectorFromString("accessibilityPerformPress"),
+                                        with: nil, waitUntilDone: true)
+            }
+            for (title, size) in [("缩小", CGSize(width: 288, height: 180)),
+                                  ("放大", image.size)] {
+                let control = try #require(button(AppLocalization.text(title), in: host))
+                press(control)
+                await layout()
+                #expect(backing.bounds.size == size && pointer.bounds.size == size,
+                        "Toolbar zoom must scale the image content together with its border")
+            }
+        }
+
+        pointer.handleMagnification(0.5)
+        await layout()
+        #expect(pointer.bounds.size == CGSize(width: 480, height: 300))
+        #expect(backing.bounds.size == pointer.bounds.size,
+                "Magnification must resize the image content together with its border")
+
+        pointer.handleMagnification(-0.5)
+        await layout()
+        #expect(pointer.bounds.size == CGSize(width: 240, height: 150))
+        #expect(backing.bounds.size == pointer.bounds.size,
+                "Shrinking must scale the image content instead of clipping the original-size image")
+        #expect((backing.cell as? NSImageCell)?.imageRect(forBounds: backing.bounds) == backing.bounds)
+
+        try sendMouseDrag(from: CGPoint(x: 236, y: 146), to: CGPoint(x: 268, y: 166),
+                          through: pointer, in: window)
+        await layout()
+        #expect(backing.bounds.size == pointer.bounds.size,
+                "Corner resizing must keep the image content and its border at the same size")
+        #expect(abs(backing.bounds.width - image.size.width * controller.pinnedScale) < 1)
+        #expect(abs(backing.bounds.height - image.size.height * controller.pinnedScale) < 1)
+        #expect(backing.image?.size == image.size,
+                "Display scaling must preserve the original image dimensions")
+
+        pointer.handleMagnification(-1)
+        await layout()
+        #expect(controller.pinnedScale == 0.2 && backing.bounds.size == CGSize(width: 64, height: 40))
+        pointer.handleMagnification(100)
+        await layout()
+        #expect(controller.pinnedScale == 3 && backing.bounds.size == CGSize(width: 960, height: 600))
+    }
+
     @Test
     func pinnedImageCanMovePastTheCurrentScreenBoundary() throws {
         let screen = try #require(NSScreen.screens.first)

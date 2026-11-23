@@ -429,6 +429,10 @@ struct ScreenshotBackingImage: NSViewRepresentable {
     func updateNSView(_ imageView: ScreenshotBackingImageView, context: Context) {
         imageView.update(image: image, preservesHDR: preservesHDR, opacity: opacity)
     }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ScreenshotBackingImageView, context: Context) -> CGSize? {
+        proposal.replacingUnspecifiedDimensions(by: image.size)
+    }
 }
 
 @MainActor
