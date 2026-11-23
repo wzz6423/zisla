@@ -81,7 +81,7 @@ struct WeatherFallbackPresentationTests {
             host.cacheDisplay(in: host.bounds, to: bitmap)
             let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
             var knobColumns = Set<Int>()
-            for y in 0..<bitmap.pixelsHigh {
+            for y in Int(track.minY * scale)..<Int(track.maxY * scale) {
                 for x in Int(track.minX * scale)..<Int(track.maxX * scale) {
                     let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
                     let contrast = isDark ? color.redComponent : 1 - color.redComponent
@@ -98,12 +98,15 @@ struct WeatherFallbackPresentationTests {
         scroll.tile()
         scroll.reflectScrolledClipView(scroll.contentView)
         let document = try #require(scroll.documentView)
-        let sourceLink = try #require(descendants(in: document).compactMap { $0 as? NSButton }.first)
-        let sourceFrame = sourceLink.convert(sourceLink.bounds, to: document)
-        #expect(language.isRightToLeft
-            ? abs(sourceFrame.maxX - document.bounds.maxX + 2) < 0.5
-            : abs(sourceFrame.minX - document.bounds.minX) < 0.5,
-            "Weather attribution must retain the enclosing layout direction in \(language.rawValue): \(sourceFrame)")
+        let sourceLinks = descendants(in: host).compactMap { $0 as? NSButton }
+        #expect(sourceLinks.count == 1, "All cities must share one provider link below the weather list")
+        let sourceLink = try #require(sourceLinks.first)
+        #expect(!sourceLink.isDescendant(of: document), "Attribution must remain outside the scrolling city rows")
+        let sourceFrame = sourceLink.convert(sourceLink.bounds, to: host)
+        #expect(sourceFrame.minY >= scroll.convert(scroll.bounds, to: host).maxY,
+                "The shared provider line must appear below the city list")
+        #expect(abs(sourceFrame.maxX - host.bounds.maxX) < 0.5,
+                "Weather attribution must remain right aligned in \(language.rawValue): \(sourceFrame)")
         #expect(document.frame.width <= scroll.contentView.bounds.width,
                 "Weather rows must fit the viewport, including the vertical scrollbar")
         var shiftedBounds = scroll.contentView.bounds
@@ -127,7 +130,7 @@ struct WeatherFallbackPresentationTests {
             let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
             let gutter = track.insetBy(dx: -2, dy: 0).intersection(host.bounds)
             var overlappingPixels = 0
-            for y in 0..<bitmap.pixelsHigh {
+            for y in Int(gutter.minY * scale)..<Int(gutter.maxY * scale) {
                 for x in Int(gutter.minX * scale)..<Int(gutter.maxX * scale) {
                     let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
                     let contrast = isDark ? color.redComponent : 1 - color.redComponent
@@ -161,7 +164,8 @@ struct WeatherFallbackPresentationTests {
                     ? 0..<Int(60 * scale)
                     : Int((host.bounds.width - 60) * scale)..<bitmap.pixelsWide
                 var changedPixels = 0
-                for y in 0..<Int(30 * scale) {
+                let listFrame = scroll.convert(scroll.bounds, to: host)
+                for y in Int(listFrame.minY * scale)..<Int((listFrame.minY + 30) * scale) {
                     for x in columns {
                         let before = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
                         let after = try #require(updated.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
@@ -224,8 +228,106 @@ struct WeatherFallbackPresentationTests {
         #expect(!window.isVisible)
     }
 
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
+    func weatherColumnShowsOneTimestampAboveTheTitleAndSharedSourcesAtTheBottom(language: AppLanguage) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("weather-metadata-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let suite = "weather-metadata-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let locations = WeatherLocationStore(storageURL: directory.appendingPathComponent("locations.json"), defaults: defaults)
+        locations.updateCurrent(name: "London", coordinate: GeoCoordinate(latitude: 51, longitude: 0))
+        locations.addSaved(name: "Tokyo", coordinate: GeoCoordinate(latitude: 35.7, longitude: 139.7))
+        let tokyoID = try #require(locations.locations.last?.id)
+        let date = Date(timeIntervalSince1970: 86_400)
+        let licenseURL = try #require(URL(string: "https://creativecommons.org/licenses/by/4.0/"))
+        let london = WeatherSnapshot(
+            temperature: 16, condition: WeatherCondition(code: 3, isDay: true), timezone: "UTC",
+            fetchedAt: date, coordinate: GeoCoordinate(latitude: 51, longitude: 0), locationName: "London",
+            source: "Open-Meteo", sourceURL: URL(string: "https://open-meteo.com/"), licenseURL: licenseURL
+        )
+        var tokyo = london
+        tokyo.locationName = "Tokyo"
+        tokyo.coordinate = GeoCoordinate(latitude: 35.7, longitude: 139.7)
+        tokyo.fetchedAt = date.addingTimeInterval(1800)
+        tokyo.sourceURL = URL(string: "https://open-meteo.com/tokyo")
+        var snapshots = [WeatherLocation.currentID: london, tokyoID: tokyo]
+        let persisted = try Data(contentsOf: directory.appendingPathComponent("locations.json"))
+        func content(at date: Date) -> some View {
+            AgendaModuleView.weatherColumn(
+                locations: locations, snapshotsByLocationID: snapshots, state: .ready("2"), at: date, refresh: {}
+            ).background(Color.white).environment(\.colorScheme, .light)
+                .environment(\.locale, language.locale)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+        }
+        let host = NSHostingView(rootView: content(at: date))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 184, height: 160),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        func textFrames() -> [(String, CGRect)] {
+            func visit(_ object: NSObject) -> [(String, CGRect)] {
+                func value(_ key: String) -> Any? {
+                    object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
+                }
+                var result: [(String, CGRect)] = []
+                if let element = object as? any NSAccessibilityElementProtocol,
+                   let text = ["accessibilityLabel", "accessibilityValue"].compactMap({ value($0) as? String }).first {
+                    result.append((text, host.convert(window.convertFromScreen(element.accessibilityFrame()), from: nil)))
+                }
+                return result + (value("accessibilityChildren") as? [NSObject] ?? []).flatMap { visit($0) }
+            }
+            return visit(host)
+        }
+        for phase in 0..<4 {
+            if phase == 1 {
+                snapshots[tokyoID]?.source = "MET Norway"
+                snapshots[tokyoID]?.sourceURL = URL(string: "https://www.met.no/")
+            }
+            let now = date.addingTimeInterval(phase < 2 ? 0 : phase == 2 ? 3600 : 5400)
+            host.rootView = content(at: now)
+            for _ in 0..<8 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            let frames = textFrames()
+            if phase == 3 {
+                #expect(frames.allSatisfy {
+                    !$0.0.contains("1970") && !["Open-Meteo", "MET Norway", "CC BY 4.0"].contains($0.0)
+                }, "An unavailable forecast must remove both the shared timestamp and attribution")
+                continue
+            }
+            let fetchedAt = phase == 2 ? tokyo.fetchedAt : london.fetchedAt
+            let expected = AppLocalization.text("更新于 %@", fetchedAt.formatted(date: .numeric, time: .shortened))
+            let timestamps = frames.filter { $0.0 == expected }
+            #expect(timestamps.count == 1, "The weather column must display exactly one update timestamp")
+            let timestamp = try #require(timestamps.first).1
+            let title = try #require(frames.first { $0.0 == AppLocalization.text("天气") }).1
+            #expect(timestamp.maxY <= title.minY, "The timestamp must be above the Weather title")
+            #expect(abs(timestamp.maxX - host.bounds.maxX) < 0.5, "The timestamp must be right aligned")
+            let sources = frames.filter { ["Open-Meteo", "MET Norway", "CC BY 4.0"].contains($0.0) }
+            #expect(sources.count == (phase == 1 ? 3 : 2), "Provider names and the shared license must appear once")
+            #expect(sources.allSatisfy { $0.1.minY >= title.maxY }, "Shared attribution must follow the weather content")
+            #expect(abs((sources.map { $0.1.maxX }.max() ?? 0) - host.bounds.maxX) < 0.5,
+                    "The attribution line must be right aligned")
+            #expect(abs((sources.map { $0.1.maxY }.max() ?? 0) - host.bounds.maxY) < 0.5,
+                    "Attribution must stay at the bottom of the weather column")
+            if phase == 2 {
+                #expect(frames.allSatisfy { $0.0 != "Open-Meteo" }, "Expired forecasts must not retain their provider attribution")
+            }
+        }
+        #expect(try Data(contentsOf: directory.appendingPathComponent("locations.json")) == persisted)
+        #expect(snapshots[WeatherLocation.currentID] == london, "Rendering must leave retained forecasts unchanged")
+        #expect(!window.isVisible)
+    }
+
     @Test
-    func fallbackRowShowsAttributionAndDoesNotPresentUnknownMetricsAsZero() throws {
+    func fallbackRowOmitsSharedAttributionAndDoesNotPresentUnknownMetricsAsZero() throws {
         let fallback = WeatherSnapshot(
             temperature: 16,
             condition: WeatherCondition(code: 3, isDay: true),
@@ -238,13 +340,13 @@ struct WeatherFallbackPresentationTests {
             licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/")
         )
         let missing = try recognizedText(in: fallback)
-        #expect(missing.contains("MET Norway"))
-        #expect(missing.contains("CC BY 4.0"))
+        #expect(!missing.contains("MET Norway"), "Provider attribution belongs below the city list")
+        #expect(!missing.contains("CC BY 4.0"), "The license must not repeat in city rows")
         #expect(!missing.contains("mm"))
         #expect(!missing.contains("%"))
         #expect(!missing.contains("32"))
         #expect(!missing.contains("0°"))
-        #expect(missing.contains("1970"), "Retained forecasts must show the update date, not just the time")
+        #expect(!missing.contains("1970"), "The update timestamp must not repeat in city rows")
 
         var complete = fallback
         complete.apparentTemperature = 32
