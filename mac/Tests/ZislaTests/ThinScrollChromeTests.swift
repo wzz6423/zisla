@@ -429,6 +429,204 @@ struct ThinScrollChromeTests {
         #expect(!window.isVisible)
     }
 
+    @Test(arguments: [NSAppearance.Name.aqua, .darkAqua]) @MainActor
+    func keyboardDashboardScrollbarRemainsVisibleAcrossResizingAndNativeStyleChanges(
+        appearanceName: NSAppearance.Name
+    ) async throws {
+        _ = NSApplication.shared
+        let summary = KeyboardTypingStatsSummary(
+            generatedAt: Date(timeIntervalSince1970: 1_900_000_000), lastInputAt: nil,
+            todayCharacterCount: 0, todayPeakCharactersPerSecond: 0,
+            todayActiveSeconds: 0, todayActiveMinuteBuckets: 0, todayTopApplication: nil,
+            todayKeyPressCount: 0, allTimeKeyPressCount: 0, applications: [], history: [],
+            timelineRange: "day", recentBuckets: [], applicationTimelines: [],
+            todayKeyCounts: [:], allTimeKeyCounts: [:]
+        )
+        let host = NSHostingView(rootView: KeyboardSoundModuleView.content(
+            summary: summary,
+            voiceStatistics: VoiceHistoryStatistics(
+                totalWordCount: 30_540, totalDuration: 13_680, wordsPerMinute: 133, savedTime: 32_040
+            ), environment: [:], isDebugBuild: false
+        )
+        .background(appearanceName == .darkAqua ? Color.black : Color.white)
+        .environment(\.colorScheme, appearanceName == .darkAqua ? .dark : .light))
+        host.sizingOptions = []
+        let window = NSWindow(
+            contentRect: CGRect(x: -100_000, y: -100_000, width: 560, height: 160),
+            styleMask: .borderless, backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: appearanceName)
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+
+        func settle() async {
+            for _ in 0..<8 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+        }
+        await settle()
+        let scroll = try #require(descendants(in: host).compactMap { $0 as? NSScrollView }.first)
+        let document = try #require(scroll.documentView)
+        let fittingHeight = document.frame.height + 80
+        for (height, expectedOverflow) in [(CGFloat(160), true), (fittingHeight, false), (160, true)] {
+            scroll.scrollerStyle = .overlay
+            window.setContentSize(CGSize(width: 560, height: height))
+            await settle()
+            scroll.tile()
+            scroll.reflectScrolledClipView(scroll.contentView)
+            let scroller = try #require(scroll.verticalScroller as? ThinScroller)
+            let overflowing = document.frame.height > scroll.contentView.bounds.height
+            #expect(overflowing == expectedOverflow)
+            #expect(document.frame.width <= scroll.contentView.bounds.width + 0.5,
+                    "The dashboard must fit the viewport beside its visible scrollbar")
+            #expect(scroller.isHidden == !overflowing)
+            if overflowing {
+                // Layout can briefly reveal an overlay knob; cross its native fade interval before measuring.
+                try await Task.sleep(for: .seconds(2))
+                let knob = scroller.rect(for: .knob)
+                let hitPoint = scroller.convert(NSPoint(x: knob.midX, y: knob.midY), to: nil)
+                #expect(scroller.testPart(hitPoint) == .knob,
+                        "Overflowing statistics must keep an operable scrollbar before pointer interaction")
+                host.displayIfNeeded()
+                let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+                host.cacheDisplay(in: host.bounds, to: bitmap)
+                let paddingColor = try #require(bitmap.colorAt(x: 1, y: 1)?.usingColorSpace(.deviceRGB))
+                #expect(abs(paddingColor.redComponent - (appearanceName == .darkAqua ? 0 : 1)) < 0.01,
+                        "The statistics scroll container must preserve its enclosing background")
+                let track = scroller.convert(scroller.bounds, to: host)
+                let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+                scroller.isHidden = true
+                let withoutScroller = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+                host.cacheDisplay(in: host.bounds, to: withoutScroller)
+                scroller.isHidden = false
+                var visibleColumns = Set<Int>()
+                for y in 0..<bitmap.pixelsHigh {
+                    for x in Int(track.minX * scale)..<Int(track.maxX * scale) {
+                        let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                        let baseline = try #require(withoutScroller.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                        if abs(color.redComponent - baseline.redComponent) > 0.1 { visibleColumns.insert(x) }
+                    }
+                }
+                #expect(visibleColumns.count == Int(3 * scale),
+                        "Overflowing statistics must render their 3pt scrollbar without requiring hover or scrolling")
+                scroll.contentView.scroll(to: CGPoint(x: 0,
+                                                      y: document.frame.height - scroll.contentView.bounds.height))
+                scroll.reflectScrolledClipView(scroll.contentView)
+                #expect(scroll.contentView.bounds.minY > 0,
+                        "Vertical scrolling must reach the complete statistics")
+            }
+        }
+        #expect(!window.isVisible && !window.isKeyWindow)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func keyboardDashboardRefreshPreservesTheSwiftUIEnvironmentThroughNativeHosting(arabic: Bool) async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let locale = Locale(identifier: arabic ? "ar" : "en_US")
+        let direction: LayoutDirection = arabic ? .rightToLeft : .leftToRight
+        let date = Date(timeIntervalSince1970: 1_900_000_000)
+        func content(count: Int64, voiceCount: Int, renderedLocale: Locale) -> some View {
+            KeyboardSoundModuleView.content(
+                summary: KeyboardTypingStatsSummary(
+                    generatedAt: date, lastInputAt: nil,
+                    todayCharacterCount: count, todayPeakCharactersPerSecond: 0,
+                    todayActiveSeconds: 0, todayActiveMinuteBuckets: 0, todayTopApplication: nil,
+                    todayKeyPressCount: count, allTimeKeyPressCount: count, applications: [],
+                    history: [], timelineRange: "day", recentBuckets: [], applicationTimelines: [],
+                    todayKeyCounts: [:], allTimeKeyCounts: [:]
+                ),
+                voiceStatistics: VoiceHistoryStatistics(
+                    totalWordCount: voiceCount, totalDuration: 13_680, wordsPerMinute: 133, savedTime: 32_040
+                ), environment: [:], isDebugBuild: false
+            )
+            .environment(\.locale, renderedLocale)
+            .environment(\.layoutDirection, direction)
+            .environment(\.colorScheme, arabic ? .dark : .light)
+            .accentColor(.red)
+        }
+        let host = NSHostingView(rootView: content(count: 123_456, voiceCount: 30_540, renderedLocale: locale))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 560, height: 160),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: arabic ? .aqua : .darkAqua)
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        func value(_ object: NSObject, _ key: String) -> Any? {
+            object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
+        }
+        func objects(_ object: NSObject) -> [NSObject] {
+            [object] + (value(object, "accessibilityChildren") as? [NSObject] ?? []).flatMap(objects)
+        }
+        for (count, voiceCount) in [(Int64(123_456), 30_540), (654_321, 43_210)] {
+            host.rootView = content(count: count, voiceCount: voiceCount, renderedLocale: locale)
+            for _ in 0..<8 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+            let rendered = objects(host)
+            let strings = rendered.compactMap { value($0, "accessibilityValue") as? String }
+            #expect(strings.contains(count.formatted(.number)), "Refreshing the native document must expose updated keyboard counts")
+            #expect(strings.contains { $0.compactMap(\.wholeNumberValue).map(String.init).joined() == String(voiceCount) },
+                    "Refreshing the native document must expose updated voice counts")
+            let scroll = try #require(descendants(in: host).compactMap { $0 as? NSScrollView }.first)
+            let document = try #require(scroll.documentView)
+            let first = try #require(rendered.first { value($0, "accessibilityValue") as? String == count.formatted(.number) }
+                as? any NSAccessibilityElementProtocol)
+            let documentFrame = window.convertToScreen(document.convert(document.bounds, to: nil))
+            #expect((first.accessibilityFrame().midX > documentFrame.midX) == arabic,
+                    "The first metric must keep the enclosing layout direction")
+            let bitmap = try #require(document.bitmapImageRepForCachingDisplay(in: document.bounds))
+            document.cacheDisplay(in: document.bounds, to: bitmap)
+            var hasRed = false
+            var hasPrimary = false
+            appearancePixels: for y in 0..<min(bitmap.pixelsHigh, 160) {
+                for x in 0..<bitmap.pixelsWide {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    hasRed = hasRed || color.redComponent > color.greenComponent + 0.3
+                    hasPrimary = hasPrimary || (color.alphaComponent > 0.5
+                        && abs(color.redComponent - (arabic ? 1 : 0)) < 0.05)
+                    if hasRed && hasPrimary { break appearancePixels }
+                }
+            }
+            #expect(hasRed, "The native document must render the enclosing accent color")
+            #expect(hasPrimary, "The explicit color scheme must override the opposite native appearance")
+            let captureBounds = CGRect(x: 0, y: 0, width: floor(document.bounds.width), height: 350)
+            let beforeLocaleChange = try #require(document.bitmapImageRepForCachingDisplay(in: captureBounds))
+            document.cacheDisplay(in: captureBounds, to: beforeLocaleChange)
+            host.rootView = content(count: count, voiceCount: voiceCount,
+                                    renderedLocale: Locale(identifier: arabic ? "en_US" : "ar"))
+            for _ in 0..<8 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+            let afterLocaleChange = try #require(document.bitmapImageRepForCachingDisplay(in: captureBounds))
+            document.cacheDisplay(in: captureBounds, to: afterLocaleChange)
+            var localeChanged = false
+            localePixels: for y in 0..<beforeLocaleChange.pixelsHigh {
+                for x in 0..<beforeLocaleChange.pixelsWide {
+                    let before = try #require(beforeLocaleChange.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    let after = try #require(afterLocaleChange.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if abs(before.redComponent - after.redComponent) > 0.05 {
+                        localeChanged = true
+                        break localePixels
+                    }
+                }
+            }
+            #expect(localeChanged, "Changing only the enclosing locale must update the rendered history dates")
+        }
+        #expect(!window.isVisible && !window.isKeyWindow)
+    }
+
     @Test(arguments: ["", "Short preview", String(repeating: "Preview paragraph\n\n", count: 80)], [false, true]) @MainActor
     func markdownPreviewScrollbarsStayThinForEmptyShortAndOverflowingDocuments(source: String, releaseNotes: Bool) async throws {
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
