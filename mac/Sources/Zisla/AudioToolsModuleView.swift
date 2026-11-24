@@ -10,6 +10,7 @@ struct AudioToolsModuleView: View {
     @State private var options = AudioProcessingOptions()
     @State private var numberDrafts: [String: String] = [:]
     @Environment(\.locale) private var locale
+    @Environment(\.settingsSearchTarget) private var searchTarget
 
     init(initialOperation: AudioToolOperation = .convert) {
         _operation = State(initialValue: initialOperation)
@@ -17,24 +18,28 @@ struct AudioToolsModuleView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 20) {
-            operationList
-                .frame(width: 184)
-            VStack(alignment: .leading, spacing: 18) {
-                AppLocalizedText(operation.detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !toolsAvailable {
-                    AppLocalizedText("需要 FFmpeg 与 ffprobe，请安装音频处理组件后重试")
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if !operation.generatesAudio { inputs }
-                configuration
-                exportOptions
-                footer
+            SettingsSearchScrollView(target: searchTarget, resetID: "") {
+                operationList
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(width: 184)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    AppLocalizedText(operation.detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !toolsAvailable {
+                        AppLocalizedText("需要 FFmpeg 与 ffprobe，请安装音频处理组件后重试")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !operation.generatesAudio { inputs }
+                    configuration
+                    exportOptions
+                    footer
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
         }
         .textFieldStyle(.roundedBorder)
         .controlSize(.regular)

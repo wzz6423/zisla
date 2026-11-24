@@ -195,7 +195,8 @@ struct SettingsView: View {
     private var detail: some View {
         SettingsSearchScrollView(
             target: input.searchTarget?.localized(locale: locale),
-            resetID: input.isSearching ? input.settingsQuery : ""
+            resetID: input.isSearching ? input.settingsQuery : "",
+            scrollsContent: input.isSearching || input.selection != .audioTools
         ) {
             VStack(alignment: .leading, spacing: 22) {
                 if input.isSearching {
