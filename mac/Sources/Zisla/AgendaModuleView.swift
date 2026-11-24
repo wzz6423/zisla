@@ -32,23 +32,46 @@ struct AgendaModuleView: View {
     }
 
     private var weatherColumn: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            Self.weatherColumn(
+                locations: model.weatherLocations,
+                snapshotsByLocationID: model.weatherSnapshotsByLocationID,
+                state: model.weatherLocationState,
+                at: context.date,
+                refresh: { model.refreshWeather() }
+            )
+        }
+    }
+
+    static func weatherColumn(
+        locations: WeatherLocationStore,
+        snapshotsByLocationID: [String: WeatherSnapshot],
+        state: WeatherLocationUIState,
+        at date: Date,
+        refresh: @escaping () -> Void
+    ) -> some View {
+        let snapshots = locations.orderedSnapshots(snapshotsByLocationID, at: date)
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(AppLocalization.text("天气"))
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新天气")) {
-                    model.refreshWeather()
-                }
+                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新天气"), action: refresh)
             }
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                Self.weatherContent(
-                    locations: model.weatherLocations,
-                    snapshotsByLocationID: model.weatherSnapshotsByLocationID,
-                    state: model.weatherLocationState,
-                    at: context.date
-                )
+            if let fetchedAt = snapshots.map(\.fetchedAt).min() {
+                Text(AppLocalization.text("更新于 %@", fetchedAt.formatted(date: .numeric, time: .shortened)))
+                    .font(.system(size: 8))
+                    .foregroundStyle(.secondary)
+                    .fitsSingleLine()
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .environment(\.layoutDirection, .leftToRight)
             }
+            weatherContent(
+                locations: locations,
+                snapshotsByLocationID: snapshotsByLocationID,
+                state: state,
+                at: date
+            )
         }
     }
 
@@ -63,8 +86,28 @@ struct AgendaModuleView: View {
         if snapshots.isEmpty {
             weatherPlaceholder(state: state, hasExpiredWeather: !snapshotsByLocationID.isEmpty)
         } else {
-            WeatherList(snapshots: snapshots, date: date)
-                .thinScrollChrome()
+            let sources = snapshots.reduce(into: [(name: String, url: URL)]()) { sources, weather in
+                guard let source = weather.source, let sourceURL = weather.sourceURL,
+                      !sources.contains(where: { $0.name == source })
+                else { return }
+                sources.append((source, sourceURL))
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                WeatherList(snapshots: snapshots, date: date)
+                    .thinScrollChrome()
+                HStack(spacing: 4) {
+                    ForEach(Array(sources.enumerated()), id: \.offset) { _, source in
+                        Link(source.name, destination: source.url)
+                    }
+                    if let licenseURL = snapshots.compactMap(\.licenseURL).first {
+                        Link("CC BY 4.0", destination: licenseURL)
+                    }
+                }
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .environment(\.layoutDirection, .leftToRight)
+            }
         }
     }
 
@@ -159,22 +202,6 @@ struct AgendaModuleView: View {
                     )
                 }
             }
-
-            if let source = weather.source, let sourceURL = weather.sourceURL {
-                HStack(spacing: 4) {
-                    Link(source, destination: sourceURL)
-                    if let licenseURL = weather.licenseURL {
-                        Link("CC BY 4.0", destination: licenseURL)
-                    }
-                }
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-            }
-
-            Text(AppLocalization.text("更新于 %@", weather.fetchedAt.formatted(date: .numeric, time: .shortened)))
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-                .fitsSingleLine()
 
             if !activeAlerts.isEmpty {
                 ForEach(activeAlerts) { alert in
