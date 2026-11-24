@@ -5,7 +5,7 @@ private struct SettingsSearchTargetKey: EnvironmentKey {
     static let defaultValue: SettingsSearchAnchor? = nil
 }
 
-private extension EnvironmentValues {
+extension EnvironmentValues {
     var settingsSearchTarget: SettingsSearchAnchor? {
         get { self[SettingsSearchTargetKey.self] }
         set { self[SettingsSearchTargetKey.self] = newValue }
@@ -49,9 +49,20 @@ extension View {
 struct SettingsSearchScrollView<Content: View>: View {
     let target: SettingsSearchAnchor?
     let resetID: String
+    var scrollsContent = true
     @ViewBuilder var content: () -> Content
 
+    @ViewBuilder
     var body: some View {
+        if scrollsContent {
+            scrollingContent
+        } else {
+            content()
+                .environment(\.settingsSearchTarget, target)
+        }
+    }
+
+    private var scrollingContent: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 content()

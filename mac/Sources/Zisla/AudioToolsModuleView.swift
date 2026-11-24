@@ -10,6 +10,7 @@ struct AudioToolsModuleView: View {
     @State private var options = AudioProcessingOptions()
     @State private var numberDrafts: [String: String] = [:]
     @Environment(\.locale) private var locale
+    @Environment(\.settingsSearchTarget) private var searchTarget
 
     init(initialOperation: AudioToolOperation = .convert) {
         _operation = State(initialValue: initialOperation)
@@ -17,24 +18,28 @@ struct AudioToolsModuleView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 20) {
-            operationList
-                .frame(width: 184, height: 460)
-            VStack(alignment: .leading, spacing: 18) {
-                AppLocalizedText(operation.detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !toolsAvailable {
-                    AppLocalizedText("需要 FFmpeg 与 ffprobe，请安装音频处理组件后重试")
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if !operation.generatesAudio { inputs }
-                configuration
-                exportOptions
-                footer
+            SettingsSearchScrollView(target: searchTarget, resetID: "") {
+                operationList
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(width: 184)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    AppLocalizedText(operation.detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !toolsAvailable {
+                        AppLocalizedText("需要 FFmpeg 与 ffprobe，请安装音频处理组件后重试")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !operation.generatesAudio { inputs }
+                    configuration
+                    exportOptions
+                    footer
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
         }
         .textFieldStyle(.roundedBorder)
         .controlSize(.regular)
@@ -66,29 +71,27 @@ struct AudioToolsModuleView: View {
     }
 
     private var operationList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(AudioToolOperation.allCases) { item in
-                    Button {
-                        operation = item
-                    } label: {
-                        Label(AppLocalization.text(item.title), systemImage: item.symbol)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(operation == item ? Color.accentColor : Color.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 10)
-                            .contentShape(RoundedRectangle(cornerRadius: 8))
-                            .background {
-                                if operation == item { SettingsTintedBackground(cornerRadius: 8) }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(controller.isProcessing || controller.isInspecting)
-                    .accessibilityAddTraits(operation == item ? .isSelected : [])
-                    .settingsSearchAnchor(.audioOperation(item))
-                    .help(AppLocalization.text(item.detail))
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(AudioToolOperation.allCases) { item in
+                Button {
+                    operation = item
+                } label: {
+                    Label(AppLocalization.text(item.title), systemImage: item.symbol)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(operation == item ? Color.accentColor : Color.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                        .background {
+                            if operation == item { SettingsTintedBackground(cornerRadius: 8) }
+                        }
                 }
+                .buttonStyle(.plain)
+                .disabled(controller.isProcessing || controller.isInspecting)
+                .accessibilityAddTraits(operation == item ? .isSelected : [])
+                .settingsSearchAnchor(.audioOperation(item))
+                .help(AppLocalization.text(item.detail))
             }
         }
     }
