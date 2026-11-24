@@ -23,6 +23,13 @@ enum TransientNoticeMetrics {
     /// Time left over once the pass ends, so the tail can be read instead of vanishing with it.
     private static let tailHoldSeconds: Double = 2.4
 
+    static func dismissalDuration(
+        for message: String, rowWidth: CGFloat, isCleaning: Bool, sweep: AIResultSweep?
+    ) -> Duration? {
+        guard !isCleaning, sweep == nil else { return nil }
+        return displayDuration(for: message, rowWidth: rowWidth)
+    }
+
     static func displayDuration(for message: String, rowWidth: CGFloat) -> Duration {
         displayDuration(textWidth: textWidth(of: message), rowWidth: rowWidth)
     }

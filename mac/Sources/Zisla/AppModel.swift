@@ -477,7 +477,7 @@ final class AppModel: ObservableObject {
     @Published var transientMessage: String? {
         didSet {
             userCareFeedback.messageDidChange()
-            scheduleTransientMessageDismissal()
+            scheduleTransientMessageDismissal(sweep: aiResultSweep.current)
         }
     }
 
@@ -595,7 +595,6 @@ final class AppModel: ObservableObject {
             onMessage: { [weak self] message in
                 guard let self else { return }
                 transientMessage = message
-                if immediateCleanup.isRunning { transientMessageDismissTask?.cancel() }
             },
             requestPermission: { permissions.openSettings(for: $0) }
         )
@@ -876,6 +875,12 @@ final class AppModel: ObservableObject {
             self?.transientMessage = message
         }
         .store(in: &cancellables)
+
+        aiResultSweep.$current
+            .sink { [weak self] sweep in
+                self?.scheduleTransientMessageDismissal(sweep: sweep)
+            }
+            .store(in: &cancellables)
 
         voiceInput.isCapturingInputPublisher
             .sink { [weak self] _ in
@@ -1412,16 +1417,18 @@ final class AppModel: ObservableObject {
     /// itself — nothing else ever clears it. A message too wide for the row scrolls once, so the
     /// lifetime follows that pass instead of a fixed beat: a long error would otherwise be swapped out
     /// mid-scroll, having shown only its opening words.
-    private func scheduleTransientMessageDismissal() {
+    private func scheduleTransientMessageDismissal(sweep: AIResultSweep?) {
         transientMessageDismissTask?.cancel()
         transientMessageDismissTask = nil
         guard let message = transientMessage else { return }
-        let duration = TransientNoticeMetrics.displayDuration(
+        guard let duration = TransientNoticeMetrics.dismissalDuration(
             for: message,
             rowWidth: islandEdge.isVertical
                 ? 320 - collapsedIslandSize.width
-                : collapsedOverflowWidth
-        )
+                : collapsedOverflowWidth,
+            isCleaning: immediateCleanup.isRunning && message == AppLocalization.text("正在清理"),
+            sweep: sweep
+        ) else { return }
         transientMessageDismissTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled, let self, self.transientMessage == message else { return }

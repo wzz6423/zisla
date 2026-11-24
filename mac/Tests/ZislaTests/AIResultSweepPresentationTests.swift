@@ -9,6 +9,115 @@ import ZislaCore
 
 @MainActor
 struct AIResultSweepPresentationTests {
+    @Test(arguments: IslandLayoutStyle.allCases, [false, true])
+    func cleanupMessageYieldsToQueuedSweepsAndReturnsWithoutAnotherMessageEvent(
+        style: IslandLayoutStyle, cancelPlayback: Bool
+    ) throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        fixture.settings.settings.islandLayoutStyle = style
+        fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: .top)
+        let presenter = SideNoticePresenter(
+            queue: fixture.queue, resultSweep: fixture.sweep, media: fixture.media,
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults),
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings,
+            languageStore: AppLanguageStore(defaults: fixture.defaults), isScreenLocked: true,
+            screenSnapshotProvider: { [] }
+        )
+        defer { presenter.stop() }
+        let source = CurrentValueSubject<String?, Never>("正在清理")
+        var displayed: [String?] = []
+        let subscription = source.combineLatest(fixture.sweep.$current)
+            .map { message, sweep in AIResultSweepController.presentationMessage(message, sweep: sweep) }
+            .removeDuplicates()
+            .sink { message in
+                displayed.append(message)
+                presenter.setTransientNoticePresented(message != nil, message: message)
+            }
+        defer { subscription.cancel() }
+        #expect(displayed == ["正在清理"])
+        let previous = presenter.compactConfiguration(for: [], at: .now)
+        fixture.receive(makeTask(id: "first-result", provider: .gpt, status: .succeeded))
+        let first = try #require(fixture.sweep.current)
+        fixture.receive(makeTask(id: "second-result", provider: .codex, status: .failed))
+        #expect(displayed == ["正在清理", nil], "Result playback must replace the cleanup text")
+        #expect(source.value == "正在清理", "Playback must preserve the ongoing cleanup message")
+        let notices = fixture.sweep.presentationNotices(from: [])
+        #expect(fixture.view.selectedCompactStatusPriority == .aiActivity)
+        #expect(try wingPixelCounts(in: fixture.view).allSatisfy { $0 > 3 },
+                "The result must keep its AI icon and text visible")
+        if style == .pill {
+            let sizing = try #require(SideNoticeLayoutEngine().compactBarSizing(for: notices, settings: fixture.settings.settings))
+            #expect(presenter.compactConfiguration(for: notices, at: .now).compactStatusLength == sizing.customPillLength,
+                    "The result text must use its own width instead of the cleanup message width")
+        }
+        if cancelPlayback {
+            fixture.sweep.cancel()
+        } else {
+            fixture.sweep.finish(id: first.id)
+            let second = try #require(fixture.sweep.current)
+            #expect(displayed == ["正在清理", nil], "Queued results must keep the cleanup message paused")
+            fixture.sweep.finish(id: second.id)
+        }
+        #expect(displayed == ["正在清理", nil, "正在清理"],
+                "Finishing or cancelling playback must restore cleanup without another message event")
+        #expect(presenter.compactConfiguration(for: [], at: .now) == previous)
+    }
+
+    @Test(arguments: ["清理完成", "清理失败", nil] as [String?])
+    func cleanupFinishingDuringASweepRestoresItsLatestResultInsteadOfProgress(result: String?) throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let source = CurrentValueSubject<String?, Never>("正在清理")
+        var displayed: [String?] = []
+        let subscription = source.combineLatest(fixture.sweep.$current)
+            .map { message, sweep in AIResultSweepController.presentationMessage(message, sweep: sweep) }
+            .removeDuplicates()
+            .sink { displayed.append($0) }
+        defer { subscription.cancel() }
+        fixture.receive(makeTask(id: "result-during-cleanup", provider: .gpt, status: .succeeded))
+        let sweep = try #require(fixture.sweep.current)
+        source.send(result)
+        #expect(displayed == ["正在清理", nil], "The latest cleanup result must wait until playback ends")
+        #expect(source.value == result)
+        fixture.sweep.finish(id: sweep.id)
+        #expect(displayed.last == result)
+        #expect(displayed.count == (result == nil ? 2 : 3))
+    }
+
+    @Test(arguments: [false, true])
+    func cleanupResultKeepsItsFullDisplayDurationUntilQueuedPlaybackEnds(cancelPlayback: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let progress = "正在清理"
+        #expect(TransientNoticeMetrics.dismissalDuration(for: progress, rowWidth: 240, isCleaning: true, sweep: nil) == nil,
+                "Ongoing cleanup must not expire when the result playback ends")
+        fixture.receive(makeTask(id: "first-duration", provider: .gpt, status: .succeeded))
+        let first = try #require(fixture.sweep.current)
+        fixture.receive(makeTask(id: "second-duration", provider: .codex, status: .failed))
+        let result = "清理完成"
+        var durations: [Duration?] = []
+        let subscription = fixture.sweep.$current.sink { sweep in
+            durations.append(TransientNoticeMetrics.dismissalDuration(for: result, rowWidth: 240, isCleaning: false, sweep: sweep))
+        }
+        defer { subscription.cancel() }
+        #expect(TransientNoticeMetrics.dismissalDuration(for: result, rowWidth: 240, isCleaning: false, sweep: first) == nil,
+                "A hidden cleanup result must not start its dismissal countdown")
+        if cancelPlayback {
+            fixture.sweep.cancel()
+        } else {
+            fixture.sweep.finish(id: first.id)
+            let second = try #require(fixture.sweep.current)
+            #expect(TransientNoticeMetrics.dismissalDuration(for: result, rowWidth: 240, isCleaning: false, sweep: second) == nil,
+                    "The countdown must remain paused throughout queued playback")
+            fixture.sweep.finish(id: second.id)
+        }
+        #expect(TransientNoticeMetrics.dismissalDuration(for: result, rowWidth: 240, isCleaning: false, sweep: fixture.sweep.current) == .seconds(4),
+                "Restoring the cleanup result must grant its full four-second display duration")
+        #expect(durations.last == .seconds(4), "The completion publication must resume dismissal before the stored sweep changes")
+        #expect(durations.dropLast().allSatisfy { $0 == nil })
+    }
+
     @Test(arguments: [IslandEdge.left, .right], [nil, CGFloat(18), 70])
     func collapsedPillsSweepTheirOwnFrameFromTopToBottom(edge: IslandEdge, top: CGFloat?) throws {
         let startedAt = Date(timeIntervalSince1970: 100)

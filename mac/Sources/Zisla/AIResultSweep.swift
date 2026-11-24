@@ -29,6 +29,10 @@ final class AIResultSweepController: ObservableObject {
         self.now = now
     }
 
+    nonisolated static func presentationMessage(_ message: String?, sweep: AIResultSweep?) -> String? {
+        sweep == nil ? message : nil
+    }
+
     func receive(previous: AIProgressStatus?, task: AIProgressTask, observedSince: Date, settings: FeatureSettings) {
         guard settings.aiProgressEnabled, settings.aiTaskResultSweepEnabled else {
             cancel()
