@@ -24,7 +24,7 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 
 ## 最小修改机制
 
-- 只修改实现行为、测试和必要文档所需的最小文件与最小代码路径；不顺手重命名、格式化、升级依赖、重排无关代码或修复不相关问题。
+- 只修改实现行为、测试和必要文档所需的最小文件与最小代码路径；不顺手重命名、升级依赖、重排无关代码或修复不相关问题。提交前格式化遵循下文的提交契约。
 - 优先在现有模块、抽象、依赖注入点、fixture 和断言辅助工具内扩展；新增抽象前先证明现有路径不能表达该测试或行为。
 - 保持公开 API、持久化格式、设置默认值、权限模型和可见 UI 不变，除非需求明确要求改变；改变时写出迁移、回滚和兼容测试。
 - 所有源码、测试、脚本和配置中的注释必须使用英文，包括行注释、块注释、文档注释以及 `TODO`、`FIXME`。只在逻辑不自明时添加注释，并解释原因或约束，不复述代码行为。
@@ -122,6 +122,8 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 
 ## 提交 PR 与署名契约
 
+- 每次 `git commit` 前（包括 `--amend`），必须在仓库根目录执行 `make format`。使用与 `.github/workflows/ci-lint.yml` 中 `SWIFTFORMAT_VERSION` 一致的 SwiftFormat 版本；该入口复用 `.swiftformat` 的规则和排除范围。
+- 格式化完成后检查 `git diff --check` 与差异，将本次任务所需的格式化改动重新暂存，保留用户和其他任务的编辑。formatter 失败时先修复，再重跑成功后提交。
 - 与开发者的对话使用中文；commit message 的标题和正文、PR 的标题和正文必须使用英文。项目名、命令、路径和 `Co-authored-by` 等结构化字段保留原值；不得为满足该要求翻译用户可见文案、本地化字符串或测试夹具。
 - 由 AI 参与产出的每个 commit 都必须带 `Co-authored-by: Name <email>` trailer，并与 PR 正文 `AI Attribution` 里声明的 agent 一致。GitHub 只承认这条 trailer 作为非账号作者的共同署名，`PR Automation` 会逐条比对 commit，缺失即失败。
 - PR 正文使用 `.github/PULL_REQUEST_TEMPLATE.md` 的七节：`- Project:` 保留模板给出的项目名，`- Type:` 与标题类型一致，`Related Issue` 写 `Closes #N` 或 `None`，`- Agent:` 写实际 agent 或 `None`。

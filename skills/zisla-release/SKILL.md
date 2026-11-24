@@ -225,6 +225,8 @@ Gitee 的「最新版」徽章按 Release 创建顺序（id）判定，既不看
 
 ## 验证与清理
 
+每次发版默认验证本地构建产物、签名、校验和、包结构、appcast、双端资产清单、永久 feed 和发布元数据。额外下载安装包、安装与真实升级验收仅在用户明确要求时执行。
+
 在 `mac/` 目录对三套资产分别执行上传前验证，`RELEASE_OUTPUT_DIRECTORY` 沿用构建时的取值：
 
 ```zsh
@@ -292,7 +294,7 @@ fi
 
 现有 GitHub Actions 的 `Release Feeds` 在 `release: published` 时自动检查线上 feed；prerelease 使用 preview 通道，永久 feed tag（`preview`、`update-release`）跳过。该工作流独立运行，不要求为发版额外手动触发或重跑。交付时如实记录其状态。
 
-线上 feed HTTP 检查与隔离实例的 Sparkle 下载、验签、替换测试仅在用户明确要求时执行；通道切换、镜像回退和更新后架构检查同样按用户要求执行。未执行的检查在交付记录中标为“未验证”，不得宣称线上更新链路通过。
+线上 feed HTTP 检查、远端安装包下载与安装验证，以及 Sparkle 下载、验签、替换和重启验收仅在用户明确要求时执行；通道切换、镜像回退和更新后架构检查同样按用户要求执行。未执行的检查在交付记录中标为“未验证”，不得宣称线上更新或安装链路通过。
 
 正式版还要先完成下节的 Homebrew cask 同步（它要读 `outputs/` 里 `arm64` 与 `x86_64` ZIP 的校验文件），再在仓库根目录执行 `make clean` 删除 `outputs/`（含 `.staging/`）与本地调试产物，并清理 `.release-*`、临时挂载和本次测试下载物，不清理私钥备份。
 
@@ -307,21 +309,28 @@ PUBLISH_TAP=true make sync-cask
 
 脚本沿用已导出的 `VERSION` 与 `RELEASE_OUTPUT_DIRECTORY`，改写 `Casks/zisla.rb` 的 `version` 与两个 `sha256`：优先读 `$RELEASE_OUTPUT_DIRECTORY/zisla-v${VERSION}-macOS-arm64.zip.sha256` 与同目录的 `x86_64` 校验文件，缺失时从已发布的 GitHub 资产拉取。校验不通过的 cask 不会写回；通过后镜像到 `wzz6423/homebrew-tap`。不带 `PUBLISH_TAP` 即为试运行，只更新仓库内的 cask。
 
-改写官网 `web/src/content.ts` 的 `latestRelease` 和 `web/README.md` 的下载链接，与 cask 使用同一实际版本；这三项留到 end 一起提交。先确认 tap 真的可安装：
+改写官网 `web/src/content.ts` 的 `latestRelease` 和 `web/README.md` 的下载链接，与 cask 使用同一实际版本；这三项留到 end 一起提交。用仓库校验器核对 cask 与官网版本：
 
 ```zsh
 ruby .github/scripts/homebrew-cask.rb verify --version "$VERSION" --content web/src/content.ts
+```
+
+cask 的下载地址必须同时保留 `#{version}` 与 `#{arch}` 插值：写死版本号会让 `brew upgrade` 在下一版拉到旧包，写死架构会把另一半用户带到错误的包。
+
+Homebrew 下载、安装、升级与 `livecheck` 验收仅在用户明确要求时执行。安装验收示例：
+
+```zsh
 brew update
 brew install --cask wzz6423/tap/zisla
 brew list --cask --versions zisla
 brew livecheck --cask wzz6423/tap/zisla
 ```
 
-`brew list --cask --versions` 必须报出本次版本，`brew livecheck` 必须解析到同一版本。cask 的下载地址必须同时保留 `#{version}` 与 `#{arch}` 插值：写死版本号会让 `brew upgrade` 在下一版拉到旧包，写死架构会把另一半用户带到错误的包。
+执行对应验收时，`brew list --cask --versions` 必须报出本次版本，`brew livecheck` 必须解析到同一版本；未执行时记录“未验证”。
 
 ## 结束发版：end commit
 
-两端全部资产上传、永久 feed 更新及资产清单核对完成，且正式版的 tap/cask/官网同步及校验完成后，才允许结束；必需发布步骤失败或未完成时不得用 end 标记成功。用户未要求的线上 feed HTTP 检查和隔离自动更新测试不作为 end 前置条件，未执行时记录“未验证”。正式版仅暂存 `Casks/zisla.rb`、`web/src/content.ts` 和 `web/README.md` 的发布元数据；tap 仓库由 `sync-cask` 单独提交和推送，其远端版本、校验和也须确认。Preview 不更新正式 cask、tap 或官网，但仍提交相同格式的空 end commit。
+两端全部资产上传、永久 feed 更新及资产清单核对完成，且正式版的 tap/cask/官网同步及校验完成后，才允许结束；必需发布步骤失败或未完成时不得用 end 标记成功。用户未要求的线上 feed HTTP 检查、远端包下载与安装、Sparkle 真实升级和 Homebrew 验收不作为 end 前置条件，未执行时记录“未验证”。正式版仅暂存 `Casks/zisla.rb`、`web/src/content.ts` 和 `web/README.md` 的发布元数据；tap 仓库由 `sync-cask` 单独提交和推送，其远端版本、校验和也须确认。Preview 不更新正式 cask、tap 或官网，但仍提交相同格式的空 end commit。
 
 ```zsh
 release_gate
