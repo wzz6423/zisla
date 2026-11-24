@@ -206,6 +206,7 @@ struct CoreAudioVolumeHardware: ApplicationVolumeAudioHardware {
 private final class ApplicationVolumeRenderControl: @unchecked Sendable {
     private var gainBits: Int32
     private var progress: Int32 = 0
+    private var signalProgress: Int32 = 0
     private var isStopped: Int32 = 0
 
     init(gain: Float) { gainBits = Int32(bitPattern: gain.bitPattern) }
@@ -221,12 +222,27 @@ private final class ApplicationVolumeRenderControl: @unchecked Sendable {
     }
 
     var renderProgress: Int32 { OSAtomicAdd32Barrier(0, &progress) }
+    var inputSignalProgress: Int32 { OSAtomicAdd32Barrier(0, &signalProgress) }
     var isActive: Bool { OSAtomicAdd32Barrier(0, &isStopped) == 0 }
     func stop() { OSAtomicCompareAndSwap32Barrier(0, 1, &isStopped) }
     func didRender() { OSAtomicIncrement32Barrier(&progress) }
+    func receivedSignal() { OSAtomicIncrement32Barrier(&signalProgress) }
 }
 
 enum ApplicationVolumeRenderer {
+    static func tapSamples(
+        input: UnsafePointer<AudioBufferList>, tapBufferIndex: Int, tapChannels: Int
+    ) -> UnsafeBufferPointer<Float>? {
+        let incoming = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
+        // A missing tap must never fall back to a physical input with the same channel count.
+        guard tapBufferIndex >= 0, incoming.count == tapBufferIndex + 1, tapChannels > 0 else { return nil }
+        let source = incoming[tapBufferIndex]
+        guard Int(source.mNumberChannels) == tapChannels,
+              let samples = source.mData?.assumingMemoryBound(to: Float.self) else { return nil }
+        let frames = Int(source.mDataByteSize) / (MemoryLayout<Float>.size * tapChannels)
+        return UnsafeBufferPointer(start: samples, count: frames * tapChannels)
+    }
+
     static func render(
         input: UnsafePointer<AudioBufferList>, output: UnsafeMutablePointer<AudioBufferList>,
         tapBufferIndex: Int, tapChannels: Int, stereoChannels: ApplicationVolumeStereoChannels, gain: Float,
@@ -249,13 +265,10 @@ enum ApplicationVolumeRenderer {
             }
         }
         guard outputBufferIndex == destination.count else { return 0 }
-        let incoming = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
-        // A missing tap must never fall back to a physical input with the same channel count.
-        guard tapBufferIndex >= 0, incoming.count == tapBufferIndex + 1 else { return 0 }
-        let source = incoming[tapBufferIndex]
-        guard tapChannels > 0, Int(source.mNumberChannels) == tapChannels,
-              let samples = source.mData?.assumingMemoryBound(to: Float.self) else { return 0 }
-        let sourceFrames = Int(source.mDataByteSize) / (MemoryLayout<Float>.size * tapChannels)
+        guard let samples = tapSamples(input: input, tapBufferIndex: tapBufferIndex, tapChannels: tapChannels) else {
+            return 0
+        }
+        let sourceFrames = samples.count / tapChannels
         let outputChannels = destination.reduce(0) { $0 + Int($1.mNumberChannels) }
         var channelOffset = 0
         var renderedFrames = 0
@@ -289,6 +302,7 @@ enum ApplicationVolumeRenderer {
 final class ApplicationVolumeAudioGraph: @unchecked Sendable {
     let processObjects: [AudioObjectID]
     let output: ApplicationVolumeOutput
+    let isMonitoring: Bool
     private let hardware: any ApplicationVolumeAudioHardware
     private let control: ApplicationVolumeRenderControl
     private let dispose: @Sendable (@escaping @Sendable () -> Void) -> Void
@@ -302,6 +316,7 @@ final class ApplicationVolumeAudioGraph: @unchecked Sendable {
         set { control.gain = newValue }
     }
     var renderProgress: Int32 { control.renderProgress }
+    var inputSignalProgress: Int32 { control.inputSignalProgress }
 
     init(
         processObjects: [AudioObjectID], output: ApplicationVolumeOutput, gain: Float,
@@ -312,55 +327,79 @@ final class ApplicationVolumeAudioGraph: @unchecked Sendable {
     ) throws {
         self.processObjects = processObjects
         self.output = output
+        isMonitoring = gain == 1
         self.hardware = hardware
         self.dispose = dispose
         control = ApplicationVolumeRenderControl(gain: gain)
         do {
-            let compensation = try hardware.tapLevelCompensation(for: processObjects)
+            let compensation = isMonitoring ? 1 : try hardware.tapLevelCompensation(for: processObjects)
             let description = CATapDescription(stereoMixdownOfProcesses: processObjects)
             description.name = "zisla App Volume"
             description.isPrivate = true
-            description.muteBehavior = .mutedWhenTapped
+            description.muteBehavior = isMonitoring ? .unmuted : .mutedWhenTapped
             let tap = try hardware.createTap(description)
             self.tap = tap
             let format = try hardware.tapFormat(tap)
             guard Self.isNativeFloat(format), format.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0 else {
                 throw ApplicationVolumeFailure.unsupportedFormat
             }
-            let aggregate = try hardware.createAggregate([
+            var aggregateDescription: [String: Any] = [
                 kAudioAggregateDeviceNameKey: "zisla App Volume",
                 kAudioAggregateDeviceUIDKey: "dev.wzz.zisla.volume.\(UUID().uuidString)",
                 kAudioAggregateDeviceIsPrivateKey: true,
-                kAudioAggregateDeviceMainSubDeviceKey: output.uid,
-                kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: output.uid]],
                 kAudioAggregateDeviceTapAutoStartKey: true,
                 kAudioAggregateDeviceTapListKey: [[
                     kAudioSubTapUIDKey: description.uuid.uuidString,
                     kAudioSubTapDriftCompensationKey: true,
                 ]],
-            ])
+            ]
+            if !isMonitoring {
+                aggregateDescription[kAudioAggregateDeviceMainSubDeviceKey] = output.uid
+                aggregateDescription[kAudioAggregateDeviceSubDeviceListKey] = [[kAudioSubDeviceUIDKey: output.uid]]
+            }
+            let aggregate = try hardware.createAggregate(aggregateDescription)
             self.aggregate = aggregate
-            let outputFormats = try hardware.outputFormats(aggregate)
             let inputChannels = try hardware.inputChannels(aggregate)
-            let stereoChannels = try hardware.stereoChannels(output.id)
-            let outputChannelCount = outputFormats.reduce(0) { $0 + Int($1.mChannelsPerFrame) }
-            guard !outputFormats.isEmpty,
-                  outputFormats.allSatisfy({ Self.isNativeFloat($0) && $0.mSampleRate == format.mSampleRate }),
-                  inputChannels.last == Int(format.mChannelsPerFrame),
-                  stereoChannels.left >= 0, stereoChannels.left < outputChannelCount,
-                  stereoChannels.right >= 0, stereoChannels.right < outputChannelCount,
-                  outputChannelCount == 1 || stereoChannels.left != stereoChannels.right else {
+            guard inputChannels.last == Int(format.mChannelsPerFrame) else {
                 throw ApplicationVolumeFailure.unsupportedFormat
+            }
+            let rendering: (formats: [AudioStreamBasicDescription], stereo: ApplicationVolumeStereoChannels)?
+            if isMonitoring {
+                rendering = nil
+            } else {
+                let outputFormats = try hardware.outputFormats(aggregate)
+                let stereoChannels = try hardware.stereoChannels(output.id)
+                let outputChannelCount = outputFormats.reduce(0) { $0 + Int($1.mChannelsPerFrame) }
+                guard !outputFormats.isEmpty,
+                      outputFormats.allSatisfy({ Self.isNativeFloat($0) && $0.mSampleRate == format.mSampleRate }),
+                      stereoChannels.left >= 0, stereoChannels.left < outputChannelCount,
+                      stereoChannels.right >= 0, stereoChannels.right < outputChannelCount,
+                      outputChannelCount == 1 || stereoChannels.left != stereoChannels.right else {
+                    throw ApplicationVolumeFailure.unsupportedFormat
+                }
+                rendering = (outputFormats, stereoChannels)
             }
             let control = self.control
             let channels = Int(format.mChannelsPerFrame)
             let proc = try hardware.createIO(aggregate) { _, input, _, output, _ in
-                if ApplicationVolumeRenderer.render(
-                    input: input, output: output, tapBufferIndex: inputChannels.count - 1,
-                    tapChannels: channels, stereoChannels: stereoChannels, gain: control.gain * compensation,
-                    outputFormats: outputFormats, isActive: control.isActive
-                ) > 0 {
+                let samples = ApplicationVolumeRenderer.tapSamples(
+                    input: input, tapBufferIndex: inputChannels.count - 1, tapChannels: channels
+                )
+                let frames: Int
+                if let rendering {
+                    frames = ApplicationVolumeRenderer.render(
+                        input: input, output: output, tapBufferIndex: inputChannels.count - 1,
+                        tapChannels: channels, stereoChannels: rendering.stereo, gain: control.gain * compensation,
+                        outputFormats: rendering.formats, isActive: control.isActive
+                    )
+                } else {
+                    frames = control.isActive ? (samples?.count ?? 0) / channels : 0
+                }
+                if frames > 0 {
                     control.didRender()
+                    if samples?.prefix(frames * channels).contains(where: { $0.isFinite && $0 != 0 }) == true {
+                        control.receivedSignal()
+                    }
                 }
             }
             self.proc = proc

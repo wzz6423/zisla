@@ -6,6 +6,106 @@ import Testing
 @testable import ZislaKit
 
 struct ApplicationVolumeAudioGraphTests {
+    @Test(arguments: [Float(0), 0.000_001, 0.5, 1])
+    func inputSignalIsDetectedBeforeTheMixerGain(gain: Float) throws {
+        let hardware = ApplicationVolumeHardwareStub()
+        let graph = try ApplicationVolumeAudioGraph(
+            processObjects: [101], output: hardware.output, gain: gain, hardware: hardware, dispose: { $0() }
+        )
+        defer { graph.stop() }
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        let silence = ApplicationVolumeBufferFixture(channels: [2], samples: [[0, -0]])
+        let lowSignal = ApplicationVolumeBufferFixture(
+            channels: [2], samples: [[Float.leastNormalMagnitude, -Float.leastNormalMagnitude]]
+        )
+
+        hardware.emit(input: silence, output: output)
+        #expect(graph.inputSignalProgress == 0, "完整的全零帧不能证明应用正在播放")
+        hardware.emit(input: lowSignal, output: output)
+        #expect(graph.inputSignalProgress == 1, "静音和低输入音量仍必须按增益前输入识别")
+        #expect(lowSignal.samples(at: 0) == [Float.leastNormalMagnitude, -Float.leastNormalMagnitude])
+        #expect(lowSignal.hasIntactCanaries && output.hasIntactCanaries)
+    }
+
+    @Test(arguments: [ApplicationVolumeHardwareStub.Stage.compensation, .outputFormats, .stereoChannels])
+    func unityMonitoringNeverMutesOrReroutesTheOriginalOutput(stage: ApplicationVolumeHardwareStub.Stage) throws {
+        let hardware = ApplicationVolumeHardwareStub()
+        hardware.failAt = stage
+        let graph = try ApplicationVolumeAudioGraph(
+            processObjects: [101], output: hardware.output, gain: 1, hardware: hardware, dispose: { $0() }
+        )
+        defer { graph.stop() }
+        #expect(hardware.tapDescriptions.first?.muteBehavior == .unmuted)
+        let description = try #require(hardware.aggregateDescriptions.first)
+        #expect(description[kAudioAggregateDeviceMainSubDeviceKey] == nil)
+        #expect(description[kAudioAggregateDeviceSubDeviceListKey] == nil,
+                "只监测图不能加入物理输出设备或重路由原始音频")
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        hardware.emit(input: input, output: output)
+        #expect(output.samples(at: 0) == [9, 9], "只监测回调不能向输出写入音频")
+        #expect(graph.inputSignalProgress == 1)
+        graph.stop()
+        hardware.emit(input: input, output: output)
+        #expect(graph.inputSignalProgress == 1, "停止后保留的回调不能报告新播放证据")
+    }
+
+    @Test
+    func inputOutsideCompleteRenderedFramesCannotKeepTheApplicationPlaying() throws {
+        let hardware = ApplicationVolumeHardwareStub()
+        let graph = try Self.graph(hardware)
+        defer { graph.stop() }
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[0, 0, 1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        hardware.emit(input: input, output: output)
+
+        #expect(output.samples(at: 0) == [0, 0])
+        #expect(graph.inputSignalProgress == 0,
+                "未复制到完整输出帧的尾部输入不能误报播放")
+        #expect(input.hasIntactCanaries && output.hasIntactCanaries)
+    }
+
+    @Test(arguments: [
+        ApplicationVolumeHardwareStub.Stage.tap, .tapFormat, .aggregate, .inputChannels, .io, .start,
+    ])
+    func monitoringFailuresReleaseEveryAcquiredResource(stage: ApplicationVolumeHardwareStub.Stage) {
+        let hardware = ApplicationVolumeHardwareStub()
+        hardware.failAt = stage
+        #expect(throws: hardware.failure) {
+            _ = try ApplicationVolumeAudioGraph(
+                processObjects: [101], output: hardware.output, gain: 1, hardware: hardware, dispose: { $0() }
+            )
+        }
+        #expect(hardware.liveTaps.isEmpty && hardware.liveAggregates.isEmpty && hardware.liveIO.isEmpty)
+    }
+
+    @Test
+    func monitoringRejectsMissingMalformedAndNonfiniteTapEvidence() throws {
+        let hardware = ApplicationVolumeHardwareStub()
+        hardware.configuredInputChannels = [2, 2]
+        let graph = try ApplicationVolumeAudioGraph(
+            processObjects: [101], output: hardware.output, gain: 1, hardware: hardware, dispose: { $0() }
+        )
+        defer { graph.stop() }
+        let output = ApplicationVolumeBufferFixture(channels: [], samples: [])
+        let inputs = [
+            ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]]),
+            ApplicationVolumeBufferFixture(channels: [2, 1], samples: [[1, -1], [1]]),
+            ApplicationVolumeBufferFixture(channels: [2, 1], samples: [[1, -1], [1, -1]]),
+            ApplicationVolumeBufferFixture(channels: [2, 2], samples: [[1, -1], [1, -1]], absentData: [1]),
+            ApplicationVolumeBufferFixture(channels: [2, 2], samples: [[1, -1], [1]], byteSizes: [8, 4]),
+            ApplicationVolumeBufferFixture(channels: [2, 2], samples: [[1, -1], [.nan, .infinity]]),
+        ]
+        for input in inputs {
+            hardware.emit(input: input, output: output)
+            #expect(graph.inputSignalProgress == 0, "缺失、格式错误、残帧或非有限值不能证明播放")
+            #expect(input.hasIntactCanaries)
+        }
+        let restored = ApplicationVolumeBufferFixture(channels: [2, 2], samples: [[1, -1], [0, 0.000_001]])
+        hardware.emit(input: restored, output: output)
+        #expect(graph.inputSignalProgress == 1)
+    }
+
     @Test
     func liveGainAndMutePreserveTapProgress() throws {
         let hardware = ApplicationVolumeHardwareStub()
@@ -561,11 +661,14 @@ final class ApplicationVolumeHardwareStub: ApplicationVolumeAudioHardware, @unch
     var failAt: Stage?
     var failure: ApplicationVolumeFailure = .hardware(-9)
     var failTapForProcesses: Set<[AudioObjectID]> = []
+    var inputAtStart: ApplicationVolumeBufferFixture?
+    var outputAtStart: ApplicationVolumeBufferFixture?
 
     private let lock = NSLock()
     private var nextID: AudioObjectID = 100
     private var recordedEvents: [String] = []
     private var descriptions: [CATapDescription] = []
+    private var recordedAggregateDescriptions: [[String: Any]] = []
     private var recordedCallbacks: [AudioDeviceIOBlock] = []
     private var taps: Set<AudioObjectID> = []
     private var aggregates: Set<AudioObjectID> = []
@@ -573,6 +676,7 @@ final class ApplicationVolumeHardwareStub: ApplicationVolumeAudioHardware, @unch
 
     var events: [String] { lock.withLock { recordedEvents } }
     var tapDescriptions: [CATapDescription] { lock.withLock { descriptions } }
+    var aggregateDescriptions: [[String: Any]] { lock.withLock { recordedAggregateDescriptions } }
     var callbacks: [AudioDeviceIOBlock] { lock.withLock { recordedCallbacks } }
     var liveTaps: Set<AudioObjectID> { lock.withLock { taps } }
     var liveAggregates: Set<AudioObjectID> { lock.withLock { aggregates } }
@@ -613,6 +717,7 @@ final class ApplicationVolumeHardwareStub: ApplicationVolumeAudioHardware, @unch
     func createAggregate(_ description: [String: Any]) throws -> AudioObjectID {
         try fail(.aggregate)
         return lock.withLock {
+            recordedAggregateDescriptions.append(description)
             nextID += 1
             aggregates.insert(nextID)
             recordedEvents.append("createAggregate:\(nextID)")
@@ -649,6 +754,9 @@ final class ApplicationVolumeHardwareStub: ApplicationVolumeAudioHardware, @unch
     func startIO(_ device: AudioObjectID, _ proc: AudioDeviceIOProcID) throws {
         try fail(.start)
         lock.withLock { recordedEvents.append("startIO:\(device)") }
+        if let inputAtStart, let outputAtStart {
+            emit(input: inputAtStart, output: outputAtStart, at: callbacks.count - 1)
+        }
     }
 
     func stopIO(_ device: AudioObjectID, _ proc: AudioDeviceIOProcID) {

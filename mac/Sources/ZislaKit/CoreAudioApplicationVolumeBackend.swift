@@ -9,14 +9,26 @@ final class ApplicationVolumeGraphStore: @unchecked Sendable {
         let output: ApplicationVolumeOutput
     }
 
+    private struct PlaybackEvidence {
+        var progress: Int32
+        var lastSignalTime: TimeInterval?
+    }
+
+    private struct GraphFailure {
+        let reason: ApplicationVolumeFailure
+        let isMonitoring: Bool
+    }
+
     private let hardware: any ApplicationVolumeAudioHardware
     private let dispose: @Sendable (@escaping @Sendable () -> Void) -> Void
     private var graphs: [String: ApplicationVolumeAudioGraph] = [:]
-    private var failures: [String: ApplicationVolumeFailure] = [:]
+    private var failures: [String: GraphFailure] = [:]
     private var contexts: [String: Context] = [:]
     private var progress: [String: Int32] = [:]
+    private var playbackEvidence: [String: PlaybackEvidence] = [:]
 
     var hasGraphs: Bool { !graphs.isEmpty }
+    var hasControls: Bool { graphs.values.contains { !$0.isMonitoring } }
     var output: AudioObjectID? { graphs.values.first?.output.id }
     var processObjects: Set<AudioObjectID> { Set(graphs.values.flatMap(\.processObjects)) }
 
@@ -49,42 +61,56 @@ final class ApplicationVolumeGraphStore: @unchecked Sendable {
         } catch {
             stop()
             let failure = error as? ApplicationVolumeFailure ?? .hardware(kAudioHardwareUnspecifiedError)
-            failures = Dictionary(uniqueKeysWithValues: requests.map { ($0.id, failure) })
-            return failures
+            failures = Dictionary(uniqueKeysWithValues: requests.map {
+                ($0.id, GraphFailure(reason: failure, isMonitoring: $0.gain == 1))
+            })
+            return failures.mapValues(\.reason)
         }
         for request in requests {
             var context = Context(
                 identifiers: request.processIdentifiers, processObjects: nil, output: output
             )
+            var keepMonitoringGraph = false
             do {
                 let objects = try hardware.processObjects(for: request.processIdentifiers)
                 context.processObjects = objects
                 let unchanged = contexts[request.id] == context
                 contexts[request.id] = context
-                if failures[request.id] != nil, unchanged { continue }
+                keepMonitoringGraph = unchanged && graphs[request.id]?.isMonitoring == true
+                if unchanged, failures[request.id]?.isMonitoring == (request.gain == 1) {
+                    continue
+                }
                 failures[request.id] = nil
-                if let graph = graphs[request.id], graph.processObjects == objects, graph.output == output {
+                if unchanged, let graph = graphs[request.id], graph.processObjects == objects, graph.output == output,
+                   graph.isMonitoring == (request.gain == 1) {
                     graph.gain = request.gain
                 } else {
-                    remove(request.id)
+                    let lastSignalTime = unchanged ? playbackEvidence[request.id]?.lastSignalTime : nil
+                    if !keepMonitoringGraph { remove(request.id) }
                     let graph = try ApplicationVolumeAudioGraph(
                         processObjects: objects, output: output, gain: request.gain, hardware: hardware, dispose: dispose
                     )
                     graphs[request.id] = graph
                     progress[request.id] = graph.renderProgress
+                    playbackEvidence[request.id] = PlaybackEvidence(
+                        progress: 0, lastSignalTime: lastSignalTime
+                    )
                 }
             } catch {
-                remove(request.id)
+                if !keepMonitoringGraph { remove(request.id) }
                 contexts[request.id] = context
-                failures[request.id] = error as? ApplicationVolumeFailure ?? .hardware(kAudioHardwareUnspecifiedError)
+                failures[request.id] = GraphFailure(
+                    reason: error as? ApplicationVolumeFailure ?? .hardware(kAudioHardwareUnspecifiedError),
+                    isMonitoring: request.gain == 1
+                )
             }
         }
-        return failures
+        return failures.mapValues(\.reason)
     }
 
     func releaseStalledGraphs() -> [String: ApplicationVolumeFailure] {
         var stalled: [String: ApplicationVolumeFailure] = [:]
-        for (id, graph) in graphs {
+        for (id, graph) in graphs where !graph.isMonitoring {
             let current = graph.renderProgress
             if progress[id] == current {
                 stalled[id] = .hardware(kAudioHardwareNotRunningError)
@@ -94,13 +120,30 @@ final class ApplicationVolumeGraphStore: @unchecked Sendable {
         }
         for (id, failure) in stalled {
             remove(id)
-            failures[id] = failure
+            failures[id] = GraphFailure(reason: failure, isMonitoring: false)
         }
         return stalled
     }
 
+    func playingApplications(at now: TimeInterval) -> Set<String> {
+        var playing: Set<String> = []
+        for (id, graph) in graphs {
+            let current = graph.inputSignalProgress
+            var evidence = playbackEvidence[id]!
+            if evidence.progress != current {
+                evidence.progress = current
+                evidence.lastSignalTime = now
+            }
+            playbackEvidence[id] = evidence
+            if let lastSignalTime = evidence.lastSignalTime, now - lastSignalTime < 1 {
+                playing.insert(id)
+            }
+        }
+        return playing
+    }
+
     func stop() {
-        for graph in graphs.values { graph.stop() }
+        for id in Array(graphs.keys) { remove(id) }
         graphs.removeAll()
         failures.removeAll()
         contexts.removeAll()
@@ -110,6 +153,7 @@ final class ApplicationVolumeGraphStore: @unchecked Sendable {
     private func remove(_ id: String) {
         graphs.removeValue(forKey: id)?.stop()
         progress[id] = nil
+        playbackEvidence[id] = nil
     }
 }
 
@@ -129,12 +173,16 @@ final class CoreAudioApplicationVolumeBackend: ApplicationVolumeMixing {
     }
     var onOutputChanged: (@MainActor () -> Void)?
     var onControlFailure: (@MainActor (String, ApplicationVolumeFailure) -> Void)?
+    var onPlaybackChanged: (@MainActor (Set<String>) -> Void)?
+    private(set) var playingApplications: Set<String> = []
 
     private let queue: DispatchQueue
     private let store: ApplicationVolumeGraphStore
     private let registerProperty: PropertyRegistration
     private let wakeNotifications: NotificationCenter
     private let scheduleWatchdog: WatchdogScheduling
+    private let schedulePlaybackCheck: WatchdogScheduling
+    private let now: @Sendable () -> TimeInterval
     private let deliver: EventDelivery
     private var isRunning = false
     private var generation: UInt64 = 0
@@ -145,6 +193,7 @@ final class CoreAudioApplicationVolumeBackend: ApplicationVolumeMixing {
     private var observedProcesses: Set<AudioObjectID> = []
     private var wakeObserver: NSObjectProtocol?
     private var cancelWatchdog: (@MainActor () -> Void)?
+    private var cancelPlaybackCheck: (@MainActor () -> Void)?
 
     init(
         hardware: any ApplicationVolumeAudioHardware = CoreAudioVolumeHardware(),
@@ -165,6 +214,15 @@ final class CoreAudioApplicationVolumeBackend: ApplicationVolumeMixing {
             timer.resume()
             return { timer.cancel() }
         },
+        schedulePlaybackCheck: @escaping WatchdogScheduling = { queue, event in
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            timer.schedule(deadline: .now() + .milliseconds(200), repeating: .milliseconds(200),
+                           leeway: .milliseconds(25))
+            timer.setEventHandler(handler: event)
+            timer.resume()
+            return { timer.cancel() }
+        },
+        now: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         deliver: @escaping EventDelivery = { event in Task { @MainActor in event() } }
     ) {
         self.queue = queue
@@ -172,6 +230,8 @@ final class CoreAudioApplicationVolumeBackend: ApplicationVolumeMixing {
         self.registerProperty = registerProperty
         self.wakeNotifications = wakeNotifications
         self.scheduleWatchdog = scheduleWatchdog
+        self.schedulePlaybackCheck = schedulePlaybackCheck
+        self.now = now
         self.deliver = deliver
     }
 
@@ -196,6 +256,8 @@ final class CoreAudioApplicationVolumeBackend: ApplicationVolumeMixing {
         generation &+= 1
         cancelWatchdog?()
         cancelWatchdog = nil
+        cancelPlaybackCheck?()
+        cancelPlaybackCheck = nil
         for (object, address, listener) in listeners {
             _ = registerProperty(object, address, listener, false)
         }
@@ -208,6 +270,7 @@ final class CoreAudioApplicationVolumeBackend: ApplicationVolumeMixing {
         let store = self.store
         // This dedicated serial queue drains pending controls before playback is restored.
         queue.sync { store.stop() }
+        playingApplications = []
     }
 
     func apply(
@@ -218,21 +281,28 @@ final class CoreAudioApplicationVolumeBackend: ApplicationVolumeMixing {
         generation &+= 1
         let currentGeneration = generation
         setWatchdogEnabled(false)
+        setPlaybackCheckEnabled(false)
         let rebuild = rebuildRequested
         rebuildRequested = false
         let store = self.store
         let deliver = self.deliver
+        let now = self.now
         queue.async { [weak self] in
             let failures = store.apply(requests, retryingApplication: retryingApplication, rebuild: rebuild)
             let hasGraphs = store.hasGraphs
+            let hasControls = store.hasControls
             let output = store.output
             let processes = store.processObjects
+            let playing = store.playingApplications(at: now())
             deliver {
                 guard let self, self.isRunning, self.generation == currentGeneration else { return }
                 self.observeOutput(output)
                 self.observeProcesses(processes)
-                self.setWatchdogEnabled(hasGraphs)
+                self.setWatchdogEnabled(hasControls)
+                self.setPlaybackCheckEnabled(hasGraphs)
                 completion(failures)
+                guard self.isRunning, self.generation == currentGeneration else { return }
+                self.updatePlayback(playing)
             }
         }
     }
@@ -304,11 +374,43 @@ final class CoreAudioApplicationVolumeBackend: ApplicationVolumeMixing {
                 guard let self, self.isRunning, self.generation == currentGeneration else { return }
                 self.queue.async { [weak self] in
                     let stalled = store.releaseStalledGraphs()
-                    let hasGraphs = store.hasGraphs
+                    let hasControls = store.hasControls
                     deliver {
                         guard let self, self.isRunning, self.generation == currentGeneration else { return }
                         for (id, failure) in stalled { self.onControlFailure?(id, failure) }
-                        if !hasGraphs { self.setWatchdogEnabled(false) }
+                        if !hasControls { self.setWatchdogEnabled(false) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func updatePlayback(_ playing: Set<String>) {
+        guard playing != playingApplications else { return }
+        playingApplications = playing
+        onPlaybackChanged?(playing)
+    }
+
+    private func setPlaybackCheckEnabled(_ enabled: Bool) {
+        guard enabled else {
+            cancelPlaybackCheck?()
+            cancelPlaybackCheck = nil
+            return
+        }
+        let store = self.store
+        let deliver = self.deliver
+        let now = self.now
+        let currentGeneration = generation
+        cancelPlaybackCheck = schedulePlaybackCheck(queue) { [weak self] in
+            deliver {
+                guard let self, self.isRunning, self.generation == currentGeneration else { return }
+                self.queue.async { [weak self] in
+                    let playing = store.playingApplications(at: now())
+                    let hasGraphs = store.hasGraphs
+                    deliver {
+                        guard let self, self.isRunning, self.generation == currentGeneration else { return }
+                        if !hasGraphs { self.setPlaybackCheckEnabled(false) }
+                        self.updatePlayback(playing)
                     }
                 }
             }

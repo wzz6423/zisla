@@ -16,13 +16,17 @@ struct ApplicationVolumeMixerModuleView: View {
                 )
             } else {
                 if let errorMessage = service.errorMessage {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.zislaWarning)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .islandGlassSurface(.card, cornerRadius: 10)
+                    HStack(spacing: 12) {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.zislaWarning)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button { service.retry() } label: { AppLocalizedText("重试") }
+                            .controlSize(.small)
+                    }
+                    .padding(10)
+                    .islandGlassSurface(.card, cornerRadius: 10)
                 }
 
                 if service.applications.isEmpty {
@@ -114,7 +118,8 @@ struct ApplicationVolumeMixerModuleView: View {
     }
 
     static func controlStatus(for application: ApplicationVolumeApplication, errorMessage: String?) -> String? {
-        guard !application.isControlled, application.isMuted || application.volume != 1 else { return nil }
-        return errorMessage == nil ? "等待应用音量控制生效" : "音量调整未生效"
+        guard errorMessage != nil, !application.isControlled,
+              application.isMuted || application.volume != 1 else { return nil }
+        return "音量调整未生效"
     }
 }

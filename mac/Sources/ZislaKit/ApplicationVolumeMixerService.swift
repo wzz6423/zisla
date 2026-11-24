@@ -62,8 +62,10 @@ extension AudioPlaybackMonitor: ApplicationVolumeSourceMonitoring {}
 @MainActor
 protocol ApplicationVolumeMixing: AnyObject {
     var isSupported: Bool { get }
+    var playingApplications: Set<String> { get }
     var onOutputChanged: (@MainActor () -> Void)? { get set }
     var onControlFailure: (@MainActor (String, ApplicationVolumeFailure) -> Void)? { get set }
+    var onPlaybackChanged: (@MainActor (Set<String>) -> Void)? { get set }
     func start()
     func stop()
     func apply(
@@ -121,12 +123,13 @@ public final class ApplicationVolumeMixerService: ObservableObject {
         }
         monitor.onSourcesChanged = { [weak self] in self?.updateSources($0) }
         backend.onOutputChanged = { [weak self] in self?.reconcile() }
+        backend.onPlaybackChanged = { [weak self] _ in self?.reconcile() }
         backend.onControlFailure = { [weak self] id, failure in
-            guard let self, self.isRunning else { return }
+            guard let self, self.isRunning, self.sources.contains(where: { $0.id == id }) else { return }
             if let index = self.applications.firstIndex(where: { $0.id == id }) {
                 self.applications[index].isControlled = false
-                self.errorMessage = AppLocalization.text(failure.messageKey)
             }
+            self.errorMessage = AppLocalization.text(failure.messageKey)
         }
     }
 
@@ -169,6 +172,11 @@ public final class ApplicationVolumeMixerService: ObservableObject {
         reconcile(retryingApplication: id)
     }
 
+    public func retry() {
+        guard errorMessage != nil else { return }
+        for source in sources { reconcile(retryingApplication: source.id) }
+    }
+
     private func persistPreferences() {
         // PID-only identities can belong to a different process after a relaunch.
         let saved = preferences.filter { !$0.key.hasPrefix("pid:") }.mapValues {
@@ -192,8 +200,9 @@ public final class ApplicationVolumeMixerService: ObservableObject {
         guard isRunning else { return }
         generation &+= 1
         let currentGeneration = generation
+        let playing = backend.playingApplications
         let controlled = Set(applications.filter(\.isControlled).map(\.id))
-        applications = sources.map { source in
+        applications = sources.filter { playing.contains($0.id) }.map { source in
             let preference = preferences[source.id] ?? Preference()
             return ApplicationVolumeApplication(
                 id: source.id, name: source.applicationName, bundleIdentifier: source.bundleIdentifier,
@@ -201,15 +210,14 @@ public final class ApplicationVolumeMixerService: ObservableObject {
                 isControlled: controlled.contains(source.id)
             )
         }
-        let requests = sources.compactMap { source -> ApplicationVolumeRequest? in
+        let requests = sources.map { source in
             let preference = preferences[source.id] ?? Preference()
-            guard preference.isMuted || preference.volume != 1 else { return nil }
             return ApplicationVolumeRequest(
                 id: source.id, processIdentifiers: source.processIdentifiers,
                 gain: preference.isMuted ? 0 : Float(preference.volume)
             )
         }
-        let requestedIDs = Set(requests.map(\.id))
+        let requestedIDs = Set(requests.filter { $0.gain != 1 }.map(\.id))
         backend.apply(requests, retryingApplication: retryingApplication) { [weak self] failures in
             guard let self, self.isRunning, self.generation == currentGeneration else { return }
             for index in self.applications.indices {

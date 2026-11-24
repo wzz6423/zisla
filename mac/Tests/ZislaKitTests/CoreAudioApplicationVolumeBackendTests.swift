@@ -2,11 +2,509 @@ import AppKit
 import CoreAudio
 import Foundation
 import Testing
+import ZislaCore
 
 @testable import ZislaKit
 
 @MainActor
 struct CoreAudioApplicationVolumeBackendTests {
+    @Test(arguments: [Float(0), 0.25])
+    func aHiddenCandidateReportsControlFailureAndCanRetryItsSavedGain(gain: Float) {
+        let fixture = ApplicationVolumeBackendFixture()
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        defaults.store.set(["music": ["volume": gain == 0 ? 0.35 : Double(gain), "isMuted": gain == 0]],
+                           forKey: ApplicationVolumeMixerService.preferencesKey)
+        let service = Self.service(fixture, sources: [Self.source("music", pids: [101])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        #expect(service.applications.isEmpty)
+        #expect(service.errorMessage == nil)
+        let silence = ApplicationVolumeBufferFixture(channels: [2], samples: [[0, 0]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: silence, output: output)
+        fixture.watchdog.fire(at: fixture.watchdog.entries.count - 1)
+        fixture.flush()
+        fixture.clock.time = 3
+
+        fixture.watchdog.fire(at: fixture.watchdog.entries.count - 1)
+        fixture.flush()
+        fixture.checkPlayback()
+
+        #expect(service.applications.isEmpty)
+        #expect(fixture.hardware.liveIO.isEmpty)
+        #expect(fixture.playback.entries.allSatisfy { $0.cancelled },
+                "最后一个控音图释放后，即使播放集合原本为空也必须取消检测轮询")
+        #expect(service.errorMessage == AppLocalization.text(
+            ApplicationVolumeFailure.hardware(kAudioHardwareNotRunningError).messageKey
+        ), "隐藏的候选控音故障也必须显示错误，保留重试入口")
+        service.retry()
+        fixture.flush()
+        #expect(fixture.hardware.liveIO.count == 1, "隐藏候选的重试必须恢复已保存静音或低音量")
+        #expect(fixture.playback.entries.last?.cancelled == false, "重试恢复音频图后必须恢复播放检测")
+        guard !fixture.hardware.liveIO.isEmpty else { return }
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        fixture.hardware.emit(input: input, output: output, at: fixture.hardware.callbacks.count - 1)
+        #expect(output.samples(at: 0) == [gain, -gain])
+        fixture.checkPlayback()
+        #expect(service.applications.first?.isControlled == true)
+        #expect(service.applications.first?.isMuted == (gain == 0))
+        #expect(service.errorMessage == nil)
+    }
+
+    @Test(arguments: [Float(0), 0.25])
+    func savedGainStillAppliesToTheFirstBufferAfterIdlePlaybackResumes(gain: Float) {
+        let fixture = ApplicationVolumeBackendFixture()
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        defaults.store.set(["music": ["volume": gain == 0 ? 0.35 : Double(gain), "isMuted": gain == 0]],
+                           forKey: ApplicationVolumeMixerService.preferencesKey)
+        let service = Self.service(fixture, sources: [Self.source("music", pids: [101])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let silence = ApplicationVolumeBufferFixture(channels: [2], samples: [[0, 0]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output, at: 0)
+        fixture.checkPlayback()
+        fixture.hardware.emit(input: silence, output: output, at: fixture.hardware.callbacks.count - 1)
+        fixture.clock.time = 1
+        fixture.checkPlayback()
+        #expect(service.applications.isEmpty)
+
+        fixture.hardware.emit(input: input, output: output, at: fixture.hardware.callbacks.count - 1)
+
+        #expect(output.samples(at: 0) == [gain, -gain],
+                "同一进程恢复的首批音频必须保持已保存静音或音量，不能等待检测后再恢复控制")
+        #expect(fixture.hardware.tapDescriptions.last?.muteBehavior == .mutedWhenTapped)
+    }
+
+    @Test(arguments: [ApplicationVolumeHardwareStub.Stage.tap, .start], [Float(1), 0, 0.25])
+    func retryingUnchangedCandidatesRecoversFromTheFirstMonitoringFailure(
+        stage: ApplicationVolumeHardwareStub.Stage, gain: Float
+    ) {
+        let fixture = ApplicationVolumeBackendFixture()
+        fixture.hardware.failAt = stage
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        defaults.store.set(["music": ["volume": Double(gain), "isMuted": false]],
+                           forKey: ApplicationVolumeMixerService.preferencesKey)
+        let service = Self.service(fixture, sources: [Self.source("music", pids: [101])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        #expect(service.applications.isEmpty)
+        #expect(service.errorMessage != nil)
+        fixture.hardware.failAt = nil
+        fixture.clock.time = 1
+
+        service.retry()
+        fixture.flush()
+
+        #expect(fixture.hardware.liveIO.count == 1,
+                "首次监测失败后同源没有新通知，点击重试必须恢复探测")
+        guard !fixture.hardware.liveIO.isEmpty else { return }
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output, at: fixture.hardware.callbacks.count - 1)
+        fixture.checkPlayback()
+        #expect(service.applications.map(\.id) == ["music"])
+        #expect(service.errorMessage == nil)
+        #expect(service.applications.first?.volume == Double(gain))
+    }
+
+    @Test
+    func oneRetryRecoversAllFailedCandidatesAfterPermissionIsGranted() {
+        let fixture = ApplicationVolumeBackendFixture()
+        fixture.hardware.failAt = .tap
+        fixture.hardware.failure = .permissionDenied
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        defaults.store.set(["music": ["volume": 0.35, "isMuted": true]],
+                           forKey: ApplicationVolumeMixerService.preferencesKey)
+        let service = Self.service(fixture, sources: [Self.source("music", pids: [101]),
+                                                      Self.source("video", pids: [201])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        #expect(service.errorMessage != nil)
+        #expect(service.applications.isEmpty)
+        fixture.hardware.failAt = nil
+
+        service.retry()
+        fixture.flush()
+
+        #expect(fixture.hardware.liveIO.count == 2,
+                "一次错误提示重试必须清除每个候选来源的创建失败缓存")
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output, at: 0)
+        #expect(output.samples(at: 0) == [0, 0])
+        fixture.hardware.emit(input: input, output: output, at: 1)
+        fixture.checkPlayback()
+        #expect(service.applications.map(\.id) == ["music", "video"])
+        #expect(service.applications.first?.isMuted == true)
+        #expect(service.applications.first?.isControlled == true)
+        #expect(service.errorMessage == nil)
+    }
+
+    @Test
+    func idleOutputNeverFlashesAndSameProcessPlaybackResumesWithSavedMute() {
+        let fixture = ApplicationVolumeBackendFixture()
+        let source = Self.source("youku", pids: [101])
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        defaults.store.set([source.id: ["volume": 0.35, "isMuted": true]],
+                           forKey: ApplicationVolumeMixerService.preferencesKey)
+        let service = Self.service(fixture, sources: [source], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        var snapshots: [[ApplicationVolumeApplication]] = []
+        let observation = service.$applications.sink { snapshots.append($0) }
+        defer { observation.cancel() }
+        service.start()
+        fixture.flush()
+
+        #expect(snapshots.allSatisfy { $0.isEmpty }, "没有输入证据的首次空闲来源不能闪现音量行")
+        #expect(fixture.hardware.tapDescriptions.last?.muteBehavior == .mutedWhenTapped,
+                "首次空闲监测也必须保留已保存静音")
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[0.000_001, -0.000_001]])
+        let silence = ApplicationVolumeBufferFixture(channels: [2], samples: [[0, 0]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output)
+        fixture.checkPlayback()
+
+        #expect(service.applications.first?.isMuted == true)
+        #expect(service.applications.first?.volume == 0.35)
+        #expect(service.applications.first?.isControlled == true)
+        #expect(fixture.hardware.tapDescriptions.last?.muteBehavior == .mutedWhenTapped)
+        fixture.hardware.emit(input: input, output: output, at: 0)
+        #expect(output.samples(at: 0) == [0, 0])
+        fixture.clock.time = 0.2
+        fixture.checkPlayback()
+        fixture.hardware.emit(input: silence, output: output, at: 0)
+        fixture.clock.time = 1.2
+        fixture.checkPlayback()
+
+        #expect(service.applications.isEmpty, "持续静默满保持窗口后必须移除音量行")
+        #expect(fixture.hardware.liveIO.count == 1, "候选输出仍运行时必须继续探测恢复")
+        #expect(fixture.hardware.tapDescriptions.last?.muteBehavior == .mutedWhenTapped)
+        fixture.hardware.emit(input: input, output: output, at: 0)
+        fixture.clock.time = 1.4
+        fixture.checkPlayback()
+        #expect(output.samples(at: 0) == [0, 0], "恢复检测前首帧也必须保持静音")
+        #expect(service.applications.first?.isMuted == true)
+        #expect(service.applications.first?.isControlled == true)
+        #expect(fixture.hardware.liveIO.count == 1)
+    }
+
+    @Test
+    func concurrentApplicationsAreFilteredByTheirOwnInputEvidence() {
+        let fixture = ApplicationVolumeBackendFixture()
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        let service = Self.service(fixture, sources: [Self.source("music", pids: [101]),
+                                                      Self.source("youku", pids: [201])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[0.000_001, -0.000_001]])
+        let silence = ApplicationVolumeBufferFixture(channels: [2], samples: [[0, 0]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output, at: 0)
+        fixture.hardware.emit(input: silence, output: output, at: 1)
+        fixture.checkPlayback()
+        #expect(service.applications.map(\.id) == ["music"], "其它应用有声不能让空闲应用出现在混音器")
+        fixture.hardware.emit(input: input, output: output, at: 1)
+        fixture.checkPlayback()
+        #expect(service.applications.map(\.id) == ["music", "youku"])
+        service.setVolume(0.000_001, for: "music")
+        fixture.flush()
+        fixture.hardware.emit(input: input, output: output, at: 2)
+        fixture.clock.time = 1
+        fixture.checkPlayback()
+        #expect(service.applications.map(\.id) == ["music"])
+        #expect(service.applications.first?.volume == 0.000_001)
+        #expect(service.applications.first?.isControlled == true)
+    }
+
+    @Test
+    func monitoringPermissionFailureDoesNotPublishAnUnverifiedApplication() {
+        let fixture = ApplicationVolumeBackendFixture()
+        fixture.hardware.failAt = .tap
+        fixture.hardware.failure = .permissionDenied
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        let service = Self.service(fixture, sources: [Self.source("youku", pids: [101])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+
+        #expect(service.applications.isEmpty)
+        #expect(service.errorMessage == AppLocalization.text(ApplicationVolumeFailure.permissionDenied.messageKey))
+        #expect(fixture.hardware.liveTaps.isEmpty && fixture.hardware.liveAggregates.isEmpty
+            && fixture.hardware.liveIO.isEmpty)
+        #expect(fixture.playback.entries.isEmpty)
+    }
+
+    @Test
+    func failedControlKeepsItsVerifiedMonitorAndRecoversOnUserRetry() {
+        let fixture = ApplicationVolumeBackendFixture()
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        let service = Self.service(fixture, sources: [Self.source("music", pids: [101])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output)
+        fixture.checkPlayback()
+        fixture.hardware.failAt = .start
+
+        service.setVolume(0.5, for: "music")
+        fixture.flush()
+
+        #expect(service.applications.first?.isControlled == false)
+        #expect(service.errorMessage != nil)
+        #expect(fixture.hardware.liveIO.count == 1)
+        fixture.hardware.emit(input: input, output: output, at: 0)
+        fixture.clock.time = 2
+        fixture.checkPlayback()
+        #expect(service.applications.map(\.id) == ["music"], "控制失败不能丢掉仍有真实输入的监测图")
+        fixture.hardware.failAt = nil
+        service.setVolume(0.5, for: "music")
+        fixture.flush()
+        #expect(service.applications.first?.isControlled == true)
+        #expect(service.errorMessage == nil)
+        #expect(fixture.hardware.liveIO.count == 1)
+    }
+
+    @Test
+    func oldPlaybackChecksCannotConsumeOrPublishTheRestartedSessionEvidence() {
+        let fixture = ApplicationVolumeBackendFixture()
+        defer { fixture.stop() }
+        fixture.backend.start()
+        fixture.apply([Self.request(gain: 1)])
+        fixture.backend.stop()
+        fixture.backend.start()
+        fixture.apply([Self.request(pids: [102], gain: 1)])
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output, at: 1)
+
+        fixture.playback.fire(at: 0)
+        fixture.flush()
+        #expect(fixture.backend.playingApplications.isEmpty)
+        fixture.clock.time = 2
+        fixture.checkPlayback()
+        #expect(fixture.backend.playingApplications == ["music"],
+                "旧检测事件不能提前消耗新图的非零输入进展")
+        fixture.backend.stop()
+        fixture.hardware.emit(input: input, output: output, at: 1)
+        fixture.playback.fire(at: fixture.playback.entries.count - 1)
+        fixture.flush()
+        #expect(fixture.backend.playingApplications.isEmpty)
+        #expect(fixture.hardware.liveTaps.isEmpty && fixture.hardware.liveAggregates.isEmpty
+            && fixture.hardware.liveIO.isEmpty)
+        #expect(fixture.playback.entries.allSatisfy { $0.cancelled })
+    }
+
+    @Test
+    func stoppingFromAnApplyCompletionCannotRepublishCapturedPlayback() {
+        let fixture = ApplicationVolumeBackendFixture()
+        defer { fixture.stop() }
+        fixture.backend.start()
+        fixture.apply([Self.request(gain: 1)])
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output)
+        var updates: [Set<String>] = []
+        fixture.backend.onPlaybackChanged = { updates.append($0) }
+
+        fixture.backend.apply([Self.request(gain: 1)], retryingApplication: nil) { _ in
+            fixture.backend.stop()
+        }
+        fixture.flush()
+
+        #expect(fixture.backend.playingApplications.isEmpty,
+                "完成回调停止后不能重新发布递交前捕获的播放证据")
+        #expect(updates.isEmpty)
+        #expect(fixture.hardware.liveIO.isEmpty)
+    }
+
+    @Test
+    func replacingAProcessFromCompletionRejectsCapturedPlaybackForTheOldContext() {
+        let fixture = ApplicationVolumeBackendFixture()
+        defer { fixture.stop() }
+        fixture.backend.start()
+        fixture.apply([Self.request(gain: 1)])
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output)
+        var updates: [Set<String>] = []
+        fixture.backend.onPlaybackChanged = { updates.append($0) }
+
+        fixture.backend.apply([Self.request(gain: 1)], retryingApplication: nil) { _ in
+            fixture.backend.apply([Self.request(pids: [102], gain: 1)], retryingApplication: nil) { _ in }
+        }
+        fixture.flush()
+
+        #expect(fixture.backend.playingApplications.isEmpty)
+        #expect(updates.isEmpty, "下一次应用进程替换不能短暂继承上次递交的非零输入证据")
+        fixture.hardware.emit(input: input, output: output, at: 1)
+        fixture.checkPlayback()
+        #expect(fixture.backend.playingApplications == ["music"])
+    }
+
+    @Test
+    func replacingOutputClearsTheMixerRowUntilTheNewGraphProvidesInput() {
+        let fixture = ApplicationVolumeBackendFixture()
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        let service = Self.service(fixture, sources: [Self.source("music", pids: [101])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output)
+        fixture.checkPlayback()
+        #expect(service.applications.map(\.id) == ["music"])
+        fixture.hardware.output = ApplicationVolumeOutput(id: 70, uid: "fixture.replacement-output")
+
+        fixture.properties.emit(.init(object: AudioObjectID(kAudioObjectSystemObject),
+                                      selector: kAudioHardwarePropertyDefaultOutputDevice))
+        fixture.flush()
+
+        #expect(service.applications.isEmpty, "更换输出的图不能继承此前设备的播放证据")
+        fixture.hardware.emit(input: input, output: output, at: 0)
+        fixture.checkPlayback()
+        #expect(service.applications.isEmpty)
+        fixture.hardware.emit(input: input, output: output, at: 1)
+        fixture.checkPlayback()
+        #expect(service.applications.map(\.id) == ["music"])
+        #expect(fixture.hardware.liveIO.count == 1)
+    }
+
+    @Test
+    func aStalledControlCanBeRetriedWithoutChangingItsSavedGain() {
+        let fixture = ApplicationVolumeBackendFixture()
+        let defaults = ApplicationVolumePlaybackDefaultsFixture()
+        let service = Self.service(fixture, sources: [Self.source("music", pids: [101])], defaults: defaults.store)
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output)
+        fixture.checkPlayback()
+        service.setVolume(0.5, for: "music")
+        fixture.flush()
+
+        fixture.watchdog.fire(at: fixture.watchdog.entries.count - 1)
+        fixture.flush()
+        #expect(service.applications.first?.isControlled == false)
+        fixture.checkPlayback()
+        #expect(service.applications.isEmpty)
+        #expect(fixture.hardware.liveIO.isEmpty, "失效控音图必须沿用原有故障回退释放")
+        service.retry()
+        fixture.flush()
+        #expect(fixture.hardware.liveIO.count == 1)
+        #expect(fixture.hardware.tapDescriptions.last?.muteBehavior == .mutedWhenTapped)
+        fixture.hardware.emit(input: input, output: output, at: 2)
+        #expect(output.samples(at: 0) == [0.5, -0.5])
+        fixture.checkPlayback()
+        #expect(service.applications.first?.isControlled == true)
+        #expect(fixture.hardware.liveIO.count == 1)
+    }
+
+    @Test
+    func unchangedPlaybackChecksDoNotRepublishTheSameEvidence() {
+        let fixture = ApplicationVolumeBackendFixture()
+        defer { fixture.stop() }
+        fixture.backend.start()
+        fixture.apply([Self.request(gain: 1)])
+        var updates: [Set<String>] = []
+        fixture.backend.onPlaybackChanged = { updates.append($0) }
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output)
+
+        fixture.checkPlayback()
+        fixture.clock.time = 0.2
+        fixture.checkPlayback()
+
+        #expect(updates == [["music"]], "未变化的播放集合不能重复发布和重建检测任务")
+    }
+
+    @Test
+    func removingTheLastCandidateCancelsBackgroundPlaybackChecks() {
+        let fixture = ApplicationVolumeBackendFixture()
+        defer { fixture.stop() }
+        fixture.backend.start()
+        fixture.apply([Self.request(gain: 1)])
+        #expect(fixture.playback.entries.count == 1, "创建候选图后必须安装后台播放检测任务")
+        fixture.apply([Self.request(gain: 1)])
+        #expect(fixture.playback.entries.filter { !$0.cancelled }.count == 1,
+                "反复协调同一候选集合只能保留一个后台检测任务")
+        fixture.apply([])
+
+        #expect(fixture.playback.entries.count == 2, "空候选集合不能安装新的检测任务")
+        #expect(fixture.playback.entries.allSatisfy { $0.cancelled }, "最后一个候选移除后必须取消检测任务")
+        #expect(fixture.hardware.liveIO.isEmpty)
+    }
+
+    @Test
+    func queuedPlaybackDeliveryCannotOverwriteANewerSession() {
+        let fixture = ApplicationVolumeBackendFixture()
+        defer { fixture.stop() }
+        fixture.backend.start()
+        fixture.apply([Self.request(gain: 1)])
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        fixture.hardware.emit(input: input, output: output)
+        fixture.playback.fire(at: 0)
+        fixture.events.runNext()
+        fixture.queue.sync {}
+        fixture.backend.stop()
+        fixture.backend.start()
+        fixture.apply([Self.request(pids: [102], gain: 1)])
+
+        fixture.flush()
+
+        #expect(fixture.backend.playingApplications.isEmpty,
+                "排队中的旧检测结果不能覆盖停止后重新创建的播放会话")
+        #expect(fixture.hardware.liveIO.count == 1)
+    }
+
+    @Test
+    func anOutputStreamSendingOnlySilenceDoesNotRemainInTheMixer() throws {
+        let fixture = ApplicationVolumeBackendFixture()
+        let source = AudioPlaybackSource(
+            id: "youku", processIdentifiers: [101], bundleIdentifier: "com.example.youku",
+            applicationName: "Youku", iconData: nil, isFrontmost: false
+        )
+        let monitor = AudioPlaybackMonitor(
+            readSources: { ([11], [source]) },
+            registerProperty: { _, _, _, _ in noErr },
+            applicationNotifications: NotificationCenter(),
+            scheduleRefresh: { _ in {} }
+        )
+        let suite = "Zisla.ApplicationVolumeSilence.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let service = ApplicationVolumeMixerService(
+            monitor: monitor, backend: fixture.backend,
+            ownProcessIdentifier: -1, ownBundleIdentifier: "fixture.zisla", defaults: defaults
+        )
+        defer { service.stop(); fixture.flush() }
+        service.start()
+        fixture.flush()
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[0, 0]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+
+        for _ in 0..<2 {
+            fixture.hardware.emit(input: input, output: output)
+            fixture.checkPlayback()
+        }
+
+        #expect(service.applications.isEmpty,
+                "保持输出 I/O 但持续发送全零音频的空闲应用不能保留在混音器中")
+    }
+
     @Test
     func stopReturnsAfterStoppingQueuedControlsAndOriginalPlaybackIsRestored() {
         let fixture = ApplicationVolumeBackendFixture()
@@ -283,6 +781,34 @@ struct CoreAudioApplicationVolumeBackendTests {
     private static func request(pids: [pid_t] = [101], gain: Float = 0.5) -> ApplicationVolumeRequest {
         ApplicationVolumeRequest(id: "music", processIdentifiers: pids, gain: gain)
     }
+
+    private static func source(_ id: String, pids: [pid_t]) -> AudioPlaybackSource {
+        AudioPlaybackSource(id: id, processIdentifiers: pids, bundleIdentifier: "fixture.\(id)",
+                            applicationName: id, iconData: nil, isFrontmost: false)
+    }
+
+    private static func service(
+        _ fixture: ApplicationVolumeBackendFixture, sources: [AudioPlaybackSource], defaults: UserDefaults
+    ) -> ApplicationVolumeMixerService {
+        let monitor = AudioPlaybackMonitor(
+            readSources: { (sources.flatMap(\.processIdentifiers).map { AudioObjectID($0) }, sources) },
+            registerProperty: { _, _, _, _ in noErr }, applicationNotifications: NotificationCenter(),
+            scheduleRefresh: { _ in {} }
+        )
+        return ApplicationVolumeMixerService(
+            monitor: monitor, backend: fixture.backend,
+            ownProcessIdentifier: -1, ownBundleIdentifier: "fixture.zisla", defaults: defaults
+        )
+    }
+}
+
+@MainActor
+private final class ApplicationVolumePlaybackDefaultsFixture {
+    private let suite = "Zisla.ApplicationVolumePlayback.\(UUID().uuidString)"
+    let store: UserDefaults
+
+    init() { store = UserDefaults(suiteName: suite)! }
+    isolated deinit { store.removePersistentDomain(forName: suite) }
 }
 
 @MainActor
@@ -292,6 +818,8 @@ private final class ApplicationVolumeBackendFixture {
     let events: ApplicationVolumeBackendEvents
     let properties: ApplicationVolumePropertyStub
     let watchdog: ApplicationVolumeWatchdogStub
+    let playback: ApplicationVolumeWatchdogStub
+    let clock: ApplicationVolumeClockStub
     let notifications: NotificationCenter
     let backend: CoreAudioApplicationVolumeBackend
 
@@ -300,12 +828,16 @@ private final class ApplicationVolumeBackendFixture {
         let queue = DispatchQueue(label: "fixture.application-volume-backend")
         let properties = ApplicationVolumePropertyStub()
         let watchdog = ApplicationVolumeWatchdogStub()
+        let playback = ApplicationVolumeWatchdogStub()
+        let clock = ApplicationVolumeClockStub()
         let events = ApplicationVolumeBackendEvents()
         let notifications = NotificationCenter()
         self.hardware = hardware
         self.queue = queue
         self.properties = properties
         self.watchdog = watchdog
+        self.playback = playback
+        self.clock = clock
         self.events = events
         self.notifications = notifications
         backend = CoreAudioApplicationVolumeBackend(
@@ -313,6 +845,8 @@ private final class ApplicationVolumeBackendFixture {
             registerProperty: { properties.register($0, address: $1, callback: $2, adding: $3) },
             wakeNotifications: notifications,
             scheduleWatchdog: { watchdog.schedule(queue: $0, event: $1) },
+            schedulePlaybackCheck: { playback.schedule(queue: $0, event: $1) },
+            now: { clock.time },
             deliver: { events.enqueue($0) }
         )
     }
@@ -341,9 +875,27 @@ private final class ApplicationVolumeBackendFixture {
         }
     }
 
+    func checkPlayback() {
+        guard !playback.entries.isEmpty else {
+            Issue.record("后台播放检测任务缺失，无法识别或恢复候选源")
+            return
+        }
+        playback.fire(at: playback.entries.count - 1)
+        flush()
+    }
+
     func stop() {
         backend.stop()
         flush()
+    }
+}
+
+private final class ApplicationVolumeClockStub: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: TimeInterval = 0
+    var time: TimeInterval {
+        get { lock.withLock { value } }
+        set { lock.withLock { value = newValue } }
     }
 }
 
