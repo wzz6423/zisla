@@ -136,7 +136,7 @@ export const it = createCatalog({
       toolbox: {
         name: 'Utility',
         caption:
-          'Timer di concentrazione, schermo sempre attivo, pulizia dello schermo e della tastiera con blocco anche di F1-F12, teleprompter, specchio e Cestino su una pagina. Metti in pausa, riprendi o reimposta il Pomodoro e segui i progressi nelle viste compatte orizzontale e verticale.',
+          'Timer di concentrazione, schermo sempre attivo, pulizia dello schermo e della tastiera con blocco anche di F1-F12, teleprompter, specchio e Cestino su una pagina. Metti in pausa, riprendi o reimposta il Pomodoro e segui i progressi nelle viste compatte orizzontale e verticale. Avvia la pulizia dei file inutili dalle utilità con le impostazioni di pulizia del sistema e segui avanzamento e risultati nell’isola.',
         points: ['Timer di concentrazione', 'Blocca F1-F12 durante la pulizia', 'Teleprompter e specchio'],
       },
       system: {
@@ -213,7 +213,7 @@ export const it = createCatalog({
       capture: {
         title: 'Schermate, catture lunghe e fissaggio',
         description:
-          'Cattura, fissa o unisci schermate a scorrimento con scorciatoie personalizzabili. Evidenzia, estrai aree di immagine, arrotonda gli angoli e conserva le annotazioni all’esportazione. Riconosci e copia il testo, traducilo e copia il risultato oppure esporta tabelle riconosciute in .xlsx. Conserva le catture sullo scaffale. Le impostazioni verificano i conflitti con voce e azioni rapide. La finestra si apre nella cartella delle schermate definita in Impostazioni → Posizione di salvataggio. Le schermate fissate restano al loro posto nelle catture successive. Le acquisizioni lunghe supportano lo scorrimento automatico lento e i dispositivi compatibili possono acquisire in HDR. L’aggancio alle finestre include la finestra delle impostazioni.',
+          'Cattura, fissa o unisci schermate a scorrimento con scorciatoie personalizzabili. Evidenzia, estrai aree di immagine, arrotonda gli angoli e conserva le annotazioni all’esportazione. Riconosci e copia il testo, traducilo e copia il risultato oppure esporta tabelle riconosciute in .xlsx. Conserva le catture sullo scaffale. Le impostazioni verificano i conflitti con voce e azioni rapide. La finestra si apre nella cartella delle schermate definita in Impostazioni → Posizione di salvataggio. Le schermate fissate restano al loro posto nelle catture successive. Le acquisizioni lunghe supportano lo scorrimento automatico lento e i dispositivi compatibili possono acquisire in HDR. L’aggancio alle finestre include la finestra delle impostazioni. Le immagini fissate seguono le dimensioni della cornice quando usi lo zoom della barra degli strumenti o del trackpad, oppure trascini un angolo.',
         detail: 'Evidenziazione ed estrazione · Riconosci, traduci e copia · Angoli arrotondati e .xlsx',
       },
       voice: {
@@ -336,6 +336,14 @@ export const it = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.25': [
+        'Avvia la pulizia dei file inutili dalle utilità con le impostazioni esistenti. Avanzamento e risultati appaiono nell’isola; i messaggi dei risultati IA restano leggibili prima del ritorno delle informazioni sulla pulizia.',
+        'Il contenuto delle schermate fissate si ridimensiona insieme alla cornice usando la barra degli strumenti, il trackpad o gli angoli, anche per le immagini HDR.',
+        'L’elenco del meteo mostra un solo orario di aggiornamento e raggruppa le fonti senza duplicati.',
+        'Le statistiche di digitazione ripristinano la barra di scorrimento verticale e la dashboard rimane nell’area visibile.',
+        'Gli strumenti audio si adattano all’area visibile delle impostazioni, con scorrimento separato per l’elenco delle operazioni e il pannello di modifica.',
+        'Il mixer del volume delle applicazioni nasconde le sorgenti audio inattive, conserva i controlli di volume e silenziamento salvati e consente di riprovare il rilevamento audio in caso di errore.',
+      ],
       'v0.1.24': [
         'La cronologia degli appunti può cercare e raggruppare gli elementi per applicazione di origine. Le Azioni rapide riconoscono i comandi che contengono here-document.',
         'La pulizia del sistema può funzionare in background con avanzamento e risultati nell’isola. La pulizia del disco trova installazioni duplicate e residui degli aggiornamenti delle applicazioni.',

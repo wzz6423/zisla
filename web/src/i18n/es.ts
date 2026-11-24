@@ -136,7 +136,7 @@ export const es = createCatalog({
       toolbox: {
         name: 'Utilidades',
         caption:
-          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado que bloquea también F1-F12, teleprónter, espejo y Papelera en una página. Pausa, reanuda o reinicia el Pomodoro y sigue su progreso en las vistas compactas horizontal y vertical.',
+          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado que bloquea también F1-F12, teleprónter, espejo y Papelera en una página. Pausa, reanuda o reinicia el Pomodoro y sigue su progreso en las vistas compactas horizontal y vertical. Inicia la limpieza de archivos innecesarios desde las utilidades con tus ajustes de limpieza del sistema y sigue el progreso y los resultados en la isla.',
         points: ['Temporizador de concentración', 'Bloquea F1-F12 durante la limpieza', 'Teleprompter y espejo'],
       },
       system: {
@@ -213,7 +213,7 @@ export const es = createCatalog({
       capture: {
         title: 'Capturas, capturas con desplazamiento y fijado',
         description:
-          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo se abre en la carpeta de capturas de Ajustes → Ubicación de guardado. Las capturas fijadas permanecen al volver a capturar. Las capturas largas admiten desplazamiento automático lento; los dispositivos compatibles pueden capturar HDR. La selección automática de ventanas incluye la ventana de ajustes de zisla.',
+          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo se abre en la carpeta de capturas de Ajustes → Ubicación de guardado. Las capturas fijadas permanecen al volver a capturar. Las capturas largas admiten desplazamiento automático lento; los dispositivos compatibles pueden capturar HDR. La selección automática de ventanas incluye la ventana de ajustes de zisla. Las imágenes fijadas se ajustan a su marco al ampliar con la barra de herramientas o el trackpad, o al arrastrar una esquina.',
         detail: 'Resaltar y extraer · Reconocer, traducir y copiar · Esquinas redondas y .xlsx',
       },
       voice: {
@@ -336,6 +336,14 @@ export const es = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.25': [
+        'Inicia la limpieza de archivos innecesarios desde las utilidades con tus ajustes actuales. El progreso y los resultados aparecen en la isla; los mensajes de resultados de IA se mantienen legibles antes de volver a mostrar la limpieza.',
+        'El contenido de las capturas fijadas cambia de tamaño junto con el marco al usar la barra de herramientas, el trackpad o las esquinas, también con imágenes HDR.',
+        'El tiempo de actualización del tiempo meteorológico aparece una sola vez para la lista y las fuentes se agrupan sin duplicados.',
+        'Las estadísticas de escritura recuperan la barra de desplazamiento vertical y el panel se mantiene dentro del área visible.',
+        'Las herramientas de audio se ajustan al área visible de los ajustes, con desplazamiento independiente para la lista de operaciones y el panel de edición.',
+        'El mezclador de volumen oculta las fuentes de audio inactivas, conserva los controles de volumen y silencio guardados y permite reintentar la detección de audio si falla.',
+      ],
       'v0.1.24': [
         'El historial del portapapeles permite buscar y agrupar por aplicación de origen. Las acciones rápidas reconocen comandos que contienen here-documents.',
         'La limpieza del sistema puede ejecutarse en segundo plano con progreso y resultados en la isla. La limpieza del disco detecta instalaciones duplicadas y residuos de actualizaciones de aplicaciones.',

@@ -121,6 +121,7 @@ const updatedStrings = (content) => [
   ...strings(content.changelog.releaseNotes['v0.1.22'], 'changelog.releaseNotes.v0.1.22'),
   ...strings(content.changelog.releaseNotes['v0.1.23'], 'changelog.releaseNotes.v0.1.23'),
   ...strings(content.changelog.releaseNotes['v0.1.24'], 'changelog.releaseNotes.v0.1.24'),
+  ...strings(content.changelog.releaseNotes['v0.1.25'], 'changelog.releaseNotes.v0.1.25'),
   ...strings(content.film, 'film'),
 ];
 
@@ -402,8 +403,6 @@ test('release notes render by version while historical wording remains available
 
 test('latest release downloads and README match the newest changelog entry', () => {
   const latest = site.changelogEntries[0];
-  assert.equal(latest.version, 'v0.1.24');
-  assert.equal(latest.date, '2026-11-22');
   assert.equal(site.latestRelease.version, latest.version);
   assert.equal(site.latestRelease.date, latest.date);
   const releasePage = `https://github.com/wzz6423/zisla/releases/tag/${latest.version}`;

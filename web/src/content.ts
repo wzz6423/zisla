@@ -211,17 +211,17 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.24',
-  date: '2026-11-22',
+  version: 'v0.1.25',
+  date: '2026-11-24',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.24',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.25',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
@@ -238,6 +238,11 @@ export interface ChangelogEntry {
  * v0.1.8/v0.1.0 have no Highlights section, so their body summaries are used instead.
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
+  {
+    version: 'v0.1.25',
+    date: '2026-11-24',
+    notes: [],
+  },
   {
     version: 'v0.1.24',
     date: '2026-11-22',

@@ -135,7 +135,7 @@ export const en: SiteContent = {
       toolbox: {
         name: 'Utilities',
         caption:
-          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning that blocks keys including F1-F12, a teleprompter, a mirror and the Trash, all on one page. Pause, resume or reset the Pomodoro timer and follow its progress in compact horizontal and vertical layouts.',
+          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning that blocks keys including F1-F12, a teleprompter, a mirror and the Trash, all on one page. Pause, resume or reset the Pomodoro timer and follow its progress in compact horizontal and vertical layouts. Start junk cleanup from Utilities using your system cleanup settings, and follow progress and results in the island.',
         points: ['Focus countdown', 'Blocks F1-F12 while cleaning', 'Teleprompter and mirror'],
       },
       system: {
@@ -211,7 +211,7 @@ export const en: SiteContent = {
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
         description:
-          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the screenshot folder set in Settings → Save Location. Pinned screenshots stay in place when capturing again. Use slow automatic scrolling for long captures, and capture HDR screenshots on supported devices. Window snapping includes the settings window.',
+          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the screenshot folder set in Settings → Save Location. Pinned screenshots stay in place when capturing again. Use slow automatic scrolling for long captures, and capture HDR screenshots on supported devices. Window snapping includes the settings window. Pinned images scale with their frame when zooming with the toolbar or trackpad, or dragging a corner.',
         detail: 'Highlight and extract · OCR, translation and copy · Rounded corners and .xlsx',
       },
       voice: {
@@ -340,6 +340,14 @@ export const en: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.25': [
+        'Start junk cleanup from Utilities using your existing cleanup settings. Progress and results appear in the island; AI result messages remain readable before cleanup feedback returns.',
+        'Pinned screenshot content scales with its frame when using toolbar zoom, trackpad magnification or corner resizing, including HDR images.',
+        'Weather shows one update timestamp for the list and groups source attribution without repeated entries.',
+        'Typing statistics restores the vertical scrollbar and keeps the dashboard within its viewport.',
+        'Audio tools fit the settings viewport, with separate scrolling for the operation list and editing panel.',
+        'The application volume mixer hides idle audio sources, preserves saved volume and mute controls, and lets you retry failed audio detection.',
+      ],
       'v0.1.24': [
         'Clipboard History can search and group entries by source application. Quick Actions recognizes commands containing here-documents.',
         'System cleanup can run in the background with island progress and results. Disk Cleanup finds duplicate application installations and leftovers from application updates.',

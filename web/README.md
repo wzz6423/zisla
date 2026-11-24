@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-This directory contains the repository's TypeScript website, built with Vite. Page copy and download links match the current macOS Release. The site presents 12 island modules and 19 standalone capabilities, including nine image tools, 27 audio operations, PDF tools, AI quota rings and model usage history, meeting countdowns and linked notes, shelf batch actions, automatic power modes, compact Pomodoro controls, HDR and scrolling screenshots, application-opening repair, and daily briefings. It also covers recording portrait and voice effects, independent save folders, scheduled cleanup, reorganized settings, daily dependency updates, actual browser download filenames, and the Zshell recommendation. Recent additions cover clipboard grouping by source application, background cleanup with island feedback, duplicate installation and update-leftover detection, HDR recordings, Command-arrow note navigation, independent AI quota regions, permission status refresh, persistent application volumes, and restoring all save folders to their defaults. A 160-second feature tour plays on request. Copy covers all 17 languages, and the changelog matches v0.1.24 (2026-11-22). System history is retained until manually cleared by default.
+This directory contains the repository's TypeScript website, built with Vite. Page copy and download links match the current macOS Release. The site presents 12 island modules and 19 standalone capabilities, including nine image tools, 27 audio operations, PDF tools, AI quota rings and model usage history, meeting countdowns and linked notes, shelf batch actions, automatic power modes, compact Pomodoro controls, HDR and scrolling screenshots, application-opening repair, and daily briefings. It also covers recording portrait and voice effects, independent save folders, scheduled cleanup, reorganized settings, daily dependency updates, actual browser download filenames, and the Zshell recommendation. Recent additions cover clipboard grouping by source application, background cleanup with island feedback, duplicate installation and update-leftover detection, HDR recordings, Command-arrow note navigation, independent AI quota regions, permission status refresh, persistent application volumes, and restoring all save folders to their defaults. The 0.1.25 update adds the Utilities junk-cleanup shortcut and fixes pinned screenshot scaling, duplicate weather labels, typing-statistics scrolling, audio-tool viewport layout, and idle application-volume sources. A 160-second feature tour plays on request. Copy covers all 17 languages, and the changelog matches v0.1.25 (2026-11-24). System history is retained until manually cleared by default.
 
 ## Run locally
 
@@ -21,10 +21,10 @@ npm run build
 Links currently used by the website:
 
 - Source: https://github.com/wzz6423/zisla
-- Release v0.1.24: https://github.com/wzz6423/zisla/releases/tag/v0.1.24
-- Apple Silicon DMG: https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-arm64.dmg
-- Apple Silicon ZIP: https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-arm64.zip
-- Universal DMG: https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-universal.dmg
-- Universal ZIP: https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-universal.zip
-- Intel DMG: https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-x86_64.dmg
-- Intel ZIP: https://github.com/wzz6423/zisla/releases/download/v0.1.24/zisla-v0.1.24-macOS-x86_64.zip
+- Release v0.1.25: https://github.com/wzz6423/zisla/releases/tag/v0.1.25
+- Apple Silicon DMG: https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-arm64.dmg
+- Apple Silicon ZIP: https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-arm64.zip
+- Universal DMG: https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-universal.dmg
+- Universal ZIP: https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-universal.zip
+- Intel DMG: https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-x86_64.dmg
+- Intel ZIP: https://github.com/wzz6423/zisla/releases/download/v0.1.25/zisla-v0.1.25-macOS-x86_64.zip

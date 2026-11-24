@@ -136,7 +136,7 @@ export const nl = createCatalog({
       toolbox: {
         name: 'Hulpprogramma’s',
         caption:
-          'Focustimer, scherm wakker houden, schermreiniging, toetsenbordreiniging die ook F1-F12 blokkeert, teleprompter, spiegel en prullenmand op één pagina. Pauzeer, hervat of reset de Pomodoro en volg de voortgang in compacte horizontale en verticale weergaven.',
+          'Focustimer, scherm wakker houden, schermreiniging, toetsenbordreiniging die ook F1-F12 blokkeert, teleprompter, spiegel en prullenmand op één pagina. Pauzeer, hervat of reset de Pomodoro en volg de voortgang in compacte horizontale en verticale weergaven. Start het opruimen van onnodige bestanden vanuit de hulpprogramma’s met je instellingen voor systeemopruiming en volg de voortgang en resultaten in het eiland.',
         points: ['Focusafteller', 'Blokkeert F1-F12 tijdens reinigen', 'Teleprompter en spiegel'],
       },
       system: {
@@ -213,7 +213,7 @@ export const nl = createCatalog({
       capture: {
         title: 'Schermafbeeldingen, scrollcaptures en vastzetten',
         description:
-          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de screenshotmap onder Instellingen → Opslaglocatie. Vastgezette afbeeldingen blijven bij nieuwe captures staan. Gebruik langzaam automatisch scrollen voor lange schermafbeeldingen; ondersteunde apparaten kunnen HDR vastleggen. Het uitlijnen op vensters omvat ook het instellingenvenster.',
+          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de screenshotmap onder Instellingen → Opslaglocatie. Vastgezette afbeeldingen blijven bij nieuwe captures staan. Gebruik langzaam automatisch scrollen voor lange schermafbeeldingen; ondersteunde apparaten kunnen HDR vastleggen. Het uitlijnen op vensters omvat ook het instellingenvenster. Vastgezette afbeeldingen schalen mee met hun kader wanneer je zoomt via de werkbalk of het trackpad, of aan een hoek sleept.',
         detail: 'Markeren en extraheren · Herkennen, vertalen en kopiëren · Ronde hoeken en .xlsx',
       },
       voice: {
@@ -323,6 +323,14 @@ export const nl = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.25': [
+        'Start het opruimen van onnodige bestanden vanuit de hulpprogramma’s met je bestaande instellingen. Voortgang en resultaten verschijnen in het eiland; AI-resultaten blijven leesbaar voordat de opruiminformatie terugkeert.',
+        'De inhoud van vastgezette schermafbeeldingen schaalt mee met het kader bij gebruik van de werkbalk, het trackpad of de hoeken, ook bij HDR-afbeeldingen.',
+        'De weerlijst toont één bijwerktijd en groepeert bronvermeldingen zonder dubbele vermeldingen.',
+        'De typstatistieken krijgen de verticale schuifbalk terug en het dashboard blijft binnen het zichtbare gebied.',
+        'Audiogereedschappen passen binnen het zichtbare deel van de instellingen, met afzonderlijk scrollen voor de bewerkingenlijst en het bewerkingspaneel.',
+        'De volumemixer verbergt inactieve audiobronnen, behoudt opgeslagen volume- en dempbediening en laat je mislukte audiodetectie opnieuw proberen.',
+      ],
       'v0.1.24': [
         'De klembordgeschiedenis kan items op bronapplicatie doorzoeken en groeperen. Snelle acties herkent commando’s met here-documenten.',
         'Systeemopruiming kan op de achtergrond draaien met voortgang en resultaten in het eiland. Schijfopruiming vindt dubbele appinstallaties en resten van applicatie-updates.',

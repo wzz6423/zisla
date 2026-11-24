@@ -147,7 +147,7 @@ export const fr: SiteContent = {
       toolbox: {
         name: 'Utilitaires',
         caption:
-          'Minuteur de concentration, maintien de l’écran éveillé, nettoyage de l’écran ou du clavier avec blocage des touches F1-F12, téléprompteur, miroir et Corbeille sur une même page. Mettez le Pomodoro en pause, reprenez-le, réinitialisez-le et suivez sa progression dans les vues compactes horizontale et verticale.',
+          'Minuteur de concentration, maintien de l’écran éveillé, nettoyage de l’écran ou du clavier avec blocage des touches F1-F12, téléprompteur, miroir et Corbeille sur une même page. Mettez le Pomodoro en pause, reprenez-le, réinitialisez-le et suivez sa progression dans les vues compactes horizontale et verticale. Lancez le nettoyage des fichiers inutiles depuis les utilitaires avec vos réglages de nettoyage système, puis suivez la progression et le résultat dans l’îlot.',
         points: [
           'Minuteur de concentration',
           'Bloque F1-F12 pendant le nettoyage',
@@ -231,7 +231,7 @@ export const fr: SiteContent = {
       capture: {
         title: 'Captures, captures défilantes et épinglage',
         description:
-          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue s’ouvre dans le dossier de captures défini dans Réglages → Emplacement de sauvegarde. Les captures épinglées restent en place lors d’une nouvelle capture. Utilisez le défilement automatique lent pour les captures longues et capturez en HDR sur les appareils compatibles. L’accrochage aux fenêtres inclut la fenêtre des réglages de zisla.',
+          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue s’ouvre dans le dossier de captures défini dans Réglages → Emplacement de sauvegarde. Les captures épinglées restent en place lors d’une nouvelle capture. Utilisez le défilement automatique lent pour les captures longues et capturez en HDR sur les appareils compatibles. L’accrochage aux fenêtres inclut la fenêtre des réglages de zisla. Les images épinglées suivent la taille de leur cadre lors du zoom par la barre d’outils, le trackpad ou le déplacement d’un coin.',
         detail: 'Surlignage et extraction · Reconnaissance, traduction et copie · Coins arrondis et .xlsx',
       },
       voice: {
@@ -361,6 +361,14 @@ export const fr: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.25': [
+        'Lancez le nettoyage des fichiers inutiles depuis les utilitaires avec vos réglages existants. La progression et les résultats apparaissent dans l’îlot ; les messages de résultat de l’IA restent lisibles avant le retour du suivi du nettoyage.',
+        'Le contenu des captures épinglées suit la taille du cadre lors du zoom par la barre d’outils, le trackpad ou le déplacement d’un coin, y compris pour les images HDR.',
+        'La météo affiche une seule date de mise à jour pour la liste et regroupe les sources sans entrées répétées.',
+        'Les statistiques de frappe retrouvent leur barre de défilement verticale et le tableau de bord reste dans sa zone visible.',
+        'Les outils audio s’adaptent à la zone visible des réglages, avec un défilement séparé pour la liste des opérations et le panneau d’édition.',
+        'Le mélangeur de volume des applications masque les sources audio inactives, conserve les réglages de volume et de sourdine et permet de relancer une détection audio en échec.',
+      ],
       'v0.1.24': [
         'L’historique du presse-papiers permet la recherche et le regroupement par application source. Les actions rapides reconnaissent les commandes contenant des here-documents.',
         'Le nettoyage système peut s’exécuter en arrière-plan avec progression et résultats dans l’île. Le nettoyage du disque repère les applications installées en double et les fichiers laissés par les mises à jour.',

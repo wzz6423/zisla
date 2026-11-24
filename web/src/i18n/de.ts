@@ -142,7 +142,7 @@ export const de: SiteContent = {
       toolbox: {
         name: 'Kleine Werkzeuge',
         caption:
-          'Fokustimer, Bildschirm wach halten, Bildschirmreinigung, Tastaturreinigung mit Sperre auch für F1-F12, Teleprompter, Spiegel und Papierkorb auf einer Seite. Den Pomodoro können Sie auch in der horizontalen und vertikalen Kompaktansicht pausieren, fortsetzen oder zurücksetzen und den Fortschritt verfolgen.',
+          'Fokustimer, Bildschirm wach halten, Bildschirmreinigung, Tastaturreinigung mit Sperre auch für F1-F12, Teleprompter, Spiegel und Papierkorb auf einer Seite. Den Pomodoro können Sie auch in der horizontalen und vertikalen Kompaktansicht pausieren, fortsetzen oder zurücksetzen und den Fortschritt verfolgen. Starten Sie die Bereinigung unnötiger Dateien in den Dienstprogrammen mit Ihren Systemeinstellungen und verfolgen Sie Fortschritt und Ergebnisse in der Insel.',
         points: [
           'Fokus-Timer',
           'Blockiert F1-F12 beim Reinigen',
@@ -226,7 +226,7 @@ export const de: SiteContent = {
       capture: {
         title: 'Bildschirmfotos, Scroll-Aufnahmen und Anheften',
         description:
-          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im Screenshotordner unter Einstellungen → Speicherort. Angeheftete Screenshots bleiben bei weiteren Aufnahmen erhalten. Lange Aufnahmen unterstützen langsames automatisches Scrollen; auf kompatiblen Geräten sind HDR-Bildschirmfotos möglich. Das Einrasten an Fenstern berücksichtigt auch das Einstellungsfenster von zisla.',
+          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im Screenshotordner unter Einstellungen → Speicherort. Angeheftete Screenshots bleiben bei weiteren Aufnahmen erhalten. Lange Aufnahmen unterstützen langsames automatisches Scrollen; auf kompatiblen Geräten sind HDR-Bildschirmfotos möglich. Das Einrasten an Fenstern berücksichtigt auch das Einstellungsfenster von zisla. Angeheftete Bilder passen sich ihrem Rahmen an, wenn Sie über die Werkzeugleiste oder das Trackpad zoomen oder eine Ecke ziehen.',
         detail: 'Markieren und extrahieren · Erkennen, übersetzen und kopieren · Runde Ecken und .xlsx',
       },
       voice: {
@@ -356,6 +356,14 @@ export const de: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.25': [
+        'Starten Sie die Bereinigung unnötiger Dateien in den Dienstprogrammen mit den vorhandenen Einstellungen. Fortschritt und Ergebnisse erscheinen in der Insel; KI-Ergebnisse bleiben lesbar, bevor die Bereinigungsanzeige zurückkehrt.',
+        'Der Inhalt angehefteter Bildschirmaufnahmen skaliert beim Zoomen über Werkzeugleiste, Trackpad oder Ecken mit dem Rahmen, auch bei HDR-Bildern.',
+        'Die Wetterliste zeigt einen gemeinsamen Aktualisierungszeitpunkt und fasst Quellenangaben ohne doppelte Einträge zusammen.',
+        'Die Tippstatistik erhält ihre vertikale Bildlaufleiste zurück und das Dashboard bleibt innerhalb des sichtbaren Bereichs.',
+        'Audiowerkzeuge passen in den sichtbaren Bereich der Einstellungen. Operationsliste und Bearbeitungsbereich lassen sich getrennt scrollen.',
+        'Der Lautstärkemixer blendet inaktive Audioquellen aus, behält gespeicherte Lautstärke- und Stummschaltungssteuerungen bei und ermöglicht erneute Versuche bei fehlgeschlagener Audioerkennung.',
+      ],
       'v0.1.24': [
         'Der Zwischenablageverlauf lässt sich nach Quellanwendung durchsuchen und gruppieren. Schnellaktionen erkennen Befehle mit Here-Dokumenten.',
         'Die Systembereinigung kann im Hintergrund laufen und Fortschritt sowie Ergebnisse in der Insel anzeigen. Die Datenträgerbereinigung erkennt doppelte App-Installationen und Überreste von App-Updates.',

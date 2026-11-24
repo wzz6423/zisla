@@ -86,7 +86,7 @@ export const vi = createCatalog({
         caption: 'Điều chỉnh âm lượng và tắt tiếng riêng cho từng ứng dụng đang phát âm thanh. Cần macOS 14.4 trở lên và quyền ghi âm thanh hệ thống. Ghi nhớ âm lượng cho từng ứng dụng và bỏ nguồn âm thanh cũ khi dừng phát.',
         points: ['Âm lượng từng ứng dụng', 'Tắt tiếng riêng', 'macOS 14.4+'],
       },
-      toolbox: { name: 'Tiện ích', caption: 'Bộ đếm tập trung, giữ màn hình sáng, vệ sinh màn hình và bàn phím có chặn cả F1-F12, máy nhắc chữ, gương và Thùng rác trong một trang. Tạm dừng, tiếp tục hoặc đặt lại Pomodoro và theo dõi tiến độ ở cả bố cục gọn ngang và dọc.', points: ['Đếm giờ tập trung', 'Chặn F1-F12 khi dọn dẹp', 'Teleprompter và gương'] },
+      toolbox: { name: 'Tiện ích', caption: 'Bộ đếm tập trung, giữ màn hình sáng, vệ sinh màn hình và bàn phím có chặn cả F1-F12, máy nhắc chữ, gương và Thùng rác trong một trang. Tạm dừng, tiếp tục hoặc đặt lại Pomodoro và theo dõi tiến độ ở cả bố cục gọn ngang và dọc. Bắt đầu dọn tệp không cần thiết từ tiện ích bằng cài đặt dọn hệ thống và theo dõi tiến độ cùng kết quả trên đảo.', points: ['Đếm giờ tập trung', 'Chặn F1-F12 khi dọn dẹp', 'Teleprompter và gương'] },
       system: { name: 'Trạng thái hệ thống', caption: 'Theo dõi CPU, GPU, bộ nhớ, đĩa, mạng, quạt và nhiệt độ NVMe SMART khi có dữ liệu. Xem lịch sử từng phút theo khoảng ngày, xuất .xlsx hoặc xóa trong Cài đặt. Kiểm tra sức khỏe, chu kỳ, nhiệt độ, dung lượng pin, pin thiết bị gần đó và IPv4/IPv6 công cộng. Chọn chế độ nguồn tự động khi cắm điện hoặc dùng pin, với tùy chọn tiết kiệm điện ở mức 20% trở xuống. Sạc ngay đến 100% khi macOS cho phép. Xem xét bộ nhớ đệm, nhật ký, tùy chọn còn sót và không gian AI bị bỏ lại trước khi chuyển vào Thùng rác; có thể tự dọn mỗi 7, 15 hoặc 30 ngày. Tự dọn theo lịch mặc định tắt; chọn chỉ mục đáng tin cậy hoặc tất cả mục có thể xử lý, kể cả mục cần xem xét. Chạy dọn dẹp ở chế độ nền với tiến độ và kết quả trên đảo. Tìm các bản cài đặt ứng dụng trùng lặp và tệp còn sót sau khi cập nhật.', points: ['Theo dõi cấp chip', 'Biểu đồ lịch sử và xuất .xlsx', 'Kiểm tra trước khi chuyển vào Thùng rác'] },
     },
   },
@@ -151,7 +151,7 @@ export const vi = createCatalog({
           'Xem trước cửa sổ từ Dock hoặc khi dùng Command-Tab, rồi bấm thẻ để kích hoạt cửa sổ. Cấu hình mới bật tính năng này; quản lý tính năng và quyền trong Cài đặt. Lọc cửa sổ đã đóng và trùng lặp; ẩn bản xem trước Dock trong khi menu ngữ cảnh đang mở.',
         detail: 'Dock và Command-Tab · Bấm để chuyển cửa sổ · Có thể cấu hình',
       },
-      capture: { title: 'Ảnh chụp, ảnh cuộn và ghim', description: 'Chụp, ghim hoặc ghép ảnh cuộn bằng phím tắt tùy chỉnh. Tô sáng vùng, trích phần ảnh, bo góc và giữ chú thích khi xuất. Nhận dạng và sao chép chữ, dịch rồi sao chép kết quả hoặc xuất bảng sang .xlsx. Lưu ảnh trên kệ. Cài đặt kiểm tra xung đột với nhập giọng nói và Thao tác nhanh. Hộp thoại lưu mở trong thư mục ảnh chụp của Cài đặt → Vị trí lưu. Ảnh đã ghim được giữ khi chụp tiếp. Dùng cuộn tự động chậm cho ảnh chụp dài và chụp HDR trên thiết bị được hỗ trợ. Vùng chụp tự khớp với cửa sổ bao gồm cả cửa sổ cài đặt.', detail: 'Tô sáng và trích xuất · Nhận dạng, dịch và sao chép · Bo góc và .xlsx' },
+      capture: { title: 'Ảnh chụp, ảnh cuộn và ghim', description: 'Chụp, ghim hoặc ghép ảnh cuộn bằng phím tắt tùy chỉnh. Tô sáng vùng, trích phần ảnh, bo góc và giữ chú thích khi xuất. Nhận dạng và sao chép chữ, dịch rồi sao chép kết quả hoặc xuất bảng sang .xlsx. Lưu ảnh trên kệ. Cài đặt kiểm tra xung đột với nhập giọng nói và Thao tác nhanh. Hộp thoại lưu mở trong thư mục ảnh chụp của Cài đặt → Vị trí lưu. Ảnh đã ghim được giữ khi chụp tiếp. Dùng cuộn tự động chậm cho ảnh chụp dài và chụp HDR trên thiết bị được hỗ trợ. Vùng chụp tự khớp với cửa sổ bao gồm cả cửa sổ cài đặt. Ảnh được ghim thay đổi kích thước theo khung khi thu phóng bằng thanh công cụ hoặc trackpad, hay khi kéo một góc.', detail: 'Tô sáng và trích xuất · Nhận dạng, dịch và sao chép · Bo góc và .xlsx' },
       voice: { title: 'Nhập giọng nói và làm sạch', description: 'Nhấn phím để bật/tắt hoặc giữ để nói với tính năng nhận dạng giọng nói của hệ thống, từ vựng chuyên ngành và từ tùy chỉnh. Có thể dùng Ollama, LM Studio hoặc mô hình từ xa để sửa bản chép lời mà vẫn giữ nguyên ý nghĩa và định dạng các mục được liệt kê rõ ràng. Cài đặt → Giám sát Hệ thống và Dọn dẹp có thể xóa âm thanh đã lưu quá 7, 15 hoặc 30 ngày mà vẫn giữ bản chép lời; dọn tự động mặc định tắt.', detail: 'Hai chế độ ghi âm · Từ vựng và từ nóng · Làm sạch tùy chọn' },
       media: { title: 'Phương tiện và âm thanh nền hệ thống', description: 'Điều khiển nội dung đang phát từ đầu đảo hoặc chọn âm thanh nền macOS. Âm thanh có thể tự dừng khi khóa màn hình, bật trình bảo vệ hoặc màn hình ngủ. Chọn dạng sóng hoặc quầng sáng bìa; tiến trình phát cũng xuất hiện ở bố cục gọn và đảo nổi.', detail: 'Điều khiển phát · Lời bài hát đồng bộ · Tự dừng âm thanh' },
       browserDownloads: { title: 'Tiến trình tải xuống trình duyệt', description: 'Phát hiện tải xuống từ Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera và Arc, hiển thị nguồn và tiến trình trực tiếp ở trên. Tiến trình hiển thị tên tệp đích thực tế khi trình duyệt cung cấp.', detail: '8 trình duyệt · Nhận dạng nguồn · Thông báo hoàn tất' },
@@ -220,6 +220,14 @@ export const vi = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.25': [
+        'Bắt đầu dọn tệp không cần thiết từ tiện ích bằng cài đặt hiện có. Tiến độ và kết quả hiển thị trên đảo; thông báo kết quả AI vẫn dễ đọc trước khi thông tin dọn dẹp xuất hiện trở lại.',
+        'Nội dung ảnh chụp màn hình được ghim thay đổi kích thước theo khung khi dùng thanh công cụ, trackpad hoặc kéo góc, kể cả ảnh HDR.',
+        'Danh sách thời tiết hiển thị một thời điểm cập nhật chung và gộp nguồn dữ liệu không trùng lặp.',
+        'Thống kê gõ phím khôi phục thanh cuộn dọc và giữ bảng thống kê trong vùng hiển thị.',
+        'Công cụ âm thanh vừa với vùng hiển thị của cài đặt, với danh sách thao tác và bảng chỉnh sửa cuộn riêng biệt.',
+        'Bộ trộn âm lượng ứng dụng ẩn nguồn âm thanh không hoạt động, giữ các điều khiển âm lượng và tắt tiếng đã lưu, đồng thời cho phép thử lại khi phát hiện âm thanh thất bại.',
+      ],
       'v0.1.24': [
         'Lịch sử clipboard có thể tìm kiếm và nhóm mục theo ứng dụng nguồn. Tác vụ nhanh nhận diện các lệnh chứa here-document.',
         'Dọn dẹp hệ thống có thể chạy ở chế độ nền với tiến độ và kết quả trên đảo. Dọn dẹp ổ đĩa tìm các bản cài đặt ứng dụng trùng lặp và tệp còn sót sau cập nhật.',

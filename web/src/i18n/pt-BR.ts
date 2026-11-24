@@ -136,7 +136,7 @@ export const ptBR = createCatalog({
       toolbox: {
         name: 'Utilitários',
         caption:
-          'Temporizador de foco, manter a tela ligada, limpeza de tela e de teclado que também bloqueia F1-F12, teleprompter, espelho e Lixo na mesma página. Pause, continue ou reinicie o Pomodoro e acompanhe o progresso nas visualizações compactas horizontal e vertical.',
+          'Temporizador de foco, manter a tela ligada, limpeza de tela e de teclado que também bloqueia F1-F12, teleprompter, espelho e Lixo na mesma página. Pause, continue ou reinicie o Pomodoro e acompanhe o progresso nas visualizações compactas horizontal e vertical. Inicie a limpeza de arquivos desnecessários nos utilitários com suas configurações de limpeza do sistema e acompanhe o progresso e os resultados na ilha.',
         points: ['Temporizador de foco', 'Bloqueia F1-F12 durante a limpeza', 'Teleprompter e espelho'],
       },
       system: {
@@ -213,7 +213,7 @@ export const ptBR = createCatalog({
       capture: {
         title: 'Capturas, rolagem e fixação',
         description:
-          'Capture, fixe ou una capturas com rolagem usando atalhos personalizáveis. Destaque áreas, extraia partes da imagem, arredonde cantos e preserve anotações ao exportar. Reconheça e copie texto, traduza e copie o resultado ou exporte tabelas reconhecidas como .xlsx. Guarde capturas na prateleira. Os ajustes verificam conflitos com voz e Ações Rápidas. A caixa de diálogo abre na pasta de capturas definida em Ajustes → Local de salvamento. Capturas fixadas permanecem ao capturar novamente. Capturas longas podem usar rolagem automática lenta; dispositivos compatíveis podem capturar HDR. A seleção automática de janelas inclui a janela de ajustes do zisla.',
+          'Capture, fixe ou una capturas com rolagem usando atalhos personalizáveis. Destaque áreas, extraia partes da imagem, arredonde cantos e preserve anotações ao exportar. Reconheça e copie texto, traduza e copie o resultado ou exporte tabelas reconhecidas como .xlsx. Guarde capturas na prateleira. Os ajustes verificam conflitos com voz e Ações Rápidas. A caixa de diálogo abre na pasta de capturas definida em Ajustes → Local de salvamento. Capturas fixadas permanecem ao capturar novamente. Capturas longas podem usar rolagem automática lenta; dispositivos compatíveis podem capturar HDR. A seleção automática de janelas inclui a janela de ajustes do zisla. As imagens fixadas acompanham o tamanho da moldura ao usar o zoom da barra de ferramentas ou do trackpad, ou ao arrastar um canto.',
         detail: 'Destaque e extração · Reconhecimento, tradução e cópia · Cantos arredondados e .xlsx',
       },
       voice: {
@@ -336,6 +336,14 @@ export const ptBR = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.25': [
+        'Inicie a limpeza de arquivos desnecessários nos utilitários com suas configurações atuais. O progresso e os resultados aparecem na ilha; as mensagens de resultado da IA continuam legíveis antes de voltar à limpeza.',
+        'O conteúdo das capturas fixadas acompanha o tamanho da moldura ao usar a barra de ferramentas, o trackpad ou os cantos, inclusive em imagens HDR.',
+        'A lista de previsão do tempo mostra um único horário de atualização e reúne as fontes sem entradas repetidas.',
+        'As estatísticas de digitação recuperam a barra de rolagem vertical e o painel permanece dentro da área visível.',
+        'As ferramentas de áudio se ajustam à área visível das configurações, com rolagem separada para a lista de operações e o painel de edição.',
+        'O mixer de volume dos aplicativos oculta fontes de áudio inativas, mantém os controles de volume e silêncio salvos e permite tentar novamente quando a detecção de áudio falha.',
+      ],
       'v0.1.24': [
         'O histórico da área de transferência permite pesquisar e agrupar pelo aplicativo de origem. As ações rápidas reconhecem comandos que contêm here-documents.',
         'A limpeza do sistema pode ser executada em segundo plano, com progresso e resultados na ilha. A limpeza do disco identifica instalações duplicadas e arquivos deixados por atualizações de aplicativos.',
