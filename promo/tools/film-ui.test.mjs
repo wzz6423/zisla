@@ -7,7 +7,7 @@ import {buildSync} from 'esbuild';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import * as Remotion from 'remotion';
-import {FPS, CROSSFADE, SCENES, TOTAL_FRAMES} from '../src/timeline.ts';
+import {CROSSFADE, SCENES, TOTAL_FRAMES} from '../src/timeline.ts';
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../', import.meta.url));
