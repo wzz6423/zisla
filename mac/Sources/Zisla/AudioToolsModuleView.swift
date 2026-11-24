@@ -18,7 +18,7 @@ struct AudioToolsModuleView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 20) {
             operationList
-                .frame(width: 184, height: 460)
+                .frame(width: 184)
             VStack(alignment: .leading, spacing: 18) {
                 AppLocalizedText(operation.detail)
                     .font(.system(size: 12))
@@ -66,29 +66,27 @@ struct AudioToolsModuleView: View {
     }
 
     private var operationList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(AudioToolOperation.allCases) { item in
-                    Button {
-                        operation = item
-                    } label: {
-                        Label(AppLocalization.text(item.title), systemImage: item.symbol)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(operation == item ? Color.accentColor : Color.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 10)
-                            .contentShape(RoundedRectangle(cornerRadius: 8))
-                            .background {
-                                if operation == item { SettingsTintedBackground(cornerRadius: 8) }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(controller.isProcessing || controller.isInspecting)
-                    .accessibilityAddTraits(operation == item ? .isSelected : [])
-                    .settingsSearchAnchor(.audioOperation(item))
-                    .help(AppLocalization.text(item.detail))
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(AudioToolOperation.allCases) { item in
+                Button {
+                    operation = item
+                } label: {
+                    Label(AppLocalization.text(item.title), systemImage: item.symbol)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(operation == item ? Color.accentColor : Color.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                        .background {
+                            if operation == item { SettingsTintedBackground(cornerRadius: 8) }
+                        }
                 }
+                .buttonStyle(.plain)
+                .disabled(controller.isProcessing || controller.isInspecting)
+                .accessibilityAddTraits(operation == item ? .isSelected : [])
+                .settingsSearchAnchor(.audioOperation(item))
+                .help(AppLocalization.text(item.detail))
             }
         }
     }
