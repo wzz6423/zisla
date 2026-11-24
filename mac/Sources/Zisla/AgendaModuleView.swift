@@ -52,6 +52,12 @@ struct AgendaModuleView: View {
     ) -> some View {
         let snapshots = locations.orderedSnapshots(snapshotsByLocationID, at: date)
         return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(AppLocalization.text("天气"))
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新天气"), action: refresh)
+            }
             if let fetchedAt = snapshots.map(\.fetchedAt).min() {
                 Text(AppLocalization.text("更新于 %@", fetchedAt.formatted(date: .numeric, time: .shortened)))
                     .font(.system(size: 8))
@@ -59,12 +65,6 @@ struct AgendaModuleView: View {
                     .fitsSingleLine()
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .environment(\.layoutDirection, .leftToRight)
-            }
-            HStack {
-                Text(AppLocalization.text("天气"))
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer()
-                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新天气"), action: refresh)
             }
             weatherContent(
                 locations: locations,
