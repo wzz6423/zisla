@@ -6,6 +6,107 @@ import Testing
 
 struct ApplicationVolumeGraphStoreTests {
     @Test
+    func playbackEvidenceSurvivesGainModeChangesButExpiresWithoutNewInput() {
+        let hardware = ApplicationVolumeHardwareStub()
+        let store = Self.store(hardware)
+        defer { store.stop() }
+        let monitoring = Self.request(gain: 1)
+        #expect(store.apply([monitoring], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.playingApplications(at: 0).isEmpty)
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        hardware.emit(input: input, output: output)
+        #expect(store.playingApplications(at: 0) == ["music"])
+        #expect(store.playingApplications(at: 0.2) == ["music"])
+
+        #expect(store.apply([Self.request(gain: 0)], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.playingApplications(at: 0.2) == ["music"], "增益模式切换不能让真实播放行闪退")
+        #expect(store.playingApplications(at: 1).isEmpty, "没有新输入时旧图证据必须过期")
+        #expect(store.apply([monitoring], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.releaseStalledGraphs().isEmpty, "空闲只监测图必须保留以发现同一进程恢复")
+        #expect(store.hasGraphs && !store.hasControls)
+        hardware.emit(input: input, output: output, at: 2)
+        #expect(store.playingApplications(at: 1.2) == ["music"])
+    }
+
+    @Test
+    func audioDeliveredDuringStartStillActivatesTheApplication() {
+        let hardware = ApplicationVolumeHardwareStub()
+        hardware.inputAtStart = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        hardware.outputAtStart = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        let store = Self.store(hardware)
+        defer { store.stop() }
+
+        #expect(store.apply([Self.request(gain: 1)], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.playingApplications(at: 0) == ["music"], "启动中到达的首个有效输入不能被进展基线吞掉")
+    }
+
+    @Test
+    func retryingAStalledGraphCannotReuseItsPriorInputEvidence() {
+        let hardware = ApplicationVolumeHardwareStub()
+        let store = Self.store(hardware)
+        defer { store.stop() }
+        #expect(store.apply([Self.request()], retryingApplication: nil, rebuild: false).isEmpty)
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        hardware.emit(input: input, output: output)
+        #expect(store.playingApplications(at: 0) == ["music"])
+        #expect(store.releaseStalledGraphs().isEmpty)
+        #expect(store.releaseStalledGraphs()["music"] == .hardware(kAudioHardwareNotRunningError))
+
+        #expect(store.apply([Self.request()], retryingApplication: "music", rebuild: false).isEmpty)
+        #expect(store.playingApplications(at: 0.2).isEmpty, "失效图的近期输入不能沿用到重试创建的新图")
+    }
+
+    @Test
+    func changedProcessesAndOutputCannotInheritPriorPlaybackEvidence() {
+        let hardware = ApplicationVolumeHardwareStub()
+        let store = Self.store(hardware)
+        defer { store.stop() }
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        #expect(store.apply([Self.request(gain: 1)], retryingApplication: nil, rebuild: false).isEmpty)
+        hardware.emit(input: input, output: output)
+        #expect(store.playingApplications(at: 0) == ["music"])
+        hardware.objectsByPID[101] = 401
+
+        #expect(store.apply([Self.request(gain: 1)], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.playingApplications(at: 0.1).isEmpty)
+        hardware.emit(input: input, output: output, at: 1)
+        #expect(store.playingApplications(at: 0.2) == ["music"])
+        hardware.objectsByPID[102] = 401
+        #expect(store.apply([Self.request(pids: [102], gain: 1)], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.playingApplications(at: 0.25).isEmpty,
+                "进程标识变化时即使音频对象未变也不能沿用上次播放证据")
+        hardware.emit(input: input, output: output, at: 2)
+        #expect(store.playingApplications(at: 0.3) == ["music"])
+        hardware.output = ApplicationVolumeOutput(id: 70, uid: "fixture.changed-output")
+        #expect(store.apply([Self.request(pids: [102], gain: 1)], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.playingApplications(at: 0.35).isEmpty)
+        hardware.emit(input: input, output: output, at: 3)
+        #expect(store.playingApplications(at: 0.4) == ["music"])
+        #expect(store.apply([], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.playingApplications(at: 0.5).isEmpty)
+        #expect(hardware.liveTaps.isEmpty && hardware.liveAggregates.isEmpty && hardware.liveIO.isEmpty)
+    }
+
+    @Test
+    func aFailedControlModeDoesNotBlockReturningToMonitoring() {
+        let hardware = ApplicationVolumeHardwareStub()
+        let store = Self.store(hardware)
+        defer { store.stop() }
+        #expect(store.apply([Self.request()], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.releaseStalledGraphs()["music"] == .hardware(kAudioHardwareNotRunningError))
+
+        #expect(store.apply([Self.request(gain: 1)], retryingApplication: nil, rebuild: false).isEmpty)
+        #expect(store.hasGraphs && !store.hasControls, "控音失败缓存不能阻止空闲来源重新探测")
+        let input = ApplicationVolumeBufferFixture(channels: [2], samples: [[1, -1]])
+        let output = ApplicationVolumeBufferFixture(channels: [2], samples: [[9, 9]])
+        hardware.emit(input: input, output: output, at: 1)
+        #expect(store.playingApplications(at: 0) == ["music"])
+    }
+
+    @Test
     func replacingHelpersRetriesTheFailedApplication() {
         let hardware = ApplicationVolumeHardwareStub()
         hardware.failTapForProcesses = [[101]]

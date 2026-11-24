@@ -120,15 +120,96 @@ struct ApplicationVolumeMixerModuleTests {
         #expect(!window.isVisible)
     }
 
+    @Test(.serialized, arguments: [false, true]) @MainActor
+    func failedDetectionOffersRetryWithOrWithoutAPlayingRow(hasPlayingRow: Bool) async throws {
+        let monitor = VolumeLayoutMonitor()
+        monitor.sources = [AudioPlaybackSource(
+            id: "fixture.retry", processIdentifiers: [101], bundleIdentifier: "fixture.retry",
+            applicationName: "Fixture Player", iconData: nil, isFrontmost: false
+        )]
+        let backend = VolumeLayoutBackend(isSupported: true)
+        backend.failure = .permissionDenied
+        backend.reportsPlayback = hasPlayingRow
+        let suite = "Zisla.ApplicationVolumeRetry.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let service = ApplicationVolumeMixerService(
+            monitor: monitor, backend: backend,
+            ownProcessIdentifier: -1, ownBundleIdentifier: "fixture.zisla", defaults: defaults
+        )
+        service.start()
+        defer { service.stop() }
+        #expect(service.errorMessage != nil)
+        #expect(service.applications.isEmpty == !hasPlayingRow)
+
+        _ = NSApplication.shared
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: ApplicationVolumeMixerModuleView(service: service)
+            .environment(\.locale, AppLanguage.english.locale))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 752, height: 160),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.close() }
+
+        func settle() async {
+            for _ in 0..<3 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+        }
+        func retryButton() -> NSObject? {
+            var visited: Set<ObjectIdentifier> = []
+            func find(in object: NSObject) -> NSObject? {
+                guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
+                if object.responds(to: NSSelectorFromString("accessibilityRole")),
+                   object.value(forKey: "accessibilityRole") as? String == NSAccessibility.Role.button.rawValue,
+                   object.responds(to: NSSelectorFromString("accessibilityLabel")),
+                   object.value(forKey: "accessibilityLabel") as? String
+                   == AppLocalization.string("重试", locale: AppLanguage.english.locale) {
+                    return object
+                }
+                guard object.responds(to: NSSelectorFromString("accessibilityChildren")) else { return nil }
+                for child in object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] {
+                    if let result = find(in: child) { return result }
+                }
+                return nil
+            }
+            return find(in: host)
+        }
+        await settle()
+        let button = try #require(retryButton(), "A failed detection must offer retry even when no application row exists")
+        backend.failure = nil
+        backend.reportsPlayback = true
+        let press = NSSelectorFromString("accessibilityPerformPress")
+        try #require(button.responds(to: press))
+        _ = button.perform(press)
+        await settle()
+
+        #expect(backend.retryIdentifiers == ["fixture.retry"])
+        #expect(service.errorMessage == nil)
+        #expect(service.applications.map(\.id) == ["fixture.retry"])
+        #expect(retryButton() == nil)
+        #expect(!window.isVisible)
+    }
+
     @Test(arguments: [
         (volume: 1.0, muted: false, controlled: false, error: nil as String?, expected: nil as String?),
-        (volume: 0.4, muted: false, controlled: false, error: nil, expected: "等待应用音量控制生效"),
-        (volume: 1.0, muted: true, controlled: false, error: nil, expected: "等待应用音量控制生效"),
+        (volume: 0.0, muted: false, controlled: false, error: nil, expected: nil),
+        (volume: 0.4, muted: false, controlled: false, error: nil, expected: nil),
+        (volume: 1.0, muted: true, controlled: false, error: nil, expected: nil),
+        (volume: 0.4, muted: true, controlled: false, error: nil, expected: nil),
+        (volume: 1.0, muted: true, controlled: true, error: nil, expected: nil),
         (volume: 0.4, muted: false, controlled: false, error: "denied", expected: "音量调整未生效"),
+        (volume: 1.0, muted: true, controlled: false, error: "denied", expected: "音量调整未生效"),
         (volume: 0.4, muted: false, controlled: true, error: "other application failed", expected: nil),
         (volume: 1.0, muted: false, controlled: false, error: "other application failed", expected: nil),
     ])
-    func rowsDistinguishDefaultOutputFromPendingAndFailedControl(
+    func rowsStayQuietUntilControlFails(
         sample: (volume: Double, muted: Bool, controlled: Bool, error: String?, expected: String?)
     ) {
         let application = ApplicationVolumeApplication(
@@ -179,16 +260,28 @@ private final class VolumeLayoutMonitor: ApplicationVolumeSourceMonitoring {
 @MainActor
 private final class VolumeLayoutBackend: ApplicationVolumeMixing {
     let isSupported: Bool
+    var playingApplications: Set<String> = []
+    var failure: ApplicationVolumeFailure?
+    var reportsPlayback = true
+    var retryIdentifiers: [String] = []
     var onOutputChanged: (@MainActor () -> Void)?
     var onControlFailure: (@MainActor (String, ApplicationVolumeFailure) -> Void)?
+    var onPlaybackChanged: (@MainActor (Set<String>) -> Void)?
 
     init(isSupported: Bool) { self.isSupported = isSupported }
     func start() {}
-    func stop() {}
+    func stop() { playingApplications = [] }
     func apply(
         _ requests: [ApplicationVolumeRequest], retryingApplication: String?,
         completion: @escaping @MainActor ([String: ApplicationVolumeFailure]) -> Void
     ) {
-        completion([:])
+        if let retryingApplication { retryIdentifiers.append(retryingApplication) }
+        completion(failure.map { failure in
+            Dictionary(uniqueKeysWithValues: requests.map { ($0.id, failure) })
+        } ?? [:])
+        let playing = reportsPlayback ? Set(requests.map(\.id)) : []
+        guard playing != playingApplications else { return }
+        playingApplications = playing
+        onPlaybackChanged?(playing)
     }
 }

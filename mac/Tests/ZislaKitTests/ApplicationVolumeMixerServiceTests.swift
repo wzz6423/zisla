@@ -10,7 +10,58 @@ struct ApplicationVolumeMixerServiceTests {
     private let preferenceDefaults = ApplicationVolumeDefaultsFixture()
 
     @Test
-    func listingSourcesDoesNotRequestAudioCapture() {
+    func retryWithoutAnErrorDoesNotReapplyAudioControls() {
+        let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        defer { service.stop() }
+        service.start()
+        let requests = backend.appliedRequests
+        let applications = service.applications
+
+        service.retry()
+
+        #expect(backend.appliedRequests == requests, "没有错误时重试不能重新协调所有候选来源")
+        #expect(service.applications == applications)
+    }
+
+    @Test
+    func retryAfterStopDoesNotRestartCaptureOrReapplyControls() {
+        let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
+        let backend = ApplicationVolumeBackendStub()
+        backend.failures = ["music": .permissionDenied]
+        let service = makeService(monitor, backend)
+        service.start()
+        #expect(service.errorMessage != nil)
+        service.stop()
+        let requests = backend.appliedRequests
+
+        service.retry()
+
+        #expect(backend.appliedRequests == requests)
+        #expect(service.applications.isEmpty)
+        #expect(service.errorMessage == nil)
+        #expect(backend.stopCount == 1)
+    }
+
+    @Test
+    func removedCandidatesCannotReportAQueuedControlFailure() {
+        let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
+        let backend = ApplicationVolumeBackendStub()
+        let service = makeService(monitor, backend)
+        defer { service.stop() }
+        service.start()
+        service.setVolume(0.25, for: "music")
+        monitor.publish([])
+
+        backend.onControlFailure?("music", .hardware(kAudioHardwareNotRunningError))
+
+        #expect(service.applications.isEmpty)
+        #expect(service.errorMessage == nil, "已退场的候选不能用旧故障回调显示错误")
+    }
+
+    @Test
+    func listingSourcesRequestsMonitoringWithoutControllingUnityPlayback() {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101, 102])])
         let backend = ApplicationVolumeBackendStub()
         let service = makeService(monitor, backend)
@@ -22,7 +73,8 @@ struct ApplicationVolumeMixerServiceTests {
         #expect(service.applications.map(\.id) == ["music"])
         #expect(service.applications.first?.volume == 1)
         #expect(service.applications.first?.isControlled == false)
-        #expect(backend.appliedRequests == [[]])
+        let monitoring = [ApplicationVolumeRequest(id: "music", processIdentifiers: [101, 102], gain: 1)]
+        #expect(backend.appliedRequests == [monitoring])
         #expect(monitor.startCount == 1)
         #expect(backend.startCount == 1)
     }
@@ -49,7 +101,7 @@ struct ApplicationVolumeMixerServiceTests {
     }
 
     @Test
-    func mutingPreservesVolumeAndUnityReleasesTheApplication() {
+    func mutingPreservesVolumeAndUnityReturnsToMonitoring() {
         let monitor = ApplicationVolumeMonitorStub(sources: [Self.source("music", pids: [101])])
         let backend = ApplicationVolumeBackendStub()
         let service = makeService(monitor, backend)
@@ -67,7 +119,9 @@ struct ApplicationVolumeMixerServiceTests {
         #expect(backend.appliedRequests.last?.first?.gain == 0.4)
 
         service.setVolume(1, for: "music")
-        #expect(backend.appliedRequests.last == [])
+        #expect(backend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "music", processIdentifiers: [101], gain: 1),
+        ])
         #expect(service.applications.first?.isControlled == false)
         #expect(service.applications.first?.volume == 1)
     }
@@ -314,7 +368,9 @@ struct ApplicationVolumeMixerServiceTests {
         )?["music"] as? [String: Any])
         #expect(resetRecord["volume"] as? Double == 1)
         #expect(resetRecord["isMuted"] as? Bool == false)
-        #expect(backend.appliedRequests.last == [])
+        #expect(backend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "music", processIdentifiers: [101], gain: 1),
+        ])
     }
 
     @Test
@@ -343,9 +399,10 @@ struct ApplicationVolumeMixerServiceTests {
         #expect(service.applications.first?.volume == 0.4)
         #expect(service.applications.first?.isMuted == true)
         #expect(service.applications.dropFirst().allSatisfy { $0.volume == 1 && !$0.isMuted })
-        #expect(backend.appliedRequests.last == [
-            ApplicationVolumeRequest(id: "music", processIdentifiers: [101], gain: 0),
-        ])
+        #expect(backend.appliedRequests.last == ids.enumerated().map {
+            ApplicationVolumeRequest(id: $0.element, processIdentifiers: [pid_t($0.offset + 101)],
+                                     gain: $0.element == "music" ? 0 : 1)
+        })
     }
 
     @Test
@@ -359,7 +416,9 @@ struct ApplicationVolumeMixerServiceTests {
 
         #expect(service.applications.first?.volume == 1)
         #expect(service.applications.first?.isMuted == false)
-        #expect(backend.appliedRequests.last == [])
+        #expect(backend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "music", processIdentifiers: [101], gain: 1),
+        ])
     }
 
     @Test
@@ -379,7 +438,9 @@ struct ApplicationVolumeMixerServiceTests {
         restored.start()
         #expect(restored.applications.first?.volume == 1)
         #expect(restored.applications.first?.isMuted == false)
-        #expect(restoredBackend.appliedRequests.last == [])
+        #expect(restoredBackend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "pid:101", processIdentifiers: [101], gain: 1),
+        ])
     }
 
     @Test
@@ -395,7 +456,9 @@ struct ApplicationVolumeMixerServiceTests {
 
         #expect(service.applications.first?.volume == 1)
         #expect(service.applications.first?.isMuted == false)
-        #expect(backend.appliedRequests.last == [])
+        #expect(backend.appliedRequests.last == [
+            ApplicationVolumeRequest(id: "pid:101", processIdentifiers: [101], gain: 1),
+        ])
     }
 
     @Test
@@ -421,7 +484,8 @@ struct ApplicationVolumeMixerServiceTests {
     private func makeService(
         _ monitor: ApplicationVolumeMonitorStub, _ backend: ApplicationVolumeBackendStub
     ) -> ApplicationVolumeMixerService {
-        ApplicationVolumeMixerService(
+        backend.playingApplications = Set(monitor.sources.map(\.id))
+        return ApplicationVolumeMixerService(
             monitor: monitor, backend: backend, ownProcessIdentifier: 999, ownBundleIdentifier: "fixture.zisla",
             defaults: preferenceDefaults.store
         )
@@ -454,8 +518,10 @@ private final class ApplicationVolumeMonitorStub: ApplicationVolumeSourceMonitor
 @MainActor
 private final class ApplicationVolumeBackendStub: ApplicationVolumeMixing {
     var isSupported = true
+    var playingApplications: Set<String> = []
     var onOutputChanged: (@MainActor () -> Void)?
     var onControlFailure: (@MainActor (String, ApplicationVolumeFailure) -> Void)?
+    var onPlaybackChanged: (@MainActor (Set<String>) -> Void)?
     var startCount = 0
     var stopCount = 0
     var failures: [String: ApplicationVolumeFailure] = [:]
@@ -464,14 +530,18 @@ private final class ApplicationVolumeBackendStub: ApplicationVolumeMixing {
     private var completions: [@MainActor ([String: ApplicationVolumeFailure]) -> Void] = []
 
     func start() { startCount += 1 }
-    func stop() { stopCount += 1 }
+    func stop() { stopCount += 1; playingApplications = [] }
     func apply(
         _ requests: [ApplicationVolumeRequest], retryingApplication: String?,
         completion: @escaping @MainActor ([String: ApplicationVolumeFailure]) -> Void
     ) {
         appliedRequests.append(requests)
         completions.append(completion)
+        let next = Set(requests.map(\.id))
+        let changed = next != playingApplications
+        playingApplications = next
         if completesImmediately { completion(failures) }
+        if changed { onPlaybackChanged?(next) }
     }
     func complete(at index: Int, failures: [String: ApplicationVolumeFailure]) { completions[index](failures) }
 }

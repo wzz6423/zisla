@@ -203,18 +203,24 @@ struct AudioPlaybackMonitorTests {
 @MainActor
 private final class AudioPlaybackMixerBackendStub: ApplicationVolumeMixing {
     var isSupported = true
+    var playingApplications: Set<String> = []
     var onOutputChanged: (@MainActor () -> Void)?
     var onControlFailure: (@MainActor (String, ApplicationVolumeFailure) -> Void)?
+    var onPlaybackChanged: (@MainActor (Set<String>) -> Void)?
     var requests: [ApplicationVolumeRequest] = []
 
     func start() {}
-    func stop() { requests = [] }
+    func stop() { requests = []; playingApplications = [] }
     func apply(
         _ requests: [ApplicationVolumeRequest], retryingApplication: String?,
         completion: @escaping @MainActor ([String: ApplicationVolumeFailure]) -> Void
     ) {
         self.requests = requests
+        let next = Set(requests.map(\.id))
+        let changed = next != playingApplications
+        playingApplications = next
         completion([:])
+        if changed { onPlaybackChanged?(next) }
     }
 }
 
