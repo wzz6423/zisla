@@ -1,4 +1,4 @@
-.PHONY: run stop update release build-package sync-cask clean
+.PHONY: run stop update release build-package sync-cask format clean
 
 LOCAL_SIGNING_ENV := SIGNING_MODE=dev
 ZISLA_FIRST ?= 0
@@ -21,6 +21,9 @@ build-package:
 # VERSION is required. Add PUBLISH_TAP=true to push the cask to the Homebrew tap.
 sync-cask:
 	@mac/Scripts/sync-homebrew-cask.sh
+
+format:
+	@swiftformat mac --config .swiftformat --cache ignore
 
 clean: stop
 	@rm -rf outputs .impeccable .playwright-cli \

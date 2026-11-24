@@ -89,7 +89,9 @@ test -L /Volumes/zisla/Applications
 diskutil eject /Volumes/zisla
 ```
 
-Use an older app version to check the new release. Confirm that automatic and manual checks from a `CN` public egress use the selected Gitee feed first and retry GitHub once, while other public egresses use GitHub first and retry Gitee once. Verify that Sparkle installs and relaunches the ZIP for the running architecture, leaving a single-architecture install on a single architecture. Test Release→Preview and Preview→Release switching as well as same-channel updates.
+Routine releases retain local artifact, signing, checksum, package layout and appcast checks, dual-site asset and permanent-feed verification, and release metadata validation. Downloading release packages again, installation checks, and real Sparkle upgrade acceptance run only when explicitly requested.
+
+For requested update acceptance, use an older app version to check the new release. Confirm that automatic and manual checks from a `CN` public egress use the selected Gitee feed first and retry GitHub once, while other public egresses use GitHub first and retry Gitee once. Verify that Sparkle installs and relaunches the ZIP for the running architecture, leaving a single-architecture install on a single architecture. Test Release→Preview and Preview→Release switching as well as same-channel updates. Checks that were not requested are recorded as `Not verified` and are not prerequisites for completing a release.
 
 ## 4. Sync the Homebrew cask
 
@@ -103,10 +105,19 @@ VERSION=1.0.0 RELEASE_OUTPUT_DIRECTORY=mac/dist PUBLISH_TAP=true make sync-cask
 
 The script rewrites `version` and both `sha256` values in `Casks/zisla.rb`, reading each digest from `$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-arm64.zip.sha256` and its `x86_64` counterpart when those files exist and from the published GitHub assets otherwise. The cask resolves `#{arch}` per machine, so Apple Silicon and Intel download only their own slice; verification rejects a cask that reuses one digest for both. It refuses to write a cask that fails `homebrew-cask.rb verify`, then mirrors the file to `wzz6423/homebrew-tap`. Omit `PUBLISH_TAP` for a dry run that only updates the in-repo cask.
 
-The cask carries `auto_updates true` because Sparkle owns the update path: `brew upgrade` then replaces the app only when the installed bundle really is behind the tap, which Homebrew 5.1.6 and later decide by reading the version inside the app. `brew upgrade --cask zisla` and `--greedy` go by the Homebrew install records instead, so they can undo a Sparkle update by putting the tap version back. Commit the rewritten cask together with the site's `latestRelease` bump — CI fails when the two pin different versions. Then confirm the tap:
+The cask carries `auto_updates true` because Sparkle owns the update path: `brew upgrade` then replaces the app only when the installed bundle really is behind the tap, which Homebrew 5.1.6 and later decide by reading the version inside the app. `brew upgrade --cask zisla` and `--greedy` go by the Homebrew install records instead, so they can undo a Sparkle update by putting the tap version back. Commit the rewritten cask together with the site's `latestRelease` bump — CI fails when the two pin different versions. Validate the cask and site metadata from the repository root:
+
+```bash
+ruby .github/scripts/homebrew-cask.rb verify --version "$VERSION" --content web/src/content.ts
+```
+
+Homebrew download, installation, upgrade, and `livecheck` acceptance run only when explicitly requested. Installation acceptance example:
 
 ```bash
 brew update
 brew install --cask wzz6423/tap/zisla
+brew list --cask --versions zisla
 brew livecheck --cask wzz6423/tap/zisla
 ```
+
+Homebrew acceptance checks that were not requested are recorded as `Not verified` and are not prerequisites for completing a release.

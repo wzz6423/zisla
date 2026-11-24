@@ -90,7 +90,9 @@ test -L /Volumes/zisla/Applications
 diskutil eject /Volumes/zisla
 ```
 
-使用旧版本检查新 Release，确认中国大陆公网出口上的自动检查和手动检查都先读取所选 Gitee feed、再回退一次 GitHub；其他公网出口先读取 GitHub、再回退一次 Gitee。验证 Sparkle 能验签、安装并重启运行架构对应的 ZIP，单架构安装更新后仍只含本机架构。还要验证 Release→Preview、Preview→Release 和同通道更新。
+每次发版保留本地产物、签名、校验和、包结构、appcast、双端资产清单、永久 feed 和发布元数据校验。额外下载发布包、安装验证和 Sparkle 真实升级验收仅在用户明确要求时执行。
+
+用户要求更新验收时，使用旧版本检查新 Release，确认中国大陆公网出口上的自动检查和手动检查都先读取所选 Gitee feed、再回退一次 GitHub；其他公网出口先读取 GitHub、再回退一次 Gitee。验证 Sparkle 能验签、安装并重启运行架构对应的 ZIP，单架构安装更新后仍只含本机架构。还要验证 Release→Preview、Preview→Release 和同通道更新。未要求的检查记录为“未验证”，不作为发版完成的前置条件。
 
 ## 4. 同步 Homebrew cask
 
@@ -104,10 +106,19 @@ VERSION=1.0.0 RELEASE_OUTPUT_DIRECTORY=mac/dist PUBLISH_TAP=true make sync-cask
 
 脚本会改写 `Casks/zisla.rb` 中的 `version` 与两个 `sha256`：`$RELEASE_OUTPUT_DIRECTORY/zisla-v$VERSION-macOS-arm64.zip.sha256` 及其 `x86_64` 同名文件存在时读本地摘要，否则从已发布的 GitHub 资产拉取。cask 按 `#{arch}` 逐机解析下载地址，Apple Silicon 与 Intel 各自只取对应架构的包；两个架构复用同一摘要会被校验拒绝。未通过 `homebrew-cask.rb verify` 的 cask 不会被写回，通过后再镜像到 `wzz6423/homebrew-tap`。不带 `PUBLISH_TAP` 即为试运行，只更新仓库内的 cask。
 
-cask 声明 `auto_updates true`，因为更新链路归 Sparkle 所有：这样 `brew upgrade` 只在已装的包确实旧于 tap 时才替换它，Homebrew 5.1.6 起靠读取应用内的版本号来判断。`brew upgrade --cask zisla` 与 `--greedy` 依据的是 Homebrew 自己的安装记录，会把 tap 的版本装回去，可能撤销一次 Sparkle 更新。改写后的 cask 必须与官网 `latestRelease` 的版本一起提交——两者版本不一致时 CI 会失败。随后验证 tap：
+cask 声明 `auto_updates true`，因为更新链路归 Sparkle 所有：这样 `brew upgrade` 只在已装的包确实旧于 tap 时才替换它，Homebrew 5.1.6 起靠读取应用内的版本号来判断。`brew upgrade --cask zisla` 与 `--greedy` 依据的是 Homebrew 自己的安装记录，会把 tap 的版本装回去，可能撤销一次 Sparkle 更新。改写后的 cask 必须与官网 `latestRelease` 的版本一起提交——两者版本不一致时 CI 会失败。在仓库根目录核对 cask 与官网元数据：
+
+```bash
+ruby .github/scripts/homebrew-cask.rb verify --version "$VERSION" --content web/src/content.ts
+```
+
+Homebrew 下载、安装、升级与 `livecheck` 验收仅在用户明确要求时执行。安装验收示例：
 
 ```bash
 brew update
 brew install --cask wzz6423/tap/zisla
+brew list --cask --versions zisla
 brew livecheck --cask wzz6423/tap/zisla
 ```
+
+未要求的 Homebrew 验收记录为“未验证”，不作为发版完成的前置条件。
