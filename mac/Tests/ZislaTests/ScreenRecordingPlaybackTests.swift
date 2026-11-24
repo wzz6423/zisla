@@ -9,8 +9,8 @@ import ZislaKit
 @MainActor
 @Suite(.serialized)
 struct ScreenRecordingPlaybackTests {
-    @Test(arguments: [false, true])
-    func pausingScrubbingAndReturningFromSourcePlaybackReusePreparedVoiceAudio(_ multitrack: Bool) async throws {
+    @Test(arguments: [false, true], [false, true])
+    func pausingScrubbingAndReturningFromSourcePlaybackReusePreparedVoiceAudio(_ multitrack: Bool, _ delayedObservation: Bool) async throws {
         let fixture = try RecordingMultitrackTestFixture()
         defer { fixture.remove() }
         _ = try await fixture.createVideo()
@@ -29,20 +29,45 @@ struct ScreenRecordingPlaybackTests {
         let temporary = sources.filter { $0.deletingLastPathComponent() != fixture.directory }
         try #require(temporary.count == (multitrack ? 2 : 1), "The fixture must own processed PCM and, for multitrack, a playback clock")
         model.playTimeline()
+        let player = try #require(model.timelinePlayer)
 
         for start in [0.2, 0.05, 0.3, 0] {
             model.playSource()
             model.seekTimeline(to: start)
             await model.previewTask?.value
+            let resumed = XCTestExpectation(description: "Prepared playback resumes after seeking")
+            let observation = player.observe(\.rate, options: .new) { player, change in
+                if change.newValue == 1 {
+                    // The test task can resume after playback has already advanced.
+                    let position = player.currentTime().seconds
+                    #expect(abs(position - start) < 0.05,
+                            "Reused playback must seek to the edited output position")
+                    resumed.fulfill()
+                }
+            }
+            defer { observation.invalidate() }
+            let advanced = XCTestExpectation(description: "Playback advances before the test resumes")
+            let boundary: Any?
+            if delayedObservation {
+                boundary = player.addBoundaryTimeObserver(forTimes: [NSValue(time: .init(seconds: start + 0.1, preferredTimescale: 60_000))],
+                                                          queue: DispatchQueue(label: "zisla-test-playback-progress")) {
+                    player.pause()
+                    advanced.fulfill()
+                }
+            } else { boundary = nil }
+            defer { if let boundary { player.removeTimeObserver(boundary) } }
             model.playTimeline()
             await model.operationTask?.value
-            let position = try #require(model.activePlayer).currentTime().seconds
+            try #require(await XCTWaiter.fulfillment(of: [resumed], timeout: 5) == .completed)
+            if delayedObservation {
+                try #require(await XCTWaiter.fulfillment(of: [advanced], timeout: 5) == .completed)
+                #expect(player.currentTime().seconds - start > 0.05,
+                        "The delayed observer must resume after playback exceeds the seek tolerance")
+            }
 
             #expect(model.isShowingTimelinePlayback && !model.isShowingSourcePlayback && !model.isBusy)
             #expect(try await playbackSources(#require(model.activePlayer?.currentItem)) == sources,
                     "Resuming an unchanged timeline must reuse its PCM and playback clock instead of processing the whole recording again")
-            #expect(abs(position - start) < 0.05,
-                    "Reused playback must seek to the edited output position")
             #expect(temporary.allSatisfy { FileManager.default.fileExists(atPath: $0.path) },
                     "Prepared audio must remain available while the timeline can resume")
             model.playTimeline()
