@@ -537,7 +537,12 @@ struct ThinScrollChromeTests {
                     todayCharacterCount: count, todayPeakCharactersPerSecond: 0,
                     todayActiveSeconds: 0, todayActiveMinuteBuckets: 0, todayTopApplication: nil,
                     todayKeyPressCount: count, allTimeKeyPressCount: count, applications: [],
-                    history: [], timelineRange: "day", recentBuckets: [], applicationTimelines: [],
+                    history: [
+                        KeyboardTypingStatsDaySummary(id: "first", date: date,
+                                                      characterCount: 10, peakCharactersPerSecond: 1, activeMinuteBuckets: 1),
+                        KeyboardTypingStatsDaySummary(id: "last", date: date.addingTimeInterval(86_400 * 30),
+                                                      characterCount: 20, peakCharactersPerSecond: 2, activeMinuteBuckets: 2),
+                    ], timelineRange: "day", recentBuckets: [], applicationTimelines: [],
                     todayKeyCounts: [:], allTimeKeyCounts: [:]
                 ),
                 voiceStatistics: VoiceHistoryStatistics(
@@ -564,6 +569,7 @@ struct ThinScrollChromeTests {
             [object] + (value(object, "accessibilityChildren") as? [NSObject] ?? []).flatMap(objects)
         }
         for (count, voiceCount) in [(Int64(123_456), 30_540), (654_321, 43_210)] {
+            descendants(in: host).compactMap { $0 as? NSScrollView }.first?.contentView.scroll(to: .zero)
             host.rootView = content(count: count, voiceCount: voiceCount, renderedLocale: locale)
             for _ in 0..<8 {
                 host.layoutSubtreeIfNeeded()
@@ -598,9 +604,17 @@ struct ThinScrollChromeTests {
             }
             #expect(hasRed, "The native document must render the enclosing accent color")
             #expect(hasPrimary, "The explicit color scheme must override the opposite native appearance")
-            let captureBounds = CGRect(x: 0, y: 0, width: floor(document.bounds.width), height: 350)
-            let beforeLocaleChange = try #require(document.bitmapImageRepForCachingDisplay(in: captureBounds))
-            document.cacheDisplay(in: captureBounds, to: beforeLocaleChange)
+            let axisObject = try #require(rendered.first {
+                value($0, "accessibilityRole") as? String == NSAccessibility.Role.unknown.rawValue
+                    && (value($0, "accessibilityLabel") as? String)?.isEmpty == false
+            })
+            let axis = try #require(axisObject as? any NSAccessibilityElementProtocol)
+            let axisFrame = document.convert(window.convertFromScreen(axis.accessibilityFrame()), from: nil)
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: axisFrame.midY - scroll.contentView.bounds.height / 2))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            host.layoutSubtreeIfNeeded()
+            #expect(document.visibleRect.contains(axisFrame), "The date axis must be visible before measuring locale rendering")
+            let beforeLocaleChange = try #require(value(axisObject, "accessibilityLabel") as? String)
             host.rootView = content(count: count, voiceCount: voiceCount,
                                     renderedLocale: Locale(identifier: arabic ? "en_US" : "ar"))
             for _ in 0..<8 {
@@ -609,20 +623,9 @@ struct ThinScrollChromeTests {
                     DispatchQueue.main.async { continuation.resume() }
                 }
             }
-            let afterLocaleChange = try #require(document.bitmapImageRepForCachingDisplay(in: captureBounds))
-            document.cacheDisplay(in: captureBounds, to: afterLocaleChange)
-            var localeChanged = false
-            localePixels: for y in 0..<beforeLocaleChange.pixelsHigh {
-                for x in 0..<beforeLocaleChange.pixelsWide {
-                    let before = try #require(beforeLocaleChange.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
-                    let after = try #require(afterLocaleChange.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
-                    if abs(before.redComponent - after.redComponent) > 0.05 {
-                        localeChanged = true
-                        break localePixels
-                    }
-                }
-            }
-            #expect(localeChanged, "Changing only the enclosing locale must update the rendered history dates")
+            let afterLocaleChange = try #require(value(axisObject, "accessibilityLabel") as? String)
+            #expect(afterLocaleChange != beforeLocaleChange,
+                    "Changing only the enclosing locale must update the visible date axis's accessibility label")
         }
         #expect(!window.isVisible && !window.isKeyWindow)
     }
