@@ -951,6 +951,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .map { message, islandVisible, mirror, teleprompter in
                 islandVisible || mirror || teleprompter ? nil : message
             }
+            .combineLatest(model.aiResultSweep.$current)
+            .map { message, sweep in AIResultSweepController.presentationMessage(message, sweep: sweep) }
             .removeDuplicates()
             .sink { [weak self, weak coordinator] message in
                 Task { @MainActor [weak self, weak coordinator] in

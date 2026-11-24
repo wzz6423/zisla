@@ -9,6 +9,7 @@ struct IslandRootView: View {
     @ObservedObject private var settingsStore: FeatureSettingsStore
     @ObservedObject private var voiceInput: VoiceInputController
     @ObservedObject private var backgroundSounds: SystemBackgroundSoundService
+    @ObservedObject private var resultSweep: AIResultSweepController
     var onPointerEntered: () -> Void
     var onPointerExited: () -> Void
     var onPinChanged: (Bool) -> Void
@@ -36,6 +37,7 @@ struct IslandRootView: View {
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         _voiceInput = ObservedObject(wrappedValue: model.voiceInput)
         _backgroundSounds = ObservedObject(wrappedValue: model.backgroundSounds)
+        _resultSweep = ObservedObject(wrappedValue: model.aiResultSweep)
         self.onPointerEntered = onPointerEntered
         self.onPointerExited = onPointerExited
         self.onPinChanged = onPinChanged
@@ -481,7 +483,9 @@ struct IslandRootView: View {
     }
 
     private var showsTransientNotice: Bool {
-        model.transientMessage != nil
+        let message = model.isIslandVisible ? model.transientMessage
+            : AIResultSweepController.presentationMessage(model.transientMessage, sweep: resultSweep.current)
+        return message != nil
             && !voiceInput.isCapturingInput
             && !model.isMirrorPresented
             && !model.isTeleprompterPresented

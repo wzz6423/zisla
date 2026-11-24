@@ -14,10 +14,10 @@ struct SystemAutoCleanupLocalizationTests {
     func immediateCleanupCopyRendersInEveryLanguage(language: AppLanguage) throws {
         let table = try Self.table(language)
         let english = try Self.table(.english)
-        let view = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
+        let view = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/ToolboxModuleView.swift"), encoding: .utf8)
         let controller = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/ImmediateCleanupController.swift"), encoding: .utf8)
-        #expect(view.contains("AppLocalization.string(\"立即清理\", locale: locale)"))
-        for key in ["立即清理", "正在清理", "清理完成",
+        #expect(view.contains("AppLocalization.text(\"清理垃圾\")"))
+        for key in ["清理垃圾", "立即清理", "正在清理", "清理完成",
                     "清理失败，如需查看详细信息请去设置-系统状态与清理页面查看",
                     "清理部分失败，如需查看详细信息请去设置-系统状态与清理页面查看"] {
             #expect(view.contains("\"\(key)\"") || controller.contains("\"\(key)\""))
@@ -32,8 +32,27 @@ struct SystemAutoCleanupLocalizationTests {
                 #expect(value != key && value != english[key])
             }
         }
+        #expect(AppLocalization.string("清理垃圾", language: .english) == "Clean Junk")
+        #expect(AppLocalization.string("清理垃圾", language: .arabic) == "تنظيف الملفات غير الضرورية")
         #expect(AppLocalization.string("立即清理", language: .english) == "Clean Now")
         #expect(AppLocalization.string("立即清理", language: .arabic) == "تنظيف الآن")
+    }
+
+    @Test
+    func toolboxHasFourShortcutsWithCleanupImmediatelyBeforeTrash() throws {
+        let toolbox = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/ToolboxModuleView.swift"), encoding: .utf8)
+        let titles = try NSRegularExpression(pattern: #"ToolShortcutButton\(\s*title: AppLocalization\.text\("([^"]+)"\)"#)
+            .matches(in: toolbox, range: NSRange(toolbox.startIndex..., in: toolbox))
+            .compactMap { match -> String? in
+                guard let range = Range(match.range(at: 1), in: toolbox) else { return nil }
+                return String(toolbox[range])
+            }
+        #expect(titles == ["提词器", "镜子", "清理垃圾", "废纸篓"])
+
+        let settings = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
+        #expect(!settings.contains("\"立即清理\""))
+        #expect(!settings.contains("immediateCleanup.start("))
+        #expect(settings.contains("immediateCleanup.errors"))
     }
 
     @Test(arguments: AppLanguage.allCases)

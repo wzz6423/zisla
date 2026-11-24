@@ -5,6 +5,7 @@ import SwiftUI
 struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var pomodoro: PomodoroService
+    @ObservedObject private var immediateCleanup: ImmediateCleanupController
     @State private var isDurationPickerPresented = false
 
     private enum Metrics {
@@ -15,6 +16,7 @@ struct ToolboxModuleView: View {
     init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
+        _immediateCleanup = ObservedObject(wrappedValue: model.immediateCleanup)
     }
 
     var body: some View {
@@ -196,6 +198,15 @@ struct ToolboxModuleView: View {
                 ) {
                     model.presentMirror()
                 }
+
+                ToolShortcutButton(
+                    title: AppLocalization.text("清理垃圾"),
+                    symbol: "arrow.3.trianglepath",
+                    help: AppLocalization.text("立即清理")
+                ) {
+                    immediateCleanup.start(settings: model.settingsStore.settings)
+                }
+                .disabled(immediateCleanup.isRunning || !ImmediateCleanupController.canCleanNow(settings: model.settingsStore.settings))
 
                 ToolShortcutButton(
                     title: AppLocalization.text("废纸篓"),
@@ -404,6 +415,7 @@ struct ToolboxModuleView: View {
             Button(action: action) {
                 Label(title, systemImage: symbol)
                     .font(.system(size: 11, weight: .semibold))
+                    .fitsSingleLine()
                     .frame(maxWidth: .infinity)
                     .frame(height: Metrics.controlHeight)
                     .contentShape(shape)

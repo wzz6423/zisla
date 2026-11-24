@@ -80,10 +80,15 @@ struct TransientNoticeScrollingTests {
 
     @Test
     func dismissalIsDerivedFromTheMessageRatherThanAFixedBeat() throws {
-        let source = try String(contentsOf: Self.sourceURL("AppModel.swift"), encoding: .utf8)
-
-        #expect(source.contains("TransientNoticeMetrics.displayDuration("))
-        #expect(!source.contains("transientMessageDuration"))
+        let short = try #require(TransientNoticeMetrics.dismissalDuration(
+            for: "已保存", rowWidth: 240, isCleaning: false, sweep: nil
+        ))
+        let long = try #require(TransientNoticeMetrics.dismissalDuration(
+            for: String(repeating: "清理结果", count: 20), rowWidth: 240, isCleaning: false, sweep: nil
+        ))
+        #expect(short == .seconds(TransientNoticeMetrics.minimumSeconds))
+        #expect(long > short)
+        #expect(long <= .seconds(TransientNoticeMetrics.maximumSeconds))
     }
 
     @Test

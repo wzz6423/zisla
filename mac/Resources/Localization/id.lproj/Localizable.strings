@@ -3758,6 +3758,7 @@
 "自动更新依赖组件" = "Perbarui Dependensi Secara Otomatis";
 "每天更新已安装的依赖组件" = "Perbarui dependensi yang terpasang setiap hari";
 "（默认）" = "(Default)";
+"清理垃圾" = "Bersihkan file sampah";
 "立即清理" = "Bersihkan sekarang";
 "正在清理" = "Sedang membersihkan";
 "清理完成" = "Pembersihan selesai";
