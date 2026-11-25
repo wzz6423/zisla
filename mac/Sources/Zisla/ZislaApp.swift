@@ -867,7 +867,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        // Allow the island panel to become the keyboard focus only when a text input interface is visible, preventing it from stealing focus from the frontmost app in other cases.
+        // Every page accepts navigation after a deliberate click; only pinned text surfaces claim focus automatically.
         Publishers.CombineLatest3(
             model.$selectedModule,
             model.$isIslandVisible,
@@ -876,9 +876,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         .sink { [weak coordinator] module, visible, isTeleprompterPresented in
             Task { @MainActor in
                 coordinator?.setAllowsKeyWindow(
-                    visible && (
-                        module.allowsIslandKeyboardFocus || isTeleprompterPresented
-                    )
+                    visible,
+                    focusesKeyboardInputSurface: module.allowsIslandKeyboardFocus || isTeleprompterPresented
                 )
             }
         }

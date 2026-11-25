@@ -215,6 +215,11 @@ struct IslandRootView: View {
                                         .padding(.horizontal, 12)
                                         .padding(.bottom, 7)
                                         .environment(\.colorScheme, .dark)
+                                        .background {
+                                            IslandModuleNavigationShortcuts { direction in
+                                                model.selectAdjacentModule(in: direction, isRightToLeft: layoutDirection == .rightToLeft)
+                                            }
+                                        }
 
                                     Group {
                                         if let activeModule {

@@ -73,6 +73,7 @@ public final class OverlayCoordinator: NSObject {
     private var stopsAfterTransientReveal = false
     private var isPinned = false
     private var allowsKeyWindow = false
+    private var focusesKeyboardInputSurface = false
     private var keepsNativeGlassActive = false
     private var isExternalDragging = false
     private var isTransientInteractionVisible = false
@@ -631,8 +632,9 @@ public final class OverlayCoordinator: NSObject {
         }
     }
 
-    public func setAllowsKeyWindow(_ allows: Bool) {
+    public func setAllowsKeyWindow(_ allows: Bool, focusesKeyboardInputSurface: Bool = true) {
         allowsKeyWindow = allows
+        self.focusesKeyboardInputSurface = focusesKeyboardInputSurface
         applyPanelFocusPolicy()
         if allows { focusKeyboardInputSurfaceIfNeeded() }
     }
@@ -725,7 +727,7 @@ public final class OverlayCoordinator: NSObject {
     /// changes, notices, repositioning — are never pinned, so they cannot reach this and cannot pull
     /// the caret out of whatever the user is typing in.
     private func focusKeyboardInputSurfaceIfNeeded() {
-        guard isPinned, allowsKeyWindow, let panel, panel.isVisible, !panel.isKeyWindow else {
+        guard isPinned, allowsKeyWindow, focusesKeyboardInputSurface, let panel, panel.isVisible, !panel.isKeyWindow else {
             return
         }
         panel.takeKeyboardFocus()

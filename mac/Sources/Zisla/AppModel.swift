@@ -122,6 +122,53 @@ extension IslandModule {
     }
 }
 
+struct IslandModuleNavigation {
+    enum Direction: Int {
+        case previous = -1
+        case next = 1
+    }
+
+    private(set) var direction: CGFloat = 1
+    private(set) var pendingSelection: IslandModule?
+
+    mutating func select(
+        _ module: IslandModule,
+        selectedModule: IslandModule,
+        settings: FeatureSettings,
+        direction: Direction? = nil
+    ) -> Bool {
+        let module = module.navigationTarget
+        let current = pendingSelection ?? selectedModule.navigationTarget
+        guard module != current else { return false }
+        let order = IslandModule.configuredOrder(settings)
+        if let direction {
+            self.direction = CGFloat(direction.rawValue)
+        } else if let from = order.firstIndex(of: current), let to = order.firstIndex(of: module) {
+            self.direction = to > from ? 1 : -1
+        }
+        pendingSelection = module
+        return true
+    }
+
+    func adjacentTarget(
+        in direction: Direction,
+        selectedModule: IslandModule,
+        settings: FeatureSettings,
+        isRightToLeft: Bool = false
+    ) -> IslandModule {
+        let order = IslandModule.enabledOrder(settings)
+        let current = pendingSelection ?? selectedModule.navigationTarget
+        let index = order.firstIndex(of: current) ?? 0
+        let offset = isRightToLeft ? -direction.rawValue : direction.rawValue
+        return order[(index + offset + order.count) % order.count]
+    }
+
+    mutating func takePendingSelection() -> IslandModule? {
+        defer { pendingSelection = nil }
+        return pendingSelection
+    }
+}
+
 struct IslandModuleLayout: Equatable {
     let islandSize: CGSize
     let panelSize: CGSize
@@ -417,30 +464,31 @@ final class AppModel: ObservableObject {
             }
         }
     }
-    /// Module switch direction (+1 rightward in module order, -1 leftward) driving the
+    /// Module switch direction (+1 rightward, -1 leftward) driving the
     /// directional page transition. Committed one run-loop turn before `selectedModule`
     /// changes so the outgoing view's removal transition also carries the fresh direction.
-    @Published private(set) var moduleSwitchDirection: CGFloat = 1
-    private var pendingModuleSelection: IslandModule?
+    var moduleSwitchDirection: CGFloat { moduleNavigation.direction }
+    @Published private var moduleNavigation = IslandModuleNavigation()
 
     /// Preferred entry point for switching modules: records the navigation direction for
     /// the directional transition, then applies the switch on the next run-loop turn.
-    func selectModule(_ module: IslandModule) {
-        let module = module.navigationTarget
-        let current = pendingModuleSelection ?? selectedModule
-        guard module != current else { return }
-        let order = IslandModule.configuredOrder(settingsStore.settings)
-        if let from = order.firstIndex(of: current),
-           let to = order.firstIndex(of: module) {
-            moduleSwitchDirection = to > from ? 1 : -1
-        }
-        pendingModuleSelection = module
+    func selectModule(_ module: IslandModule, direction: IslandModuleNavigation.Direction? = nil) {
+        guard moduleNavigation.select(module, selectedModule: selectedModule, settings: settingsStore.settings, direction: direction)
+        else { return }
         DispatchQueue.main.async { [weak self] in
-            guard let self, let target = self.pendingModuleSelection else { return }
-            self.pendingModuleSelection = nil
+            guard let self, let target = self.moduleNavigation.takePendingSelection() else { return }
             guard target != self.selectedModule else { return }
             self.selectedModule = target
         }
+    }
+
+    func selectAdjacentModule(in direction: IslandModuleNavigation.Direction, isRightToLeft: Bool) {
+        selectModule(
+            moduleNavigation.adjacentTarget(
+                in: direction, selectedModule: selectedModule, settings: settingsStore.settings, isRightToLeft: isRightToLeft
+            ),
+            direction: direction
+        )
     }
 
     @Published var isPinned = false

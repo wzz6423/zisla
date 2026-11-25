@@ -21,6 +21,7 @@ public final class IslandPanel: NSPanel {
         NSApp.activate(ignoringOtherApps: true)
     }
     public var allowsKeyWindow = false
+    public weak var pageNavigationShortcutView: NSView?
     /// Records that the transparent style's native glass surface is on screen. The active-appearance
     /// override below is what keeps that surface rendering, so this never influences focus.
     public var keepsNativeGlassActive = false
@@ -53,7 +54,8 @@ public final class IslandPanel: NSPanel {
     private func islandHasActiveAppearance() -> Bool { true }
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        TextEditingCommands.performKeyEquivalent(with: event, in: self)
+        pageNavigationShortcutView?.performKeyEquivalent(with: event) == true
+            || TextEditingCommands.performKeyEquivalent(with: event, in: self)
             || super.performKeyEquivalent(with: event)
     }
 

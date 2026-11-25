@@ -209,7 +209,7 @@ struct QuickNotesServiceTests {
     }
 
     @Test(arguments: [false, true])
-    func adjacentSelectionFollowsDisplayedOrderAndStopsAtBothEnds(welcomeDismissed: Bool) async throws {
+    func adjacentSelectionFollowsDisplayedOrderAndWrapsAtBothEnds(welcomeDismissed: Bool) async throws {
         let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -225,19 +225,22 @@ struct QuickNotesServiceTests {
 
         service.selectAdjacent(in: .previous)
         #expect(service.selectedID == first.id)
-        service.selectAdjacent(in: .previous)
+        if let welcomeNote = service.welcomeNote {
+            service.selectAdjacent(in: .previous)
+            #expect(service.selectedID == welcomeNote.id)
+        }
         let topID = service.welcomeNote?.id ?? first.id
         #expect(service.selectedID == topID)
         service.selectAdjacent(in: .previous)
-        #expect(service.selectedID == topID, "Moving above the first displayed item must not wrap")
+        #expect(service.selectedID == last.id, "Moving above the first displayed item must wrap to the last")
 
         service.select(id: middle.id)
         service.selectAdjacent(in: .next)
         #expect(service.selectedID == last.id, "Locked notes remain selectable")
         service.selectAdjacent(in: .next)
-        #expect(service.selectedID == last.id, "Moving below the last displayed item must not wrap")
+        #expect(service.selectedID == topID, "Moving below the last displayed item must wrap to the first")
         service.selectAdjacent(in: .previous)
-        #expect(service.selectedID == middle.id)
+        #expect(service.selectedID == last.id)
         #expect(service.notes == [first, middle, last], "Navigation must not reorder or edit notes")
     }
 
@@ -282,7 +285,7 @@ struct QuickNotesServiceTests {
     }
 
     @Test
-    func adjacentSelectionCanLeaveANoteWhoseBodyFailedToLoad() async throws {
+    func adjacentSelectionWrapsAwayFromANoteWhoseBodyFailedToLoad() async throws {
         let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -297,12 +300,13 @@ struct QuickNotesServiceTests {
         ))
         let first = NotesAppBridge.NoteSummary(id: "first", title: "First", modifiedAt: Date(timeIntervalSince1970: 2))
         let second = NotesAppBridge.NoteSummary(id: "second", title: "Second", modifiedAt: Date(timeIntervalSince1970: 1))
+        await service.delete(id: try #require(service.welcomeNote).id)
         service.applyFetchedNotes([second, first])
         service.select(id: first.id)
         #expect(await service.loadNote() == nil)
         #expect(service.errorMessage == "injected read failure")
 
-        service.selectAdjacent(in: .next)
+        service.selectAdjacent(in: .previous)
         #expect(service.selectedID == second.id)
         #expect(await service.loadNote()?.plainText == second.id)
         #expect(!service.isLoadingNote)
@@ -357,17 +361,18 @@ struct QuickNotesServiceTests {
         #expect(events == [.updated, .updated])
     }
 
-    @Test
-    func preservesPendingSaveWhenLoadingAnotherNote() async throws {
+    @Test(arguments: [false, true])
+    func preservesPendingSaveWhenLoadingAnotherNote(wrapping: Bool) async throws {
         let writes = ControlledNoteWrites()
         let service = makeService(writes: writes, saveDelay: .milliseconds(1))
         let first = NotesAppBridge.NoteSummary(id: "first", title: "第一条", modifiedAt: Date(timeIntervalSince1970: 2))
         let second = NotesAppBridge.NoteSummary(id: "second", title: "第二条", modifiedAt: Date(timeIntervalSince1970: 1))
+        await service.delete(id: try #require(service.welcomeNote).id)
         service.applyFetchedNotes([first, second])
         service.select(id: first.id)
 
         service.scheduleSave(id: first.id, html: "first body")
-        service.selectAdjacent(in: .next)
+        service.selectAdjacent(in: wrapping ? .previous : .next)
         #expect(service.selectedID == second.id)
         _ = await service.loadNote()
 
