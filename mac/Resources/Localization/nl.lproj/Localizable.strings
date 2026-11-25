@@ -3778,3 +3778,9 @@
 "重复安装 · 版本 %@ · %@ · 保留：%@" = "Dubbele installatie · Versie %@ · %@ · Behouden: %@";
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Update-restanten · Oude versie %@ · %@ · Huidige versie: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "De app-kopie of de huidige versie is gewijzigd. Het item is behouden.";
+
+/* Independent countdown timers */
+"计时器" = "Timer";
+"计时结束" = "Timer afgelopen";
+"计时器名称" = "Timernaam";
+"添加计时器" = "Timer toevoegen";

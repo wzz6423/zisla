@@ -3778,3 +3778,9 @@
 "重复安装 · 版本 %@ · %@ · 保留：%@" = "Cài đặt trùng lặp · Phiên bản %@ · %@ · Giữ lại: %@";
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Tệp còn lại sau cập nhật · Phiên bản cũ %@ · %@ · Phiên bản hiện tại: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "Bản sao ứng dụng hoặc phiên bản hiện tại đã thay đổi. Mục được giữ lại.";
+
+/* Independent countdown timers */
+"计时器" = "Bộ hẹn giờ";
+"计时结束" = "Đã hết giờ";
+"计时器名称" = "Tên bộ hẹn giờ";
+"添加计时器" = "Thêm bộ hẹn giờ";

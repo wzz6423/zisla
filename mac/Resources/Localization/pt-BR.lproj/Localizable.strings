@@ -3778,3 +3778,9 @@
 "重复安装 · 版本 %@ · %@ · 保留：%@" = "Instalação duplicada · Versão %@ · %@ · Manter: %@";
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Resíduos de atualização · Versão antiga %@ · %@ · Versão atual: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "A cópia do aplicativo ou a versão atual mudou. O item foi mantido.";
+
+/* Independent countdown timers */
+"计时器" = "Temporizador";
+"计时结束" = "Temporizador concluído";
+"计时器名称" = "Nome do temporizador";
+"添加计时器" = "Adicionar temporizador";

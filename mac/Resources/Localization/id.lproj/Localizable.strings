@@ -3778,3 +3778,9 @@
 "重复安装 · 版本 %@ · %@ · 保留：%@" = "Instalasi duplikat · Versi %@ · %@ · Pertahankan: %@";
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Sisa pembaruan · Versi lama %@ · %@ · Versi saat ini: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "Salinan aplikasi atau versi saat ini telah berubah. Item dipertahankan.";
+
+/* Independent countdown timers */
+"计时器" = "Pengatur waktu";
+"计时结束" = "Waktu selesai";
+"计时器名称" = "Nama pengatur waktu";
+"添加计时器" = "Tambah pengatur waktu";

@@ -140,6 +140,7 @@ struct CompactPillStatusContent: View {
             } else {
                 let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
                 let iconSize = max(0, thickness - 8)
+                let countdownName = presentation.priority == .focusCountdown ? presentation.notice.metadata?["timerName"] ?? "" : ""
                 let textBudget = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
                     - iconSize - (presentation.showsWaveform ? iconSize + 6 : 0) - 6
                     - CompactPillStatusPresentation.trailingInset - leadingInset
@@ -174,7 +175,12 @@ struct CompactPillStatusContent: View {
                         waveform(size: iconSize, thickness: thickness)
                     }
                     if !text.isEmpty {
-                        if edge.isVertical {
+                        if presentation.priority == .focusCountdown {
+                            CompactCountdownText(name: countdownName, clock: text, edge: edge,
+                                                 length: textLength, thickness: thickness)
+                                .frame(width: edge.isVertical ? thickness : textLength,
+                                       height: edge.isVertical ? textLength : thickness)
+                        } else if edge.isVertical {
                             VerticalStatusText(text: text, availableWidth: thickness, availableHeight: textLength,
                                                scrollProgress: lyricScrollProgress)
                                 .frame(width: thickness, height: textLength, alignment: .top)
@@ -189,7 +195,7 @@ struct CompactPillStatusContent: View {
                         waveform(size: iconSize, thickness: thickness)
                     }
                     if presentation.priority == .focusCountdown {
-                        CompactPomodoroControls(edge: edge)
+                        CompactPomodoroControls(edge: edge, notice: presentation.notice)
                             .frame(width: edge.isVertical ? thickness : CompactPillStatusPresentation.pomodoroControlsLength,
                                    height: edge.isVertical ? CompactPillStatusPresentation.pomodoroControlsLength : thickness)
                     }

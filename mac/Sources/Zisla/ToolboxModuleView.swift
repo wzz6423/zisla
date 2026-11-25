@@ -6,7 +6,6 @@ struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var pomodoro: PomodoroService
     @ObservedObject private var immediateCleanup: ImmediateCleanupController
-    @State private var isDurationPickerPresented = false
 
     private enum Metrics {
         static let controlHeight: CGFloat = 40
@@ -21,119 +20,15 @@ struct ToolboxModuleView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            focusPanel
+            timerPanel
             toolActions
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    private var focusPanelShape: UnevenRoundedRectangle {
-        IslandSurfaceGeometry.moduleContentShape(
-            bottomLeadingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
-        )
-    }
-
-    private var startPauseButtonShape: UnevenRoundedRectangle {
-        IslandSurfaceGeometry.moduleContentShape(
-            bottomLeadingRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(inset: 10)
-        )
-    }
-
-    private var focusPanel: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(AppLocalization.text(pomodoro.mode.title))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-            }
-
-            Spacer(minLength: 0)
-            durationDisplay
-                .frame(maxWidth: .infinity, alignment: .center)
-            Spacer(minLength: 0)
-
-            HStack(spacing: 8) {
-                Button {
-                    pomodoro.toggleStartPause()
-                } label: {
-                    Text(startPauseTitle)
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Metrics.controlHeight)
-                        .contentShape(startPauseButtonShape)
-                }
-                .buttonStyle(.plain)
-                .background(Color.fillCard)
-                .clipShape(startPauseButtonShape)
-                .help(startPauseTitle)
-
-                Button {
-                    pomodoro.reset()
-                } label: {
-                    Text(AppLocalization.text("重置"))
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Metrics.controlHeight)
-                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .background(Color.fillControl)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .help(AppLocalization.text("重置番茄钟"))
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(10)
-        .frame(width: 236, height: Metrics.toolContentHeight)
-        .background(Color.fillCard)
-        .clipShape(focusPanelShape)
-        .overlay {
-            focusPanelShape
-                .strokeBorder(Color.strokeCard, lineWidth: 1)
-        }
-    }
-
-    @ViewBuilder
-    private var durationDisplay: some View {
-        if pomodoro.phase == .idle {
-            Button {
-                isDurationPickerPresented.toggle()
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(pomodoro.displayClock)
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .buttonStyle(.plain)
-            .help(AppLocalization.text("设置时长"))
-            .popover(isPresented: $isDurationPickerPresented, arrowEdge: .top) {
-                HStack(spacing: 8) {
-                    durationInput("小时", value: durationHours)
-                    Text(AppLocalization.text("小时"))
-                        .foregroundStyle(.secondary)
-
-                    durationInput("分钟", value: durationMinutes)
-                    Text(AppLocalization.text("分"))
-                        .foregroundStyle(.secondary)
-
-                    durationInput("秒", value: durationSeconds)
-                    Text(AppLocalization.text("秒"))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(12)
-            }
-        } else {
-            Text(pomodoro.displayClock)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.primary)
-        }
+    private var timerPanel: some View {
+        ToolboxTimerPanel(service: pomodoro)
+            .frame(width: pomodoro.countdowns.isEmpty ? 236 : 320, height: Metrics.toolContentHeight)
     }
 
     private var toolActions: some View {
@@ -221,72 +116,6 @@ struct ToolboxModuleView: View {
         .frame(maxWidth: .infinity, alignment: .top)
     }
 
-    private var currentDuration: TimeInterval {
-        let seconds = pomodoro.mode == .focus
-            ? pomodoro.focusDuration
-            : pomodoro.restDuration
-        return max(1, seconds)
-    }
-
-    private var durationHours: Binding<Int> {
-        Binding(
-            get: { Int(currentDuration) / 3_600 },
-            set: {
-                setDuration(
-                    hours: $0,
-                    minutes: durationMinutes.wrappedValue,
-                    seconds: durationSeconds.wrappedValue
-                )
-            }
-        )
-    }
-
-    private var durationMinutes: Binding<Int> {
-        Binding(
-            get: { Int(currentDuration / 60) % 60 },
-            set: {
-                setDuration(
-                    hours: durationHours.wrappedValue,
-                    minutes: $0,
-                    seconds: durationSeconds.wrappedValue
-                )
-            }
-        )
-    }
-
-    private var durationSeconds: Binding<Int> {
-        Binding(
-            get: { Int(currentDuration) % 60 },
-            set: {
-                setDuration(
-                    hours: durationHours.wrappedValue,
-                    minutes: durationMinutes.wrappedValue,
-                    seconds: $0
-                )
-            }
-        )
-    }
-
-    private func durationInput(_ title: String, value: Binding<Int>) -> some View {
-        TextField(AppLocalization.text(title), value: value, format: .number)
-            .textFieldStyle(.roundedBorder)
-            .multilineTextAlignment(.trailing)
-            .frame(width: 44)
-    }
-
-    private func setDuration(hours: Int, minutes: Int, seconds: Int) {
-        let duration = TimeInterval(Self.durationSeconds(
-            hours: hours,
-            minutes: minutes,
-            seconds: seconds
-        ))
-        if pomodoro.mode == .focus {
-            pomodoro.setFocusDuration(duration)
-        } else {
-            pomodoro.setRestDuration(duration)
-        }
-    }
-
     static let maximumDurationSeconds = Int.max / 2
 
     static func durationSeconds(hours: Int, minutes: Int, seconds: Int) -> Int {
@@ -298,20 +127,6 @@ struct ToolboxModuleView: View {
             return maximumDurationSeconds
         }
         return min(maximumDurationSeconds, max(1, totalSeconds))
-    }
-
-    private var startPauseTitle: String {
-        switch pomodoro.phase {
-        case .running: AppLocalization.text("暂停")
-        case .idle, .paused: AppLocalization.text("开始")
-        }
-    }
-
-    private var startPauseSymbol: String {
-        switch pomodoro.phase {
-        case .running: "pause.fill"
-        case .idle, .paused: "play.fill"
-        }
     }
 
     private var toolTogglesRow: some View {
@@ -427,4 +242,288 @@ struct ToolboxModuleView: View {
             .help(help)
         }
     }
+}
+
+struct ToolboxTimerPanel: View {
+    @ObservedObject var service: PomodoroService
+
+    var body: some View {
+        ScrollView(.vertical) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: service.countdowns.isEmpty ? 1 : 2), spacing: 6) {
+                ToolboxTimerCard(service: service, timerID: nil, compact: !service.countdowns.isEmpty)
+                ForEach(service.countdowns) { countdown in
+                    ToolboxTimerCard(service: service, timerID: countdown.id, compact: true)
+                }
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .accessibilityIdentifier("toolbox.timers")
+        .overlay(alignment: .topTrailing) {
+            IconButton(symbol: "plus", help: AppLocalization.text("添加计时器"), size: .compact) {
+                service.addCountdown()
+            }
+            .accessibilityLabel(AppLocalization.text("添加计时器"))
+            .accessibilityIdentifier("toolbox.addTimer")
+            .padding(6)
+        }
+    }
+}
+
+struct ToolboxTimerCard: View {
+    @ObservedObject var service: PomodoroService
+    let timerID: UUID?
+    let compact: Bool
+    @State private var isDurationPickerPresented = false
+    @State private var isEditingName = false
+    @State private var draftName = ""
+    @FocusState private var nameIsFocused: Bool
+
+    private var countdown: CountdownTimer? { service.countdowns.first { $0.id == timerID } }
+    private var engine: PomodoroEngine { countdown?.engine ?? service.engine }
+    private var clock: String { countdown?.displayClock ?? service.displayClock }
+    private var name: String { countdown?.name ?? service.name }
+    private var title: String { name.isEmpty ? AppLocalization.text(timerID == nil ? engine.mode.title : "计时器") : name }
+    private var toggleTitle: String { AppLocalization.text(engine.phase == .running ? "暂停" : engine.phase == .paused ? "继续" : "开始") }
+    private var identifier: String { timerID?.uuidString ?? "pomodoro" }
+    private var shape: UnevenRoundedRectangle {
+        IslandSurfaceGeometry.moduleContentShape(
+            bottomLeadingRadius: compact ? IslandSurfaceGeometry.moduleInnerCornerRadius : IslandSurfaceGeometry.moduleOuterBottomCornerRadius
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 6 : 0) {
+            nameField
+                .padding(.trailing, 24)
+            if !compact { Spacer(minLength: 0) }
+            HStack(spacing: 4) {
+                durationDisplay
+                if compact {
+                    Spacer(minLength: 0)
+                    controls
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            if !compact {
+                Spacer(minLength: 0)
+                HStack(spacing: 8) {
+                    Button(action: toggle) {
+                        Text(toggleTitle)
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color.fillCard)
+                    .clipShape(IslandSurfaceGeometry.moduleContentShape(
+                        bottomLeadingRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(inset: 10)
+                    ))
+                    .help(toggleTitle)
+                    .accessibilityIdentifier("toolbox.toggleTimer.\(identifier)")
+                    Button(action: cancel) {
+                        Text(AppLocalization.text("取消"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color.fillControl)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .help(AppLocalization.text("取消"))
+                    .accessibilityIdentifier("toolbox.cancelTimer.\(identifier)")
+                }
+            }
+        }
+        .padding(compact ? 8 : 10)
+        .frame(maxWidth: .infinity)
+        .frame(height: compact ? 65 : 136)
+        .background(Color.fillCard)
+        .clipShape(shape)
+        .overlay { shape.strokeBorder(Color.strokeCard, lineWidth: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("toolbox.timer.\(identifier)")
+    }
+
+    @ViewBuilder
+    private var nameField: some View {
+        if isEditingName {
+            TextField(AppLocalization.text("计时器名称"), text: $draftName)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, weight: .semibold))
+                .focused($nameIsFocused)
+                .onSubmit(commitName)
+                .onExitCommand { isEditingName = false }
+                .onChange(of: nameIsFocused) { _, focused in
+                    if !focused && isEditingName { commitName() }
+                }
+                .accessibilityIdentifier("toolbox.timerName.\(identifier)")
+        } else {
+            Button {
+                draftName = name
+                isEditingName = true
+                nameIsFocused = true
+            } label: {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(AppLocalization.text("计时器名称"))
+            .accessibilityIdentifier("toolbox.renameTimer.\(identifier)")
+        }
+    }
+
+    private func commitName() {
+        if let timerID { service.renameCountdown(id: timerID, name: draftName) }
+        else { service.setName(draftName) }
+        isEditingName = false
+    }
+
+    private var controls: some View {
+        HStack(spacing: 2) {
+            if engine.phase == .idle {
+                Button(action: toggle) {
+                    Text(toggleTitle)
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(minWidth: 28, minHeight: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(Color.fillControl)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .accessibilityIdentifier("toolbox.toggleTimer.\(identifier)")
+            } else {
+                IconButton(symbol: engine.phase == .running ? "pause.fill" : "play.fill", help: toggleTitle, size: .compact, action: toggle)
+                    .accessibilityLabel(toggleTitle)
+                    .accessibilityIdentifier("toolbox.toggleTimer.\(identifier)")
+            }
+            IconButton(symbol: "xmark", help: AppLocalization.text("取消"), size: .compact, action: cancel)
+                .accessibilityLabel(AppLocalization.text("取消"))
+                .accessibilityIdentifier("toolbox.cancelTimer.\(identifier)")
+        }
+    }
+
+    private func toggle() {
+        if let timerID { service.toggleCountdown(id: timerID) }
+        else { service.toggleStartPause() }
+    }
+
+    private func cancel() {
+        if let timerID { service.cancelCountdown(id: timerID) }
+        else { service.reset() }
+    }
+
+    @ViewBuilder
+    private var durationDisplay: some View {
+        if engine.phase == .idle {
+            Button { isDurationPickerPresented.toggle() } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    timeText
+                    if !compact {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .help(AppLocalization.text("设置时长"))
+            .popover(isPresented: $isDurationPickerPresented, arrowEdge: .top) {
+                HStack(spacing: 8) {
+                    durationInput("小时", value: durationHours)
+                    Text(AppLocalization.text("小时")).foregroundStyle(.secondary)
+                    durationInput("分钟", value: durationMinutes)
+                    Text(AppLocalization.text("分")).foregroundStyle(.secondary)
+                    durationInput("秒", value: durationSeconds)
+                    Text(AppLocalization.text("秒")).foregroundStyle(.secondary)
+                }
+                .padding(12)
+            }
+        } else { timeText }
+    }
+
+    private var timeText: some View {
+        Text(clock)
+            .font(.system(size: compact ? 20 : 26, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .foregroundStyle(.primary)
+            .accessibilityLabel(clock)
+            .accessibilityIdentifier("toolbox.timerClock.\(identifier)")
+    }
+
+    private var currentDuration: TimeInterval {
+        let seconds = engine.mode == .focus
+            ? engine.focusDuration
+            : engine.restDuration
+        return max(1, seconds)
+    }
+
+    private var durationHours: Binding<Int> {
+        Binding(
+            get: { Int(currentDuration) / 3_600 },
+            set: {
+                setDuration(
+                    hours: $0,
+                    minutes: durationMinutes.wrappedValue,
+                    seconds: durationSeconds.wrappedValue
+                )
+            }
+        )
+    }
+
+    private var durationMinutes: Binding<Int> {
+        Binding(
+            get: { Int(currentDuration / 60) % 60 },
+            set: {
+                setDuration(
+                    hours: durationHours.wrappedValue,
+                    minutes: $0,
+                    seconds: durationSeconds.wrappedValue
+                )
+            }
+        )
+    }
+
+    private var durationSeconds: Binding<Int> {
+        Binding(
+            get: { Int(currentDuration) % 60 },
+            set: {
+                setDuration(
+                    hours: durationHours.wrappedValue,
+                    minutes: durationMinutes.wrappedValue,
+                    seconds: $0
+                )
+            }
+        )
+    }
+
+    private func durationInput(_ title: String, value: Binding<Int>) -> some View {
+        TextField(AppLocalization.text(title), value: value, format: .number)
+            .textFieldStyle(.roundedBorder)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 44)
+    }
+
+    private func setDuration(hours: Int, minutes: Int, seconds: Int) {
+        let duration = TimeInterval(ToolboxModuleView.durationSeconds(
+            hours: hours,
+            minutes: minutes,
+            seconds: seconds
+        ))
+        if let timerID {
+            service.setCountdownDuration(id: timerID, duration: duration)
+        } else if engine.mode == .focus {
+            service.setFocusDuration(duration)
+        } else {
+            service.setRestDuration(duration)
+        }
+    }
+
 }

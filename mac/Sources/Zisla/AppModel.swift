@@ -28,7 +28,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
 
     var allowsIslandKeyboardFocus: Bool {
         switch self {
-        case .shelf, .clipboard, .download, .mail, .quickNotes:
+        case .shelf, .clipboard, .download, .mail, .quickNotes, .toolbox:
             true
         default:
             false
@@ -4524,7 +4524,7 @@ final class AppModel: ObservableObject {
 
     private func refreshToolboxReminderNotice() {
         let settings = settingsStore.settings
-        guard !isPomodoroCountdownActive else {
+        guard !pomodoro.hasActiveCountdowns || screenCleaning.isScreenCleaning || screenCleaning.isKeyboardCleaning else {
             clearToolboxReminderNotices()
             return
         }
@@ -4618,19 +4618,12 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private var isPomodoroCountdownActive: Bool {
-        Self.shouldPresentPomodoroCountdown(
-            mode: pomodoro.mode,
-            phase: pomodoro.phase,
-            isScreenCleaning: screenCleaning.isScreenCleaning,
-            isKeyboardCleaning: screenCleaning.isKeyboardCleaning
-        )
-    }
-
     private func refreshFocusCountdownNotice() {
         guard settingsStore.settings.sideNoticesEnabled,
               settingsStore.settings.focusCountdownIslandEnabled,
-              isPomodoroCountdownActive
+              pomodoro.hasActiveCountdowns,
+              !screenCleaning.isScreenCleaning,
+              !screenCleaning.isKeyboardCleaning
         else {
             clearFocusCountdownNotices()
             return
@@ -4641,9 +4634,9 @@ final class AppModel: ObservableObject {
 
     static func refreshFocusCountdownNotices(for pomodoro: PomodoroService, in queue: SideNoticeQueue) {
         let notices = [
-            pomodoro.focusCountdownNotice(for: .left),
-            pomodoro.focusCountdownNotice(for: .right),
-        ]
+            pomodoro.countdownNotices(for: .left, limit: 2),
+            pomodoro.countdownNotices(for: .right, limit: 2),
+        ].flatMap { $0 }
         queue.removeAll(
             withIDPrefix: PomodoroService.focusCountdownNoticeIDPrefix,
             except: Set(notices.map(\.id))
@@ -4652,7 +4645,7 @@ final class AppModel: ObservableObject {
             let existing = (notice.side == .left ? queue.left : queue.right)
                 .first { $0.id == notice.id }
             guard existing?.title != notice.title || existing?.detail != notice.detail
-                || existing?.progress != notice.progress else { continue }
+                || existing?.progress != notice.progress || existing?.metadata != notice.metadata else { continue }
             if !queue.updateIfPresent(notice) {
                 queue.enqueue(notice, expiresAfter: nil)
             }
