@@ -26,6 +26,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     public let pageSize: Int
 
     private let database: ClipboardHistoryDatabase
+    var imagePinnedLookup: @Sendable (UUID) async throws -> Bool?
     private let persistenceDelay: Duration
     private let now: () -> Date
     private let imageTextRecognizer: (@Sendable (Data) async throws -> String)?
@@ -33,6 +34,8 @@ public final class ClipboardHistoryStore: ObservableObject {
     private var pendingImageRecognitionIDs: [UUID] = []
     private var imageRecognitionTask: Task<Void, Never>?
     private var activeImageRecognitionID: UUID?
+    private var imageRecognitionPinnedStates: [UUID: Bool] = [:]
+    private var imageHistoryClearGeneration = 0
     private var imageRecognitionCancellation: ClipboardImageRecognitionCancellation?
     private struct ImageRecognitionWaiter {
         let continuation: CheckedContinuation<String, any Error>
@@ -73,7 +76,9 @@ public final class ClipboardHistoryStore: ObservableObject {
         now: @escaping () -> Date = Date.init,
         imageTextRecognizer: (@Sendable (Data) async throws -> String)? = nil
     ) {
-        database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        self.database = database
+        imagePinnedLookup = { try await database.imageIsPinned(id: $0) }
         self.capacity = capacity.map { max(1, $0) }
         self.maxImageBytes = max(1, maxImageBytes)
         self.pageSize = max(1, pageSize)
@@ -248,6 +253,7 @@ public final class ClipboardHistoryStore: ObservableObject {
         let now = persistenceCompatibleDate()
         let pageBoundary = items.last
         let item: ClipboardHistoryItem
+        let existingContentIsVisible = items.contains { $0.content == content }
         if let index = items.firstIndex(where: { $0.content == content }) {
             var existing = items.remove(at: index)
             existing.content = content
@@ -270,7 +276,10 @@ public final class ClipboardHistoryStore: ObservableObject {
             }
         }
         schedulePersistence(.upsert(item, capacity: capacity))
-        if item.content.isImage, item.recognizedImageText == nil {
+        if item.content.isImage, item.recognizedImageText == nil, imageRecognitionEnabled, imageTextRecognizer != nil {
+            if existingContentIsVisible || item.isPinned {
+                imageRecognitionPinnedStates[item.id] = item.isPinned
+            }
             enqueueImageRecognition(id: item.id)
         }
         if displayedQuery.grouping == .sourceApp, hasItemsBeyondDisplayedPage, pageBoundary == nil {
@@ -283,6 +292,9 @@ public final class ClipboardHistoryStore: ObservableObject {
         guard let index = items.firstIndex(where: { $0.id == id }),
               items[index].isPinned != isPinned else { return }
         items[index].isPinned = isPinned
+        if imageRecognitionStates[id] != nil {
+            imageRecognitionPinnedStates[id] = isPinned
+        }
         items[index].lastCopiedAt = persistenceCompatibleDate()
         let item = items[index]
         if matchesDisplayedQuery(item) {
@@ -303,8 +315,9 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
 
     public func removeAllHistory() {
-        for item in items where !item.isPinned {
-            cancelImageRecognition(id: item.id)
+        imageHistoryClearGeneration += 1
+        for id in Array(imageRecognitionStates.keys) where imageRecognitionPinnedStates[id] == false {
+            cancelImageRecognition(id: id)
         }
         let previousCount = items.count
         items.removeAll { !$0.isPinned }
@@ -328,6 +341,15 @@ public final class ClipboardHistoryStore: ObservableObject {
         if let item = items.first(where: { $0.id == id }) {
             guard item.content.isImage else { throw CocoaError(.fileReadCorruptFile) }
             if let text = item.recognizedImageText { return text }
+            imageRecognitionPinnedStates[id] = item.isPinned
+        } else if imageRecognitionStates[id] == nil {
+            let generation = imageHistoryClearGeneration
+            await waitUntilLoaded()
+            guard let isPinned = try await imagePinnedLookup(id) else { throw CancellationError() }
+            try Task.checkCancellation()
+            guard isPinned || generation == imageHistoryClearGeneration else { throw CancellationError() }
+            guard imageRecognitionEnabled else { throw CancellationError() }
+            imageRecognitionPinnedStates[id] = isPinned
         }
         let requestID = UUID()
         let cancellation = ClipboardImageRecognitionCancellation()
@@ -349,11 +371,18 @@ public final class ClipboardHistoryStore: ObservableObject {
         }
     }
 
+    var imageRecognitionWaiterCounts: [UUID: Int] {
+        imageRecognitionWaiters.mapValues(\.count)
+    }
+
+    var imageRecognitionMetadataCount: Int { imageRecognitionPinnedStates.count }
+
     public func cancelImageRecognition(id: UUID? = nil) {
         let ids = id.map { [$0] } ?? Array(imageRecognitionStates.keys)
         for id in ids {
             pendingImageRecognitionIDs.removeAll { $0 == id }
             imageRecognitionStates.removeValue(forKey: id)
+            imageRecognitionPinnedStates.removeValue(forKey: id)
             if activeImageRecognitionID == id {
                 imageRecognitionCancellation?.cancel()
                 imageRecognitionTask?.cancel()
@@ -383,6 +412,7 @@ public final class ClipboardHistoryStore: ObservableObject {
             if let index = pendingImageRecognitionIDs.firstIndex(where: { imageRecognitionWaiters[$0] == nil }) {
                 cancelImageRecognition(id: pendingImageRecognitionIDs[index])
             } else {
+                imageRecognitionPinnedStates.removeValue(forKey: id)
                 for waiter in (imageRecognitionWaiters.removeValue(forKey: id) ?? [:]).values {
                     waiter.continuation.resume(throwing: CocoaError(.fileReadTooLarge))
                 }
@@ -411,6 +441,7 @@ public final class ClipboardHistoryStore: ObservableObject {
         let persistenceTask = persistenceTask
         let database = database
         let maximumBytes = maxImageBytes
+        let clearGeneration = imageHistoryClearGeneration
         imageRecognitionTask = Task { [weak self] in
             let result: Result<String, any Error>
             do {
@@ -430,6 +461,10 @@ public final class ClipboardHistoryStore: ObservableObject {
                     throw CocoaError(.fileReadNoSuchFile)
                 }
                 try Task.checkCancellation()
+                if let self {
+                    if imageRecognitionPinnedStates[id] == nil { imageRecognitionPinnedStates[id] = image.isPinned }
+                    guard imageRecognitionPinnedStates[id] == true || clearGeneration == imageHistoryClearGeneration else { throw CancellationError() }
+                }
                 let text: String
                 if let cached = image.text {
                     text = cached
@@ -448,6 +483,7 @@ public final class ClipboardHistoryStore: ObservableObject {
             guard let self else { return }
             if !cancellation.isCancelled {
                 imageRecognitionStates.removeValue(forKey: id)
+                imageRecognitionPinnedStates.removeValue(forKey: id)
                 if case let .failure(error) = result, !(error is CancellationError) {
                     imageRecognitionError = (id, AppLocalization.text("识别失败：%@", error.localizedDescription))
                 }
@@ -648,7 +684,7 @@ public final class ClipboardHistoryStore: ObservableObject {
         guard displayedQuery.category == .all || item.category == displayedQuery.category else { return false }
         return displayedQuery.searchText.isEmpty
             || item.content.previewText.localizedCaseInsensitiveContains(displayedQuery.searchText)
-            || item.recognizedImageText?.localizedCaseInsensitiveContains(displayedQuery.searchText) == true
+            || ClipboardImageTextSearch.contains(item.recognizedImageText, query: displayedQuery.searchText)
             || item.sourceApp?.name.localizedCaseInsensitiveContains(displayedQuery.searchText) == true
             || item.sourceApp?.bundleIdentifier.localizedCaseInsensitiveContains(displayedQuery.searchText) == true
     }

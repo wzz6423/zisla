@@ -142,6 +142,13 @@ public struct ClipboardSourceApp: Codable, Equatable, Sendable {
     }
 }
 
+enum ClipboardImageTextSearch {
+    static func contains(_ text: String?, query: String) -> Bool {
+        guard let text else { return false }
+        return text.range(of: query, options: [.caseInsensitive], locale: Locale(identifier: "en_US_POSIX")) != nil
+    }
+}
+
 public struct ClipboardHistoryItem: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var content: ClipboardHistoryContent

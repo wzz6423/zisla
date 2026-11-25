@@ -555,6 +555,7 @@ public final class FileShelfStore: ObservableObject {
     public nonisolated static func imageFormat(for data: Data, maximumBytes: Int = maximumImageBytes, maximumPixels: Int = maximumImagePixels,
                                                requiresExactPixelBytes: Bool = false) throws -> String {
         guard data.count <= maximumBytes else { throw CocoaError(.fileReadTooLarge) }
+        let data = Data(data)
         // Read dimensions without decoding first, so tiny compressed inputs cannot allocate huge bitmaps.
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               CGImageSourceGetCount(source) == 1,

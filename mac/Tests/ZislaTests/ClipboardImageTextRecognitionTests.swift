@@ -39,12 +39,33 @@ struct ClipboardImageTextRecognitionTests {
             forged.replaceSubrange(16..<24, with: [0, 0, 0xFF, 0xFF, 0, 0, 0xFF, 0xFF])
             data = forged
         }
-        await #expect(throws: CocoaError.self) {
-            try await ClipboardImageTextRecognition.recognize(data) { _, _ in
+        do {
+            _ = try await ClipboardImageTextRecognition.recognize(data) { _, _ in
                 Issue.record("Invalid images must not allocate a decoded image or enter Vision")
                 return []
             }
+            Issue.record("Unsafe input must be rejected: \(input)")
+        } catch let error as CocoaError {
+            if input == "oversized-bytes" {
+                #expect(error.code == .fileReadTooLarge)
+            } else {
+                #expect(error.code == .fileReadCorruptFile || error.code == .fileReadTooLarge)
+            }
         }
+    }
+
+    @Test
+    func validPNGDataSlicesAreValidatedAndRecognizedWithoutAbsoluteIndexTraps() async throws {
+        let bytes = try imageData(format: "png")
+        let buffer = Data(repeating: 0xEE, count: 64) + bytes
+        let slice = buffer.dropFirst(64)
+        #expect(slice.startIndex == 64)
+        #expect(try FileShelfStore.imageFormat(for: slice, requiresExactPixelBytes: true) == "png")
+        let text = try await ClipboardImageTextRecognition.recognize(slice) { image, _ in
+            #expect(image.width == 32 && image.height == 24)
+            return [ScreenshotRecognizedFragment(text: "sliced input", boundingBox: .zero)]
+        }
+        #expect(text == "sliced input")
     }
 
     @Test
