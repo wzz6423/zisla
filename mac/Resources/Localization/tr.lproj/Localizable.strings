@@ -3784,3 +3784,11 @@
 "取消图片文字识别" = "Görüntü metni tanımayı iptal et";
 "等待识别图片文字" = "Görüntü metni tanıma bekleniyor";
 "正在识别图片文字" = "Görüntü metni tanınıyor";
+
+"缩放图片" = "Görselleri yeniden boyutlandır";
+"转换图片格式" = "Görsel biçimini dönüştür";
+"导入录屏素材库" = "Kayıt medya kitaplığına aktar";
+"图片工具当前不可用，请稍后重试" = "Görsel araçları şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.";
+"无法压缩同名项目：%@" = "Aynı adlı öğeler arşivlenemez: %@";
+"素材库导入完成" = "Medya kitaplığına aktarma tamamlandı";
+"%ld 个结果未能加入中转站" = "%ld sonuç rafa eklenemedi";

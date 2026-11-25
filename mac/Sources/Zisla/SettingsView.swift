@@ -9,7 +9,7 @@ struct SettingsView: View {
     @ObservedObject private var settingsStore: FeatureSettingsStore
     @ObservedObject private var clipboardAssistant: ClipboardAssistantController
     @ObservedObject private var immediateCleanup: ImmediateCleanupController
-    @StateObject private var input = SettingsInput()
+    @StateObject private var input: SettingsInput
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var networkProxyMonitor = NetworkProxyAvailabilityMonitor()
     @StateObject private var historyPanelPresentation = SystemMetricsHistoryPanelPresentationState()
@@ -41,8 +41,9 @@ struct SettingsView: View {
     @StateObject private var aiUsageHistory: AIUsageHistoryController
     @StateObject private var aiUsageHistoryPresentation = SystemMetricsHistoryPanelPresentationState()
 
-    init(model: AppModel) {
+    init(model: AppModel, input: SettingsInput = SettingsInput()) {
         self.model = model
+        _input = StateObject(wrappedValue: input)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         _clipboardAssistant = ObservedObject(wrappedValue: model.clipboardAssistant)
         _immediateCleanup = ObservedObject(wrappedValue: model.immediateCleanup)

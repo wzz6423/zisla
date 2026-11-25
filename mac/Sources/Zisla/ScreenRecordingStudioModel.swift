@@ -77,6 +77,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     var commitPendingCanvasText: (() -> Void)?
     var onExportedFile: ((URL) -> Void)?
     private var returnsExportsToShelf = false
+    var beforeCommittingMediaImport: ((RecordingMediaImportResult) async -> Void)?
 
     init(appModel: AppModel? = nil, capture: ScreenRecordingService = ScreenRecordingService(),
          exporter: ScreenRecordingExporter = ScreenRecordingExporter(),
@@ -373,7 +374,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     @discardableResult
-    func importMedia(_ urls: [URL], returningExportsToShelf: Bool = false) -> Bool {
+    func importMedia(_ urls: [URL], returningExportsToShelf: Bool = false,
+                     completion: ((Result<Void, Error>) -> Void)? = nil) -> Bool {
         commitPendingCanvasText?()
         guard !urls.isEmpty, !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return false }
         let original = project
@@ -383,7 +385,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         isBusy = true
         errorMessage = nil
         operationTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self else { completion?(.failure(CancellationError())); return }
             defer {
                 if projectRevision == revision { isBusy = false; operationTask = nil }
             }
@@ -394,15 +396,18 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 }
                 let result = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 prepared = result
+                await beforeCommittingMediaImport?(result)
                 try Task.checkCancellation()
-                guard project == original, directory == originalDirectory else { result.discard(); return }
+                guard project == original, directory == originalDirectory else { throw CancellationError() }
                 if original == nil {
                     try store.save(result.project, in: result.directory)
                     install(result.project, directory: result.directory)
                 } else {
                     isBusy = false
                     update { $0 = result.project }
-                    guard project == result.project else { result.discard(); return }
+                    guard project == result.project else {
+                        throw CocoaError(.fileWriteUnknown, userInfo: [NSLocalizedDescriptionKey: errorMessage ?? ""])
+                    }
                 }
                 if returningExportsToShelf { returnsExportsToShelf = true }
                 if let asset = result.project.timeline?.assets.first(where: { result.addedFiles.contains($0.file) }) {
@@ -413,8 +418,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
                     notices.enqueue(.init(title: AppLocalization.text("已跳过 %d 个重复素材", result.duplicateCount),
                                           side: .left, symbolName: "rectangle.on.rectangle"), expiresAfter: 3)
                 }
+                completion?(.success(()))
             } catch {
                 prepared?.discard()
+                completion?(.failure(error))
                 guard projectRevision == revision else { return }
                 if !(error is CancellationError) { errorMessage = error.localizedDescription }
             }

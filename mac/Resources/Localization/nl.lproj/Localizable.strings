@@ -3784,3 +3784,11 @@
 "取消图片文字识别" = "Tekstherkenning annuleren";
 "等待识别图片文字" = "Wachten op tekstherkenning";
 "正在识别图片文字" = "Tekst in afbeelding herkennen";
+
+"缩放图片" = "Afbeeldingen verkleinen of vergroten";
+"转换图片格式" = "Afbeeldingsformaat converteren";
+"导入录屏素材库" = "Importeren in de mediabibliotheek";
+"图片工具当前不可用，请稍后重试" = "Afbeeldingstools zijn momenteel niet beschikbaar. Probeer het later opnieuw.";
+"无法压缩同名项目：%@" = "Items met dezelfde naam kunnen niet worden ingepakt: %@";
+"素材库导入完成" = "Importeren in de mediabibliotheek voltooid";
+"%ld 个结果未能加入中转站" = "%ld resultaten konden niet aan de plank worden toegevoegd";

@@ -82,7 +82,7 @@ export const fr: SiteContent = {
       shelf: {
         name: 'Casier',
         caption:
-          'Glissez fichiers, sons, vidéos ou liens en haut de l’écran, puis recherchez, filtrez et sélectionnez plusieurs éléments pour les copier, les partager ou les envoyer aux Notes rapides. Convertissez des images en PDF, envoyez le texte reconnu aux Notes rapides ou ouvrez une vidéo dans le studio d’enregistrement pour la monter. Retrouvez aussi les fichiers dans le Finder.',
+          'Glissez fichiers, sons, vidéos ou liens en haut de l’écran, puis recherchez, filtrez et sélectionnez plusieurs éléments pour les copier, les partager ou les envoyer aux Notes rapides. Convertissez des images en PDF, envoyez le texte reconnu aux Notes rapides ou ouvrez une vidéo dans le studio d’enregistrement pour la monter. Retrouvez aussi les fichiers dans le Finder. Compressez les fichiers et dossiers sélectionnés en ZIP, ou ouvrez les images sélectionnées dans les outils d’image pour les redimensionner ou les convertir ; les résultats réussis reviennent sur l’étagère. Importez des images, des vidéos et de l’audio dans la bibliothèque du studio.',
         points: ['Recherche et actions groupées', 'Images vers PDF et Notes rapides', 'Montage vidéo dans le studio'],
       },
       clipboard: {
@@ -198,7 +198,7 @@ export const fr: SiteContent = {
       },
       recording: {
         title: 'Enregistrer et monter dans le studio',
-        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes, avec animations, zooms et sous-titres. Réglez le lissage de la peau, la luminosité, l’affinement du visage et du corps, les effets vocaux et des traînées fluides du curseur dans la couleur choisie. Lisez le montage dans le studio. Formats : original, 16:9, 9:16, 1:1 ou 4:3 ; export vidéo, GIF, Live Photo ou audio, avec FFmpeg pour certains formats. Prévisualisez les propositions IA facultatives avant application. Le dossier d’enregistrement se règle séparément dans Réglages → Emplacement de sauvegarde. Enregistrez en HDR sur les appareils compatibles.',
+        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes, avec animations, zooms et sous-titres. Réglez le lissage de la peau, la luminosité, l’affinement du visage et du corps, les effets vocaux et des traînées fluides du curseur dans la couleur choisie. Lisez le montage dans le studio. Formats : original, 16:9, 9:16, 1:1 ou 4:3 ; export vidéo, GIF, Live Photo ou audio, avec FFmpeg pour certains formats. Prévisualisez les propositions IA facultatives avant application. Le dossier d’enregistrement se règle séparément dans Réglages → Emplacement de sauvegarde. Enregistrez en HDR sur les appareils compatibles. Importez des images, des vidéos et de l’audio depuis l’étagère vers la bibliothèque en conservant le projet et la timeline actuels.',
         detail: 'Effets de portrait et de voix · Traînées colorées du curseur · Lecture et export multipistes',
       },
       permissions: {

@@ -8,8 +8,10 @@ struct ShelfContextActionLocalizationTests {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let keys = Set(["多选", "取消选择", "操作", "已选择 %ld 个项目", "选择顺序 %ld", "识图并发送到随记",
                         "在录屏工作室中编辑", "所选项目不支持此操作", "文件已失效或无法读取：%@",
-                        "无法写入随记，请检查备忘录权限后重试", "录屏工作室当前不可用，请稍后重试", "已发送到录屏工作室", "已取消操作"])
-        let sources = try ["ShelfModuleView.swift", "ShelfContextActions.swift"].map {
+                        "无法写入随记，请检查备忘录权限后重试", "录屏工作室当前不可用，请稍后重试", "已发送到录屏工作室", "已取消操作",
+                        "压缩为 ZIP", "缩放图片", "转换图片格式", "导入录屏素材库", "图片工具当前不可用，请稍后重试",
+                        "无法压缩同名项目：%@", "素材库导入完成", "%ld 个结果未能加入中转站"])
+        let sources = try ["ShelfModuleView.swift", "ShelfContextActions.swift", "ImageToolsModel.swift"].map {
             try String(contentsOf: root.appendingPathComponent("Sources/Zisla/" + $0), encoding: .utf8)
         }.joined(separator: "\n")
         let literal = try NSRegularExpression(pattern: #""((?:[^"\\\n]|\\.)*)""#)
@@ -28,9 +30,12 @@ struct ShelfContextActionLocalizationTests {
                 #expect(AppLocalization.string(key, language: language) == value)
             }
             if language != .simplifiedChinese && language != .traditionalChinese {
-                #expect(table["识图并发送到随记"] != "识图并发送到随记")
-                if language != .english {
-                    #expect(table["识图并发送到随记"] != "Recognize Text and Send to Quick Notes")
+                for action in ShelfContextAction.allCases where action != .compressFiles {
+                    let value = try #require(table[action.title])
+                    #expect(value != action.title)
+                    if language != .english {
+                        #expect(value != AppLocalization.string(action.title, language: .english))
+                    }
                 }
             }
         }
@@ -41,6 +46,11 @@ struct ShelfContextActionLocalizationTests {
         #expect(AppLocalization.string(ShelfContextAction.recognizeToQuickNote.title, language: .english)
             == "Recognize Text and Send to Quick Notes")
         #expect(AppLocalization.string(ShelfContextAction.editVideo.title, language: .arabic) == "التحرير في استوديو التسجيل")
+        #expect(AppLocalization.string(ShelfContextAction.resizeImages.title, language: .english) == "Resize Images")
+        #expect(AppLocalization.string(ShelfContextAction.convertImages.title, language: .japanese) == "画像形式を変換")
+        #expect(AppLocalization.string(ShelfContextAction.importToStudioLibrary.title, language: .arabic) == "الاستيراد إلى مكتبة وسائط التسجيل")
+        #expect(AppLocalization.format("%ld 个结果未能加入中转站", locale: AppLanguage.english.locale, [2])
+            == "2 results could not be added to the shelf")
         #expect(AppLanguage.arabic.isRightToLeft)
     }
 

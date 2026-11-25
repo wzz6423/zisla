@@ -251,7 +251,8 @@ struct ImageToolsSettingsLifecycleTests {
     func settingsViewBindsTheRetainedOwnerInsteadOfUsingOperationIdentity() throws {
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: package.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
-        #expect(source.contains("@StateObject private var input = SettingsInput()"))
+        #expect(source.contains("@StateObject private var input: SettingsInput"))
+        #expect(source.contains("_input = StateObject(wrappedValue: input)"))
         #expect(source.contains("store: input.imageTools"))
         #expect(source.contains("recognition: input.imageRecognition"))
         #expect(source.contains("set: { input.selectImageOperation($0) }"))

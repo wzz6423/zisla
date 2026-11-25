@@ -686,7 +686,8 @@ final class AppModel: ObservableObject {
     /// recording-start cleanup can reorder windows.
     var onVoiceInputWillStart: (() -> Void)?
     var onScreenRecordingRequested: (() -> Void)?
-    var onShelfVideosRequested: (([URL]) -> Bool)?
+    var onShelfVideosRequested: (([URL], Bool) async throws -> Void)?
+    var onShelfImagesRequested: (([URL], ImageToolOperation) throws -> Void)?
 
     /// Model discovery state: used by the settings page to show connection test results and the available model list.
     @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
@@ -1914,12 +1915,26 @@ final class AppModel: ObservableObject {
     }
 
     func performShelfContextAction(_ action: ShelfContextAction, items: [FileShelfItem]) {
+        guard action != .editVideo && action != .importToStudioLibrary || settingsStore.settings.screenRecordingEnabled else {
+            transientMessage = ShelfContextActionError.studioUnavailable.localizedDescription
+            return
+        }
+        guard action != .resizeImages && action != .convertImages || settingsStore.settings.imageToolsEnabled else {
+            transientMessage = ShelfContextActionError.imageToolsUnavailable.localizedDescription
+            return
+        }
         let task = shelfContextActions.perform(action, items: items, createQuickNote: { [weak self] text in
             guard let self else { return false }
             let created = await quickNotes.create(markdown: text)
             if created { selectModule(.quickNotes) }
             return created
-        }, openStudio: { [weak self] urls in self?.onShelfVideosRequested?(urls) ?? false })
+        }, openStudio: { [weak self] urls, libraryOnly in
+            guard let importMedia = self?.onShelfVideosRequested else { throw ShelfContextActionError.studioUnavailable }
+            try await importMedia(urls, libraryOnly)
+        }, openImageTools: { [weak self] urls, operation in
+            guard let open = self?.onShelfImagesRequested else { throw ShelfContextActionError.imageToolsUnavailable }
+            try open(urls, operation)
+        })
         guard let task else {
             transientMessage = shelfContextActions.message
             return
@@ -2750,6 +2765,68 @@ final class AppModel: ObservableObject {
                 self.transientMessage = self.clipboardAssistantMessage("已保存到 %@", destination.path)
             }
         }
+    }
+
+    nonisolated static func zipArchiveError(
+        sources: [URL], destination: URL,
+        runArchive: @escaping @Sendable ([String], URL) async throws -> AIAgentProcessOutput = { arguments, directory in
+            try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/zip"), arguments: arguments,
+                                               workingDirectoryURL: directory, timeout: 5 * 60,
+                                               maximumOutputBytes: 1, maximumErrorBytes: 256 * 1_024)
+        }
+    ) async -> String? {
+        let manager = FileManager.default
+        var seen = Set<URL>()
+        let sources = sources.filter { seen.insert($0.standardizedFileURL).inserted }
+        guard !sources.isEmpty else { return ShelfContextActionError.unsupportedSelection.localizedDescription }
+        let output = destination.resolvingSymlinksInPath().standardizedFileURL
+        if manager.fileExists(atPath: destination.path)
+            || (try? destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+            return CocoaError(.fileWriteFileExists).localizedDescription
+        }
+        var names = Set<String>()
+        var conflicts: [String] = []
+        for source in sources {
+            guard source.isFileURL,
+                  let values = try? source.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey]),
+                  values.isSymbolicLink != true, values.isRegularFile == true || values.isDirectory == true,
+                  source.lastPathComponent != "/", manager.isReadableFile(atPath: source.path) else {
+                return ShelfContextActionError.unavailableFile(source.lastPathComponent).localizedDescription
+            }
+            let resolved = source.resolvingSymlinksInPath().standardizedFileURL
+            guard output != resolved, values.isDirectory != true || !output.path.hasPrefix(resolved.path + "/") else {
+                return CocoaError(.fileWriteInvalidFileName).localizedDescription
+            }
+            let name = source.lastPathComponent.precomposedStringWithCanonicalMapping
+                .folding(options: [.caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            if !names.insert(name).inserted { conflicts.append(source.lastPathComponent) }
+        }
+        guard conflicts.isEmpty else {
+            return ShelfContextActionError.conflictingArchiveNames(conflicts.joined(separator: ", ")).localizedDescription
+        }
+        var completed = false
+        defer { if !completed { try? manager.removeItem(at: destination) } }
+        if sources.count == 1, !sources[0].lastPathComponent.hasPrefix("-") {
+            let error = await zipArchiveError(source: sources[0], destination: destination)
+            completed = error == nil && !Task.isCancelled
+            return Task.isCancelled ? CancellationError().localizedDescription : error
+        }
+        do {
+            for source in sources {
+                try Task.checkCancellation()
+                let scoped = source.startAccessingSecurityScopedResource()
+                defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+                let result = try await runArchive(["-q", "-r", "-y", destination.path, "--", "./" + source.lastPathComponent],
+                                                  source.deletingLastPathComponent())
+                if result.didTimeout { return AppLocalization.text("压缩操作超时") }
+                guard result.status == 0 else {
+                    return result.standardError.isEmpty ? AppLocalization.text("无法创建 ZIP 文件") : result.standardError
+                }
+            }
+            try Task.checkCancellation()
+            completed = true
+            return nil
+        } catch { return error.localizedDescription }
     }
 
     nonisolated static func zipArchiveError(source: URL, destination: URL) async -> String? {

@@ -7,15 +7,23 @@ import ZislaCore
 import ZislaKit
 
 enum ShelfContextAction: CaseIterable {
+    case compressFiles
+    case resizeImages
+    case convertImages
     case imagesToPDF
     case recognizeToQuickNote
     case editVideo
+    case importToStudioLibrary
 
     var title: String {
         switch self {
+        case .compressFiles: "压缩为 ZIP"
+        case .resizeImages: "缩放图片"
+        case .convertImages: "转换图片格式"
         case .imagesToPDF: "图片转 PDF"
         case .recognizeToQuickNote: "识图并发送到随记"
         case .editVideo: "在录屏工作室中编辑"
+        case .importToStudioLibrary: "导入录屏素材库"
         }
     }
 
@@ -24,10 +32,17 @@ enum ShelfContextAction: CaseIterable {
             guard item.text == nil else { return false }
             let type = UTType(filenameExtension: item.url.pathExtension)
             switch self {
+            case .compressFiles:
+                return true
+            case .resizeImages, .convertImages:
+                return item.screenshotMetadata != nil || ImageProcessingService.supportedExtensions.contains(item.url.pathExtension.lowercased())
             case .imagesToPDF, .recognizeToQuickNote:
                 return item.screenshotMetadata != nil || type?.conforms(to: .image) == true
             case .editVideo:
                 return item.screenshotMetadata == nil && (type?.conforms(to: .movie) == true || type?.conforms(to: .video) == true)
+            case .importToStudioLibrary:
+                return item.screenshotMetadata != nil || type?.conforms(to: .image) == true
+                    || type?.conforms(to: .movie) == true || type?.conforms(to: .video) == true || type?.conforms(to: .audio) == true
             }
         }
     }
@@ -38,6 +53,8 @@ enum ShelfContextActionError: LocalizedError, Equatable {
     case unavailableFile(String)
     case quickNoteUnavailable
     case studioUnavailable
+    case imageToolsUnavailable
+    case conflictingArchiveNames(String)
     case noRecognizedText
 
     var errorDescription: String? {
@@ -46,6 +63,8 @@ enum ShelfContextActionError: LocalizedError, Equatable {
         case let .unavailableFile(name): AppLocalization.text("文件已失效或无法读取：%@", name)
         case .quickNoteUnavailable: AppLocalization.text("无法写入随记，请检查备忘录权限后重试")
         case .studioUnavailable: AppLocalization.text("录屏工作室当前不可用，请稍后重试")
+        case .imageToolsUnavailable: AppLocalization.text("图片工具当前不可用，请稍后重试")
+        case let .conflictingArchiveNames(names): AppLocalization.text("无法压缩同名项目：%@", names)
         case .noRecognizedText: AppLocalization.text("未识别到文字")
         }
     }
@@ -72,7 +91,15 @@ final class ShelfContextActions: ObservableObject {
         _ action: ShelfContextAction,
         items: [FileShelfItem],
         createQuickNote: @escaping @MainActor (String) async -> Bool,
-        openStudio: @escaping @MainActor ([URL]) -> Bool,
+        openStudio: @escaping @MainActor ([URL], Bool) async throws -> Void,
+        openImageTools: @escaping @MainActor ([URL], ImageToolOperation) throws -> Void = { _, _ in
+            throw ShelfContextActionError.imageToolsUnavailable
+        },
+        archiveFiles: @escaping @Sendable ([URL], URL) async throws -> Void = { urls, output in
+            if let error = await AppModel.zipArchiveError(sources: urls, destination: output) {
+                throw CocoaError(.fileWriteUnknown, userInfo: [NSLocalizedDescriptionKey: error])
+            }
+        },
         convertImages: @escaping @Sendable ([URL], URL) throws -> Void = {
             try PDFProcessingService().convertImagesToPDF($0, to: $1)
         },
@@ -85,6 +112,8 @@ final class ShelfContextActions: ObservableObject {
             message = ShelfContextActionError.unsupportedSelection.localizedDescription
             return nil
         }
+        var seen = Set<UUID>()
+        let items = items.filter { seen.insert($0.id).inserted }
         isProcessing = true
         generatedItemID = nil
         isCancellable = true
@@ -99,18 +128,21 @@ final class ShelfContextActions: ObservableObject {
             var staging: URL?
             do {
                 try Task.checkCancellation()
-                let urls = try Self.fileURLs(items, in: shelf)
+                let urls = try Self.fileURLs(items, in: shelf, requiresRegularFile: action != .compressFiles)
                 defer { urls.forEach(shelf.endAccessing) }
                 switch action {
-                case .imagesToPDF:
+                case .compressFiles, .imagesToPDF:
                     let directory = temporaryDirectory.appendingPathComponent("zisla-shelf-action-" + UUID().uuidString, isDirectory: true)
                     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
                                                             attributes: [.posixPermissions: 0o700])
                     staging = directory
-                    let output = directory.appendingPathComponent("images.pdf")
+                    let name = action == .imagesToPDF ? "images.pdf"
+                        : ScreenRecordingStudioModel.fileName(urls.count == 1 ? urls[0].lastPathComponent : "Archive", extension: "zip")
+                    let output = directory.appendingPathComponent(name)
                     let worker = Task.detached(priority: .userInitiated) {
                         try Task.checkCancellation()
-                        try convertImages(urls, output)
+                        if action == .compressFiles { try await archiveFiles(urls, output) }
+                        else { try convertImages(urls, output) }
                     }
                     try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                     try Task.checkCancellation()
@@ -119,6 +151,9 @@ final class ShelfContextActions: ObservableObject {
                     }
                     generatedItemID = shelf.items.last?.id
                     message = AppLocalization.text("已加入 %ld 个项目", 1)
+                case .resizeImages, .convertImages:
+                    try openImageTools(urls, action == .resizeImages ? .resize : .convert)
+                    message = nil
                 case .recognizeToQuickNote:
                     let worker = Task.detached(priority: .userInitiated) {
                         var texts: [String] = []
@@ -148,13 +183,13 @@ final class ShelfContextActions: ObservableObject {
                     isCancellable = false
                     guard await createQuickNote(text) else { throw ShelfContextActionError.quickNoteUnavailable }
                     message = AppLocalization.text("已创建随记")
-                case .editVideo:
+                case .editVideo, .importToStudioLibrary:
                     try Task.checkCancellation()
-                    guard openStudio(urls) else { throw ShelfContextActionError.studioUnavailable }
-                    message = AppLocalization.text("已发送到录屏工作室")
+                    try await openStudio(urls, action == .importToStudioLibrary)
+                    message = AppLocalization.text(action == .editVideo ? "已发送到录屏工作室" : "素材库导入完成")
                 }
             } catch {
-                message = error is CancellationError
+                message = error is CancellationError || Task.isCancelled
                     ? AppLocalization.text("已取消操作")
                     : AppLocalization.text("操作失败：%@", error.localizedDescription)
             }

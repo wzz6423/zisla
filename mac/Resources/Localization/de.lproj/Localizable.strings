@@ -3785,3 +3785,11 @@
 "取消图片文字识别" = "Bildtexterkennung abbrechen";
 "等待识别图片文字" = "Warten auf Bildtexterkennung";
 "正在识别图片文字" = "Bildtext wird erkannt";
+
+"缩放图片" = "Bilder skalieren";
+"转换图片格式" = "Bildformat konvertieren";
+"导入录屏素材库" = "In die Aufnahme-Mediathek importieren";
+"图片工具当前不可用，请稍后重试" = "Die Bildwerkzeuge sind derzeit nicht verfügbar. Bitte später erneut versuchen.";
+"无法压缩同名项目：%@" = "Gleichnamige Elemente können nicht archiviert werden: %@";
+"素材库导入完成" = "Import in die Mediathek abgeschlossen";
+"%ld 个结果未能加入中转站" = "%ld Ergebnisse konnten nicht zur Ablage hinzugefügt werden";

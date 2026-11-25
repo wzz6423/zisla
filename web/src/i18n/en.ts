@@ -82,7 +82,7 @@ export const en: SiteContent = {
       shelf: {
         name: 'Shelf',
         caption:
-          'Drag files, audio, video or links to the top of the screen, then search, filter and select several shelf items to copy, share or send to Quick Notes. Convert images to PDF, recognise image text into Quick Notes, or send videos to the recording studio for editing. Reveal files in Finder whenever needed.',
+          'Drag files, audio, video or links to the top of the screen, then search, filter and select several shelf items to copy, share or send to Quick Notes. Convert images to PDF, recognise image text into Quick Notes, or send videos to the recording studio for editing. Reveal files in Finder whenever needed. Compress selected files and folders to ZIP, or open selected images in Image Tools for resizing or conversion; successful results return to the shelf. Import images, video and audio into the recording media library.',
         points: ['Search and batch actions', 'Images to PDF and Quick Notes', 'Edit videos in the studio'],
       },
       clipboard: {
@@ -178,7 +178,7 @@ export const en: SiteContent = {
       },
       recording: {
         title: 'Record and edit in the recording studio',
-        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks with animations, zooms and captions. Adjust portrait smoothing, brightness, face and body slimming, choose voice effects, and add smooth cursor trails in your colour. Play the edited result in the studio. Choose original, 16:9, 9:16, 1:1 or 4:3; export video, GIF, Live Photo or audio, with FFmpeg needed for some formats. Preview optional AI edits before applying them. Recording has its own folder in Settings → Save Location. Record HDR on supported devices.',
+        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks with animations, zooms and captions. Adjust portrait smoothing, brightness, face and body slimming, choose voice effects, and add smooth cursor trails in your colour. Play the edited result in the studio. Choose original, 16:9, 9:16, 1:1 or 4:3; export video, GIF, Live Photo or audio, with FFmpeg needed for some formats. Preview optional AI edits before applying them. Recording has its own folder in Settings → Save Location. Record HDR on supported devices. Import images, video and audio from the shelf into the media library while keeping the current project and timeline.',
         detail: 'Portrait and voice effects · Coloured cursor trails · Multitrack playback and export',
       },
       permissions: {

@@ -3783,3 +3783,11 @@
 "取消图片文字识别" = "Cancel image text recognition";
 "等待识别图片文字" = "Waiting to recognize image text";
 "正在识别图片文字" = "Recognizing image text";
+
+"缩放图片" = "Resize Images";
+"转换图片格式" = "Convert Image Format";
+"导入录屏素材库" = "Import to Recording Media Library";
+"图片工具当前不可用，请稍后重试" = "Image tools are unavailable. Please try again later.";
+"无法压缩同名项目：%@" = "Cannot archive items with the same name: %@";
+"素材库导入完成" = "Media library import complete";
+"%ld 个结果未能加入中转站" = "%ld results could not be added to the shelf";

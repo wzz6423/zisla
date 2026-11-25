@@ -83,7 +83,7 @@ export const nl = createCatalog({
       shelf: {
         name: 'Plank',
         caption:
-          'Sleep bestanden, audio, video of links naar de bovenkant van het scherm. Zoek en filter items, selecteer er meerdere en kopieer, deel of stuur ze naar Snelle notities. Zet afbeeldingen om naar PDF, stuur herkende tekst naar Snelle notities of bewerk video’s in de opnamestudio. Je kunt bestanden ook in Finder tonen.',
+          'Sleep bestanden, audio, video of links naar de bovenkant van het scherm. Zoek en filter items, selecteer er meerdere en kopieer, deel of stuur ze naar Snelle notities. Zet afbeeldingen om naar PDF, stuur herkende tekst naar Snelle notities of bewerk video’s in de opnamestudio. Je kunt bestanden ook in Finder tonen. Pak geselecteerde bestanden en mappen in als ZIP of open geselecteerde afbeeldingen in de afbeeldingstools om ze te schalen of converteren; geslaagde resultaten keren terug naar de plank. Importeer afbeeldingen, video en audio in de mediabibliotheek van de opnamestudio.',
         points: ['Zoeken en batchacties', 'Afbeeldingen naar PDF en Snelle notities', 'Video’s bewerken in de studio'],
       },
       clipboard: {
@@ -180,7 +180,7 @@ export const nl = createCatalog({
       },
       recording: {
         title: 'Opnemen en bewerken in de studio',
-        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen met animaties, zoom en ondertitels. Pas huidverzachting, helderheid, versmalling van gezicht en lichaam, stemeffecten en vloeiende cursorsporen in je eigen kleur aan. Speel de bewerking af in de studio. Kies origineel, 16:9, 9:16, 1:1 of 4:3; exporteer video, GIF, Live Photo of audio. Sommige formaten vereisen FFmpeg. Bekijk optionele AI-plannen voordat je ze toepast. De opnamemap kies je apart onder Instellingen → Opslaglocatie. Neem HDR op met ondersteunde apparaten.',
+        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen met animaties, zoom en ondertitels. Pas huidverzachting, helderheid, versmalling van gezicht en lichaam, stemeffecten en vloeiende cursorsporen in je eigen kleur aan. Speel de bewerking af in de studio. Kies origineel, 16:9, 9:16, 1:1 of 4:3; exporteer video, GIF, Live Photo of audio. Sommige formaten vereisen FFmpeg. Bekijk optionele AI-plannen voordat je ze toepast. De opnamemap kies je apart onder Instellingen → Opslaglocatie. Neem HDR op met ondersteunde apparaten. Importeer afbeeldingen, video en audio vanaf de plank in de mediabibliotheek en behoud het huidige project en de tijdlijn.',
         detail: 'Portret- en stemeffecten · Gekleurde cursorsporen · Meersporenweergave en export',
       },
       permissions: {
