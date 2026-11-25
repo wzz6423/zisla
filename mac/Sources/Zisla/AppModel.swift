@@ -83,9 +83,9 @@ enum IslandModule: String, CaseIterable, Identifiable {
             .ai
         case .mail, .quickNotes, .system, .battery, .keyboardSound:
             .system
-        case .download, .agenda, .volumeMixer:
+        case .download, .agenda:
             .agenda
-        case .toolbox:
+        case .toolbox, .volumeMixer:
             .toolbox
         case .lockScreen:
             .standard
@@ -175,7 +175,7 @@ struct IslandModuleLayout: Equatable {
     /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
     /// Width matches standard; only the island body is taller.
     static let clipboard = compactModule(contentHeight: shelfContentHeight)
-    static let ai = compactModule(contentHeight: 350)
+    static let ai = system
     static let battery = system
     static let keyboardSound = system
     static let notes = system

@@ -36,7 +36,7 @@ struct KeyboardSoundModuleView: View {
         Group {
             if let summary, !(isDebugBuild && environment["ZISLA_DEBUG_IGNORE_KEYBOARD_STATS"] == "1") {
                 DashboardScrollView(summary: summary, voiceStatistics: voiceStatistics)
-                    .thinScrollChrome()
+                    .thinScrollChrome(autohidesScrollers: false)
             } else {
                 EmptyState(
                     symbol: "chart.xyaxis.line",
@@ -54,6 +54,7 @@ struct KeyboardSoundModuleView: View {
             let scroll = NSScrollView()
             scroll.drawsBackground = false
             scroll.horizontalScrollElasticity = .none
+            ThinScrollChrome.apply(to: scroll, autohidesScrollers: false)
             let hosting = NSHostingView(rootView: content)
             hosting.translatesAutoresizingMaskIntoConstraints = false
             scroll.documentView = hosting

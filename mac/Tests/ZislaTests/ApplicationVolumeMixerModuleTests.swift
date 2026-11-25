@@ -25,14 +25,17 @@ struct ApplicationVolumeMixerModuleTests {
         #expect(!IslandModule.allCases.contains { $0.rawValue == "pdf" })
     }
 
-    @Test
-    func mixerSharesTheDownloadsPanelHeight() {
-        #expect(IslandModule.volumeMixer.layout == IslandModule.download.layout)
-        #expect(IslandModuleLayout.resolved(for: .volumeMixer, dashboardCardCount: 0)
-            == IslandModuleLayout.resolved(for: .download, dashboardCardCount: 0))
+    @Test(arguments: [CGFloat(16), 44])
+    func mixerSharesTheToolboxPanelHeight(contentTopInset: CGFloat) {
+        #expect(IslandModule.volumeMixer.layout == IslandModule.toolbox.layout)
+        #expect(IslandModuleLayout.resolved(
+            for: .volumeMixer, dashboardCardCount: 0, contentTopInset: contentTopInset
+        ) == IslandModuleLayout.resolved(
+            for: .toolbox, dashboardCardCount: 0, contentTopInset: contentTopInset
+        ))
     }
 
-    @Test(arguments: [false, true], [160.0, 300.0]) @MainActor
+    @Test(arguments: [false, true], [136.0, 300.0]) @MainActor
     func unavailableMessagesStayCenteredWithoutAPageHeading(isSupported: Bool, height: Double) throws {
         let backend = VolumeLayoutBackend(isSupported: isSupported)
         let suite = "Zisla.ApplicationVolumeLayout.\(UUID().uuidString)"
@@ -85,7 +88,7 @@ struct ApplicationVolumeMixerModuleTests {
         let host = NSHostingView(rootView: ApplicationVolumeMixerModuleView(service: service)
             .environment(\.colorScheme, .dark))
         host.sizingOptions = []
-        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 752, height: 160),
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 752, height: 136),
                               styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
@@ -105,9 +108,9 @@ struct ApplicationVolumeMixerModuleTests {
         let document = try #require(scrollView.documentView)
         #expect(abs(scrollView.frame.width - 728) <= 1)
         if hasFailure {
-            #expect(scrollView.frame.height > 50 && scrollView.frame.height < 136)
+            #expect(scrollView.frame.height > 50 && scrollView.frame.height < 112)
         } else {
-            #expect(abs(scrollView.frame.height - 136) <= 1)
+            #expect(abs(scrollView.frame.height - 112) <= 1)
         }
         #expect(document.bounds.height > scrollView.contentView.bounds.height)
         let initialOffset = scrollView.contentView.bounds.minY
@@ -148,7 +151,7 @@ struct ApplicationVolumeMixerModuleTests {
         let host = NSHostingView(rootView: ApplicationVolumeMixerModuleView(service: service)
             .environment(\.locale, AppLanguage.english.locale))
         host.sizingOptions = []
-        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 752, height: 160),
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 752, height: 136),
                               styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host

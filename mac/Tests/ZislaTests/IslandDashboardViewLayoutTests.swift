@@ -23,7 +23,7 @@ struct IslandDashboardViewLayoutTests {
         (IslandModuleLayout.system, CGFloat(401)),
         (IslandModuleLayout.shelf, CGFloat(355)),
         (IslandModuleLayout.clipboard, CGFloat(355)),
-        (IslandModuleLayout.ai, CGFloat(350)),
+        (IslandModuleLayout.ai, CGFloat(401)),
     ])
     func loweredHeaderPreservesEachFixedModulesContentBudget(
         layout: IslandModuleLayout, contentHeight: CGFloat
@@ -80,8 +80,9 @@ struct IslandDashboardViewLayoutTests {
         let chrome = topInset + IslandDashboardLayout.mediaHeaderHeight
             + IslandDashboardLayout.toolbarHeight + IslandDashboardLayout.toolbarBottomInset
         for (module, contentHeight): (IslandModule, CGFloat) in [
-            (.shelf, 355), (.clipboard, 355), (.toolbox, 136),
-            (.agenda, 160), (.download, 160), (.system, 401), (.aiMonitor, 350)
+            (.shelf, 355), (.clipboard, 355), (.toolbox, 136), (.volumeMixer, 136),
+            (.agenda, 160), (.download, 160), (.system, 401),
+            (.keyboardSound, 401), (.aiMonitor, 401)
         ] {
             let layout = IslandModuleLayout.resolved(
                 for: module, dashboardCardCount: 0, contentTopInset: topInset
@@ -95,6 +96,11 @@ struct IslandDashboardViewLayoutTests {
             #expect(layout.islandSize.height - chrome - IslandSurfaceGeometry.moduleInset * 2 == contentHeight)
             #expect(layout.panelSize.height == layout.islandSize.height + 4)
         }
+        #expect(IslandModuleLayout.resolved(
+            for: .aiMonitor, dashboardCardCount: 0, contentTopInset: topInset
+        ) == IslandModuleLayout.resolved(
+            for: .keyboardSound, dashboardCardCount: 0, contentTopInset: topInset
+        ), "AI and keyboard pages must stay the same size below the camera-aligned header")
         for cardCount in [0, 1, 2, 3, 100] {
             let layout = IslandModuleLayout.resolved(
                 for: .dashboard, dashboardCardCount: cardCount, contentTopInset: topInset
