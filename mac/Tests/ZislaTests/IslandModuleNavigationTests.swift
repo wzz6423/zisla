@@ -23,14 +23,12 @@ struct IslandModuleNavigationTests {
         #expect(navigation.adjacentTarget(in: .next, selectedModule: .battery, settings: settings, isRightToLeft: isRightToLeft) == expectedAfterFirst)
         #expect(navigation.adjacentTarget(in: .next, selectedModule: .mail, settings: settings, isRightToLeft: isRightToLeft) == expectedAfterFirst,
                 "A disabled selection must navigate from the displayed fallback page")
-        let selectedLast = navigation.select(rightmost, selectedModule: leftmost, settings: settings, direction: .previous)
+        let selectedLast = navigation.select(rightmost, selectedModule: leftmost)
         #expect(selectedLast)
-        #expect(navigation.direction == -1, "Wrapping left must keep the leftward transition")
         let pendingLast = navigation.takePendingSelection()
         #expect(pendingLast == rightmost)
-        let selectedFirst = navigation.select(leftmost, selectedModule: rightmost, settings: settings, direction: .next)
+        let selectedFirst = navigation.select(leftmost, selectedModule: rightmost)
         #expect(selectedFirst)
-        #expect(navigation.direction == 1, "Wrapping right must keep the rightward transition")
     }
 
     @Test
@@ -43,7 +41,7 @@ struct IslandModuleNavigationTests {
         for expected in order.dropFirst().prefix(3) {
             let target = navigation.adjacentTarget(in: .next, selectedModule: first, settings: settings)
             #expect(target == expected, "Each command must advance even before the previous page mounts")
-            let selected = navigation.select(target, selectedModule: first, settings: settings, direction: .next)
+            let selected = navigation.select(target, selectedModule: first)
             #expect(selected)
         }
         let pending = navigation.takePendingSelection()
@@ -52,42 +50,39 @@ struct IslandModuleNavigationTests {
         #expect(replay == nil, "A committed selection must not replay")
 
         let next = navigation.adjacentTarget(in: .next, selectedModule: first, settings: settings)
-        let selectedNext = navigation.select(next, selectedModule: first, settings: settings, direction: .next)
+        let selectedNext = navigation.select(next, selectedModule: first)
         #expect(selectedNext)
         let previous = navigation.adjacentTarget(in: .previous, selectedModule: first, settings: settings)
         #expect(previous == first)
-        let selectedPrevious = navigation.select(previous, selectedModule: first, settings: settings, direction: .previous)
+        let selectedPrevious = navigation.select(previous, selectedModule: first)
         #expect(selectedPrevious)
         let cancelled = navigation.takePendingSelection()
         #expect(cancelled == first, "Opposite commands must cancel the queued page")
     }
 
     @Test
-    func directSelectionKeepsMouseDirectionAndLegacyTargets() {
+    func directSelectionKeepsLegacyTargetsAndCoalescesRepeatedCommands() {
         let settings = FeatureSettings.default
         var navigation = IslandModuleNavigation()
-        let selectedShelf = navigation.select(.shelf, selectedModule: .dashboard, settings: settings)
+        let selectedShelf = navigation.select(.shelf, selectedModule: .dashboard)
         #expect(selectedShelf)
-        #expect(navigation.direction == 1)
-        let repeatedShelf = navigation.select(.shelf, selectedModule: .dashboard, settings: settings)
+        let repeatedShelf = navigation.select(.shelf, selectedModule: .dashboard)
         #expect(!repeatedShelf)
         let pendingShelf = navigation.takePendingSelection()
         #expect(pendingShelf == .shelf)
-        let selectedDashboard = navigation.select(.dashboard, selectedModule: .shelf, settings: settings)
+        let selectedDashboard = navigation.select(.dashboard, selectedModule: .shelf)
         #expect(selectedDashboard)
-        #expect(navigation.direction == -1)
         let pendingDashboard = navigation.takePendingSelection()
         #expect(pendingDashboard == .dashboard)
-        let selectedBattery = navigation.select(.battery, selectedModule: .dashboard, settings: settings)
+        let selectedBattery = navigation.select(.battery, selectedModule: .dashboard)
         #expect(selectedBattery)
         let pendingSystem = navigation.takePendingSelection()
         #expect(pendingSystem == .system)
-        let repeatedBattery = navigation.select(.battery, selectedModule: .system, settings: settings)
+        let repeatedBattery = navigation.select(.battery, selectedModule: .system)
         #expect(!repeatedBattery)
         #expect(navigation.pendingSelection == nil)
-        let selectedLockScreen = navigation.select(.lockScreen, selectedModule: .system, settings: settings)
+        let selectedLockScreen = navigation.select(.lockScreen, selectedModule: .system)
         #expect(selectedLockScreen)
-        #expect(navigation.direction == 1, "A direct target outside the configured order must keep the previous direction")
         let pendingLockScreen = navigation.takePendingSelection()
         #expect(pendingLockScreen == .lockScreen)
     }
@@ -114,10 +109,9 @@ struct IslandModuleNavigationTests {
         for direction in [IslandModuleNavigation.Direction.previous, .next] {
             let target = navigation.adjacentTarget(in: direction, selectedModule: .dashboard, settings: settings)
             #expect(target == .dashboard)
-            let selected = navigation.select(target, selectedModule: .dashboard, settings: settings, direction: direction)
+            let selected = navigation.select(target, selectedModule: .dashboard)
             #expect(!selected)
             #expect(navigation.pendingSelection == nil)
-            #expect(navigation.direction == 1)
         }
     }
 }

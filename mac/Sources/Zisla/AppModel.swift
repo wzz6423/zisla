@@ -128,24 +128,15 @@ struct IslandModuleNavigation {
         case next = 1
     }
 
-    private(set) var direction: CGFloat = 1
     private(set) var pendingSelection: IslandModule?
 
     mutating func select(
         _ module: IslandModule,
-        selectedModule: IslandModule,
-        settings: FeatureSettings,
-        direction: Direction? = nil
+        selectedModule: IslandModule
     ) -> Bool {
         let module = module.navigationTarget
         let current = pendingSelection ?? selectedModule.navigationTarget
         guard module != current else { return false }
-        let order = IslandModule.configuredOrder(settings)
-        if let direction {
-            self.direction = CGFloat(direction.rawValue)
-        } else if let from = order.firstIndex(of: current), let to = order.firstIndex(of: module) {
-            self.direction = to > from ? 1 : -1
-        }
         pendingSelection = module
         return true
     }
@@ -464,16 +455,11 @@ final class AppModel: ObservableObject {
             }
         }
     }
-    /// Module switch direction (+1 rightward, -1 leftward) driving the
-    /// directional page transition. Committed one run-loop turn before `selectedModule`
-    /// changes so the outgoing view's removal transition also carries the fresh direction.
-    var moduleSwitchDirection: CGFloat { moduleNavigation.direction }
-    @Published private var moduleNavigation = IslandModuleNavigation()
+    private var moduleNavigation = IslandModuleNavigation()
 
-    /// Preferred entry point for switching modules: records the navigation direction for
-    /// the directional transition, then applies the switch on the next run-loop turn.
-    func selectModule(_ module: IslandModule, direction: IslandModuleNavigation.Direction? = nil) {
-        guard moduleNavigation.select(module, selectedModule: selectedModule, settings: settingsStore.settings, direction: direction)
+    /// Coalesces page commands before applying the latest selection on the next run-loop turn.
+    func selectModule(_ module: IslandModule) {
+        guard moduleNavigation.select(module, selectedModule: selectedModule)
         else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, let target = self.moduleNavigation.takePendingSelection() else { return }
@@ -486,8 +472,7 @@ final class AppModel: ObservableObject {
         selectModule(
             moduleNavigation.adjacentTarget(
                 in: direction, selectedModule: selectedModule, settings: settingsStore.settings, isRightToLeft: isRightToLeft
-            ),
-            direction: direction
+            )
         )
     }
 
@@ -2013,12 +1998,15 @@ final class AppModel: ObservableObject {
     }
 
     func joinMeetingNotice(_ eventID: String) {
-        calendar.refreshMeetings()
-        guard let event = calendar.meetingEvents.first(where: { $0.id == eventID }) else {
-            transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
-            return
+        Task { [weak self] in
+            guard let self else { return }
+            await calendar.refreshMeetings().value
+            guard let event = calendar.meetingEvents.first(where: { $0.id == eventID }) else {
+                transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
+                return
+            }
+            joinMeeting(event)
         }
-        joinMeeting(event)
     }
 
     func openMeetingNote(_ note: FileShelfItem) {

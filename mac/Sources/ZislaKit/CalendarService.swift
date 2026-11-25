@@ -195,6 +195,55 @@ struct CalendarServiceEnvironment {
     }
 }
 
+struct CalendarQueryOperations: Sendable {
+    var events: @Sendable (DateInterval, Bool) async -> [CalendarEventSnapshot]
+    var reminders: @Sendable (DateInterval, Calendar, @escaping @Sendable ([CalendarEventSnapshot]) -> Void) async -> Void
+
+    static func live(makeStore: @escaping @Sendable () -> EKEventStore = { EKEventStore() }) -> Self {
+        let query = CalendarQuery(makeStore: makeStore)
+        return Self(
+            events: { interval, refreshSources in await query.events(in: interval, refreshSources: refreshSources) },
+            reminders: { interval, calendar, completion in
+                await query.reminders(in: interval, calendar: calendar, completion: completion)
+            }
+        )
+    }
+}
+
+private actor CalendarQuery {
+    private nonisolated let queue = DispatchSerialQueue(label: "dev.wzz.zisla.calendar-query", qos: .userInitiated)
+    nonisolated var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
+    private let makeStore: @Sendable () -> EKEventStore
+    private var storedEventStore: EKEventStore?
+
+    init(makeStore: @escaping @Sendable () -> EKEventStore) {
+        self.makeStore = makeStore
+    }
+
+    private var store: EKEventStore {
+        if let storedEventStore { return storedEventStore }
+        let store = makeStore()
+        storedEventStore = store
+        return store
+    }
+
+    func events(in interval: DateInterval, refreshSources: Bool) -> [CalendarEventSnapshot] {
+        let store = store
+        if refreshSources { store.refreshSourcesIfNecessary() }
+        let predicate = store.predicateForEvents(withStart: interval.start, end: interval.end, calendars: nil)
+        return store.events(matching: predicate).map(CalendarService.makeEventSnapshot)
+    }
+
+    func reminders(in interval: DateInterval, calendar: Calendar, completion: @escaping @Sendable ([CalendarEventSnapshot]) -> Void) {
+        let store = store
+        let predicate = store.predicateForReminders(in: nil)
+        store.fetchReminders(matching: predicate) { @Sendable reminders in
+            // EventKit objects stay in the callback; only value snapshots cross back to the UI.
+            completion(CalendarService.makeReminderSnapshots(from: reminders ?? [], calendar: calendar, dueWithin: interval))
+        }
+    }
+}
+
 @MainActor
 public final class CalendarService: ObservableObject {
     public nonisolated static let weekDayCount = 7
@@ -213,10 +262,12 @@ public final class CalendarService: ObservableObject {
     private var lastRefreshFinishedAt: Date?
     private let mutations: CalendarMutationCommands
     private let environment: CalendarServiceEnvironment
+    private let queries: CalendarQueryOperations
     private var storeChangedObserver: NSObjectProtocol?
     private var meetingObservers: [(NotificationCenter, NSObjectProtocol)] = []
     private var meetingRefreshTimer: Timer?
     private var monitoringGeneration: UInt64 = 0
+    private(set) var pendingMeetingRefresh: Task<Void, Never>?
     private(set) var scheduledRefresh: Task<Void, Never>?
     private var refreshGeneration: UInt64 = 0
     private var agendaLifecycleGeneration: UInt64 = 0
@@ -230,10 +281,12 @@ public final class CalendarService: ObservableObject {
         self.init(store: store, mutations: .live(store: store))
     }
 
-    init(store: EKEventStore, mutations: CalendarMutationCommands, environment: CalendarServiceEnvironment = .live) {
+    init(store: EKEventStore, mutations: CalendarMutationCommands, environment: CalendarServiceEnvironment = .live,
+         queries: CalendarQueryOperations = .live()) {
         self.store = store
         self.mutations = mutations
         self.environment = environment
+        self.queries = queries
         authorizationStatus = environment.authorizationStatus(.event)
         reminderAuthorizationStatus = environment.authorizationStatus(.reminder)
         queryAnchorDate = environment.now()
@@ -295,6 +348,8 @@ public final class CalendarService: ObservableObject {
         refreshGeneration &+= 1
         scheduledRefresh?.cancel()
         scheduledRefresh = nil
+        pendingMeetingRefresh?.cancel()
+        pendingMeetingRefresh = nil
         meetingRefreshTimer?.invalidate()
         meetingRefreshTimer = nil
         for (center, observer) in meetingObservers { center.removeObserver(observer) }
@@ -306,15 +361,23 @@ public final class CalendarService: ObservableObject {
         meetingEvents = []
     }
 
-    public func refreshMeetings() {
+    @discardableResult
+    public func refreshMeetings() -> Task<Void, Never> {
         updateAuthorizationStatuses()
-        guard hasEventAccess else {
-            meetingEvents = []
-            return
-        }
+        let readsEvents = hasEventAccess
+        if !readsEvents { meetingEvents = [] }
         let date = environment.now()
-        let predicate = store.predicateForEvents(withStart: date, end: date.addingTimeInterval(86_400), calendars: nil)
-        meetingEvents = MeetingWorkflow.meetings(in: store.events(matching: predicate).map(Self.makeEventSnapshot), at: date)
+        let queries = queries
+        pendingMeetingRefresh?.cancel()
+        let task = Task { @MainActor [weak self] in
+            guard readsEvents, !Task.isCancelled else { return }
+            let snapshots = await queries.events(DateInterval(start: date, duration: 86_400), false)
+            guard let self, !Task.isCancelled else { return }
+            self.updateAuthorizationStatuses()
+            self.meetingEvents = self.hasEventAccess ? MeetingWorkflow.meetings(in: snapshots, at: self.environment.now()) : []
+        }
+        pendingMeetingRefresh = task
+        return task
     }
 
     public func resolveMeeting(_ snapshot: CalendarEventSnapshot) -> CalendarEventSnapshot? {
@@ -346,7 +409,8 @@ public final class CalendarService: ObservableObject {
             updateAuthorizationStatuses()
             try await requestUndeterminedAccess(lifecycleGeneration: lifecycleGeneration)
             try checkAgendaLifecycle(lifecycleGeneration)
-            refreshMeetings()
+            await refreshMeetings().value
+            try checkAgendaLifecycle(lifecycleGeneration)
 
             let readsEvents = Self.canReadEvents(authorizationStatus)
             let readsReminders = Self.canReadReminders(reminderAuthorizationStatus)
@@ -359,11 +423,6 @@ public final class CalendarService: ObservableObject {
                 )
                 return
             }
-
-            // iCloud and subscribed calendars can finish syncing after the first
-            // store is created. This call makes the initial query include those
-            // sources, while the store-change observer covers later edits.
-            store.refreshSourcesIfNecessary()
 
             let calendar = Calendar.current
             guard let interval = Self.agendaDateInterval(containing: referenceDate, calendar: calendar) else {
@@ -379,15 +438,11 @@ public final class CalendarService: ObservableObject {
             let end = interval.end
             var nextItems: [CalendarEventSnapshot] = []
             if readsEvents {
-                let predicate = store.predicateForEvents(
-                    withStart: start,
-                    end: end,
-                    calendars: nil
-                )
-                nextItems += store.events(matching: predicate).map(Self.makeEventSnapshot)
+                nextItems += await queries.events(interval, true)
+                try checkAgendaLifecycle(lifecycleGeneration)
             }
             if readsReminders {
-                fetchReminderSnapshots(
+                await fetchReminderSnapshots(
                     appending: nextItems,
                     from: start,
                     to: end,
@@ -395,10 +450,14 @@ public final class CalendarService: ObservableObject {
                     generation: generation,
                     lifecycleGeneration: lifecycleGeneration
                 )
+                try checkAgendaLifecycle(lifecycleGeneration)
                 return
             }
 
             completeRefresh(with: nextItems, generation: generation, lifecycleGeneration: lifecycleGeneration)
+        } catch is CancellationError {
+            completeRefresh(with: events, generation: generation, lifecycleGeneration: lifecycleGeneration,
+                            errorDescription: errorDescription)
         } catch {
             completeRefresh(
                 with: [],
@@ -555,17 +614,12 @@ public final class CalendarService: ObservableObject {
         calendar: Calendar,
         generation: UInt64,
         lifecycleGeneration: UInt64
-    ) {
+    ) async {
         let enqueue = environment.enqueue
-        let predicate = store.predicateForReminders(in: nil)
-        store.fetchReminders(matching: predicate) { [weak self] reminders in
+        await queries.reminders(DateInterval(start: start, end: end), calendar) { [weak self] snapshots in
             enqueue { @MainActor [weak self] in
                 guard let self else { return }
-                let items = baseItems + Self.makeReminderSnapshots(
-                    from: reminders ?? [],
-                    calendar: calendar,
-                    dueWithin: DateInterval(start: start, end: end)
-                )
+                let items = baseItems + snapshots
                 self.completeRefresh(with: items, generation: generation, lifecycleGeneration: lifecycleGeneration)
             }
         }
@@ -593,7 +647,10 @@ public final class CalendarService: ObservableObject {
         }
         guard generation == refreshGeneration else { return }
 
-        events = Self.preparedAgendaItems(items)
+        updateAuthorizationStatuses()
+        if !hasEventAccess { meetingEvents = [] }
+        let authorizedItems = items.filter { $0.kind == .event ? hasEventAccess : hasReminderAccess }
+        events = Self.preparedAgendaItems(authorizedItems)
         self.errorDescription = errorDescription
         if errorDescription == nil {
             lastRefreshFinishedAt = Date()

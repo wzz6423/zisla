@@ -20,12 +20,12 @@ struct MeetingCountdownControllerTests {
     }
 
     @Test
-    func timerWaitsForTheLeadWindowTicksOnlyBeforeStartAndThenWaitsForEnd() throws {
+    func timerWaitsForTheLeadWindowTicksOnlyBeforeStartAndThenWaitsForEnd() async throws {
         let fixture = try CountdownFixture()
         defer { fixture.close() }
         let event = try fixture.event(start: fixture.date.addingTimeInterval(3_600))
         fixture.store.fixtures = [event]
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         fixture.controller.configure()
         #expect(fixture.intervals.last == 3_000)
         #expect(fixture.queue.left.isEmpty)
@@ -51,35 +51,35 @@ struct MeetingCountdownControllerTests {
     }
 
     @Test
-    func calendarUpdatesReplaceTheCountdownAndRemoveCancelledOrDeletedMeetings() throws {
+    func calendarUpdatesReplaceTheCountdownAndRemoveCancelledOrDeletedMeetings() async throws {
         let fixture = try CountdownFixture()
         defer { fixture.close() }
         let later = try fixture.event(id: "later", start: fixture.date.addingTimeInterval(300))
         fixture.store.fixtures = [later]
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         fixture.controller.configure()
         #expect(fixture.queue.left.first?.detail == "05:00")
         let earlier = try fixture.event(id: "earlier", start: fixture.date.addingTimeInterval(60))
         fixture.store.fixtures = [later, earlier]
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         #expect(fixture.queue.left.count == 1 && fixture.queue.right.count == 1)
         #expect(fixture.queue.left.first?.title == "earlier")
         #expect(fixture.queue.left.first?.detail == "01:00")
         earlier.fixtureStatus = .canceled
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         #expect(fixture.queue.left.first?.title == "later")
         fixture.store.fixtures = []
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         #expect(fixture.queue.left.isEmpty && fixture.queue.right.isEmpty)
         #expect(fixture.timers.last?.isValid == false)
     }
 
     @Test
-    func languageChangesRefreshOngoingTextAndCalendarPermissionRevocationRemovesIt() throws {
+    func languageChangesRefreshOngoingTextAndCalendarPermissionRevocationRemovesIt() async throws {
         let fixture = try CountdownFixture()
         defer { fixture.close() }
         fixture.store.fixtures = [try fixture.event(start: fixture.date.addingTimeInterval(-60))]
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         fixture.controller.configure()
         #expect(fixture.queue.left.first?.detail == "会议进行中")
         fixture.language.language = .english
@@ -87,17 +87,17 @@ struct MeetingCountdownControllerTests {
         fixture.language.language = .arabic
         #expect(fixture.queue.left.first?.detail == "الاجتماع جارٍ")
         fixture.access = .denied
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         #expect(fixture.queue.left.isEmpty && fixture.queue.right.isEmpty)
         #expect(fixture.timers.last?.isValid == false)
     }
 
     @Test(arguments: ["calendar", "notices", "stop", "restart"])
-    func disablingOrRestartingInvalidatesLateTimersWithoutRestoringOldNotices(change: String) throws {
+    func disablingOrRestartingInvalidatesLateTimersWithoutRestoringOldNotices(change: String) async throws {
         let fixture = try CountdownFixture()
         defer { fixture.close() }
         fixture.store.fixtures = [try fixture.event(start: fixture.date.addingTimeInterval(60))]
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         fixture.controller.configure()
         let old = try #require(fixture.actions.last)
         if change == "calendar" { fixture.settings.settings.calendarEnabled = false; fixture.controller.configure() }
@@ -105,7 +105,7 @@ struct MeetingCountdownControllerTests {
         if change == "stop" || change == "restart" { fixture.controller.stop() }
         if change == "restart" {
             fixture.store.fixtures = []
-            fixture.calendar.refreshMeetings()
+            await fixture.calendar.refreshMeetings().value
             fixture.controller.configure()
         }
         let count = fixture.timers.count
@@ -116,17 +116,17 @@ struct MeetingCountdownControllerTests {
     }
 
     @Test
-    func aChangedMeetingInvalidatesItsPreviousTimerCallback() throws {
+    func aChangedMeetingInvalidatesItsPreviousTimerCallback() async throws {
         let fixture = try CountdownFixture()
         defer { fixture.close() }
         let event = try fixture.event(start: fixture.date.addingTimeInterval(60))
         fixture.store.fixtures = [event]
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         fixture.controller.configure()
         let old = try #require(fixture.actions.last)
         event.startDate = fixture.date.addingTimeInterval(3_600)
         event.endDate = event.startDate.addingTimeInterval(3_600)
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         let count = fixture.timers.count
         old()
         #expect(fixture.queue.left.isEmpty && fixture.queue.right.isEmpty)
@@ -135,18 +135,18 @@ struct MeetingCountdownControllerTests {
     }
 
     @Test(arguments: ["calendar", "language"])
-    func stoppedCountdownIgnoresCalendarAndLanguagePublishers(source: String) throws {
+    func stoppedCountdownIgnoresCalendarAndLanguagePublishers(source: String) async throws {
         let fixture = try CountdownFixture()
         defer { fixture.close() }
         let event = try fixture.event(start: fixture.date.addingTimeInterval(60))
         fixture.store.fixtures = [event]
-        fixture.calendar.refreshMeetings()
+        await fixture.calendar.refreshMeetings().value
         fixture.controller.configure()
         fixture.controller.stop()
         let count = fixture.timers.count
         if source == "calendar" {
             event.title = "Renamed"
-            fixture.calendar.refreshMeetings()
+            await fixture.calendar.refreshMeetings().value
         } else {
             fixture.language.language = .english
         }
@@ -171,7 +171,13 @@ private final class CountdownFixture {
     var actions: [@Sendable () -> Void] = []
     lazy var calendar = CalendarService(store: store, mutations: .live(store: store),
                                         environment: CalendarServiceEnvironment(authorizationStatus: { [self] _ in access }, now: { [self] in date },
-                                                                                notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()))
+                                                                                notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()),
+                                        queries: CalendarQueryOperations(events: { [self] interval, _ in
+                                            await MainActor.run {
+                                                let predicate = store.predicateForEvents(withStart: interval.start, end: interval.end, calendars: nil)
+                                                return store.events(matching: predicate).map(CalendarService.makeEventSnapshot)
+                                            }
+                                        }, reminders: { _, _, complete in complete([]) }))
     lazy var controller = MeetingCountdownController(calendar: calendar, queue: queue, settings: settings,
                                                      language: language, now: { [self] in date }, makeTimer: { [self] interval, action in
                                                          let timer = Timer(timeInterval: interval, repeats: false) { _ in action() }

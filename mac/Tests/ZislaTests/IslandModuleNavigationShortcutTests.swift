@@ -3,6 +3,7 @@ import SwiftUI
 import Testing
 import WebKit
 import ZislaCore
+import EventKit
 
 @testable import Zisla
 @testable import ZislaKit
@@ -23,7 +24,7 @@ struct IslandModuleNavigationShortcutTests {
             let target = navigation.adjacentTarget(
                 in: direction, selectedModule: first, settings: settings, isRightToLeft: layoutDirection == .rightToLeft
             )
-            _ = navigation.select(target, selectedModule: first, settings: settings, direction: direction)
+            _ = navigation.select(target, selectedModule: first)
         })
         let panel = IslandPanel(contentView: host, frame: CGRect(x: 0, y: 0, width: 320, height: 200))
         defer { panel.contentView = nil; panel.close() }
@@ -45,10 +46,8 @@ struct IslandModuleNavigationShortcutTests {
         let right = try event(in: panel, keyCode: 124, isRepeat: true)
         #expect(panel.performKeyEquivalent(with: left))
         #expect(navigation.pendingSelection == last)
-        #expect(navigation.direction == -1)
         #expect(panel.performKeyEquivalent(with: right))
         #expect(navigation.pendingSelection == first)
-        #expect(navigation.direction == 1)
         #expect(panel.performKeyEquivalent(with: right))
         #expect(navigation.pendingSelection == order[1], "Repeated commands must advance from the pending page")
         #expect(panel.performKeyEquivalent(with: right))
@@ -211,26 +210,73 @@ struct IslandModuleNavigationShortcutTests {
             let target = navigation.adjacentTarget(
                 in: direction, selectedModule: selectedModule, settings: settings, isRightToLeft: layoutDirection == .rightToLeft
             )
-            _ = navigation.select(target, selectedModule: selectedModule, settings: settings, direction: direction)
+            _ = navigation.select(target, selectedModule: selectedModule)
             if let pending = navigation.takePendingSelection() { selectedModule = pending }
         }.environment(\.layoutDirection, .rightToLeft))
         let panel = IslandPanel(contentView: host, frame: CGRect(x: 0, y: 0, width: 320, height: 200))
         defer { panel.contentView = nil; panel.close() }
         await layout(host)
 
-        let scenarios: [(IslandModule, UInt16, IslandModule, CGFloat)] = [
-            (.clipboard, 123, .keyboardSound, -1),
-            (.clipboard, 124, .dashboard, 1),
-            (.dashboard, 124, .keyboardSound, 1),
-            (.keyboardSound, 123, .dashboard, -1),
+        let scenarios: [(IslandModule, UInt16, IslandModule)] = [
+            (.clipboard, 123, .keyboardSound),
+            (.clipboard, 124, .dashboard),
+            (.dashboard, 124, .keyboardSound),
+            (.keyboardSound, 123, .dashboard),
         ]
-        for (start, keyCode, expected, expectedDirection) in scenarios {
+        for (start, keyCode, expected) in scenarios {
             selectedModule = start
             #expect(panel.performKeyEquivalent(with: try event(in: panel, keyCode: keyCode)))
             #expect(selectedModule == expected, "Arrow \(keyCode) must select the physically adjacent page in RTL")
-            #expect(navigation.direction == expectedDirection, "The transition must retain the physical arrow direction")
         }
         #expect(observedLayoutDirections == [.rightToLeft, .rightToLeft, .rightToLeft, .rightToLeft])
+        #expect(!panel.isVisible)
+    }
+
+    @Test
+    func pendingPageResourcesDoNotBlockCommandArrowsOrDirectSelection() async throws {
+        let gate = PendingPageResource()
+        let store = EKEventStore()
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        let calendar = CalendarService(store: store, mutations: .live(store: store), environment: CalendarServiceEnvironment(
+            authorizationStatus: { kind in kind == .event ? .fullAccess : .denied }, now: { date },
+            notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter(),
+            authorizationPromptHost: { nil }
+        ), queries: CalendarQueryOperations(events: { _, refreshSources in
+            if refreshSources { await gate.wait() }
+            return []
+        }, reminders: { _, _, complete in complete([]) }))
+        defer { gate.release(); calendar.stop() }
+        let settings = FeatureSettings.default
+        var selectedModule: IslandModule = .agenda
+        var navigation = IslandModuleNavigation()
+        let host = NSHostingView(rootView: ShortcutFixtureView { direction, layoutDirection in
+            let target = navigation.adjacentTarget(
+                in: direction, selectedModule: selectedModule, settings: settings, isRightToLeft: layoutDirection == .rightToLeft
+            )
+            _ = navigation.select(target, selectedModule: selectedModule)
+            if let pending = navigation.takePendingSelection() { selectedModule = pending }
+        })
+        let panel = IslandPanel(contentView: host, frame: CGRect(x: 0, y: 0, width: 320, height: 200))
+        defer { panel.contentView = nil; panel.close() }
+        await layout(host)
+        let refresh = Task { await calendar.refresh(referenceDate: date) }
+        for await _ in gate.started { break }
+        #expect(calendar.isLoading)
+
+        #expect(panel.performKeyEquivalent(with: try event(in: panel, keyCode: 124)))
+        #expect(selectedModule == .toolbox, "Pending resources must leave the next-page command responsive")
+        #expect(panel.performKeyEquivalent(with: try event(in: panel, keyCode: 123)))
+        #expect(selectedModule == .agenda)
+        let directSelection = navigation.select(.dashboard, selectedModule: selectedModule)
+        #expect(directSelection, "Pending resources must leave direct page selection responsive")
+        if let pending = navigation.takePendingSelection() { selectedModule = pending }
+        #expect(selectedModule == .dashboard)
+        #expect(calendar.isLoading, "Navigation must complete while resource loading is still pending")
+
+        gate.release()
+        await refresh.value
+        #expect(!calendar.isLoading)
+        #expect(selectedModule == .dashboard, "A late resource result must not restore the page that requested it")
         #expect(!panel.isVisible)
     }
 
@@ -260,6 +306,32 @@ struct IslandModuleNavigationShortcutTests {
             await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
         }
         host.layoutSubtreeIfNeeded()
+    }
+}
+
+@MainActor
+private final class PendingPageResource {
+    let started: AsyncStream<Void>
+    private let startedContinuation: AsyncStream<Void>.Continuation
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    init() {
+        let stream = AsyncStream<Void>.makeStream()
+        started = stream.stream
+        startedContinuation = stream.continuation
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            startedContinuation.yield(())
+        }
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
+        startedContinuation.finish()
     }
 }
 

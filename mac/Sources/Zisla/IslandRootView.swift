@@ -221,83 +221,85 @@ struct IslandRootView: View {
                                             }
                                         }
 
-                                    Group {
-                                        if let activeModule {
-                                            DeferredMount {
-                                                switch activeModule {
-                                                case .dashboard:
-                                                    IslandDashboardView(model: model)
-                                                case .shelf:
-                                                    ShelfModuleView(model: model)
-                                                case .clipboard:
-                                                    ClipboardHistoryModuleView(model: model)
-                                                case .aiMonitor:
-                                                    AIProgressModuleView(monitor: model.aiMonitor,
-                                                                         displayedBalanceProviders: model.settingsStore.settings.aiAccountBalanceDisplayedProviders,
-                                                                         monitoredBalanceProviders: model.settingsStore.settings.aiAccountBalanceMonitoredProviders,
-                                                                         language: model.languageStore.language)
-                                                case .download:
-                                                    DownloadModuleView(model: model)
-                                                case .agenda:
-                                                    AgendaModuleView(model: model, calendar: model.calendar)
-                                                case .mail:
-                                                    MailModuleView(
-                                                        model: model,
-                                                        onTransientInteractionChanged: onTransientInteractionChanged
-                                                    )
-                                                case .quickNotes:
-                                                    QuickNoteModuleView(model: model)
-                                                case .volumeMixer:
-                                                    ApplicationVolumeMixerModuleView(service: model.applicationVolumes)
-                                                case .toolbox:
-                                                    ToolboxModuleView(model: model)
-                                                case .system, .battery:
-                                                    SystemMonitorView(
-                                                        service: model.systemMonitor,
-                                                        batteryMonitor: model.battery,
-                                                        networkMonitor: model.networkBattery,
-                                                        showsSystemMonitor: settingsStore.settings.systemMonitorEnabled,
-                                                        showsBatteryMonitor: settingsStore.settings.systemMonitorEnabled,
-                                                        onCleanupRequested: cleanupPanelPresentation.present,
-                                                        onTransientMessage: { model.transientMessage = $0 }
-                                                    )
-                                                case .lockScreen:
-                                                    LockScreenModuleView(model: model)
-                                                case .keyboardSound:
-                                                    KeyboardSoundModuleView(model: model)
+                                    ZStack {
+                                        Group {
+                                            if let activeModule {
+                                                DeferredMount(animation: ZislaMotion.moduleSwitch) {
+                                                    switch activeModule {
+                                                    case .dashboard:
+                                                        IslandDashboardView(model: model)
+                                                    case .shelf:
+                                                        ShelfModuleView(model: model)
+                                                    case .clipboard:
+                                                        ClipboardHistoryModuleView(model: model)
+                                                    case .aiMonitor:
+                                                        AIProgressModuleView(monitor: model.aiMonitor,
+                                                                             displayedBalanceProviders: model.settingsStore.settings.aiAccountBalanceDisplayedProviders,
+                                                                             monitoredBalanceProviders: model.settingsStore.settings.aiAccountBalanceMonitoredProviders,
+                                                                             language: model.languageStore.language)
+                                                    case .download:
+                                                        DownloadModuleView(model: model)
+                                                    case .agenda:
+                                                        AgendaModuleView(model: model, calendar: model.calendar)
+                                                    case .mail:
+                                                        MailModuleView(
+                                                            model: model,
+                                                            onTransientInteractionChanged: onTransientInteractionChanged
+                                                        )
+                                                    case .quickNotes:
+                                                        QuickNoteModuleView(model: model)
+                                                    case .volumeMixer:
+                                                        ApplicationVolumeMixerModuleView(service: model.applicationVolumes)
+                                                    case .toolbox:
+                                                        ToolboxModuleView(model: model)
+                                                    case .system, .battery:
+                                                        SystemMonitorView(
+                                                            service: model.systemMonitor,
+                                                            batteryMonitor: model.battery,
+                                                            networkMonitor: model.networkBattery,
+                                                            showsSystemMonitor: settingsStore.settings.systemMonitorEnabled,
+                                                            showsBatteryMonitor: settingsStore.settings.systemMonitorEnabled,
+                                                            onCleanupRequested: cleanupPanelPresentation.present,
+                                                            onTransientMessage: { model.transientMessage = $0 }
+                                                        )
+                                                    case .lockScreen:
+                                                        LockScreenModuleView(model: model)
+                                                    case .keyboardSound:
+                                                        KeyboardSoundModuleView(model: model)
+                                                    }
+                                                }
+                                            } else {
+                                                ContentUnavailableView {
+                                                    Label(AppLocalization.text("没有启用模块"), systemImage: "rectangle.slash")
                                                 }
                                             }
-                                        } else {
-                                            ContentUnavailableView {
-                                                Label(AppLocalization.text("没有启用模块"), systemImage: "rectangle.slash")
-                                            }
                                         }
-                                    }
-                                    .padding(.horizontal, IslandSurfaceGeometry.moduleInset)
-                                    .padding(.top, IslandSurfaceGeometry.moduleInset)
-                                    .padding(.bottom, IslandSurfaceGeometry.moduleInset)
-                                    .frame(
-                                        maxWidth: .infinity,
-                                        maxHeight: .infinity,
-                                        alignment: .top
-                                    )
-                                    .clipShape(
-                                        UnevenRoundedRectangle(
-                                            cornerRadii: .init(
-                                                topLeading: 0,
-                                                bottomLeading: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-                                                bottomTrailing: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
-                                                topTrailing: 0
-                                            ),
-                                            style: .continuous
+                                        .padding(.horizontal, IslandSurfaceGeometry.moduleInset)
+                                        .padding(.top, IslandSurfaceGeometry.moduleInset)
+                                        .padding(.bottom, IslandSurfaceGeometry.moduleInset)
+                                        .frame(
+                                            maxWidth: .infinity,
+                                            maxHeight: .infinity,
+                                            alignment: .top
                                         )
-                                    )
-                                    .id(activeModule?.rawValue)
-                                    .transition(
-                                        reduceMotion
-                                            ? .identity
-                                            : .modulePush(direction: model.moduleSwitchDirection)
-                                    )
+                                        .clipShape(
+                                            UnevenRoundedRectangle(
+                                                cornerRadii: .init(
+                                                    topLeading: 0,
+                                                    bottomLeading: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
+                                                    bottomTrailing: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
+                                                    topTrailing: 0
+                                                ),
+                                                style: .continuous
+                                            )
+                                        )
+                                        .id(activeModule?.rawValue)
+                                        .transition(
+                                            reduceMotion
+                                                ? .identity
+                                                : .asymmetric(insertion: .identity, removal: .opacity)
+                                        )
+                                    }
                                     .animation(reduceMotion ? nil : ZislaMotion.moduleSwitch, value: activeModule)
                                     // Lower modules sit on dark frosted glass, so force dark mode for legible light text.
                                     .environment(\.colorScheme, .dark)

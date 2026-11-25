@@ -63,7 +63,7 @@ struct ClipboardCalendarEditorTests {
     }
 
     @Test(arguments: [false, true])
-    func clipboardInviteBecomesAJoinableCalendarMeetingOnlyAfterConfirmation(confirm: Bool) throws {
+    func clipboardInviteBecomesAJoinableCalendarMeetingOnlyAfterConfirmation(confirm: Bool) async throws {
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = try #require(TimeZone(secondsFromGMT: 0))
         let now = try #require(utc.date(from: DateComponents(year: 2026, month: 11, day: 10, hour: 8, minute: 55)))
@@ -80,13 +80,20 @@ struct ClipboardCalendarEditorTests {
         store.savedCalendar = try #require(EKCalendar.perform(NSSelectorFromString("calendarWithEventStore:"),
                                                               with: store)?.takeUnretainedValue() as? EKCalendar)
         store.savedCalendar?.title = "Fixture"
+        let queryEvents: @MainActor (DateInterval) -> [CalendarEventSnapshot] = { interval in
+            let predicate = store.predicateForEvents(withStart: interval.start, end: interval.end, calendars: nil)
+            return store.events(matching: predicate).map(CalendarService.makeEventSnapshot)
+        }
         let service = CalendarService(store: store, mutations: .live(store: store),
                                       environment: CalendarServiceEnvironment(authorizationStatus: { _ in .fullAccess }, now: { now },
-                                                                              notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()))
+                                                                              notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()),
+                                      queries: CalendarQueryOperations(events: { interval, _ in
+                                          await queryEvents(interval)
+                                      }, reminders: { _, _, complete in complete([]) }))
         defer { service.stop() }
         try CalendarItemEditor.complete(response: confirm ? .alertFirstButtonReturn : .alertSecondButtonReturn,
                                         calendar: service, draft: draft, kind: .event)
-        service.refreshMeetings()
+        await service.refreshMeetings().value
         if confirm {
             let meeting = try #require(service.meetingEvents.first)
             #expect(store.savedEvents.count == 1)
