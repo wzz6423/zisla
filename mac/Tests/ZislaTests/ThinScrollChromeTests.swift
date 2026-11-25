@@ -483,7 +483,12 @@ struct ThinScrollChromeTests {
             #expect(overflowing == expectedOverflow)
             #expect(document.frame.width <= scroll.contentView.bounds.width + 0.5,
                     "The dashboard must fit the viewport beside its visible scrollbar")
-            #expect(scroller.isHidden == !overflowing)
+            if !overflowing {
+                let knob = scroller.rect(for: .knob)
+                let hitPoint = scroller.convert(NSPoint(x: knob.midX, y: knob.midY), to: nil)
+                #expect(scroller.testPart(hitPoint) == .noPart,
+                        "Statistics that fit must keep their scrollbar space without an operable knob")
+            }
             if overflowing {
                 // Layout can briefly reveal an overlay knob; cross its native fade interval before measuring.
                 try await Task.sleep(for: .seconds(2))

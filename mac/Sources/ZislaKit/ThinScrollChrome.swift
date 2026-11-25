@@ -5,11 +5,13 @@ import SwiftUI
 public extension View {
     func thinScrollChrome(
         visibleWhenScrollable: Bool = true,
-        scrollerStyle: NSScroller.Style = .legacy
+        scrollerStyle: NSScroller.Style = .legacy,
+        autohidesScrollers: Bool = true
     ) -> some View {
         background(ThinScrollChromeConfigurator(
             visibleWhenScrollable: visibleWhenScrollable,
-            scrollerStyle: scrollerStyle
+            scrollerStyle: scrollerStyle,
+            autohidesScrollers: autohidesScrollers
         ))
     }
 }
@@ -17,9 +19,11 @@ public extension View {
 private struct ThinScrollChromeConfigurator: NSViewRepresentable {
     let visibleWhenScrollable: Bool
     let scrollerStyle: NSScroller.Style
+    let autohidesScrollers: Bool
 
     func makeNSView(context: Context) -> ThinScrollChromeHost {
-        ThinScrollChromeHost(visibleWhenScrollable: visibleWhenScrollable, scrollerStyle: scrollerStyle)
+        ThinScrollChromeHost(visibleWhenScrollable: visibleWhenScrollable, scrollerStyle: scrollerStyle,
+                             autohidesScrollers: autohidesScrollers)
     }
 
     func updateNSView(_ nsView: ThinScrollChromeHost, context: Context) {
@@ -34,10 +38,12 @@ final class ThinScrollChromeHost: NSView {
     private var pendingApply = false
     private let visibleWhenScrollable: Bool
     private let scrollerStyle: NSScroller.Style
+    private let autohidesScrollers: Bool
 
-    init(visibleWhenScrollable: Bool, scrollerStyle: NSScroller.Style = .legacy) {
+    init(visibleWhenScrollable: Bool, scrollerStyle: NSScroller.Style = .legacy, autohidesScrollers: Bool = true) {
         self.visibleWhenScrollable = visibleWhenScrollable
         self.scrollerStyle = scrollerStyle
+        self.autohidesScrollers = autohidesScrollers
         super.init(frame: .zero)
         isHidden = true
     }
@@ -77,13 +83,14 @@ final class ThinScrollChromeHost: NSView {
            isThinScroller(scrollView.verticalScroller),
            isThinScroller(scrollView.horizontalScroller),
            !visibleWhenScrollable || (scrollView.scrollerStyle == scrollerStyle
-               && scrollView.autohidesScrollers && scrollView.hasVerticalScroller) {
+               && scrollView.autohidesScrollers == autohidesScrollers && scrollView.hasVerticalScroller) {
             return
         }
         ThinScrollChrome.apply(
             to: scrollView,
             visibleWhenScrollable: visibleWhenScrollable,
-            scrollerStyle: scrollerStyle
+            scrollerStyle: scrollerStyle,
+            autohidesScrollers: autohidesScrollers
         )
         styleObservation = scrollView.observe(\.scrollerStyle) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.scheduleApply() }
@@ -142,11 +149,12 @@ public enum ThinScrollChrome {
     public static func apply(
         to scrollView: NSScrollView,
         visibleWhenScrollable: Bool = true,
-        scrollerStyle: NSScroller.Style = .legacy
+        scrollerStyle: NSScroller.Style = .legacy,
+        autohidesScrollers: Bool = true
     ) {
         if visibleWhenScrollable {
             scrollView.scrollerStyle = scrollerStyle
-            scrollView.autohidesScrollers = true
+            scrollView.autohidesScrollers = autohidesScrollers
             scrollView.hasVerticalScroller = true
         }
         scrollView.scrollerKnobStyle = .default

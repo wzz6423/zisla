@@ -398,11 +398,12 @@ struct KeyboardSoundModuleViewTests {
         let voiceStatistics = scenario.hasVoice ? VoiceHistoryStatistics(
             totalWordCount: 30_540, totalDuration: 13_680, wordsPerMinute: 133, savedTime: 32_040
         ) : nil
-        let host = NSHostingView(rootView: KeyboardSoundModuleView.content(
-            summary: summary, voiceStatistics: voiceStatistics, environment: [:]
-        )
-        .environment(\.locale, language.locale)
-        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        let content = { (statistics: VoiceHistoryStatistics?) in
+            KeyboardSoundModuleView.content(summary: summary, voiceStatistics: statistics, environment: [:])
+                .environment(\.locale, language.locale)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+        }
+        let host = NSHostingView(rootView: content(voiceStatistics))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: scenario.width, height: 160),
                               styleMask: .borderless, backing: .buffered, defer: false)
@@ -410,18 +411,10 @@ struct KeyboardSoundModuleViewTests {
         window.contentView = host
         defer { window.contentView = nil; window.close() }
 
-        func settle() async {
-            for _ in 0..<8 {
-                host.layoutSubtreeIfNeeded()
-                await withCheckedContinuation { continuation in
-                    DispatchQueue.main.async { continuation.resume() }
-                }
-            }
-        }
-        await settle()
         func descendants(_ view: NSView) -> [NSView] {
             [view] + view.subviews.flatMap(descendants)
         }
+        host.layoutSubtreeIfNeeded()
         let scrolls = descendants(host).compactMap { $0 as? NSScrollView }
         if !scenario.hasSummary {
             #expect(scrolls.isEmpty, "Unavailable statistics must keep the centered empty state without a scroll area")
@@ -430,6 +423,32 @@ struct KeyboardSoundModuleViewTests {
         }
         let scroll = try #require(scrolls.first)
         let document = try #require(scroll.documentView)
+        let firstFrame = scroll.convert(document.bounds, from: document)
+        try #require(firstFrame.width > 0)
+        let centerOffset = firstFrame.midX - scroll.bounds.midX
+        let scrollbarInset = scroll.bounds.width - firstFrame.width
+        func settle() async {
+            for _ in 0..<8 {
+                host.layoutSubtreeIfNeeded()
+                let frame = scroll.convert(document.bounds, from: document)
+                #expect(abs(frame.midX - scroll.bounds.midX - centerOffset) < 0.5,
+                        "Mounting, resizing and refreshing statistics must not add a horizontal shift")
+                #expect(abs(scroll.bounds.width - frame.width - scrollbarInset) < 0.5,
+                        "Scrollbar visibility must keep the statistics viewport width stable")
+                #expect(abs(scroll.contentView.bounds.minX) < 0.5,
+                        "Statistics must keep their horizontal scroll origin")
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+        }
+        await settle()
+        if scenario.hasVoice {
+            for statistics in [nil, voiceStatistics] as [VoiceHistoryStatistics?] {
+                host.rootView = content(statistics)
+                await settle()
+            }
+        }
 
         for height: CGFloat in [160, 900, 160] {
             scroll.scrollerStyle = .legacy
