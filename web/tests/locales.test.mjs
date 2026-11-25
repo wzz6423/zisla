@@ -125,6 +125,19 @@ const updatedStrings = (content) => [
   ...strings(content.film, 'film'),
 ];
 
+test('clipboard image text search is authored and rendered in every locale', () => {
+  for (const locale of siteLocales) {
+    const authored = authoredCatalogs.get(locale)?.showcase?.modules?.clipboard?.caption;
+    assert.equal(typeof authored, 'string', `${locale} must author its clipboard caption`);
+    const content = site.getSiteContent(locale);
+    assert.equal(content.showcase.modules.clipboard.caption, authored);
+    if (locale !== 'en') assert.notEqual(authored, english.showcase.modules.clipboard.caption);
+    assert.ok(renderInMemory(locale).html.includes(escapedText(authored)), `${locale} must render its clipboard instructions`);
+  }
+  assert.match(english.showcase.modules.clipboard.caption, /on-device text recognition/);
+  assert.match(english.showcase.modules.clipboard.caption, /Right-click a history image/);
+});
+
 test('launch film sits after the changelog and before the footer with explicit playback', () => {
   const content = site.getSiteContent('zh-Hans');
   const { html } = renderInMemory('zh-Hans');

@@ -89,7 +89,7 @@ export const nl = createCatalog({
       clipboard: {
         name: 'Klembord',
         caption:
-          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het. Je kunt geschiedenis ouder dan 7, 15 of 30 dagen automatisch verwijderen en favorieten behouden. Automatisch verwijderen staat standaard uit. Zoek en groepeer de geschiedenis op bronapplicatie.',
+          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het. Je kunt geschiedenis ouder dan 7, 15 of 30 dagen automatisch verwijderen en favorieten behouden. Automatisch verwijderen staat standaard uit. Zoek en groepeer de geschiedenis op bronapplicatie. Nieuwe afbeeldingen proberen op de achtergrond lokaal tekst te herkennen, zodat je het origineel via de tekst kunt vinden. Klik met de rechtermuisknop op een afbeelding in de geschiedenis om de tekst te herkennen of te kopiëren.',
         points: ['Geschiedenis in het eiland', 'Filteren op type', 'Snelle notities en favorieten'],
       },
       aiMonitor: {

@@ -16,7 +16,7 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 | --- | --- |
 | Home | Summarizes the current Pomodoro timer, first active AI task, native downloads, and multiple browser download progresses on demand. |
 | Handoff | Drag files, media, or links to the top trigger area to keep them in the handoff tray, reveal them in Finder, or open the system share menu. Stashed screenshots have blue, double-width cards and their own category, with image copy, PNG export, and deletion. |
-| Clipboard | Stores a searchable local history, filters by image, URL, and file, and marks favorites; history and link detection are independent switches. |
+| Clipboard | Stores a searchable local history, filters by image, URL, and file, and marks favorites; history and link detection are independent switches. New images are queued for on-device OCR; search recognized text to find the original image, or right-click a history image to recognize or copy its text. |
 | AI monitoring | Aggregates activity tasks, status, token trends, contribution heatmaps, and side notices from supported CLIs, desktop apps, and IDEs. |
 | Downloads | Uses `yt-dlp` for video and audio; without `ffmpeg`, AVFoundation wraps compatible tracks and a read-only Bilibili fallback is available. |
 | Schedule | Shows weather for the current location and up to six saved locations; view, create, and delete calendar events and reminders and mark reminders complete. |

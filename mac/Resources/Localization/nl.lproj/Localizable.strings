@@ -3778,3 +3778,9 @@
 "重复安装 · 版本 %@ · %@ · 保留：%@" = "Dubbele installatie · Versie %@ · %@ · Behouden: %@";
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Update-restanten · Oude versie %@ · %@ · Huidige versie: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "De app-kopie of de huidige versie is gewijzigd. Het item is behouden.";
+
+"识别图片文字" = "Tekst in afbeelding herkennen";
+"复制图片文字" = "Tekst uit afbeelding kopiëren";
+"取消图片文字识别" = "Tekstherkenning annuleren";
+"等待识别图片文字" = "Wachten op tekstherkenning";
+"正在识别图片文字" = "Tekst in afbeelding herkennen";

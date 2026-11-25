@@ -3778,3 +3778,9 @@
 "重复安装 · 版本 %@ · %@ · 保留：%@" = "Yinelenen kurulum · Sürüm %@ · %@ · Korunacak: %@";
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Güncelleme kalıntısı · Eski sürüm %@ · %@ · Geçerli sürüm: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "Uygulama kopyası veya geçerli sürümün durumu değişti. Öğe korundu.";
+
+"识别图片文字" = "Görüntü metnini tanı";
+"复制图片文字" = "Görüntü metnini kopyala";
+"取消图片文字识别" = "Görüntü metni tanımayı iptal et";
+"等待识别图片文字" = "Görüntü metni tanıma bekleniyor";
+"正在识别图片文字" = "Görüntü metni tanınıyor";

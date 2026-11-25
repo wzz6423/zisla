@@ -2,6 +2,11 @@ import Combine
 import Foundation
 import ZislaCore
 
+public enum ClipboardImageRecognitionState: Equatable, Sendable {
+    case queued
+    case processing
+}
+
 @MainActor
 public final class ClipboardHistoryStore: ObservableObject {
     private static let maximumPendingMutations = 512
@@ -13,6 +18,8 @@ public final class ClipboardHistoryStore: ObservableObject {
     @Published public private(set) var currentPage = 0
     @Published public private(set) var isLoading = true
     @Published public private(set) var isHistoryExpanded = false
+    @Published public private(set) var imageRecognitionStates: [UUID: ClipboardImageRecognitionState] = [:]
+    @Published public private(set) var imageRecognitionError: (id: UUID, message: String)?
 
     public let capacity: Int?
     public let maxImageBytes: Int
@@ -21,6 +28,18 @@ public final class ClipboardHistoryStore: ObservableObject {
     private let database: ClipboardHistoryDatabase
     private let persistenceDelay: Duration
     private let now: () -> Date
+    private let imageTextRecognizer: (@Sendable (Data) async throws -> String)?
+    private var imageRecognitionEnabled = true
+    private var pendingImageRecognitionIDs: [UUID] = []
+    private var imageRecognitionTask: Task<Void, Never>?
+    private var activeImageRecognitionID: UUID?
+    private var imageRecognitionCancellation: ClipboardImageRecognitionCancellation?
+    private struct ImageRecognitionWaiter {
+        let continuation: CheckedContinuation<String, any Error>
+        let cancellation: ClipboardImageRecognitionCancellation
+    }
+
+    private var imageRecognitionWaiters: [UUID: [UUID: ImageRecognitionWaiter]] = [:]
     private var cleanupPolicy: VoiceRecordingCleanupPolicy = .never
     private var cleanupGeneration = 0
     private(set) var cleanupTimer: Timer?
@@ -51,7 +70,8 @@ public final class ClipboardHistoryStore: ObservableObject {
         maxImageBytes: Int = 10 * 1024 * 1024,
         pageSize: Int = 20,
         persistenceDelay: Duration = .seconds(1),
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        imageTextRecognizer: (@Sendable (Data) async throws -> String)? = nil
     ) {
         database = ClipboardHistoryDatabase(storageURL: storageURL)
         self.capacity = capacity.map { max(1, $0) }
@@ -59,11 +79,13 @@ public final class ClipboardHistoryStore: ObservableObject {
         self.pageSize = max(1, pageSize)
         self.persistenceDelay = persistenceDelay
         self.now = now
+        self.imageTextRecognizer = imageTextRecognizer
         reload()
     }
 
     isolated deinit {
         stopCleanup()
+        cancelImageRecognition()
     }
 
     public func configureCleanup(policy: VoiceRecordingCleanupPolicy) {
@@ -248,6 +270,9 @@ public final class ClipboardHistoryStore: ObservableObject {
             }
         }
         schedulePersistence(.upsert(item, capacity: capacity))
+        if item.content.isImage, item.recognizedImageText == nil {
+            enqueueImageRecognition(id: item.id)
+        }
         if displayedQuery.grouping == .sourceApp, hasItemsBeyondDisplayedPage, pageBoundary == nil {
             schedulePendingPersistence(immediately: true)
         }
@@ -271,12 +296,16 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     public func remove(id: UUID) {
         guard items.contains(where: { $0.id == id }) else { return }
+        cancelImageRecognition(id: id)
         items.removeAll { $0.id == id }
         totalItemCount = max(0, totalItemCount - 1)
         schedulePersistence(.remove(id))
     }
 
     public func removeAllHistory() {
+        for item in items where !item.isPinned {
+            cancelImageRecognition(id: item.id)
+        }
         let previousCount = items.count
         items.removeAll { !$0.isPinned }
         if displayedQuery.scope == .history {
@@ -286,6 +315,152 @@ public final class ClipboardHistoryStore: ObservableObject {
             totalItemCount = max(0, totalItemCount - (previousCount - items.count))
         }
         schedulePersistence(.removeHistory)
+    }
+
+    public func setImageRecognitionEnabled(_ enabled: Bool) {
+        imageRecognitionEnabled = enabled
+        if !enabled { cancelImageRecognition() }
+    }
+
+    public func recognizeImageText(id: UUID) async throws -> String {
+        try Task.checkCancellation()
+        guard imageRecognitionEnabled, imageTextRecognizer != nil else { throw CancellationError() }
+        if let item = items.first(where: { $0.id == id }) {
+            guard item.content.isImage else { throw CocoaError(.fileReadCorruptFile) }
+            if let text = item.recognizedImageText { return text }
+        }
+        let requestID = UUID()
+        let cancellation = ClipboardImageRecognitionCancellation()
+        return try await withTaskCancellationHandler {
+            return try await withCheckedThrowingContinuation { continuation in
+                imageRecognitionWaiters[id, default: [:]][requestID] = ImageRecognitionWaiter(continuation: continuation, cancellation: cancellation)
+                enqueueImageRecognition(id: id, prioritize: true)
+            }
+        } onCancel: {
+            cancellation.cancel()
+            Task { @MainActor [weak self] in
+                guard let self, let waiter = imageRecognitionWaiters[id]?.removeValue(forKey: requestID) else { return }
+                waiter.continuation.resume(throwing: CancellationError())
+                if imageRecognitionWaiters[id]?.isEmpty == true {
+                    imageRecognitionWaiters.removeValue(forKey: id)
+                    cancelImageRecognition(id: id)
+                }
+            }
+        }
+    }
+
+    public func cancelImageRecognition(id: UUID? = nil) {
+        let ids = id.map { [$0] } ?? Array(imageRecognitionStates.keys)
+        for id in ids {
+            pendingImageRecognitionIDs.removeAll { $0 == id }
+            imageRecognitionStates.removeValue(forKey: id)
+            if activeImageRecognitionID == id {
+                imageRecognitionCancellation?.cancel()
+                imageRecognitionTask?.cancel()
+            }
+            for waiter in (imageRecognitionWaiters.removeValue(forKey: id) ?? [:]).values {
+                waiter.continuation.resume(throwing: CancellationError())
+            }
+        }
+    }
+
+    public func waitUntilImageRecognitionFinished() async {
+        while let task = imageRecognitionTask { await task.value }
+        await waitUntilLoaded()
+    }
+
+    private func enqueueImageRecognition(id: UUID, prioritize: Bool = false) {
+        guard imageRecognitionEnabled, imageTextRecognizer != nil else { return }
+        if activeImageRecognitionID == id, imageRecognitionCancellation?.isCancelled == false { return }
+        if let index = pendingImageRecognitionIDs.firstIndex(of: id) {
+            if prioritize {
+                pendingImageRecognitionIDs.remove(at: index)
+                pendingImageRecognitionIDs.insert(id, at: 0)
+            }
+            return
+        }
+        if pendingImageRecognitionIDs.count >= Self.maximumPendingMutations {
+            if let index = pendingImageRecognitionIDs.firstIndex(where: { imageRecognitionWaiters[$0] == nil }) {
+                cancelImageRecognition(id: pendingImageRecognitionIDs[index])
+            } else {
+                for waiter in (imageRecognitionWaiters.removeValue(forKey: id) ?? [:]).values {
+                    waiter.continuation.resume(throwing: CocoaError(.fileReadTooLarge))
+                }
+                return
+            }
+        }
+        if prioritize {
+            pendingImageRecognitionIDs.insert(id, at: 0)
+        } else {
+            pendingImageRecognitionIDs.append(id)
+        }
+        imageRecognitionStates[id] = .queued
+        startImageRecognition()
+    }
+
+    private func startImageRecognition() {
+        guard imageRecognitionTask == nil, !pendingImageRecognitionIDs.isEmpty,
+              imageRecognitionEnabled, let imageTextRecognizer else { return }
+        let id = pendingImageRecognitionIDs.removeFirst()
+        let cancellation = ClipboardImageRecognitionCancellation()
+        activeImageRecognitionID = id
+        imageRecognitionCancellation = cancellation
+        imageRecognitionStates[id] = .processing
+        if imageRecognitionError?.id == id { imageRecognitionError = nil }
+        schedulePendingPersistence(immediately: true)
+        let persistenceTask = persistenceTask
+        let database = database
+        let maximumBytes = maxImageBytes
+        imageRecognitionTask = Task { [weak self] in
+            let result: Result<String, any Error>
+            do {
+                await persistenceTask?.value
+                try Task.checkCancellation()
+                if let self {
+                    while !pendingMutations.isEmpty || inFlightPersistenceGeneration != nil {
+                        schedulePendingPersistence(immediately: true)
+                        await self.persistenceTask?.value
+                        try Task.checkCancellation()
+                        if let errorDescription {
+                            throw CocoaError(.fileWriteUnknown, userInfo: [NSLocalizedDescriptionKey: errorDescription])
+                        }
+                    }
+                }
+                guard let image = try await database.loadImageForRecognition(id: id, maximumBytes: maximumBytes) else {
+                    throw CocoaError(.fileReadNoSuchFile)
+                }
+                try Task.checkCancellation()
+                let text: String
+                if let cached = image.text {
+                    text = cached
+                } else {
+                    text = try await imageTextRecognizer(image.data).trimmingCharacters(in: .whitespacesAndNewlines)
+                    try Task.checkCancellation()
+                    guard try await database.saveRecognizedImageText(text, id: id, imageData: image.data, cancellation: cancellation) else {
+                        throw CancellationError()
+                    }
+                }
+                try Task.checkCancellation()
+                result = .success(text)
+            } catch {
+                result = .failure(error)
+            }
+            guard let self else { return }
+            if !cancellation.isCancelled {
+                imageRecognitionStates.removeValue(forKey: id)
+                if case let .failure(error) = result, !(error is CancellationError) {
+                    imageRecognitionError = (id, AppLocalization.text("识别失败：%@", error.localizedDescription))
+                }
+                if case .success = result { reload() }
+                for waiter in (imageRecognitionWaiters.removeValue(forKey: id) ?? [:]).values {
+                    waiter.continuation.resume(with: waiter.cancellation.isCancelled ? .failure(CancellationError()) : result)
+                }
+            }
+            activeImageRecognitionID = nil
+            imageRecognitionCancellation = nil
+            imageRecognitionTask = nil
+            startImageRecognition()
+        }
     }
 
     public func flushPendingChanges() {
@@ -473,6 +648,7 @@ public final class ClipboardHistoryStore: ObservableObject {
         guard displayedQuery.category == .all || item.category == displayedQuery.category else { return false }
         return displayedQuery.searchText.isEmpty
             || item.content.previewText.localizedCaseInsensitiveContains(displayedQuery.searchText)
+            || item.recognizedImageText?.localizedCaseInsensitiveContains(displayedQuery.searchText) == true
             || item.sourceApp?.name.localizedCaseInsensitiveContains(displayedQuery.searchText) == true
             || item.sourceApp?.bundleIdentifier.localizedCaseInsensitiveContains(displayedQuery.searchText) == true
     }
