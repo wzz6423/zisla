@@ -149,10 +149,18 @@ test('clipboard image text search is authored and rendered in every locale', () 
     const content = site.getSiteContent(locale);
     assert.equal(content.showcase.modules.clipboard.caption, authored);
     if (locale !== 'en') assert.notEqual(authored, english.showcase.modules.clipboard.caption);
-    assert.ok(renderInMemory(locale).html.includes(escapedText(authored)), `${locale} must render its clipboard instructions`);
+    assert.ok(renderInMemory(locale).html.includes(escapedText(authored)), `${locale} must render its clipboard overview`);
+    const authoredGuide = authoredCatalogs.get(locale)?.help?.guides?.clipboard;
+    assert.ok(authoredGuide?.steps.length > 0, `${locale} must author its clipboard instructions`);
+    const { html } = renderHelpInMemory(locale);
+    for (const step of authoredGuide.steps) {
+      assert.ok(html.includes(escapedText(step)), `${locale} must render its clipboard instructions`);
+    }
   }
-  assert.match(english.showcase.modules.clipboard.caption, /on-device text recognition/);
-  assert.match(english.showcase.modules.clipboard.caption, /Right-click a history image/);
+  assert.match(english.showcase.modules.clipboard.caption, /search local clipboard history, including text in images/);
+  const instructions = english.help.guides.clipboard.steps.join(' ');
+  assert.match(instructions, /on-device recognition.*search.*original image/);
+  assert.match(instructions, /Right-click.*recognize or copy its text/);
 });
 
 test('launch film sits after the changelog and before the footer with explicit playback', () => {
