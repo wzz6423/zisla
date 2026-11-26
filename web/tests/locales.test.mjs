@@ -491,6 +491,11 @@ test('the homepage stays concise while linked help retains translated guides and
     const { html, document, metadata } = renderHelpInMemory(locale);
     assert.doesNotMatch(html, /class="hero"|id="showcase"|id="changelog"/);
     assert.ok(html.includes(`href="./?lang=${locale}"`), `${locale}: help returns home`);
+    for (const markup of [homepage.html, html]) {
+      const footer = markup.match(/<footer\b[\s\S]*?<\/footer>/)?.[0];
+      assert.ok(footer?.includes(`<a href="./help.html?lang=${locale}">${escapedText(content.header.navItems.help)}</a>`),
+        `${locale}: both footers link to localized user help`);
+    }
     for (const id of site.guideIds) {
       const guide = content.help.guides[id];
       assert.ok(guide.steps.length > 0, `${locale}: ${id} has actionable steps`);
@@ -654,6 +659,11 @@ test('help metadata and cross-page links retain locale and safely encode the que
   });
   assert.ok(help.html.includes('href="./?campaign=sample&amp;lang=ar&amp;source=docs#showcase"'));
   assert.ok(help.html.includes('class="header-cta" href="./?campaign=sample&amp;lang=ar&amp;source=docs#download"'));
+  for (const markup of [page.html, help.html]) {
+    const footer = markup.match(/<footer\b[\s\S]*?<\/footer>/)?.[0];
+    assert.ok(footer?.includes(`<a href="./help.html?campaign=sample&amp;lang=ar&amp;source=docs">${escapedText(site.getSiteContent('ar').header.navItems.help)}</a>`),
+      'footer help keeps the selected language and query on both pages');
+  }
   assert.equal(help.navigations.length, 0, 'the help page must not redirect itself');
 });
 

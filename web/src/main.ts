@@ -1064,6 +1064,10 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(documentationLink('contributing', locale).url) +
     '" target="_blank" rel="noreferrer">' +
     escapeHtml(content.developers.docs.contributing.title) +
+    '</a><a href="' +
+    escapeHtml(helpHref) +
+    '">' +
+    escapeHtml(content.header.navItems.help) +
     '</a></div></div><div class="footer-bottom reveal-step" style="--reveal-index: 1"><span>' +
     escapeHtml(content.footer.tagline) +
     '</span><span class="footer-meta">' +
