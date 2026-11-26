@@ -27,6 +27,10 @@ struct ToolboxTimerLayoutTests {
         #expect(abs(right.accessibilityFrame().minX - window.frame.minX - 246) < 0.5,
                 "Adding countdowns must not move the right toolbox actions")
         #expect(scroll.frame.height == 136)
+        let addButton = try #require(Self.element("toolbox.addTimer", in: host) as? any NSAccessibilityElementProtocol)
+        let viewport = window.convertToScreen(scroll.contentView.convert(scroll.contentView.bounds, to: nil))
+        #expect(viewport.insetBy(dx: 6, dy: 6).contains(addButton.accessibilityFrame()),
+                "The entire add button must stay inset inside the timer cards, including when the scrollbar appears")
         let document = try #require(scroll.documentView)
         if additionalTimers > 1 {
             #expect(document.frame.height > scroll.contentView.bounds.height)

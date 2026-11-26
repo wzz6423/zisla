@@ -259,6 +259,8 @@ struct ToolboxTimerPanel: View {
                 }
                 .accessibilityLabel(AppLocalization.text("添加计时器"))
                 .accessibilityIdentifier("toolbox.addTimer")
+                .padding(.trailing, service.countdowns.count > 1
+                    ? NSScroller.scrollerWidth(for: .mini, scrollerStyle: .legacy) : 0)
                 .padding(6)
             }
     }
