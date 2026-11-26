@@ -58,7 +58,7 @@ Açılır pencere işlem sırasına göre `Command+1` ile `Command+9`, ardından
 
 Ayarlar → Kayıt Konumu; indirme, ekran görüntüsü, görüntü araçları, kayıt, PDF, Hızlı İşlemler ve günlük özet için ayrı klasör seçer. Yeni ayarlar `~/Downloads` altındaki `picture` görüntüleri, `video` kayıtları, `pdf`, `quick` ve `daily` kullanır. Ses araçları dosya/klasör aktarım penceresi kullanır. Raf dosyaları özgünlere başvurur; saklanan görüntüler ve bağlam notu durumu `~/Library/Application Support/zisla` altında, kayıt projeleri kayıt klasöründe yönetilir. Hızlı Notlar metni Apple Notlar'dadır.
 
-[Kullanıcı yardımı ve adım adım kılavuzlar](https://wzz6423.github.io/zisla/?lang=tr#help) dokuz konuyu kapsar: pano, yakalama, raf, toplantılar, yapay zekâ, medya araçları, günlük özetler, masaüstü notları/pencere önizlemeleri ve oynatma/karıştırma; kısa film parçaları içerir.
+[Kullanıcı yardımı ve adım adım kılavuzlar](https://wzz6423.github.io/zisla/help.html?lang=tr#help) dokuz konuyu kapsar: pano, yakalama, raf, toplantılar, yapay zekâ, medya araçları, günlük özetler, masaüstü notları/pencere önizlemeleri ve oynatma/karıştırma; kısa film parçaları içerir.
 
 ### Ekran görüntüsü kısayolları ve saklama
 

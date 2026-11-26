@@ -56,7 +56,7 @@ Het eiland heeft 12 modules: Home, Overdracht, Klembord, AI-monitor, Toetsenbord
 - **AI-accounts:** bekijk ondersteunde accounttegoeden, resetmomenten, waarschuwingen bij laag tegoed en meetmomenten; exporteer lokale tokengeschiedenis als `.xlsx`.
 - **Snelle acties:** popupacties gebruiken `Command+1` tot en met `Command+0` in volgorde. De aanvullende standaardsneltoets voor nieuwe configuraties is `Command+N` voor de eerste actie. Updates behouden opgeslagen en gewiste sneltoetsen.
 
-De [gebruikershulp](https://wzz6423.github.io/zisla/?lang=nl#help) bevat negen stapsgewijze gidsen: klembord, schermafbeeldingen/opnames, plank, vergaderingen, AI, mediatools, dagoverzichten, desktopnotities/venstervoorbeelden en afspelen/mixen. De [macOS-gids](mac/README.md#opslaglocaties) beschrijft uitvoermappen en afhankelijkheden.
+De [gebruikershulp](https://wzz6423.github.io/zisla/help.html?lang=nl#help) bevat negen stapsgewijze gidsen: klembord, schermafbeeldingen/opnames, plank, vergaderingen, AI, mediatools, dagoverzichten, desktopnotities/venstervoorbeelden en afspelen/mixen. De [macOS-gids](mac/README.md#opslaglocaties) beschrijft uitvoermappen en afhankelijkheden.
 
 ## Aan de slag
 

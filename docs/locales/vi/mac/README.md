@@ -58,7 +58,7 @@ Cửa sổ Thao tác Nhanh gán `Command+1` đến `Command+9`, rồi `Command+0
 
 Cài đặt → Nơi lưu cho phép chọn thư mục riêng cho tải xuống, ảnh chụp màn hình, công cụ ảnh, ghi hình, PDF, Thao tác Nhanh và bản tin hằng ngày. Cấu hình mới mặc định dùng thư mục con của `~/Downloads`: `picture` cho ảnh chụp/ảnh, `video` cho ghi hình, `pdf`, `quick` và `daily`. Công cụ âm thanh dùng hộp thoại xuất để chọn tệp hoặc thư mục. Tệp trên kệ giữ tham chiếu đến bản gốc; ảnh cất và trạng thái ghi chú theo ngữ cảnh được quản lý cục bộ trong `~/Library/Application Support/zisla`, còn dự án ghi dùng thư mục ghi hình. Nội dung ghi chú nhanh nằm trong Apple Notes.
 
-[Trợ giúp và từng bước](https://wzz6423.github.io/zisla/?lang=vi#help) gồm chín nhóm bảng nhớ, chụp/ghi, kệ, họp, AI, đa phương tiện, bản tin, ghi chú/xem cửa sổ và phát/trộn với đoạn phim ngắn.
+[Trợ giúp và từng bước](https://wzz6423.github.io/zisla/help.html?lang=vi#help) gồm chín nhóm bảng nhớ, chụp/ghi, kệ, họp, AI, đa phương tiện, bản tin, ghi chú/xem cửa sổ và phát/trộn với đoạn phim ngắn.
 
 ### Phím tắt và cất ảnh màn hình
 

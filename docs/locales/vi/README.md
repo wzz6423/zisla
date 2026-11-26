@@ -56,7 +56,7 @@ Với công cụ không có nguồn hoạt động cục bộ ổn định, `zis
 - **Tài khoản AI:** Xem hạn mức hỗ trợ, giờ đặt lại, cảnh báo sắp hết và giờ lấy mẫu; xuất lịch sử token tại máy sang `.xlsx`.
 - **Thao tác Nhanh:** Hành động trong cửa sổ dùng `Command+1` đến `Command+0` theo thứ tự. Phím kích hoạt mặc định bổ sung cho cấu hình mới là `Command+N` để thực hiện hành động đầu tiên. Nâng cấp giữ phím đã lưu và trạng thái xóa phím kích hoạt.
 
-[Trợ giúp người dùng](https://wzz6423.github.io/zisla/?lang=vi#help) có chín hướng dẫn từng bước: bảng nhớ tạm, chụp/ghi, kệ, họp, AI, công cụ đa phương tiện, bản tin hằng ngày, ghi chú máy tính/xem trước cửa sổ và phát/trộn âm. [Hướng dẫn macOS](mac/README.md) liệt kê thư mục lưu và phụ thuộc công cụ.
+[Trợ giúp người dùng](https://wzz6423.github.io/zisla/help.html?lang=vi#help) có chín hướng dẫn từng bước: bảng nhớ tạm, chụp/ghi, kệ, họp, AI, công cụ đa phương tiện, bản tin hằng ngày, ghi chú máy tính/xem trước cửa sổ và phát/trộn âm. [Hướng dẫn macOS](mac/README.md) liệt kê thư mục lưu và phụ thuộc công cụ.
 
 ## Bắt đầu
 

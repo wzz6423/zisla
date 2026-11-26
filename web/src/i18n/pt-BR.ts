@@ -84,13 +84,13 @@ export const ptBR = createCatalog({
       shelf: {
         name: 'Prateleira',
         caption:
-          'Arraste arquivos, áudios, vídeos ou links para o topo da tela. Pesquise, filtre e selecione vários itens para copiar, compartilhar ou enviar às Notas rápidas. Converta imagens em PDF, envie o texto reconhecido às Notas rápidas ou abra vídeos no estúdio de gravação para editar. Você também pode localizar os arquivos no Finder. Compacte os arquivos e pastas selecionados em ZIP ou abra as imagens selecionadas nas ferramentas de imagem para redimensionar ou converter; os resultados concluídos voltam à bandeja. Importe imagens, vídeo e áudio para a biblioteca do estúdio.',
+          "Guarde arquivos na prateleira para pesquisar, selecionar e compartilhar. Crie ZIP ou PDF, redimensione ou converta imagens e envie mídia para notas ou estúdio.",
         points: ['Busca e ações em lote', 'Imagens para PDF e Notas rápidas', 'Editar vídeos no estúdio'],
       },
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Consulte o histórico do clipboard dentro da ilha e filtre por imagem, URL, caminho ou tipo de arquivo e veja quando cada item foi copiado. Envie um item para Notas rápidas, fixe-o como favorito ou exclua-o. Você pode excluir automaticamente o histórico com mais de 7, 15 ou 30 dias e manter os favoritos. A exclusão automática vem desativada. Pesquise e agrupe o histórico pelo aplicativo de origem. Novas imagens tentam reconhecer texto no dispositivo em segundo plano para encontrar o original pelo texto. Clique com o botão direito em uma imagem do histórico para reconhecer ou copiar seu texto.',
+          "Pesquise o histórico local e texto em imagens. Filtre por tipo ou aplicativo, salve favoritos e envie itens para Notas rápidas.",
         points: ['Histórico dentro da ilha', 'Filtro por tipo', 'Notas rápidas e favoritos'],
       },
       aiMonitor: {
@@ -181,7 +181,7 @@ export const ptBR = createCatalog({
       },
       recording: {
         title: 'Grave e edite no estúdio',
-        description: 'Grave tela, janela ou região com áudio do sistema, microfone e câmera opcionais. Edite vídeo, áudio, imagens e texto em várias faixas com animações, zooms e legendas. Ajuste suavização da pele, brilho, afinamento de rosto e corpo, efeitos de voz e rastros suaves do cursor na cor escolhida. Reproduza a edição no estúdio. Escolha proporção original, 16:9, 9:16, 1:1 ou 4:3; exporte vídeo, GIF, Live Photo ou áudio. Alguns formatos exigem FFmpeg. Revise propostas opcionais de IA antes de aplicar. A pasta de gravação é definida separadamente em Ajustes → Local de salvamento. Grave em HDR nos dispositivos compatíveis. Importe imagens, vídeo e áudio da bandeja para a biblioteca, mantendo o projeto e a linha do tempo atuais.',
+        description: "Grave tela, janela ou região, edite faixas, legendas e efeitos de retrato/voz e exporte. HDR em aparelhos compatíveis e importação da prateleira.",
         detail: 'Efeitos de retrato e voz · Rastros coloridos do cursor · Reprodução e exportação multifaixa',
       },
       permissions: {
@@ -485,8 +485,7 @@ export const ptBR = createCatalog({
       "Escolha a saída de áudio na área de mídia e fonte automática ou player preferido nos Ajustes. Isso não atribui um dispositivo diferente a cada app.",
       "Sons e estatísticas do teclado são independentes e usam Monitoramento de Entrada. O mixer exige macOS 14.4+ e Gravação de Áudio do Sistema.",
       "O resumo diário oferece 8 modelos, prévia e exportação PNG manual ou diária, com pasta própria."
-    ],
-    "documentLanguage": "Idioma do documento: {language}"
+    ]
   },
   download: {
     eyebrow: 'PRONTO QUANDO VOCÊ ESTIVER',

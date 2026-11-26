@@ -58,7 +58,7 @@ Das Schnellaktions-Popup vergibt `Command+1` bis `Command+9`, danach `Command+0`
 
 Einstellungen → Speicherort wählt separate Ordner für Downloads, Screenshots, Bildwerkzeuge, Aufnahmen, PDF, Schnellaktionen und Tagesberichte. Neue Konfigurationen verwenden Unterordner von `~/Downloads`: `picture` für Screenshots/Bilder, `video` für Aufnahmen, `pdf`, `quick` und `daily`. Audiowerkzeuge wählen Datei oder Ordner über einen Exportdialog. Ablagedateien behalten Verweise auf die Originale; abgelegte Screenshots und Kontextnotizstatus werden lokal unter `~/Library/Application Support/zisla` verwaltet, Aufnahmeprojekte im Aufnahmeordner. Schnellnotiztext liegt in Apple Notizen.
 
-[Benutzerhilfe und Schrittanleitungen](https://wzz6423.github.io/zisla/?lang=de#help) behandeln neun Themen: Zwischenablage, Aufnahme, Ablage, Besprechungen, KI, Medienwerkzeuge, Tagesberichte, Desktop-Notizen/Fenstervorschauen und Wiedergabe/Mixing, mit kurzen Filmausschnitten.
+[Benutzerhilfe und Schrittanleitungen](https://wzz6423.github.io/zisla/help.html?lang=de#help) behandeln neun Themen: Zwischenablage, Aufnahme, Ablage, Besprechungen, KI, Medienwerkzeuge, Tagesberichte, Desktop-Notizen/Fenstervorschauen und Wiedergabe/Mixing, mit kurzen Filmausschnitten.
 
 ### Screenshot-Kurzbefehle und Ablage
 

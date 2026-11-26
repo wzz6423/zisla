@@ -58,7 +58,7 @@ Il popup assegna `Command+1`…`Command+9`, poi `Command+0`, nell'ordine delle a
 
 Impostazioni → Posizione di salvataggio separa download, screenshot, immagini, registrazioni, PDF, azioni rapide e riepiloghi. Le nuove configurazioni usano sottocartelle di `~/Downloads`: `picture` per immagini/screenshot, `video` per registrazioni, `pdf`, `quick`, `daily`. L'audio usa la finestra di export per scegliere file o cartella. Lo scaffale conserva riferimenti agli originali; screenshot e stato delle note contestuali sono locali in `~/Library/Application Support/zisla`, i progetti nella cartella registrazioni e le Note rapide in Note di Apple.
 
-La [guida utente](https://wzz6423.github.io/zisla/?lang=it#help) copre nove temi con passi e brevi video: appunti, cattura, scaffale, riunioni, AI, strumenti media, riepiloghi, note desktop/anteprime e riproduzione/mixer.
+La [guida utente](https://wzz6423.github.io/zisla/help.html?lang=it#help) copre nove temi con passi e brevi video: appunti, cattura, scaffale, riunioni, AI, strumenti media, riepiloghi, note desktop/anteprime e riproduzione/mixer.
 
 ### Screenshot: scorciatoie e conservazione
 

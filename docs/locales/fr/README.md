@@ -56,7 +56,7 @@ L'îlot comporte 12 modules : Accueil, Transfert, Presse-papiers, Surveillance d
 - **Comptes d'IA :** Consultez les quotas disponibles des comptes pris en charge, les heures de réinitialisation, les alertes de quota faible et les heures d'échantillonnage ; exportez l'historique local des tokens au format `.xlsx`.
 - **Actions rapides :** Les actions de la fenêtre utilisent `Command+1` à `Command+0` dans l'ordre. Le déclencheur supplémentaire par défaut des nouvelles configurations est `Command+N` pour la première action. Les mises à niveau conservent les raccourcis enregistrés et les déclencheurs effacés.
 
-[L'aide utilisateur](https://wzz6423.github.io/zisla/?lang=fr#help) fournit neuf guides pas à pas : presse-papiers, capture, étagère, réunions, IA, outils multimédias, bulletins quotidiens, notes de bureau/aperçus des fenêtres et lecture/mixage. Le [guide macOS](mac/README.md) indique les dossiers d'enregistrement des outils et leurs dépendances.
+[L'aide utilisateur](https://wzz6423.github.io/zisla/help.html?lang=fr#help) fournit neuf guides pas à pas : presse-papiers, capture, étagère, réunions, IA, outils multimédias, bulletins quotidiens, notes de bureau/aperçus des fenêtres et lecture/mixage. Le [guide macOS](mac/README.md) indique les dossiers d'enregistrement des outils et leurs dépendances.
 
 ## Premiers pas
 

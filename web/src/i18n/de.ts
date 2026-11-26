@@ -82,13 +82,13 @@ export const de: SiteContent = {
       shelf: {
         name: 'Ablage',
         caption:
-          'Ziehen Sie Dateien, Audio, Videos oder Links an den oberen Bildschirmrand. Suchen und filtern Sie Ablagen, wählen Sie mehrere aus und kopieren, teilen oder senden Sie sie an Schnellnotizen. Wandeln Sie Bilder in PDF um, senden Sie erkannten Bildtext an Schnellnotizen oder bearbeiten Sie Videos im Aufnahmestudio. Dateien lassen sich auch im Finder anzeigen. Komprimiere ausgewählte Dateien und Ordner als ZIP oder öffne ausgewählte Bilder zum Skalieren oder Konvertieren in den Bildwerkzeugen; erfolgreiche Ergebnisse kehren zur Ablage zurück. Importiere Bilder, Video und Audio in die Aufnahme-Mediathek.',
+          "Dateien auf der Ablage suchen, auswählen und teilen. ZIP oder PDF erstellen, Bilder skalieren oder konvertieren und an Notizen oder das Studio senden.",
         points: ['Suche und Sammelaktionen', 'Bilder als PDF und Schnellnotizen', 'Videos im Studio bearbeiten'],
       },
       clipboard: {
         name: 'Zwischenablage',
         caption:
-          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp und sieh, wann jeder Eintrag kopiert wurde. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen. Optional wird Verlauf gelöscht, der älter als 7, 15 oder 30 Tage ist; Favoriten bleiben erhalten. Automatisches Löschen ist standardmäßig aus. Suchen und gruppieren Sie den Verlauf nach der Quellanwendung. Neue Bilder werden im Hintergrund lokal auf Text geprüft, damit sich das Original über seinen Text finden lässt. Per Rechtsklick auf ein Bild im Verlauf lässt sich sein Text erkennen oder kopieren.',
+          "Durchsuche den lokalen Verlauf und Text in Bildern. Filtere nach Typ oder Quell-App, speichere Favoriten und sende Einträge an Schnellnotizen.",
         points: ['Verlauf in der Island', 'Filter nach Typ', 'Kurznotizen und Favoriten'],
       },
       aiMonitor: {
@@ -194,7 +194,7 @@ export const de: SiteContent = {
       },
       recording: {
         title: 'Aufnehmen und bearbeiten im Studio',
-        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren mit Animationen, Zooms und Untertiteln. Passen Sie Hautglättung, Helligkeit, Gesichts- und Körperform sowie Stimmeffekte an und ergänzen Sie sanfte Cursorspuren in eigener Farbe. Spielen Sie das Ergebnis im Studio ab. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3; exportieren Sie Video, GIF, Live Photo oder Audio. Manche Formate benötigen FFmpeg. Prüfen Sie optionale KI-Vorschläge vor der Anwendung. Der Aufnahmeordner wird unter Einstellungen → Speicherort separat gewählt. Auf unterstützten Geräten sind HDR-Aufnahmen möglich. Importiere Bilder, Video und Audio aus der Ablage in die Mediathek und behalte das aktuelle Projekt und die Zeitleiste bei.',
+        description: "Bildschirm, Fenster oder Bereich aufnehmen, Spuren, Untertitel und Bild-/Stimmeffekte bearbeiten und exportieren. Mit HDR auf unterstützten Geräten und Medienimport aus der Ablage.",
         detail: 'Porträt- und Stimmeffekte · Farbige Cursorspuren · Mehrspurwiedergabe und Export',
       },
       permissions: {
@@ -503,8 +503,7 @@ export const de: SiteContent = {
       "Wähle die Audioausgabe im Medienbereich und automatische Quelle oder bevorzugten Player in Einstellungen. Diese Wahl weist Apps keine getrennten Geräte zu.",
       "Tastentöne und Tippstatistik sind unabhängig und nutzen Eingabeüberwachung. Der App-Mixer benötigt macOS 14.4+ und Systemaudioaufnahme.",
       "Der Tagesbericht bietet 8 Vorlagen, Vorschau und manuelle oder tägliche PNG-Ausgabe mit eigenem Ordner."
-    ],
-    "documentLanguage": "Dokumentsprache: {language}"
+    ]
   },
   download: {
     eyebrow: 'JEDERZEIT EINSATZBEREIT',

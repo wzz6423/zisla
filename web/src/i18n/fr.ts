@@ -83,13 +83,13 @@ export const fr: SiteContent = {
       shelf: {
         name: 'Casier',
         caption:
-          'Glissez fichiers, sons, vidéos ou liens en haut de l’écran, puis recherchez, filtrez et sélectionnez plusieurs éléments pour les copier, les partager ou les envoyer aux Notes rapides. Convertissez des images en PDF, envoyez le texte reconnu aux Notes rapides ou ouvrez une vidéo dans le studio d’enregistrement pour la monter. Retrouvez aussi les fichiers dans le Finder. Compressez les fichiers et dossiers sélectionnés en ZIP, ou ouvrez les images sélectionnées dans les outils d’image pour les redimensionner ou les convertir ; les résultats réussis reviennent sur l’étagère. Importez des images, des vidéos et de l’audio dans la bibliothèque du studio.',
+          "Gardez vos fichiers sur l’étagère pour chercher, sélectionner et partager. Créez un ZIP ou PDF, redimensionnez ou convertissez les images, puis envoyez vers les notes ou le studio.",
         points: ['Recherche et actions groupées', 'Images vers PDF et Notes rapides', 'Montage vidéo dans le studio'],
       },
       clipboard: {
         name: 'Presse-papiers',
         caption:
-          'Consultez l’historique du presse-papiers dans la Dynamic Island et filtrez par image, URL, chemin et type de fichier, et voyez quand chaque élément a été copié. Envoyez un élément vers les notes rapides, épinglez-le en favori ou supprimez-le. Vous pouvez supprimer automatiquement l’historique de plus de 7, 15 ou 30 jours en conservant les favoris. La suppression automatique est désactivée par défaut. Recherchez et regroupez les éléments de l’historique par application source. La reconnaissance du texte des nouvelles images est tentée en arrière-plan sur votre Mac pour retrouver les originaux par leur texte. Un clic droit sur une image de l’historique permet de reconnaître ou de copier son texte.',
+          "Parcourez et cherchez l’historique local, y compris le texte des images. Filtrez par type ou application, gardez des favoris et envoyez vers les notes rapides.",
         points: ['Historique dans l’île', 'Filtre par type', 'Notes rapides et favoris'],
       },
       aiMonitor: {
@@ -199,7 +199,7 @@ export const fr: SiteContent = {
       },
       recording: {
         title: 'Enregistrer et monter dans le studio',
-        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes, avec animations, zooms et sous-titres. Réglez le lissage de la peau, la luminosité, l’affinement du visage et du corps, les effets vocaux et des traînées fluides du curseur dans la couleur choisie. Lisez le montage dans le studio. Formats : original, 16:9, 9:16, 1:1 ou 4:3 ; export vidéo, GIF, Live Photo ou audio, avec FFmpeg pour certains formats. Prévisualisez les propositions IA facultatives avant application. Le dossier d’enregistrement se règle séparément dans Réglages → Emplacement de sauvegarde. Enregistrez en HDR sur les appareils compatibles. Importez des images, des vidéos et de l’audio depuis l’étagère vers la bibliothèque en conservant le projet et la timeline actuels.',
+        description: "Enregistrez écran, fenêtre ou zone, montez les pistes et sous-titres avec effets portrait/voix, puis exportez. HDR compatible et import depuis l’étagère.",
         detail: 'Effets de portrait et de voix · Traînées colorées du curseur · Lecture et export multipistes',
       },
       permissions: {
@@ -508,8 +508,7 @@ export const fr: SiteContent = {
       "Choisissez la sortie audio dans la zone média, puis la source automatique ou le lecteur préféré dans Réglages. Ce choix ne répartit pas les applications entre appareils.",
       "Sons et statistiques clavier ont des interrupteurs distincts et utilisent Surveillance de l’entrée. Le mélangeur nécessite macOS 14.4+ et Enregistrement audio système.",
       "Le bilan quotidien propose 8 modèles, une prévisualisation et un export PNG manuel ou journalier, avec un dossier indépendant."
-    ],
-    "documentLanguage": "Langue du document : {language}"
+    ]
   },
   download: {
     eyebrow: 'DISPONIBLE QUAND VOUS VOULEZ',

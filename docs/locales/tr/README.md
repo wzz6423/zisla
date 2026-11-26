@@ -56,7 +56,7 @@ Adada 12 modül vardır: Ana Sayfa, Aktarım, Pano, Yapay Zekâ İzleme, Klavye 
 - **Yapay zekâ hesapları:** Desteklenen hesapların kotalarını, yenilenme zamanlarını, düşük kota bildirimlerini ve örnekleme zamanlarını görün; yerel token geçmişini `.xlsx` olarak dışa aktarın.
 - **Hızlı İşlemler:** Açılır penceredeki işlemler sırasıyla `Command+1` ile `Command+0` kullanır. Yeni yapılandırmalarda ilk işlem için ek varsayılan tetikleyici `Command+N`'dir. Yükseltmeler kayıtlı kısayolları ve temizlenmiş tetikleyicileri korur.
 
-[Kullanıcı yardımı](https://wzz6423.github.io/zisla/?lang=tr#help) dokuz adım adım kılavuz sunar: pano, yakalama, raf, toplantılar, yapay zekâ, medya araçları, günlük özetler, masaüstü notları/pencere önizlemeleri ve oynatma/karıştırma. [macOS kılavuzu](mac/README.md) araçların kayıt klasörlerini ve bağımlılıklarını listeler.
+[Kullanıcı yardımı](https://wzz6423.github.io/zisla/help.html?lang=tr#help) dokuz adım adım kılavuz sunar: pano, yakalama, raf, toplantılar, yapay zekâ, medya araçları, günlük özetler, masaüstü notları/pencere önizlemeleri ve oynatma/karıştırma. [macOS kılavuzu](mac/README.md) araçların kayıt klasörlerini ve bağımlılıklarını listeler.
 
 ## Başlangıç
 

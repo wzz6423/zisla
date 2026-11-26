@@ -56,7 +56,7 @@ A ilha tem 12 módulos: Início, Transferência, Área de transferência, Monito
 - **Contas de IA:** Veja cotas de contas compatíveis, horários de redefinição, avisos de cota baixa e horários de amostragem; exporte histórico local de tokens em `.xlsx`.
 - **Ações rápidas:** Ações do aviso usam `Command+1` até `Command+0` em ordem. O gatilho adicional padrão para configurações novas é `Command+N` para a primeira ação. Atualizações preservam atalhos salvos e gatilhos apagados.
 
-A [ajuda ao usuário](https://wzz6423.github.io/zisla/?lang=pt-BR#help) oferece nove guias passo a passo: área de transferência, captura, prateleira, reuniões, IA, ferramentas de mídia, resumos diários, notas da área de trabalho/prévias de janelas e reprodução/mixagem. O [guia macOS](mac/README.md) lista pastas e dependências.
+A [ajuda ao usuário](https://wzz6423.github.io/zisla/help.html?lang=pt-BR#help) oferece nove guias passo a passo: área de transferência, captura, prateleira, reuniões, IA, ferramentas de mídia, resumos diários, notas da área de trabalho/prévias de janelas e reprodução/mixagem. O [guia macOS](mac/README.md) lista pastas e dependências.
 
 ## Primeiros passos
 

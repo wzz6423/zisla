@@ -68,6 +68,7 @@ import {
 import './styles.css';
 
 const app = document.querySelector<HTMLDivElement>('#app');
+const isHelpPage = document.documentElement.dataset.page === 'help';
 
 if (!app) {
   throw new Error('找不到官网挂载节点');
@@ -188,13 +189,13 @@ const updateDocumentMetadata = (
   document.documentElement.lang = locale;
   document.documentElement.dir = localeDirection(locale);
   document.documentElement.dataset.locale = locale;
-  document.title = content.meta.documentTitle;
-  setMetaContent('meta[name="description"]', { name: 'description' }, content.meta.description);
-  setMetaContent('meta[property="og:title"]', { property: 'og:title' }, content.meta.ogTitle);
+  document.title = isHelpPage ? content.help.title + ' · zisla' : content.meta.documentTitle;
+  setMetaContent('meta[name="description"]', { name: 'description' }, isHelpPage ? content.help.lede : content.meta.description);
+  setMetaContent('meta[property="og:title"]', { property: 'og:title' }, isHelpPage ? document.title : content.meta.ogTitle);
   setMetaContent(
     'meta[property="og:description"]',
     { property: 'og:description' },
-    content.meta.ogDescription,
+    isHelpPage ? content.help.lede : content.meta.ogDescription,
   );
   setMetaContent('meta[property="og:locale"]', { property: 'og:locale' }, openGraphLocales[locale]);
 };
@@ -664,6 +665,10 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
   currentLocale = locale;
   updateDocumentMetadata(locale, content);
 
+  const query = new URLSearchParams(window.location.search);
+  query.set('lang', locale);
+  const homeHref = './?' + query;
+  const helpHref = navHrefs.help + '?' + query;
   const heroTitle = content.hero.title.replace(/^([^<]+)<br>/, '<span class="hero-word">$1</span>');
   const sectionProgressMarkup = [
     ['top', content.header.brandHomeAriaLabel],
@@ -672,7 +677,6 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     ['ai', content.ai.eyebrow],
     ['how-it-works', content.flow.eyebrow],
     ['download', content.download.eyebrow],
-    ['help', content.help.title],
     ['faq', content.faq.eyebrow],
     ['developers', content.developers.eyebrow],
     ['changelog', content.changelog.eyebrow],
@@ -766,8 +770,6 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
         escapeHtml(doc.title) +
         '</span><span class="doc-description">' +
         escapeHtml(doc.description) +
-        '</span><span class="doc-description">' +
-        escapeHtml(format(content.help.documentLanguage, { language: localeNativeNames[link.language] })) +
         '</span></span>' +
         icon('arrow-up-right', 16) +
         '</a>'
@@ -776,32 +778,32 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     .join('');
 
   const helpMarkup =
-    '<section class="section help-section" id="help"><div class="section-wrap"><div class="section-heading reveal"><div><h2 class="section-title">' +
-    escapeHtml(content.help.title) + '</h2></div><p class="section-lede">' + escapeHtml(content.help.lede) +
+    '<section class="section help-section" id="help"><div class="section-wrap"><div class="section-heading reveal"><div><h1 class="section-title">' +
+    escapeHtml(content.help.title) + '</h1></div><p class="section-lede">' + escapeHtml(content.help.lede) +
     '</p></div><nav class="guide-nav" aria-label="' + escapeHtml(content.help.title) + '">' +
     guideIds.map((id) => '<a href="#guide-' + id + '">' + escapeHtml(content.help.guides[id].title) + '</a>').join('') +
     '</nav><div class="guide-list">' + guideIds.map((id) => {
       const guide = content.help.guides[id];
-      return '<article class="user-guide reveal" id="guide-' + id + '"><h3><a href="#guide-' + id + '">' +
-        escapeHtml(guide.title) + '</a></h3><p>' + escapeHtml(guide.summary) + '</p><dl><dt>' +
+      return '<article class="user-guide reveal" id="guide-' + id + '"><h2><a href="#guide-' + id + '">' +
+        escapeHtml(guide.title) + '</a></h2><p>' + escapeHtml(guide.summary) + '</p><dl><dt>' +
         escapeHtml(content.help.labels.entry) + '</dt><dd>' + escapeHtml(guide.entry) +
         '</dd></dl><ol>' + guide.steps.map((step) => '<li>' + escapeHtml(step) + '</li>').join('') + '</ol><dl>' +
         (['shortcuts', 'permissions', 'output'] as const).map((field) => '<dt>' +
           escapeHtml(content.help.labels[field]) + '</dt><dd>' + escapeHtml(guide[field]) + '</dd>').join('') +
         '</dl></article>';
-    }).join('') + '</div><h3 class="help-subtitle">' + escapeHtml(content.help.workflowsTitle) +
-    '</h3><p class="section-lede">' + escapeHtml(content.help.videoNotice) + '</p><div class="help-workflows">' +
+    }).join('') + '</div><h2 class="help-subtitle">' + escapeHtml(content.help.workflowsTitle) +
+    '</h2><p class="section-lede">' + escapeHtml(content.help.videoNotice) + '</p><div class="help-workflows">' +
     workflowIds.map((id) => {
       const workflow = content.help.workflows[id];
       const excerpt = workflowExcerpts[id];
-      return '<article class="workflow-example reveal" id="workflow-' + id + '"><h4>' +
-        escapeHtml(workflow.title) + '</h4><ol>' + workflow.steps.map((step) => '<li>' + escapeHtml(step) + '</li>').join('') +
+      return '<article class="workflow-example reveal" id="workflow-' + id + '"><h3>' +
+        escapeHtml(workflow.title) + '</h3><ol>' + workflow.steps.map((step) => '<li>' + escapeHtml(step) + '</li>').join('') +
         '</ol><video class="workflow-video" controls playsinline preload="none" width="1920" height="1080" aria-label="' +
         escapeHtml(workflow.title) + '" src="' + launchFilmMedia.video + '#t=' + excerpt.start + ',' + excerpt.end + '"></video><p><a href="' + launchFilmMedia.video + '#t=' + excerpt.start + ',' + excerpt.end + '">' +
         escapeHtml(content.help.excerptLabel) + ' <bdi>' + excerpt.start + '–' + excerpt.end + '</bdi></a> · <a href="#guide-' +
         excerpt.guide + '">' + escapeHtml(content.help.guideLinkLabel) + '</a></p></article>';
-    }).join('') + '</div><h3 class="help-subtitle">' + escapeHtml(content.help.preferencesTitle) +
-    '</h3><ul class="help-preferences">' + content.help.preferences.map((item) => '<li>' + escapeHtml(item) + '</li>').join('') +
+    }).join('') + '</div><h2 class="help-subtitle">' + escapeHtml(content.help.preferencesTitle) +
+    '</h2><ul class="help-preferences">' + content.help.preferences.map((item) => '<li>' + escapeHtml(item) + '</li>').join('') +
     '</ul></div></section>';
 
   const faqMarkup = faqIds
@@ -1007,12 +1009,8 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     })
     .join('');
 
-  document.querySelector<HTMLVideoElement>('#launchFilm')?.pause();
-  document.querySelectorAll<HTMLVideoElement>('.workflow-video').forEach((video) => video.pause());
-  app.innerHTML =
-    '<nav class="section-progress-nav" aria-label="' + escapeHtml(content.header.navAriaLabel) + '">' +
-    sectionProgressMarkup + '</nav><main><section class="hero" id="top"><header class="site-header">' +
-    '<a class="brand" href="#top" aria-label="' +
+  const headerMarkup = '<header class="site-header">' +
+    '<a class="brand" href="' + escapeHtml(isHelpPage ? homeHref : '#top') + '" aria-label="' +
     escapeHtml(content.header.brandHomeAriaLabel) +
     '"><img class="brand-mark" src="./assets/zisla-icon.png" alt="" /><span>zisla <span class="brand-subtitle">/ ' +
     escapeHtml(content.tagline) +
@@ -1028,7 +1026,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.film.title) +
     '</a>' +
     navIds
-      .map((id) => '<a class="nav-link" href="' + navHrefs[id] + '">' + escapeHtml(content.header.navItems[id]) + '</a>')
+      .map((id) => '<a class="nav-link" href="' + escapeHtml(id === 'help' ? (isHelpPage ? '#help' : helpHref) : isHelpPage ? homeHref + navHrefs[id] : navHrefs[id]) + '">' + escapeHtml(content.header.navItems[id]) + '</a>')
       .join('') +
     '<label class="language-picker"><span class="sr-only">' +
     escapeHtml(content.header.languageLabel) +
@@ -1045,12 +1043,41 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
         '" aria-pressed="' + String(mode === currentThemeMode) + '" aria-label="' + label +
         '" title="' + label + '">' + icon(themeModeIcons[mode], 16) + '</button>';
     }).join('') +
-    '</div><a class="header-cta" href="#download" aria-label="' +
+    '</div><a class="header-cta" href="' + escapeHtml(isHelpPage ? homeHref + '#download' : '#download') + '" aria-label="' +
     escapeHtml(content.header.downloadCtaAriaLabel) +
     '">' +
     escapeHtml(content.header.downloadCta) +
     icon('arrow-down-to-line', 14) +
-    '</a></nav></header><div class="section-wrap hero-inner"><div class="hero-copy"><p class="eyebrow">' +
+    '</a></nav></header>';
+
+  const footerMarkup = '<footer class="site-footer"><div class="section-wrap reveal-sequence"><div class="footer-word" aria-hidden="true">zisla</div><div class="footer-top reveal-step" style="--reveal-index: 0"><a class="brand" href="' + escapeHtml(isHelpPage ? homeHref : '#top') + '" aria-label="' +
+    escapeHtml(content.footer.brandHomeAriaLabel) +
+    '"><img class="brand-mark" src="./assets/zisla-icon.png" alt="" /><span>zisla</span></a><div class="footer-links"><a href="' +
+    repositoryLinks.github +
+    '" target="_blank" rel="noreferrer">GitHub</a><a href="' +
+    repositoryLinks.gitee +
+    '" target="_blank" rel="noreferrer">Gitee</a><a href="' +
+    latestRelease.previewPage +
+    '" target="_blank" rel="noreferrer">' +
+    escapeHtml(content.footer.previewChannelLabel) +
+    '</a><a href="' +
+    escapeHtml(documentationLink('contributing', locale).url) +
+    '" target="_blank" rel="noreferrer">' +
+    escapeHtml(content.developers.docs.contributing.title) +
+    '</a></div></div><div class="footer-bottom reveal-step" style="--reveal-index: 1"><span>' +
+    escapeHtml(content.footer.tagline) +
+    '</span><span class="footer-meta">' +
+    license +
+    ' · ' +
+    latestRelease.version +
+    ' · macOS</span></div></div></footer><div class="toast" id="toast" role="status" aria-live="polite"></div>';
+
+  document.querySelector<HTMLVideoElement>('#launchFilm')?.pause();
+  document.querySelectorAll<HTMLVideoElement>('.workflow-video').forEach((video) => video.pause());
+  const homepageMarkup =
+    '<nav class="section-progress-nav" aria-label="' + escapeHtml(content.header.navAriaLabel) + '">' +
+    sectionProgressMarkup + '</nav><main><section class="hero" id="top">' +
+    headerMarkup + '<div class="section-wrap hero-inner"><div class="hero-copy"><p class="eyebrow">' +
     escapeHtml(content.hero.eyebrow) +
     '</p><h1 class="hero-title">' +
     heroTitle +
@@ -1200,7 +1227,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     '</p></div></div><dl class="download-notes reveal-step" style="--reveal-index: 1">' +
     downloadNoteIds.map(renderDownloadNote).join('') +
     '</dl></div></section>' +
-    helpMarkup + '<section class="section faq-section" id="faq"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
+    '<section class="section faq-section" id="faq"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
     escapeHtml(content.faq.eyebrow) +
     '</p><h2 class="section-title">' +
     escapeHtml(content.faq.title) +
@@ -1245,27 +1272,10 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.developers.checksumLabel) +
     '</a></div></div><ul class="performance-list">' +
     content.developers.performancePoints.map((point) => '<li>' + icon('check', 14) + '<span>' + escapeHtml(point) + '</span></li>').join('') +
-    '</ul></div></div></section>' + changelogSectionMarkup + filmSectionMarkup + '</main><footer class="site-footer"><div class="section-wrap reveal-sequence"><div class="footer-word" aria-hidden="true">zisla</div><div class="footer-top reveal-step" style="--reveal-index: 0"><a class="brand" href="#top" aria-label="' +
-    escapeHtml(content.footer.brandHomeAriaLabel) +
-    '"><img class="brand-mark" src="./assets/zisla-icon.png" alt="" /><span>zisla</span></a><div class="footer-links"><a href="' +
-    repositoryLinks.github +
-    '" target="_blank" rel="noreferrer">GitHub</a><a href="' +
-    repositoryLinks.gitee +
-    '" target="_blank" rel="noreferrer">Gitee</a><a href="' +
-    latestRelease.previewPage +
-    '" target="_blank" rel="noreferrer">' +
-    escapeHtml(content.footer.previewChannelLabel) +
-    '</a><a href="' +
-    escapeHtml(documentationLink('contributing', locale).url) +
-    '" target="_blank" rel="noreferrer">' +
-    escapeHtml(content.developers.docs.contributing.title) +
-    '</a></div></div><div class="footer-bottom reveal-step" style="--reveal-index: 1"><span>' +
-    escapeHtml(content.footer.tagline) +
-    '</span><span class="footer-meta">' +
-    license +
-    ' · ' +
-    latestRelease.version +
-    ' · macOS</span></div></div></footer><div class="toast" id="toast" role="status" aria-live="polite"></div>';
+    '</ul></div></div></section>' + changelogSectionMarkup + filmSectionMarkup + '</main>' + footerMarkup;
+
+  app.innerHTML = isHelpPage ? headerMarkup + '<main class="help-page" id="top">' +
+    helpMarkup + filmSectionMarkup + '</main>' + footerMarkup : homepageMarkup;
 
   createIcons({ icons: siteIcons });
   setMenuOpen(false);
@@ -1380,7 +1390,20 @@ const showLocale = async (locale: SiteLocale, preserveScroll = false) => {
   }
   if (pendingLocale !== locale) return;
   renderSite(locale, preserveScroll);
-  initIntroScene();
+  if (!isHelpPage) initIntroScene();
+};
+
+const redirectLegacyHelp = () => {
+  if (isHelpPage) return false;
+  const destination = window.location.hash;
+  if (destination !== '#help' && !guideIds.some((id) => destination === '#guide-' + id) &&
+    !workflowIds.some((id) => destination === '#workflow-' + id)) return false;
+  const address = new URL(navHrefs.help, window.location.href);
+  address.search = window.location.search;
+  address.searchParams.set('lang', readInitialLocale());
+  address.hash = destination;
+  window.location.replace(address.href);
+  return true;
 };
 
 const updateScrollWithIntro = () => {
@@ -1392,7 +1415,8 @@ const updateScrollWithIntro = () => {
 
 window.addEventListener('scroll', updateScrollWithIntro, { passive: true });
 window.addEventListener('resize', updateScrollProgress);
-window.addEventListener('popstate', () => showLocale(readInitialLocale()));
+window.addEventListener('popstate', () => redirectLegacyHelp() ? undefined : showLocale(readInitialLocale()));
+window.addEventListener('hashchange', redirectLegacyHelp);
 desktopQuery.addEventListener?.('change', () => setMenuOpen(false));
 reducedMotionQuery.addEventListener?.('change', bindReveals);
 colorSchemeQuery.addEventListener('change', () => {
@@ -1404,4 +1428,6 @@ window.addEventListener('keydown', (event) => {
   document.querySelector<HTMLButtonElement>('.menu-toggle')?.focus();
 });
 
-void showLocale(currentLocale);
+if (!redirectLegacyHelp()) {
+  void showLocale(currentLocale);
+}

@@ -84,13 +84,13 @@ export const es = createCatalog({
       shelf: {
         name: 'Bandeja',
         caption:
-          'Arrastra archivos, audio, vídeos o enlaces a la parte superior de la pantalla. Busca, filtra y selecciona varios elementos para copiarlos, compartirlos o enviarlos a Notas rápidas. Convierte imágenes en PDF, envía el texto reconocido a Notas rápidas o abre vídeos en el estudio de grabación para editarlos. También puedes mostrar los archivos en Finder. Comprime los archivos y carpetas seleccionados en ZIP, o abre las imágenes seleccionadas en las herramientas de imagen para cambiar su tamaño o formato; los resultados correctos vuelven a la bandeja. Importa imágenes, vídeo y audio a la biblioteca del estudio.',
+          "Guarda archivos en la bandeja para buscar, seleccionar y compartir. Crea ZIP o PDF, cambia tamaño o formato de imágenes y envía medios a notas o al estudio.",
         points: ['Búsqueda y acciones por lotes', 'Imágenes a PDF y Notas rápidas', 'Edición de vídeo en el estudio'],
       },
       clipboard: {
         name: 'Portapapeles',
         caption:
-          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo y mira cuándo se copió cada entrada. Envía una entrada a Notas rápidas, márcala como favorita o elimínala. Puedes borrar automáticamente el historial de más de 7, 15 o 30 días conservando los favoritos. El borrado automático está desactivado de forma predeterminada. Busca y agrupa el historial por aplicación de origen. Las imágenes nuevas intentan reconocer el texto en el dispositivo en segundo plano para encontrar el original por su texto. Haz clic derecho en una imagen del historial para reconocer o copiar su texto.',
+          "Busca en el historial local y en el texto de las imágenes. Filtra por tipo o aplicación, guarda favoritos y envía entradas a Notas rápidas.",
         points: ['Historial dentro de la isla', 'Filtrado por tipo', 'Notas rápidas y favoritos'],
       },
       aiMonitor: {
@@ -181,7 +181,7 @@ export const es = createCatalog({
       },
       recording: {
         title: 'Graba y edita en el estudio',
-        description: 'Graba una pantalla, ventana o zona con audio del sistema, micrófono y cámara opcionales. Edita vídeo, audio, imágenes y texto en varias pistas con animaciones, zooms y subtítulos. Ajusta suavizado de piel, brillo, afinamiento de cara y cuerpo, efectos de voz y estelas suaves del cursor en el color elegido. Reproduce el montaje en el estudio. Elige proporción original, 16:9, 9:16, 1:1 o 4:3; exporta vídeo, GIF, Live Photo o audio. Algunos formatos necesitan FFmpeg. Revisa las propuestas opcionales de IA antes de aplicarlas. La carpeta de grabación se elige por separado en Ajustes → Ubicación de guardado. Graba en HDR en dispositivos compatibles. Importa imágenes, vídeo y audio desde la bandeja a la biblioteca conservando el proyecto y la línea de tiempo actuales.',
+        description: "Graba pantalla, ventana o región, edita pistas, subtítulos y efectos de retrato/voz y exporta. HDR en equipos compatibles e importación desde la bandeja.",
         detail: 'Efectos de retrato y voz · Estelas de cursor en color · Reproducción y exportación multipista',
       },
       permissions: {
@@ -485,8 +485,7 @@ export const es = createCatalog({
       "Elige salida de audio en la zona multimedia y fuente automática o reproductor preferido en Ajustes. Esta opción no asigna dispositivos distintos por app.",
       "Sonidos y estadísticas de teclado son independientes y usan Monitorización de entrada. El mezclador necesita macOS 14.4+ y Grabación de audio del sistema.",
       "El resumen diario ofrece 8 plantillas, vista previa y exportación PNG manual o diaria con carpeta independiente."
-    ],
-    "documentLanguage": "Idioma del documento: {language}"
+    ]
   },
   download: {
     eyebrow: 'LISTO CUANDO TÚ LO ESTÉS',

@@ -58,7 +58,7 @@ The Quick Actions popup assigns `Command+1` through `Command+9`, then `Command+0
 
 Settings → Save Location selects separate folders for downloads, screenshots, image tools, recordings, PDF, Quick Actions, and daily briefings. New configurations default to `~/Downloads` subfolders: `picture` for screenshots/images, `video` for recordings, `pdf`, `quick`, and `daily`. Audio tools use an export dialog to select a file or folder. Shelf files retain references to the originals; stashed screenshots and context-note state are managed locally under `~/Library/Application Support/zisla`, while recording projects use the recording folder. Quick Notes text lives in Apple Notes.
 
-[User help and step-by-step guides](https://wzz6423.github.io/zisla/?lang=en#help) cover nine topics: clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/window previews, and playback/mixing, with short film excerpts.
+[User help and step-by-step guides](https://wzz6423.github.io/zisla/help.html?lang=en#help) cover nine topics: clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/window previews, and playback/mixing, with short film excerpts.
 
 ### Screenshot shortcuts and stashing
 

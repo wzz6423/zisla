@@ -55,11 +55,11 @@ const renderSource = stripTypeScriptTypes(mainSource.slice(mainSource.indexOf('c
 
 const renderInMemory = (locale, releases = site.changelogEntries, runtimeNodes = {}, options = {}) => {
   const classList = { add() {}, remove() {}, toggle() {} };
-  const node = () => ({ style: {}, dataset: {}, classList, setAttribute() {}, append() {} });
+  const node = () => ({ style: {}, dataset: {}, classList, setAttribute(name, value) { this[name] = value; }, append() {} });
   const app = { ...node(), innerHTML: '' };
   const metadata = [];
   const document = {
-    documentElement: { ...node(), scrollHeight: 800 },
+    documentElement: { ...node(), dataset: { page: options.page }, scrollHeight: 800 },
     body: node(),
     head: { querySelector: () => null, append: (element) => metadata.push(element) },
     querySelector: (selector) => selector === '#app' ? app : runtimeNodes[selector] ?? null,
@@ -67,8 +67,11 @@ const renderInMemory = (locale, releases = site.changelogEntries, runtimeNodes =
     getElementById: (id) => options.targets?.[id] ?? null,
     createElement: node,
   };
+  const navigations = [];
+  const location = new URL(options.url ?? `https://example.test/zisla/${options.page === 'help' ? 'help.html' : ''}`);
+  location.replace = (address) => navigations.push(new URL(address, location));
   const window = {
-    location: new URL(options.url ?? "https://example.test/zisla/"),
+    location,
     history: {
       replaceState(_state, _title, address) { window.location = new URL(address, window.location); },
       pushState(_state, _title, address) { window.location = new URL(address, window.location); },
@@ -94,8 +97,11 @@ const renderInMemory = (locale, releases = site.changelogEntries, runtimeNodes =
   });
   vm.runInContext(renderSource, context);
   vm.runInContext(`renderSite(${JSON.stringify(locale)})`, context);
-  return { html: app.innerHTML, document, metadata, window, context };
+  return { html: app.innerHTML, document, metadata, window, context, navigations };
 };
+
+const renderHelpInMemory = (locale, releases = site.changelogEntries, runtimeNodes = {}, options = {}) =>
+  renderInMemory(locale, releases, runtimeNodes, { ...options, page: 'help' });
 
 const strings = (value, path) => {
   if (typeof value === 'string') return [[path, value]];
@@ -310,8 +316,8 @@ test('current feature descriptions keep meeting, power and application-repair co
   assert.match(content.showcase.modules.dashboard.caption, /AI work is grouped by application on Home/);
   assert.match(content.showcase.modules.agenda.caption, /Events with a meeting link.*10 minutes before the start.*one-click join/);
   assert.match(content.showcase.modules.agenda.caption, /Create a meeting note.*link and unlink existing context notes/);
-  assert.match(content.showcase.modules.shelf.caption, /search, filter and select several.*copy, share or send to Quick Notes/);
-  assert.match(content.showcase.modules.shelf.caption, /Convert images to PDF.*send videos to the recording studio/);
+  assert.match(content.showcase.modules.shelf.caption, /Search, select and share.*ZIP or PDF.*resize or convert images/);
+  assert.match(content.showcase.modules.shelf.caption, /Quick Notes or the recording studio/);
   assert.match(content.showcase.modules.mail.caption, /one message or all inbox messages as read/);
   assert.match(content.showcase.modules.toolbox.caption, /Pause, resume or reset.*compact horizontal and vertical/);
   assert.match(content.showcase.modules.system.caption, /automatic power modes for plugged-in and battery use.*20% or below/);
@@ -334,13 +340,13 @@ test('current feature descriptions keep meeting, power and application-repair co
 });
 
 test('current release describes source grouping, cleanup, HDR and saved preferences', () => {
-  assert.match(english.showcase.modules.clipboard.caption, /Search and group history by source application/);
+  assert.match(english.showcase.modules.clipboard.caption, /search local clipboard history.*text in images.*type or source app/);
   assert.match(english.showcase.modules.system.caption, /background.*island progress and results/);
   assert.match(english.showcase.modules.system.caption, /duplicate application installations.*leftovers/);
   assert.match(english.showcase.modules.quickNotes.caption, /Command-arrow.*native body typography/);
   assert.match(english.showcase.modules.volumeMixer.caption, /remembered per application.*stale audio sources/);
   assert.match(english.showcase.modules.aiMonitor.caption, /account regions independently.*daily usage records/i);
-  assert.match(english.extensions.features.recording.description, /HDR on supported devices/);
+  assert.match(english.extensions.features.recording.description, /HDR on compatible devices.*media imports from the shelf/);
   assert.match(english.extensions.features.permissions.description, /status refreshes after access is granted/);
   assert.match(english.extensions.features.capture.description, /settings window/);
   assert.match(english.extensions.features.windowPreviews.description, /duplicate windows.*context menus/);
@@ -380,10 +386,11 @@ for (const locale of siteLocales) {
     assert.equal(content.changelog.releaseNotes['v0.1.23'].length, 13);
     assert.equal(content.changelog.releaseNotes['v0.1.24'].length, 9);
     const rendered = renderInMemory(locale);
+    const help = renderHelpInMemory(locale);
     for (const [path, value] of updatedStrings(content)) {
-      if (path.startsWith('meta.') || path === 'help.documentLanguage') continue;
+      if (path.startsWith('meta.')) continue;
       const expected = path.startsWith('faq.') ? value : escapedText(value);
-      assert.ok(rendered.html.includes(expected), `${locale}: ${path} is rendered`);
+      assert.ok((path.startsWith('help.') ? help.html : rendered.html).includes(expected), `${locale}: ${path} is rendered on its page`);
     }
     assert.equal((rendered.html.match(/class="workflow-module reveal-step"/g) ?? []).length, 12);
     assert.equal((rendered.html.match(/class="extension-item reveal-step"/g) ?? []).length, site.crossModuleFeatureIds.length);
@@ -458,11 +465,15 @@ test('help languages mirror the native AppLanguage values', () => {
   assert.deepEqual(values.sort(), [...siteLocales].sort());
 });
 
-test('user help exposes linked guides and translated workflow demonstrations in every locale', () => {
+test('the homepage stays concise while linked help retains translated guides and demonstrations', () => {
   for (const locale of siteLocales) {
     const content = site.getSiteContent(locale);
-    const { html, document, metadata } = renderInMemory(locale);
-    assert.ok(html.includes(`href="#help">${escapedText(content.header.navItems.help)}</a>`), locale);
+    const homepage = renderInMemory(locale);
+    assert.ok(homepage.html.includes(`href="./help.html?lang=${locale}">${escapedText(content.header.navItems.help)}</a>`), locale);
+    assert.doesNotMatch(homepage.html, /class="user-guide|class="workflow-video|id="help"/);
+    const { html, document, metadata } = renderHelpInMemory(locale);
+    assert.doesNotMatch(html, /class="hero"|id="showcase"|id="changelog"/);
+    assert.ok(html.includes(`href="./?lang=${locale}"`), `${locale}: help returns home`);
     for (const id of site.guideIds) {
       const guide = content.help.guides[id];
       assert.ok(guide.steps.length > 0, `${locale}: ${id} has actionable steps`);
@@ -496,12 +507,6 @@ test('developer resources select complete documents in the chosen locale', () =>
       assert.equal(sourcePath, expected, `${locale}: localized resource path`);
       assert.ok(existsSync(new URL(`../../${sourcePath}`, import.meta.url)), `${locale}: ${sourcePath} exists`);
       assert.ok(html.includes(`href="${link.url}"`), `${locale}: resource links to ${sourcePath}`);
-      if (site.documentationCardIds.includes(id)) {
-        const label = site.format(site.getSiteContent(locale).help.documentLanguage, {
-          language: localeNativeNames[link.language],
-        });
-        assert.ok(html.includes(escapedText(label)), `${locale}: actual target language is visible`);
-      }
     }
   }
 });
@@ -581,11 +586,65 @@ test('explicit language links override saved preferences while invalid values le
   assert.equal(vm.runInContext('readInitialLocale()', page.context), defaultLocale);
 });
 
+test('legacy homepage help links forward with language, query and destination intact', () => {
+  for (const locale of siteLocales) {
+    for (const destination of ['help', ...site.guideIds.map((id) => 'guide-' + id), ...site.workflowIds.map((id) => 'workflow-' + id)]) {
+      const page = renderInMemory('en', site.changelogEntries, {}, {
+        url: `https://example.test/zisla/?campaign=help&lang=${locale}#${destination}`, storedLocale: 'en',
+      });
+      assert.equal(page.navigations.length, 1);
+      const url = page.navigations[0];
+      assert.equal(url.pathname, '/zisla/help.html');
+      assert.equal(url.searchParams.get('lang'), locale);
+      assert.equal(url.searchParams.get('campaign'), 'help');
+      assert.equal(url.hash, '#' + destination);
+    }
+  }
+  for (const destination of ['showcase', 'film', 'guide-unknown', '%3Cimg%20onerror=alert(1)%3E']) {
+    const page = renderInMemory('en', site.changelogEntries, {}, { url: `https://example.test/zisla/#${destination}` });
+    assert.equal(page.navigations.length, 0, destination);
+  }
+  for (const search of ['', '?lang=xx&campaign=help']) {
+    const page = renderInMemory('en', site.changelogEntries, {}, {
+      url: `https://example.test/zisla/${search}#guide-shelf`, storedLocale: 'fr',
+    });
+    assert.equal(page.navigations[0].searchParams.get('lang'), 'fr', 'saved language applies to old links without a supported language');
+    assert.equal(page.navigations[0].searchParams.get('campaign'), search ? 'help' : null);
+  }
+  const handlers = new Map();
+  const page = renderInMemory('en', site.changelogEntries, {}, { windowHandlers: handlers });
+  page.window.location.hash = '#guide-shelf';
+  handlers.get('hashchange')();
+  assert.equal(page.navigations[0].hash, '#guide-shelf');
+});
+
+test('help metadata and cross-page links retain locale and safely encode the query', () => {
+  for (const locale of siteLocales) {
+    const page = renderHelpInMemory(locale);
+    const content = site.getSiteContent(locale);
+    assert.equal(page.document.title, content.help.title + ' · zisla');
+    assert.ok(page.metadata.some((entry) => entry.name === 'description' && entry.content === content.help.lede));
+    assert.ok(page.metadata.some((entry) => entry.property === 'og:title' && entry.content === page.document.title));
+    assert.ok(page.metadata.some((entry) => entry.property === 'og:description' && entry.content === content.help.lede));
+    assert.equal(page.document.documentElement.dir, localeDirection(locale));
+  }
+  const page = renderInMemory('ar', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/?campaign=sample&lang=ar&source=docs',
+  });
+  assert.ok(page.html.includes('href="./help.html?campaign=sample&amp;lang=ar&amp;source=docs"'));
+  const help = renderHelpInMemory('ar', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/help.html?campaign=sample&lang=ar&source=docs#guide-ai',
+  });
+  assert.ok(help.html.includes('href="./?campaign=sample&amp;lang=ar&amp;source=docs#showcase"'));
+  assert.ok(help.html.includes('class="header-cta" href="./?campaign=sample&amp;lang=ar&amp;source=docs#download"'));
+  assert.equal(help.navigations.length, 0, 'the help page must not redirect itself');
+});
+
 test('initial guide deep links reach the selected section without interpreting arbitrary hash markup', () => {
   let visits = 0;
   const target = { scrollIntoView() { visits++; } };
-  const page = renderInMemory('ar', site.changelogEntries, {}, {
-    url: 'https://example.test/zisla/?lang=ar#guide-meeting', targets: { 'guide-meeting': target },
+  const page = renderHelpInMemory('ar', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/help.html?lang=ar#guide-meeting', targets: { 'guide-meeting': target },
   });
   assert.equal(visits, 1);
   assert.equal(page.document.documentElement.dir, 'rtl');
@@ -599,8 +658,8 @@ test('language switching preserves the guide and query, and help navigation reta
   const control = { addEventListener(event, handler) { handlers.set(event, handler); } };
   const anchor = { getAttribute: () => '#guide-ai', addEventListener(event, handler) { handlers.set('anchor-' + event, handler); } };
   const target = { getBoundingClientRect: () => ({ top: 400 }), scrollIntoView() {} };
-  const page = renderInMemory('en', site.changelogEntries, { '#languageSelect': control }, {
-    url: 'https://example.test/zisla/?campaign=guide&lang=en#guide-clipboard',
+  const page = renderHelpInMemory('en', site.changelogEntries, { '#languageSelect': control }, {
+    url: 'https://example.test/zisla/help.html?campaign=guide&lang=en#guide-clipboard',
     selectors: { 'a[href^="#"]': [anchor] }, targets: { 'guide-ai': target },
   });
   handlers.get('change')({ currentTarget: { value: 'ar' } });
@@ -627,14 +686,14 @@ test('browser back restores the language and help destination from its URL', asy
   const targets = Object.fromEntries(['guide-clipboard', 'guide-meeting'].map((id) => [id, {
     scrollIntoView() { visits.push(id); },
   }]));
-  const page = renderInMemory('en', site.changelogEntries, {}, {
-    url: 'https://example.test/zisla/?lang=en#guide-clipboard', targets, windowHandlers: handlers,
+  const page = renderHelpInMemory('en', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/help.html?lang=en#guide-clipboard', targets, windowHandlers: handlers,
   });
-  page.window.location = new URL('https://example.test/zisla/?lang=ja#guide-meeting');
+  page.window.location = new URL('https://example.test/zisla/help.html?lang=ja#guide-meeting');
   await handlers.get('popstate')();
   assert.equal(page.document.documentElement.lang, 'ja');
   assert.equal(visits.at(-1), 'guide-meeting');
-  page.window.location = new URL('https://example.test/zisla/?lang=en#guide-clipboard');
+  page.window.location = new URL('https://example.test/zisla/help.html?lang=en#guide-clipboard');
   await handlers.get('popstate')();
   assert.equal(page.document.documentElement.lang, 'en');
   assert.equal(visits.at(-1), 'guide-clipboard');
@@ -649,8 +708,7 @@ test('guide content is escaped as text and cannot inject markup or URL attribute
       title: payload, summary: payload, entry: payload, steps: [payload], shortcuts: payload,
       permissions: payload, output: payload,
     };
-    const { html } = renderInMemory('en');
-    const help = html.slice(html.indexOf('id="help"'), html.indexOf('id="faq"'));
+    const { html: help } = renderHelpInMemory('en');
     assert.ok(help.includes(escapedText(payload)));
     assert.doesNotMatch(help, /<img src=x|href="javascript:/);
     assert.ok(help.includes('id="guide-clipboard"'), 'untrusted copy cannot replace the stable id');

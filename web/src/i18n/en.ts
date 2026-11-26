@@ -83,13 +83,13 @@ export const en: SiteContent = {
       shelf: {
         name: 'Shelf',
         caption:
-          'Drag files, audio, video or links to the top of the screen, then search, filter and select several shelf items to copy, share or send to Quick Notes. Convert images to PDF, recognise image text into Quick Notes, or send videos to the recording studio for editing. Reveal files in Finder whenever needed. Compress selected files and folders to ZIP, or open selected images in Image Tools for resizing or conversion; successful results return to the shelf. Import images, video and audio into the recording media library.',
+          "Keep files and media on the shelf. Search, select and share items, create ZIP or PDF, resize or convert images, and send media to Quick Notes or the recording studio.",
         points: ['Search and batch actions', 'Images to PDF and Quick Notes', 'Edit videos in the studio'],
       },
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it. Optionally delete history older than 7, 15 or 30 days while keeping favourites; automatic deletion is off by default. Search and group history by source application. New images are queued for on-device text recognition, so you can search their text to find the original image. Right-click a history image to recognize or copy its text.',
+          "Browse and search local clipboard history, including text in images. Filter by type or source app, keep favourites, and send entries to Quick Notes.",
         points: ['History inside the island', 'Filter by type', 'Quick Notes and favourites'],
       },
       aiMonitor: {
@@ -179,7 +179,7 @@ export const en: SiteContent = {
       },
       recording: {
         title: 'Record and edit in the recording studio',
-        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks with animations, zooms and captions. Adjust portrait smoothing, brightness, face and body slimming, choose voice effects, and add smooth cursor trails in your colour. Play the edited result in the studio. Choose original, 16:9, 9:16, 1:1 or 4:3; export video, GIF, Live Photo or audio, with FFmpeg needed for some formats. Preview optional AI edits before applying them. Recording has its own folder in Settings → Save Location. Record HDR on supported devices. Import images, video and audio from the shelf into the media library while keeping the current project and timeline.',
+        description: "Record a display, window or region, edit tracks, captions and portrait/voice effects, then preview and export. Supports HDR on compatible devices and media imports from the shelf.",
         detail: 'Portrait and voice effects · Coloured cursor trails · Multitrack playback and export',
       },
       permissions: {
@@ -487,8 +487,7 @@ export const en: SiteContent = {
       "Choose an audio output device from the media area. In Settings, choose automatic media source or a preferred player; this does not route each app to a different device.",
       "Keyboard sounds and typing statistics have independent switches and use Input Monitoring. The application volume mixer needs macOS 14.4+ and System Audio Recording permission.",
       "Use Daily Briefing in Settings to preview one of 8 templates and export PNG manually or daily; its folder is independent in Save Location."
-    ],
-    "documentLanguage": "Document language: {language}"
+    ]
   },
   download: {
     eyebrow: 'READY WHEN YOU ARE',

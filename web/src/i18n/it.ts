@@ -84,13 +84,13 @@ export const it = createCatalog({
       shelf: {
         name: 'Scaffale',
         caption:
-          'Trascina file, audio, video o link nella parte alta dello schermo, poi cerca, filtra e seleziona più elementi per copiarli, condividerli o inviarli alle Note rapide. Converti immagini in PDF, invia il testo riconosciuto alle Note rapide o apri i video nello studio di registrazione per modificarli. Puoi anche mostrare i file nel Finder. Comprimi i file e le cartelle selezionati in ZIP oppure apri le immagini selezionate negli strumenti immagine per ridimensionarle o convertirle; i risultati riusciti tornano nella raccolta. Importa immagini, video e audio nella libreria dello studio.',
+          "Tieni i file sullo scaffale per cercare, selezionare e condividere. Crea ZIP o PDF, ridimensiona o converti immagini e invia media alle note o allo studio.",
         points: ['Ricerca e azioni in gruppo', 'Immagini in PDF e Note rapide', 'Modifica video nello studio'],
       },
       clipboard: {
         name: 'Appunti',
         caption:
-          'Sfoglia la cronologia degli appunti nell’isola e filtra per immagine, URL, percorso o tipo di file e guarda quando ogni elemento è stato copiato. Invia un elemento a Note rapide, fissalo tra i preferiti o eliminalo. Puoi eliminare automaticamente la cronologia più vecchia di 7, 15 o 30 giorni mantenendo i preferiti. L’eliminazione automatica è disattivata inizialmente. Cerca e raggruppa la cronologia per applicazione di origine. Le nuove immagini tentano il riconoscimento del testo sul dispositivo in background, così puoi ritrovare l’originale cercandone il testo. Fai clic destro su un’immagine nella cronologia per riconoscere o copiarne il testo.',
+          "Cerca nella cronologia locale e nel testo delle immagini. Filtra per tipo o app, conserva preferiti e invia elementi alle note rapide.",
         points: ['Cronologia nell’isola', 'Filtro per tipo', 'Note rapide e preferiti'],
       },
       aiMonitor: {
@@ -181,7 +181,7 @@ export const it = createCatalog({
       },
       recording: {
         title: 'Registra e monta nello studio',
-        description: 'Registra schermo, finestra o area con audio del sistema, microfono e fotocamera opzionali. Modifica video, audio, immagini e testo su più tracce con animazioni, zoom e sottotitoli. Regola levigatura della pelle, luminosità, snellimento di viso e corpo, effetti vocali e scie fluide del cursore nel colore scelto. Riproduci il montaggio nello studio. Scegli proporzioni originali, 16:9, 9:16, 1:1 o 4:3; esporta video, GIF, Live Photo o audio. Alcuni formati richiedono FFmpeg. Controlla le proposte IA opzionali prima di applicarle. La cartella delle registrazioni si imposta separatamente in Impostazioni → Posizione di salvataggio. Registra in HDR sui dispositivi compatibili. Importa immagini, video e audio dalla raccolta nella libreria mantenendo il progetto e la timeline attuali.',
+        description: "Registra schermo, finestra o area, modifica tracce, sottotitoli ed effetti ritratto/voce ed esporta. HDR sui dispositivi compatibili e importazione dallo scaffale.",
         detail: 'Effetti ritratto e voce · Scie colorate del cursore · Riproduzione ed export multitraccia',
       },
       permissions: {
@@ -485,8 +485,7 @@ export const it = createCatalog({
       "Scegli l’uscita audio nell’area multimediale e sorgente automatica o lettore preferito nelle impostazioni. Questo non assegna dispositivi distinti alle app.",
       "Suoni e statistiche tastiera sono indipendenti e usano Monitoraggio input. Il mixer richiede macOS 14.4+ e Registrazione audio di sistema.",
       "Il riepilogo giornaliero offre 8 modelli, anteprima ed esportazione PNG manuale o giornaliera con cartella indipendente."
-    ],
-    "documentLanguage": "Lingua del documento: {language}"
+    ]
   },
   download: {
     eyebrow: 'PRONTO QUANDO LO SEI TU',

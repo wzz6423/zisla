@@ -58,7 +58,7 @@ El aviso asigna `Command+1` a `Command+9` y después `Command+0` según el orden
 
 Ajustes → Ubicación de guardado elige carpetas independientes para descargas, capturas, herramientas de imagen, grabaciones, PDF, acciones rápidas y resúmenes. Las configuraciones nuevas usan subcarpetas de `~/Downloads`: `picture` para capturas/imágenes, `video` para grabaciones, `pdf`, `quick` y `daily`. Audio usa un diálogo de exportación para elegir archivo o carpeta. La estantería mantiene referencias a originales; capturas guardadas y estado de notas contextuales se gestionan en `~/Library/Application Support/zisla`, mientras los proyectos usan la carpeta de grabación. El texto de notas rápidas vive en Notas de Apple.
 
-La [ayuda y guías paso a paso](https://wzz6423.github.io/zisla/?lang=es#help) cubren nueve temas: portapapeles, captura, estantería, reuniones, IA, herramientas multimedia, resúmenes diarios, notas de escritorio/vistas previas y reproducción/mezcla, con fragmentos de vídeo.
+La [ayuda y guías paso a paso](https://wzz6423.github.io/zisla/help.html?lang=es#help) cubren nueve temas: portapapeles, captura, estantería, reuniones, IA, herramientas multimedia, resúmenes diarios, notas de escritorio/vistas previas y reproducción/mezcla, con fragmentos de vídeo.
 
 ### Atajos y almacenamiento de capturas
 

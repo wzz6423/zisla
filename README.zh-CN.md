@@ -56,7 +56,7 @@ zisla 可监控 Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi
 - **AI 账户：** 查看支持账户的剩余额度、重置时间、低额度通知和采样时间；本机 token 历史可导出 `.xlsx`。
 - **快捷操作：** 弹窗内 `Command+1` 到 `Command+0` 按动作顺序执行；新配置额外默认触发键为 `Command+N`，用于首个动作。已保存组合和清空状态在升级时保留。
 
-[用户帮助](https://wzz6423.github.io/zisla/?lang=zh-Hans#help)提供剪贴板、截图/录屏、中转、会议、AI、媒体工具、每日简报、桌面便签/窗口预览和播放/混音九组逐步指南。[macOS 指南](mac/README.zh-CN.md#保存位置)列出各工具保存目录与依赖。
+[用户帮助](https://wzz6423.github.io/zisla/help.html?lang=zh-Hans#help)提供剪贴板、截图/录屏、中转、会议、AI、媒体工具、每日简报、桌面便签/窗口预览和播放/混音九组逐步指南。[macOS 指南](mac/README.zh-CN.md#保存位置)列出各工具保存目录与依赖。
 
 ## 快速开始
 

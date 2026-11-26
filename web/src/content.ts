@@ -23,7 +23,7 @@ export const navHrefs: Record<NavId, string> = {
   ai: '#ai',
   download: '#download',
   changelog: '#changelog',
-  help: '#help',
+  help: './help.html',
   faq: '#faq',
   developers: '#developers',
 };
@@ -641,7 +641,6 @@ export interface SiteContent {
     videoNotice: string;
     preferencesTitle: string;
     preferences: readonly string[];
-    documentLanguage: string;
   };
   download: {
     eyebrow: string;

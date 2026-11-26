@@ -58,7 +58,7 @@ De popup gebruikt `Command+1`…`Command+9` en `Command+0` in actievolgorde. Nie
 
 Instellingen → Opslaglocatie biedt afzonderlijke mappen voor downloads, schermafbeeldingen, afbeeldingstools, opnames, PDF, Snelle acties en dagoverzicht. Nieuwe configuraties gebruiken `~/Downloads` met `picture`, `video`, `pdf`, `quick`, `daily`. Audiotools kiezen bestand/map met exportdialoog. De plank bewaart verwijzingen naar originelen; schermafbeeldingen en contextnotities onder `~/Library/Application Support/zisla`, projecten in de opnamemap en Snelle notities in Apple Notities.
 
-[Gebruikershulp](https://wzz6423.github.io/zisla/?lang=nl#help) biedt negen gidsen met stappen en korte films: klembord, vastleggen, plank, vergaderingen, AI, mediatools, dagoverzicht, desktopnotities/venstervoorbeelden en afspelen/mixen.
+[Gebruikershulp](https://wzz6423.github.io/zisla/help.html?lang=nl#help) biedt negen gidsen met stappen en korte films: klembord, vastleggen, plank, vergaderingen, AI, mediatools, dagoverzicht, desktopnotities/venstervoorbeelden en afspelen/mixen.
 
 ### Schermafbeeldingstoetsen en bewaren
 

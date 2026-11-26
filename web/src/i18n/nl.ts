@@ -84,13 +84,13 @@ export const nl = createCatalog({
       shelf: {
         name: 'Plank',
         caption:
-          'Sleep bestanden, audio, video of links naar de bovenkant van het scherm. Zoek en filter items, selecteer er meerdere en kopieer, deel of stuur ze naar Snelle notities. Zet afbeeldingen om naar PDF, stuur herkende tekst naar Snelle notities of bewerk video’s in de opnamestudio. Je kunt bestanden ook in Finder tonen. Pak geselecteerde bestanden en mappen in als ZIP of open geselecteerde afbeeldingen in de afbeeldingstools om ze te schalen of converteren; geslaagde resultaten keren terug naar de plank. Importeer afbeeldingen, video en audio in de mediabibliotheek van de opnamestudio.',
+          "Bewaar bestanden op de plank om te zoeken, selecteren en delen. Maak ZIP of PDF, wijzig of converteer afbeeldingen en stuur media naar notities of studio.",
         points: ['Zoeken en batchacties', 'Afbeeldingen naar PDF en Snelle notities', 'Video’s bewerken in de studio'],
       },
       clipboard: {
         name: 'Klembord',
         caption:
-          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het. Je kunt geschiedenis ouder dan 7, 15 of 30 dagen automatisch verwijderen en favorieten behouden. Automatisch verwijderen staat standaard uit. Zoek en groepeer de geschiedenis op bronapplicatie. Nieuwe afbeeldingen proberen op de achtergrond lokaal tekst te herkennen, zodat je het origineel via de tekst kunt vinden. Klik met de rechtermuisknop op een afbeelding in de geschiedenis om de tekst te herkennen of te kopiëren.',
+          "Doorzoek lokale geschiedenis en tekst in afbeeldingen. Filter op type of bronapp, bewaar favorieten en stuur items naar Snelle notities.",
         points: ['Geschiedenis in het eiland', 'Filteren op type', 'Snelle notities en favorieten'],
       },
       aiMonitor: {
@@ -181,7 +181,7 @@ export const nl = createCatalog({
       },
       recording: {
         title: 'Opnemen en bewerken in de studio',
-        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen met animaties, zoom en ondertitels. Pas huidverzachting, helderheid, versmalling van gezicht en lichaam, stemeffecten en vloeiende cursorsporen in je eigen kleur aan. Speel de bewerking af in de studio. Kies origineel, 16:9, 9:16, 1:1 of 4:3; exporteer video, GIF, Live Photo of audio. Sommige formaten vereisen FFmpeg. Bekijk optionele AI-plannen voordat je ze toepast. De opnamemap kies je apart onder Instellingen → Opslaglocatie. Neem HDR op met ondersteunde apparaten. Importeer afbeeldingen, video en audio vanaf de plank in de mediabibliotheek en behoud het huidige project en de tijdlijn.',
+        description: "Neem scherm, venster of gebied op, bewerk sporen, ondertitels en portret-/stemeffecten en exporteer. Met HDR op geschikte apparaten en media-import van de plank.",
         detail: 'Portret- en stemeffecten · Gekleurde cursorsporen · Meersporenweergave en export',
       },
       permissions: {
@@ -472,8 +472,7 @@ export const nl = createCatalog({
       "Kies audio-uitvoer in het mediagebied en automatische bron of favoriete speler in instellingen. Dit wijst apps geen aparte apparaten toe.",
       "Toetsgeluiden en typstatistiek zijn onafhankelijk en gebruiken Invoercontrole. De appmixer vereist macOS 14.4+ en systeemaudio-opname.",
       "Het dagoverzicht biedt 8 sjablonen, voorbeeld en handmatige of dagelijkse PNG-export met eigen map."
-    ],
-    "documentLanguage": "Documenttaal: {language}"
+    ]
   },
   download: {
     eyebrow: 'KLAAR WANNEER JIJ KLAAR BENT',

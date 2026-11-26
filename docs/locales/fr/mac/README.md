@@ -58,7 +58,7 @@ La fenêtre des actions rapides attribue `Command+1` à `Command+9`, puis `Comma
 
 Réglages → Emplacement d'enregistrement sélectionne des dossiers distincts pour les téléchargements, captures d'écran, outils d'image, enregistrements, PDF, actions rapides et bulletins quotidiens. Les nouvelles configurations utilisent par défaut les sous-dossiers de `~/Downloads` : `picture` pour captures/images, `video` pour enregistrements, `pdf`, `quick` et `daily`. Les outils audio utilisent une boîte d'export pour choisir un fichier ou un dossier. Les fichiers de l'étagère conservent des références aux originaux ; les captures conservées et l'état des notes contextuelles sont gérés localement sous `~/Library/Application Support/zisla`, tandis que les projets d'enregistrement utilisent le dossier d'enregistrement. Le texte des notes rapides est stocké dans Apple Notes.
 
-[L'aide utilisateur et les guides pas à pas](https://wzz6423.github.io/zisla/?lang=fr#help) couvrent neuf thèmes : presse-papiers, capture, étagère, réunions, IA, outils multimédias, bulletins quotidiens, notes de bureau/aperçus des fenêtres et lecture/mixage, avec de courts extraits vidéo.
+[L'aide utilisateur et les guides pas à pas](https://wzz6423.github.io/zisla/help.html?lang=fr#help) couvrent neuf thèmes : presse-papiers, capture, étagère, réunions, IA, outils multimédias, bulletins quotidiens, notes de bureau/aperçus des fenêtres et lecture/mixage, avec de courts extraits vidéo.
 
 ### Raccourcis et conservation des captures d'écran
 

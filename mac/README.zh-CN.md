@@ -58,7 +58,7 @@ Swift target、Bundle ID、本地数据目录和 `zislactl` 均使用 zisla 标�
 
 从设置 → 保存位置分别选择下载、截图、图片工具、录屏、PDF、快捷操作和每日简报的目录。新配置默认保存到 `~/Downloads` 下的 `picture`（截图/图片）、`video`（录屏）、`pdf`、`quick` 与 `daily` 子目录。音频工具通过导出对话框选择文件或文件夹。中转文件保留原文件引用；暂存截图与位置便签的本地状态在 `~/Library/Application Support/zisla` 中管理，录屏工程使用录屏目录。随记正文保存在系统「备忘录」。
 
-[用户帮助与逐步指南](https://wzz6423.github.io/zisla/?lang=zh-Hans#help)提供剪贴板、截图/录屏、中转、会议、AI、媒体工具、每日简报、桌面便签/窗口预览和播放/混音九组指南，以及短片段演示。
+[用户帮助与逐步指南](https://wzz6423.github.io/zisla/help.html?lang=zh-Hans#help)提供剪贴板、截图/录屏、中转、会议、AI、媒体工具、每日简报、桌面便签/窗口预览和播放/混音九组指南，以及短片段演示。
 
 ### 截图快捷键与暂存
 

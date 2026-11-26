@@ -74,8 +74,8 @@ export const vi = createCatalog({
     pointsAriaLabel: 'Điểm nổi bật của {name}',
     modules: {
       dashboard: { name: 'Trang chính', caption: 'Thẻ động chỉ xuất hiện khi có phiên tập trung, tác vụ AI hoặc lượt tải đang chạy; khi không có gì xảy ra, chúng không chiếm chỗ. Trang chính nhóm các tác vụ AI đang chạy theo ứng dụng.', points: ['Xuất hiện khi cần', 'Tiến trình trực tiếp', 'Bố cục tự điều chỉnh'] },
-      shelf: { name: 'Kệ', caption: 'Kéo tệp, âm thanh, video hoặc liên kết lên phía trên màn hình, rồi tìm kiếm, lọc và chọn nhiều mục để sao chép, chia sẻ hoặc gửi đến Ghi chú nhanh. Chuyển ảnh thành PDF, gửi chữ nhận dạng được đến Ghi chú nhanh hoặc mở video trong studio ghi hình để chỉnh sửa. Bạn cũng có thể hiển thị tệp trong Finder. Nén tệp và thư mục đã chọn thành ZIP hoặc mở ảnh đã chọn trong công cụ ảnh để đổi kích thước hay định dạng; kết quả thành công sẽ trở lại khay. Nhập ảnh, video và âm thanh vào thư viện phương tiện ghi hình.', points: ['Tìm kiếm và thao tác hàng loạt', 'Ảnh thành PDF và Ghi chú nhanh', 'Sửa video trong studio'] },
-      clipboard: { name: 'Clipboard', caption: 'Xem lịch sử clipboard trong đảo và lọc theo ảnh, URL, đường dẫn hoặc loại tệp và xem thời gian mỗi mục được sao chép. Gửi mục vào Ghi chú nhanh, ghim làm yêu thích hoặc xóa. Bạn có thể tự xóa lịch sử cũ hơn 7, 15 hoặc 30 ngày và giữ mục yêu thích. Mặc định tắt tự xóa. Tìm kiếm và nhóm lịch sử theo ứng dụng nguồn. Ảnh mới sẽ thử nhận dạng chữ trên thiết bị trong nền để tìm lại ảnh gốc bằng nội dung chữ. Nhấp chuột phải vào ảnh trong lịch sử để nhận dạng hoặc sao chép chữ.', points: ['Lịch sử trong đảo', 'Lọc theo loại', 'Ghi chú nhanh và yêu thích'] },
+      shelf: { name: 'Kệ', caption: "Giữ tệp trên kệ để tìm, chọn và chia sẻ. Tạo ZIP hoặc PDF, đổi kích thước hay định dạng ảnh và gửi phương tiện tới ghi chú hoặc studio.", points: ['Tìm kiếm và thao tác hàng loạt', 'Ảnh thành PDF và Ghi chú nhanh', 'Sửa video trong studio'] },
+      clipboard: { name: 'Clipboard', caption: "Tìm lịch sử cục bộ và chữ trong ảnh. Lọc theo loại hoặc ứng dụng, lưu mục yêu thích và gửi đến Ghi chú nhanh.", points: ['Lịch sử trong đảo', 'Lọc theo loại', 'Ghi chú nhanh và yêu thích'] },
       aiMonitor: { name: 'Trình theo dõi AI', caption: 'Tổng hợp tác vụ và trạng thái từ CLI AI, ứng dụng desktop và IDE. Dữ liệu số đáng tin cậy tạo xu hướng token và bản đồ hoạt động; chọn ngày để xem token đầu vào, đầu ra và tổng theo nhà cung cấp và mô hình. Xem lịch sử, xuất toàn bộ thành .xlsx hoặc xóa trong Cài đặt. Hiển thị hạn mức thực còn lại, thời điểm đặt lại và cảnh báo hạn mức thấp, gồm khung 5h/7d và ngân sách Cursor bằng đô la khi có dữ liệu. Không đọc nội dung prompt hay câu trả lời. Các bố cục đảo gọn cũng hiển thị hạn mức còn lại bằng vòng tròn. Chọn khu vực tài khoản riêng biệt; bản ghi sử dụng hằng ngày và màu hạn mức còn lại nhất quán giữa các bố cục.', points: ['Tác vụ từ nhiều công cụ AI', 'Lịch sử mô hình và xuất .xlsx', 'Hạn mức và thời điểm đặt lại'] },
       keyboardSound: { name: 'Âm thanh bàn phím', caption: 'Phát 20 âm thanh bàn phím cơ tích hợp cho phím bấm toàn hệ thống, có âm lượng và biến thiên cao độ tự nhiên. Bật thống kê gõ cục bộ để xem tổng quan, xu hướng, lịch sử, dòng thời gian ứng dụng và bản đồ phím F1-F12. Tổng nhập giọng nói, thời gian đọc chính tả, tốc độ và thời gian tiết kiệm cũng có trên bảng bàn phím. Cấu hình mới bật âm thanh và thống kê; có thể tắt riêng.', points: ['20 âm thanh tích hợp', 'Âm thanh nhả phím và biến thiên cao độ', 'Thống kê bật tắt riêng'] },
       download: { name: 'Trình tải xuống', caption: 'Dán liên kết hoặc để zisla nhận liên kết từ clipboard khi bật. Chọn video hoặc âm thanh và tải vào thư mục mặc định hay thư mục bạn chọn. Liên kết được hỗ trợ hiển thị nguồn, tiến trình trực tiếp và trạng thái hoàn tất. Chọn thư mục tải xuống trong Cài đặt → Vị trí lưu, riêng với ảnh chụp và bản ghi. Liên kết Bilibili tải phần video đã chọn. Quản lý thành phần tại Cài đặt → Thành phần phụ thuộc và chọn cập nhật hằng ngày các thành phần đã cài.', points: ['Chế độ video / âm thanh', 'Thư mục mặc định hoặc tùy chỉnh', 'Nguồn và tiến trình trực tiếp'] },
@@ -122,7 +122,7 @@ export const vi = createCatalog({
       },
       recording: {
         title: 'Ghi và biên tập trong studio',
-        description: 'Ghi màn hình, cửa sổ hoặc vùng với âm thanh hệ thống, micrô và camera tùy chọn. Biên tập video, âm thanh, ảnh và chữ trên nhiều rãnh với hoạt ảnh, thu phóng và phụ đề. Chỉnh làm mịn da, độ sáng, khuôn mặt và cơ thể, hiệu ứng giọng nói và vệt con trỏ mượt với màu tự chọn. Phát kết quả biên tập trong studio. Chọn tỷ lệ gốc, 16:9, 9:16, 1:1 hoặc 4:3; xuất video, GIF, Live Photo hoặc âm thanh. Một số định dạng cần FFmpeg. Xem đề xuất AI trước khi áp dụng. Thư mục bản ghi được chọn riêng trong Cài đặt → Vị trí lưu. Ghi HDR trên thiết bị được hỗ trợ. Nhập ảnh, video và âm thanh từ khay vào thư viện phương tiện, giữ nguyên dự án và dòng thời gian hiện tại.',
+        description: "Ghi màn hình, cửa sổ hoặc vùng, sửa các rãnh, phụ đề và hiệu ứng hình/giọng rồi xuất. HDR trên thiết bị phù hợp và nhập từ kệ.",
         detail: 'Hiệu ứng chân dung và giọng nói · Vệt con trỏ có màu · Phát và xuất nhiều rãnh',
       },
       permissions: {
@@ -370,8 +370,7 @@ export const vi = createCatalog({
       "Chọn thiết bị âm thanh đầu ra ở vùng media và nguồn tự động hoặc trình phát ưu tiên trong Cài đặt. Tùy chọn này không gán thiết bị riêng cho từng ứng dụng.",
       "Âm phím và thống kê gõ bật độc lập, dùng Giám sát đầu vào. Bộ trộn ứng dụng cần macOS 14.4+ và quyền Ghi âm thanh hệ thống.",
       "Tổng kết hằng ngày có 8 mẫu, xem trước và xuất PNG thủ công hoặc mỗi ngày vào thư mục riêng."
-    ],
-    "documentLanguage": "Ngôn ngữ tài liệu: {language}"
+    ]
   },
   download: {
     eyebrow: 'SẴN SÀNG KHI BẠN SẴN SÀNG',

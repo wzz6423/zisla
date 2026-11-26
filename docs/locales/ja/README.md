@@ -56,7 +56,7 @@ Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi Code、Qwen Cod
 - **AI アカウント：** 対応する残量、リセット時刻、低残量通知、取得時刻。ローカル token 履歴は `.xlsx` 出力できます。
 - **クイックアクション：** Command+1 から Command+0 が操作順に対応。新規設定の追加キー Command+N は最初の操作です。更新時も保存済みキーと解除状態を保持します。
 
-[ユーザーヘルプ](https://wzz6423.github.io/zisla/?lang=ja#help) にはクリップボード、撮影、棚、会議、AI、メディアツール、日次レポート、場所メモ・ウィンドウプレビュー、再生・ミックスの 9 つの手順ガイドと短い映像があります。 [macOS ガイド](mac/README.md#保存先) は出力先と依存ツールを記載します。
+[ユーザーヘルプ](https://wzz6423.github.io/zisla/help.html?lang=ja#help) にはクリップボード、撮影、棚、会議、AI、メディアツール、日次レポート、場所メモ・ウィンドウプレビュー、再生・ミックスの 9 つの手順ガイドと短い映像があります。 [macOS ガイド](mac/README.md#保存先) は出力先と依存ツールを記載します。
 
 ## 始め方
 

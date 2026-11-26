@@ -58,7 +58,7 @@ Popup memberikan `Command+1` hingga `Command+9`, lalu `Command+0` sesuai urutan 
 
 Pengaturan → Lokasi Simpan memilih folder terpisah untuk unduhan, tangkapan, gambar, rekaman, PDF, Tindakan Cepat, dan ringkasan harian. Konfigurasi baru memakai subfolder `~/Downloads`: `picture` untuk tangkapan/gambar, `video` untuk rekaman, `pdf`, `quick`, dan `daily`. Alat audio memilih berkas/folder melalui dialog ekspor. Berkas rak tetap merujuk aslinya; tangkapan tersimpan dan status catatan konteks dikelola di `~/Library/Application Support/zisla`, proyek rekaman memakai folder rekaman. Teks Catatan Cepat tersimpan di Apple Notes.
 
-[Bantuan dan panduan langkah demi langkah](https://wzz6423.github.io/zisla/?lang=id#help) mencakup sembilan topik: papan klip, tangkapan, rak, rapat, AI, alat media, ringkasan harian, catatan desktop/pratinjau jendela, serta pemutaran/mixing, dengan cuplikan film pendek.
+[Bantuan dan panduan langkah demi langkah](https://wzz6423.github.io/zisla/help.html?lang=id#help) mencakup sembilan topik: papan klip, tangkapan, rak, rapat, AI, alat media, ringkasan harian, catatan desktop/pratinjau jendela, serta pemutaran/mixing, dengan cuplikan film pendek.
 
 ### Pintasan dan penyimpanan tangkapan
 

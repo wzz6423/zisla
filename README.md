@@ -56,7 +56,7 @@ The island has 12 modules: Home, Handoff, Clipboard, AI monitoring, Keyboard sou
 - **AI accounts:** View supported account allowances, reset times, low-quota notices, and sampling times; export local token history as `.xlsx`.
 - **Quick Actions:** Popup actions use `Command+1` through `Command+0` in order. The additional default trigger for new configurations is `Command+N` for the first action. Upgrades retain saved shortcuts and cleared triggers.
 
-[User help](https://wzz6423.github.io/zisla/?lang=en#help) provides nine step-by-step guides: clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/window previews, and playback/mixing. The [macOS guide](mac/README.md#save-locations) lists tool save folders and dependencies.
+[User help](https://wzz6423.github.io/zisla/help.html?lang=en#help) provides nine step-by-step guides: clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/window previews, and playback/mixing. The [macOS guide](mac/README.md#save-locations) lists tool save folders and dependencies.
 
 ## Get started
 

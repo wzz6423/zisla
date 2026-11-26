@@ -2100,7 +2100,7 @@ html[dir="rtl"] :is(.hero-word, .footer-word) {
 }
 
 .guide-nav a,
-.user-guide h3 a,
+.user-guide h2 a,
 .workflow-example a {
   color: inherit;
   text-underline-offset: 4px;
@@ -2122,8 +2122,8 @@ html[dir="rtl"] :is(.hero-word, .footer-word) {
   scroll-margin-top: calc(var(--header-height) + 24px);
 }
 
-.user-guide h3,
-.workflow-example h4,
+.user-guide h2,
+.workflow-example h3,
 .help-subtitle {
   font-size: 22px;
   line-height: 1.4;
@@ -2173,4 +2173,8 @@ html[dir="rtl"] :is(.hero-word, .footer-word) {
   aspect-ratio: 16 / 9;
   margin-top: 20px;
   background: var(--background);
+}
+
+.help-page {
+  padding-top: var(--header-height);
 }

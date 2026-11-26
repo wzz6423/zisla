@@ -56,7 +56,7 @@ Pulau memiliki 12 modul: Beranda, Serah Terima, Papan Klip, Pemantauan AI, Suara
 - **Akun AI:** Lihat kuota akun yang didukung, waktu reset, pemberitahuan kuota rendah, dan waktu pengambilan sampel; ekspor riwayat token lokal sebagai `.xlsx`.
 - **Tindakan Cepat:** Tindakan popup memakai `Command+1` sampai `Command+0` secara berurutan. Pemicu tambahan default untuk konfigurasi baru adalah `Command+N` bagi tindakan pertama. Peningkatan mempertahankan pintasan tersimpan dan pemicu yang dikosongkan.
 
-[Bantuan pengguna](https://wzz6423.github.io/zisla/?lang=id#help) menyediakan sembilan panduan langkah demi langkah: papan klip, tangkapan, rak, rapat, AI, alat media, ringkasan harian, catatan desktop/pratinjau jendela, serta pemutaran/mixing. [Panduan macOS](mac/README.md) mencantumkan folder simpan dan dependensi alat.
+[Bantuan pengguna](https://wzz6423.github.io/zisla/help.html?lang=id#help) menyediakan sembilan panduan langkah demi langkah: papan klip, tangkapan, rak, rapat, AI, alat media, ringkasan harian, catatan desktop/pratinjau jendela, serta pemutaran/mixing. [Panduan macOS](mac/README.md) mencantumkan folder simpan dan dependensi alat.
 
 ## Mulai menggunakan
 

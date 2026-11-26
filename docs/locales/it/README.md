@@ -56,7 +56,7 @@ L'isola contiene 12 moduli: Home, Trasferimento, Appunti, Monitoraggio AI, Suoni
 - **Account AI:** consulta quote disponibili, orari di ripristino, avvisi di quota bassa e tempi di campionamento supportati; esporta la cronologia locale dei token in `.xlsx`.
 - **Azioni rapide:** nel popup, `Command+1` fino a `Command+0` seguono l'ordine delle azioni. Per le nuove configurazioni, il comando aggiuntivo predefinito `Command+N` esegue la prima azione. Gli aggiornamenti conservano scorciatoie salvate e comandi rimossi.
 
-La [guida utente](https://wzz6423.github.io/zisla/?lang=it#help) offre nove guide passo dopo passo: appunti, cattura, scaffale, riunioni, AI, strumenti media, riepiloghi giornalieri, note del desktop/anteprime delle finestre e riproduzione/mixer. La [guida macOS](mac/README.md#posizioni-di-salvataggio) elenca cartelle di output e dipendenze.
+La [guida utente](https://wzz6423.github.io/zisla/help.html?lang=it#help) offre nove guide passo dopo passo: appunti, cattura, scaffale, riunioni, AI, strumenti media, riepiloghi giornalieri, note del desktop/anteprime delle finestre e riproduzione/mixer. La [guida macOS](mac/README.md#posizioni-di-salvataggio) elenca cartelle di output e dipendenze.
 
 ## Iniziare
 

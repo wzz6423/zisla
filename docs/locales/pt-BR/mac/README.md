@@ -58,7 +58,7 @@ O aviso de Ações rápidas atribui `Command+1` até `Command+9`, depois `Comman
 
 Ajustes → Local de salvamento seleciona pastas separadas para downloads, capturas de tela, ferramentas de imagem, gravações, PDF, Ações rápidas e resumos diários. As configurações novas usam por padrão subpastas de `~/Downloads`: `picture` para capturas/imagens, `video` para gravações, `pdf`, `quick` e `daily`. As ferramentas de áudio usam uma janela de exportação para escolher um arquivo ou uma pasta. Os arquivos da prateleira mantêm referências aos originais; as capturas guardadas e o estado das notas contextuais são gerenciados localmente em `~/Library/Application Support/zisla`, enquanto os projetos usam a pasta de gravação. O texto das Notas rápidas fica em Notas da Apple.
 
-[Ajuda ao usuário e guias passo a passo](https://wzz6423.github.io/zisla/?lang=pt-BR#help) cobrem nove tópicos: área de transferência, captura, prateleira, reuniões, IA, ferramentas de mídia, resumos diários, notas da área de trabalho/prévias de janelas e reprodução/mixagem, com pequenos trechos do filme.
+[Ajuda ao usuário e guias passo a passo](https://wzz6423.github.io/zisla/help.html?lang=pt-BR#help) cobrem nove tópicos: área de transferência, captura, prateleira, reuniões, IA, ferramentas de mídia, resumos diários, notas da área de trabalho/prévias de janelas e reprodução/mixagem, com pequenos trechos do filme.
 
 ### Atalhos e armazenamento de capturas
 
