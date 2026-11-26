@@ -2685,10 +2685,6 @@ public enum SystemDiskCleanup {
         let digest: Data
     }
 
-    private struct DuplicateFileOriginal: Sendable {
-        let url: URL
-    }
-
     private static func scanUserFileCandidates(
         fileManager: SystemMonitorFileManaging,
         kinds: Set<DiskCleanupKind>,
@@ -2715,6 +2711,7 @@ public enum SystemDiskCleanup {
         guard needsLargeFiles || needsDuplicates || needsBackups else { return result }
 
         let allowed = allowedUserFileRoots(fileManager: fileManager, directories: directories)
+        let backupRoots = userFileDirectories(fileManager: fileManager)
         let referenceDate = options.referenceDate ?? Date()
         let largeFileCutoff = referenceDate.addingTimeInterval(-options.oldFileAge)
         var firstFileSizes = Set<UInt64>()
@@ -2730,6 +2727,7 @@ public enum SystemDiskCleanup {
                 let standardized = fileURL.standardizedFileURL
                 let size = allocatedByteSize(of: standardized, fileManager: fileManager)
                 if needsBackups, AIAgentArtifactCleanup.isBackupFile(standardized, home: fileManager.homeDirectoryForCurrentUser()),
+                   SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: backupRoots),
                    let modified = (try? fileManager.attributesOfItem(atPath: standardized.path)[.modificationDate]) as? Date,
                    referenceDate.timeIntervalSince(modified) >= AIAgentArtifactCleanup.backupMinAge {
                     result.append(DiskCleanupCandidate(
@@ -2779,7 +2777,7 @@ public enum SystemDiskCleanup {
         return result
     }
 
-    /// Finds repeated allocated sizes first, then retains only the first SHA256 match for each duplicate group.
+    /// Selects the retained copy after reading each group so visible paths win across scan roots.
     private static func duplicateFileCandidates(
         fileManager: SystemMonitorFileManaging,
         directories: [URL],
@@ -2789,8 +2787,8 @@ public enum SystemDiskCleanup {
         excludedPaths: Set<String>
     ) -> [DiskCleanupCandidate] {
         guard !repeatedFileSizes.isEmpty else { return [] }
-        var originals: [DuplicateFileKey: DuplicateFileOriginal] = [:]
-        var result: [DiskCleanupCandidate] = []
+        var groups: [DuplicateFileKey: [URL]] = [:]
+        let homeComponentCount = fileManager.homeDirectoryForCurrentUser().standardizedFileURL.pathComponents.count
         enumerateUserFiles(
             in: directories,
             fileManager: fileManager,
@@ -2807,22 +2805,23 @@ public enum SystemDiskCleanup {
                     return
                 }
                 let key = DuplicateFileKey(byteSize: size, digest: digest)
-                if let original = originals[key] {
-                    result.append(
-                        DiskCleanupCandidate(
-                            url: standardized,
-                            kind: .duplicateFile,
-                            byteSize: size,
-                            displayName: standardized.lastPathComponent,
-                            detail: AppLocalization.text("与 %@ 重复 · 保留副本：%@", original.url.lastPathComponent, original.url.path)
-                        )
-                    )
-                } else {
-                    originals[key] = DuplicateFileOriginal(url: standardized)
-                }
+                groups[key, default: []].append(standardized)
             }
         }
-        return result
+        return groups.flatMap { key, files -> [DiskCleanupCandidate] in
+            let original = files.first {
+                $0.pathComponents.dropFirst(homeComponentCount).allSatisfy { !$0.hasPrefix(".") }
+            } ?? files[0]
+            return files.filter { $0 != original }.map { file in
+                DiskCleanupCandidate(
+                    url: file,
+                    kind: .duplicateFile,
+                    byteSize: key.byteSize,
+                    displayName: file.lastPathComponent,
+                    detail: AppLocalization.text("与 %@ 重复 · 保留副本：%@", original.lastPathComponent, original.path)
+                )
+            }
+        }
     }
 
     private static func scanUnfinishedDownloads(
@@ -3477,15 +3476,15 @@ public enum SystemDiskCleanup {
             return
         }
 
-        for child in children.sorted(by: { !$0.lastPathComponent.hasPrefix(".") && $1.lastPathComponent.hasPrefix(".") }) {
+        for child in children {
             autoreleasepool {
                 guard !isSymbolicLink(child) else { return }
                 let standardized = child.standardizedFileURL
+                guard ![".git", ".svn", ".hg"].contains(standardized.lastPathComponent) else { return }
                 guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: allowed) else { return }
 
                 if isDirectory(standardized, fileManager: fileManager) {
-                    guard standardized.pathExtension.lowercased() != "app",
-                          ![".git", ".svn", ".hg"].contains(standardized.lastPathComponent) else { return }
+                    guard standardized.pathExtension.lowercased() != "app" else { return }
                     enumerateFilesRecursively(
                         at: standardized,
                         fileManager: fileManager,

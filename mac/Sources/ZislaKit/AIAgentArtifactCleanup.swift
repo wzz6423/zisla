@@ -30,19 +30,20 @@ struct AIAgentArtifactCleanup: Sendable {
                     if isEmptyTask(task) {
                         result.append(candidate(task, source: root))
                     } else if let contents = children(of: task) {
-                        for backup in contents where Self.isBackupName(backup.lastPathComponent) && validItem(backup, under: root) {
+                        for backup in contents where Self.isBackupName(backup.lastPathComponent)
+                            && validItem(backup, under: root) && matchesBackup(backup, minimumAge: nil) {
                             result.append(candidate(backup, source: root))
                         }
                     }
                 }
             }
             if let contents = children(of: root) {
-                for backup in contents where Self.isBackupName(backup.lastPathComponent) && isStaleBackup(backup) {
+                for backup in contents where Self.isBackupName(backup.lastPathComponent) && matchesBackup(backup) {
                     result.append(candidate(backup, source: root))
                 }
             }
             if root.lastPathComponent == ".claude", let histories = children(of: root.appendingPathComponent("file-history")) {
-                for history in histories where isStaleBackup(history) {
+                for history in histories where matchesBackup(history) {
                     result.append(candidate(history, source: root))
                 }
             }
@@ -63,13 +64,14 @@ struct AIAgentArtifactCleanup: Sendable {
                 let task = root.appendingPathComponent("tasks").appendingPathComponent(taskName)
                 if components.count == 2 { return isEmptyTask(task) }
                 return components.count == 3 && Self.isBackupName(path.lastPathComponent)
+                    && matchesBackup(path, minimumAge: nil)
             }
             if root.lastPathComponent == ".claude", components.first == "file-history" {
                 return components.count == 2 && UUID(uuidString: path.lastPathComponent) != nil
-                    && validItem(path, under: root) && isStaleBackup(path)
+                    && validItem(path, under: root) && matchesBackup(path)
             }
             if let name = components.first, Self.isBackupName(name) {
-                return components.count == 1 && validItem(path, under: root) && isStaleBackup(path)
+                return components.count == 1 && validItem(path, under: root) && matchesBackup(path)
             }
         }
         return nil
@@ -119,25 +121,25 @@ struct AIAgentArtifactCleanup: Sendable {
 
     private func isEmptyTask(_ url: URL) -> Bool {
         var remaining = Self.maximumEntries
-        return treeMatches(url, empty: true, depth: 0, remaining: &remaining)
+        return treeMatches(url, empty: true, minimumAge: nil, depth: 0, remaining: &remaining)
     }
 
-    private func isStaleBackup(_ url: URL) -> Bool {
+    private func matchesBackup(_ url: URL, minimumAge: TimeInterval? = Self.backupMinAge) -> Bool {
         var remaining = Self.maximumEntries
-        return treeMatches(url, empty: false, depth: 0, remaining: &remaining)
+        return treeMatches(url, empty: false, minimumAge: minimumAge, depth: 0, remaining: &remaining)
     }
 
-    private func treeMatches(_ url: URL, empty: Bool, depth: Int, remaining: inout Int) -> Bool {
+    private func treeMatches(_ url: URL, empty: Bool, minimumAge: TimeInterval?, depth: Int, remaining: inout Int) -> Bool {
         guard !Task.isCancelled, depth < Self.maximumDepth, remaining > 0,
               let attributes = try? fileManager.attributesOfItem(atPath: url.path),
               let type = attributes[.type] as? FileAttributeType else { return false }
         remaining -= 1
-        if !empty {
+        if let minimumAge {
             guard let modified = attributes[.modificationDate] as? Date,
-                  referenceDate.timeIntervalSince(modified) >= Self.backupMinAge else { return false }
+                  referenceDate.timeIntervalSince(modified) >= minimumAge else { return false }
         }
         if type == .typeRegular { return !empty || depth > 0 && url.lastPathComponent == ".DS_Store" }
         guard type == .typeDirectory, let contents = children(of: url) else { return false }
-        return contents.allSatisfy { treeMatches($0, empty: empty, depth: depth + 1, remaining: &remaining) }
+        return contents.allSatisfy { treeMatches($0, empty: empty, minimumAge: minimumAge, depth: depth + 1, remaining: &remaining) }
     }
 }

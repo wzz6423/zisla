@@ -456,6 +456,105 @@ struct AIAgentArtifactCleanupTests {
         #expect(fixture.files.trashedURLs.isEmpty)
     }
 
+    @Test(arguments: ["unreadable", "symlink", "type", "depth", "entries"])
+    func taskBackupDescendantsAreRecheckedBeforeSizingAndTrash(failure: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let backup = try fixture.directory(".gemini/tasks/current/backup")
+        try fixture.file(".gemini/tasks/current/backup/source.txt", contents: "recent backup")
+        let candidate = try #require(fixture.scan().first { $0.url == backup })
+        fixture.files.clearSizedDirectories()
+        let nested = try fixture.directory(".gemini/tasks/current/backup/nested")
+        switch failure {
+        case "unreadable": fixture.files.deniedPaths.insert(nested.path)
+        case "symlink":
+            let target = try fixture.directory("Documents/retained")
+            try FileManager.default.createSymbolicLink(at: nested.appendingPathComponent("linked"), withDestinationURL: target)
+        case "type":
+            let file = try fixture.file(".gemini/tasks/current/backup/nested/socket", contents: "")
+            fixture.files.attributeOverrides[file.path] = [.type: FileAttributeType.typeSocket]
+        case "depth":
+            try fixture.directory(".gemini/tasks/current/backup/nested/" + Array(repeating: "child", count: 17).joined(separator: "/"))
+        default:
+            fixture.files.extraChildren[nested.path] = Array(repeating: nested.appendingPathComponent("child"), count: 20_001)
+        }
+
+        #expect(!fixture.scan().contains { $0.url == backup }, "An unverifiable task backup must not be offered")
+        #expect(!fixture.files.sizedDirectories.contains(backup.path), "Unverifiable backups must be rejected before size enumeration")
+        let result = SystemDiskCleanup.trashSelected(candidates: [candidate], fileManager: fixture.files)
+        #expect(result.successCount == 0)
+        #expect(result.failures.count == 1)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [".git", ".svn", ".hg"])
+    func regularVersionControlMetadataFilesNeverBecomeCleanupCandidates(name: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        try fixture.file("Downloads/project/" + name, contents: "gitdir: shared-checkout")
+        try fixture.file("Documents/project/" + name, contents: "gitdir: shared-checkout")
+
+        #expect(SystemDiskCleanup.scanCandidates(fileManager: fixture.files, kinds: [.duplicateFile]).isEmpty)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: ["roots", "subtrees"])
+    func visibleDuplicateOriginalWinsAcrossRootsAndSubtrees(layout: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let hidden: URL
+        let original: URL
+        if layout == "roots" {
+            hidden = try fixture.file("Downloads/.copy", contents: "identical contents")
+            original = try fixture.file("Documents/original.txt", contents: "identical contents")
+        } else {
+            hidden = try fixture.file("Downloads/early/.hidden/copy", contents: "identical contents")
+            original = try fixture.file("Downloads/later/original.txt", contents: "identical contents")
+            fixture.files.extraChildren[fixture.home.appendingPathComponent("Downloads").path] = [
+                fixture.home.appendingPathComponent("Downloads/early", isDirectory: true),
+                fixture.home.appendingPathComponent("Downloads/later", isDirectory: true),
+            ]
+        }
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: fixture.files, kinds: [.duplicateFile])
+
+        #expect(candidates.map(\.url) == [hidden])
+        #expect(candidates.first?.detail?.contains(original.path) == true)
+        #expect(SystemDiskCleanup.trashSelected(candidates: candidates, fileManager: fixture.files).successCount == 1)
+        #expect(!fixture.files.trashedURLs.contains(original))
+    }
+
+    @Test
+    func duplicatesWithOnlyHiddenPathsKeepOneOriginal() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = try fixture.file("Downloads/.original", contents: "identical contents")
+        let copy = try fixture.file("Documents/.copy", contents: "identical contents")
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: fixture.files, kinds: [.duplicateFile])
+
+        #expect(candidates.map(\.url) == [copy])
+        #expect(candidates.first?.detail?.contains(original.path) == true)
+    }
+
+    @Test
+    func backupCandidatesUseOnlyUserRootsAuthorizedForTrash() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let authorized = try fixture.file("Documents/backups/copy.bak", contents: "old copy", age: 8 * 86400)
+        try fixture.file("Projects/backups/copy.bak", contents: "outside cleanup roots", age: 8 * 86400)
+        let candidates = SystemDiskCleanup.scanCandidates(
+            fileManager: fixture.files, kinds: [.temporaryFiles],
+            options: DiskCleanupScanOptions(referenceDate: fixture.referenceDate, additionalUserDirectories: [fixture.home.appendingPathComponent("Projects")])
+        )
+
+        #expect(candidates.map(\.url) == [authorized])
+        let result = SystemDiskCleanup.trashSelected(candidates: candidates, fileManager: fixture.files)
+        #expect(result.successCount == 1)
+        #expect(result.failures.isEmpty)
+        #expect(fixture.files.trashedURLs == [authorized])
+    }
+
     private final class ProgressResults: @unchecked Sendable {
         private let lock = NSLock()
         private var storage: [[DiskCleanupCandidate]] = []
@@ -507,6 +606,10 @@ struct AIAgentArtifactCleanupTests {
         var missingAttributes = Set<String>()
         var attributeOverrides: [String: [FileAttributeKey: Any]] = [:]
         var cancelAtPath: String?
+        private let enumerationLock = NSLock()
+        private var enumerationPaths: [String] = []
+        var sizedDirectories: [String] { enumerationLock.withLock { enumerationPaths } }
+        func clearSizedDirectories() { enumerationLock.withLock { enumerationPaths.removeAll() } }
         var trashedURLs: [URL] = []
         private let base = DefaultSystemMonitorFileManager()
 
@@ -542,7 +645,8 @@ struct AIAgentArtifactCleanupTests {
             return try base.attributesOfItem(atPath: path)
         }
         func enumerator(at url: URL, includingPropertiesForKeys keys: [URLResourceKey]?, options: FileManager.DirectoryEnumerationOptions) -> FileManager.DirectoryEnumerator? {
-            base.enumerator(at: url, includingPropertiesForKeys: keys, options: options)
+            enumerationLock.withLock { enumerationPaths.append(url.standardizedFileURL.path) }
+            return base.enumerator(at: url, includingPropertiesForKeys: keys, options: options)
         }
         func trashItem(at url: URL) throws -> URL {
             trashedURLs.append(url)
