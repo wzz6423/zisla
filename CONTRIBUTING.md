@@ -1,6 +1,6 @@
 # Contributing to zisla
 
-**English** | [简体中文](CONTRIBUTING.zh-CN.md)
+**English** | [简体中文](CONTRIBUTING.zh-CN.md) | [Other languages](docs/locales/README.md)
 
 Thank you for contributing to zisla.
 
@@ -25,6 +25,8 @@ swift test
 ```
 
 Remove test, build, and packaging binaries before committing.
+
+Before every commit or amend, run `make format` from the repository root using SwiftFormat 0.64.7, matching CI. Review its diff and keep only formatting needed by the current task.
 
 ## Branches and commits
 
@@ -116,7 +118,7 @@ Thank you for opening a pull request. Check these requirements while it is await
 - The `PR Quality` check validates this format; a pull request cannot be merged while the check is failing. `PR Automation` then applies the labels and assigns the pull request.
 - Run `cd mac && swift test` for macOS code changes; describe the manual verification results in text for UI changes.
 - PR bodies and release notes can be text-only; images, screenshots, and covers are not required.
-- Update the relevant documentation when changing user-visible behavior, build instructions, or the release process.
+- Update related formal documentation and website help in the same patch when changing features, behavior, defaults, build instructions, or release processes. User-facing website copy covers all 17 languages; reuse the existing help structure and localized documentation directory.
 - Do not commit `.build`, `dist`, downloaded files, logs, tokens, signing materials, or personal data.
 - `main` and `publish-v*` are protected and can only be updated through a reviewed pull request that passes its checks.
 
@@ -142,12 +144,12 @@ Maintainers and requested reviewers can skip checks that a change cannot affect,
 
 ## Path-scoped checks
 
-A platform workflow only runs its checks when the pull request touches the files it builds, so a documentation change never boots a macOS runner:
+A platform workflow only runs its checks when the pull request touches the files it builds, so documentation changes are checked according to the owning path:
 
 | Workflow | Runs when the pull request touches |
 | --- | --- |
-| `Swift Tests` | `mac/**`, `Makefile`, `.github/**` |
-| `Web CI` | `web/**`, `.github/**` |
+| `Swift Tests` | `mac/**`, `Makefile`, `.swiftformat`, `.github/**` |
+| `Web CI` | `web/**`, `promo/**`, `docs/**`, `.github/**` |
 
 - The `paths` field of `.github/ci-skip.json` owns the scopes, and a workflow that declares none always runs. `CI Lint`, `PR Quality Gates`, `CodeQL` and `Dependency Review` therefore run on every pull request. Repository hygiene and skill validation are part of `CI Checks`; the former `hygiene` and `skills` skip aliases are no longer used.
 - Any change under `.github/` runs everything, because a change to CI must be proven against every platform.

@@ -1,14 +1,20 @@
 # `zislactl` integration reference
 
-**English** | [简体中文](cli-reference.zh-CN.md)
+**English** | [简体中文](cli-reference.zh-CN.md) | [Other languages](../../docs/locales/README.md)
 
-`zislactl` is the shared local status protocol for AI tools, scripts, and CI tasks that integrate with zisla. It writes task state, usage, and notifications as structured data and uses atomic replacement to avoid partially written state. This document defines stable providers, commands, and field constraints.
+`zislactl` is the shared local status protocol for AI tools, scripts, and CI tasks that integrate with zisla. It writes task state, usage, and notifications as structured data and persists it in SQLite transactions to avoid partially written state. This document defines stable providers, commands, and field constraints.
 
 ## Design principles
 
 - State is written locally and never uploads prompts, answer bodies, or credentials.
-- Updates for the same task ID are idempotent; readers always see complete JSON state.
+- Updates for the same task ID are idempotent; readers see complete committed database state.
 - Provider names accept compatibility aliases but are persisted using their canonical value.
+
+## Local persistence and JSON boundaries
+
+Tasks, usage, and notices live in `~/Library/Application Support/zisla/ai-state.sqlite`. Writes use SQLite transactions; the current protocol does not write `ai-state.json`. Clearing tasks retains usage history.
+
+`zislactl` accepts the documented command-line options, and `list` prints line-oriented text. Integrations and configuration still use structured JSON, including external tools' JSON/JSONL session inputs and settings JSON encoding/decoding, under their own parsing rules. The CLI itself uses command-line arguments, text output, and SQLite persistence.
 
 ## Providers
 
@@ -162,7 +168,7 @@ zislactl message \
 
 - `--app`, `--sender`, and `--content` are required; `--app-bundle-id` is optional and helps resolve the installed app icon.
 - Line breaks and excess whitespace are collapsed, and the body is truncated to about 48 characters with an ellipsis.
-- One write atomically persists both `IslandNotice` entries without changing existing `notify` behavior.
+- One SQLite transaction persists both `IslandNotice` entries without changing existing `notify` behavior.
 
 ## Exit codes
 
@@ -170,5 +176,5 @@ zislactl message \
 | --- | --- |
 | `0` | Success |
 | `64` | Invalid argument or subcommand |
-| `65` | Data error, missing task, or corrupted state file |
+| `65` | Data error, missing task, or corrupted database |
 | `70` | Filesystem or other runtime error |

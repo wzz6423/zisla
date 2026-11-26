@@ -9,6 +9,28 @@ import ZislaKit
 
 @MainActor
 struct ClipboardAssistantShortcutTests {
+    @Test(arguments: [false, true])
+    func additionalDefaultTriggerPreservesNumberedActionsWhenRegistrationFails(fails: Bool) throws {
+        let registry = Registry()
+        if fails { registry.failures[UInt32(kVK_ANSI_N)] = .registrationFailed }
+        let controller = makeController(registry)
+        controller.setTriggers(hotkey: ClipboardAssistantDefaults.triggerHotkey, mouseButton: nil)
+        defer { controller.dismiss(animated: false) }
+        controller.present(Self.detection, visualStyle: .transparent)
+        #expect(controller.shortcutHint(for: Self.actions[0]) == (fails ? "⌘ 1" : "⌘ N / ⌘ 1"))
+        #expect(controller.shortcutHint(for: Self.actions[1]) == "⌘ 2")
+        #expect(controller.shortcutHint(for: Self.actions[2]) == "⌘ 3")
+        var performed: [ClipboardAssistantAction] = []
+        controller.onPerformAction = { performed.append($0) }
+        try registry.callback(keyCode: UInt32(fails ? kVK_ANSI_1 : kVK_ANSI_N))()
+        #expect(performed == [Self.actions[0]])
+        #expect(registry.bindings.isEmpty)
+        controller.present(Self.detection, visualStyle: .transparent)
+        try registry.callback(keyCode: UInt32(kVK_ANSI_2))()
+        #expect(performed == [Self.actions[0], Self.actions[1]])
+        #expect(registry.bindings.isEmpty)
+    }
+
     @Test(arguments: [0, 1, 2])
     func noteShortcutsReachViewCopyAndDeleteInTheDisplayedOrder(index: Int) throws {
         let registry = Registry()
@@ -264,7 +286,7 @@ struct ClipboardAssistantShortcutTests {
             controller.setScreenshotSelectionActive(false)
             controller.setScreenshotActive(false)
             controller.setSystemScreenshotActive(false)
-            #expect(registry.hotkeys.count == 4)
+            #expect(registry.hotkeys.count == 5)
             previous()
             #expect(performed.isEmpty)
             try registry.callback(keyCode: UInt32(kVK_ANSI_2))()
@@ -320,7 +342,7 @@ struct ClipboardAssistantShortcutTests {
         #expect(performed.isEmpty)
         #expect(registry.bindings.isEmpty)
         controller.present(Self.detection, visualStyle: .transparent)
-        #expect(registry.hotkeys.count == 3)
+        #expect(registry.hotkeys.count == 4)
         controller.dismiss(animated: false)
     }
 
@@ -380,7 +402,7 @@ struct ClipboardAssistantShortcutTests {
         oldAction()
         #expect(controller.presentation.detection == Self.detection)
         #expect(performed.isEmpty)
-        #expect(registry.hotkeys.count == (clearDismiss ? 3 : 1))
+        #expect(registry.hotkeys.count == (clearDismiss ? 4 : 1))
         #expect(controller.actionHotkeys.isEmpty == !clearDismiss)
         let mouse = try #require(registry.bindings.values.first { $0.mouseButton == 3 }?.callback)
         mouse()
@@ -566,7 +588,7 @@ struct ClipboardAssistantShortcutTests {
         controller.present(Self.detection, visualStyle: .transparent)
         #expect(registry.hotkeys.filter { $0.conflicts(with: close) }.count == 1)
         #expect(controller.dismissShortcutFeedbackKey == Self.dismissConflictKey)
-        #expect(controller.shortcutHint(for: Self.actions[0]) == "⌘ 1")
+        #expect(controller.shortcutHint(for: Self.actions[0]) == (primaryConflict ? "⌘ 1" : "⌘ N / ⌘ 1"))
         #expect(controller.shortcutHint(for: Self.actions[1]) == (primaryConflict ? "⌘ 2" : nil))
         try registry.callback(keyCode: close.keyCode)()
         #expect(performed.isEmpty)
@@ -716,7 +738,8 @@ struct ClipboardAssistantShortcutTests {
             windowPresenter: { _, _ in }, makeTriggerMonitor: { registry.makeMonitor() }
         )
         controller.displayDuration = .never
-        controller.setTriggers(hotkey: ClipboardAssistantDefaults.triggerHotkey, mouseButton: nil, dismissHotkey: dismissHotkey)
+        // These existing fixtures exercise the saved legacy Command+1 conflict.
+        controller.setTriggers(hotkey: Self.hotkey(UInt32(kVK_ANSI_1), "1"), mouseButton: nil, dismissHotkey: dismissHotkey)
         return controller
     }
 

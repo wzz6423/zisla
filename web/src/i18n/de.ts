@@ -17,6 +17,7 @@ export const de: SiteContent = {
     menuCloseLabel: 'Navigation schließen',
     menuButtonTitle: 'Navigation öffnen',
     navItems: {
+      help: "Hilfe",
       showcase: 'Funktionen',
       ai: 'KI-Ablauf',
       download: 'Download',
@@ -331,6 +332,179 @@ export const de: SiteContent = {
         desc: 'Zeiger weg – und sie klappt zu; beim Öffnen wird die App weder aktiviert noch der Fokus entzogen.',
       },
     },
+  },
+  help: {
+    "title": "Mit zisla beginnen",
+    "lede": "Wähle eine Aufgabe und prüfe Zugang, Schritte, Rechte und Speicherort.",
+    "labels": {
+      "entry": "Zugang",
+      "shortcuts": "Tastenkürzel",
+      "permissions": "Berechtigungen",
+      "output": "Ergebnis und Speicherort"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Kopierte Inhalte wiederverwenden",
+        "summary": "Suche im Verlauf oder wähle nach dem Kopieren eine Aktion.",
+        "entry": "Insel → Zwischenablage; Einstellungen → Schnellaktionen.",
+        "steps": [
+          "Aktiviere Verlauf oder Schnellaktionen und kopiere einen Beispieltext oder Link.",
+          "Öffne die Zwischenablage, filtere oder suche und kopiere einen Eintrag.",
+          "Kopiere ein Beispielbild mit lesbarem Text, warte auf die lokale Erkennung im Hintergrund und suche dann nach einem Wort, um das Originalbild zu finden.",
+          "Klicke mit der rechten Maustaste auf das Bild, um Text zu erkennen oder zu kopieren; laufende Erkennung kannst du abbrechen. Die Hintergrund-Erkennung kopiert den Text nicht automatisch.",
+          "Füge ihn in der Ziel-App ein. Bei einer neuen Kopie kannst du im Aktionsfenster den nächsten Schritt wählen."
+        ],
+        "shortcuts": "Command+1…9 und Command+0 folgen der Aktionsreihenfolge. Neue Konfigurationen nutzen zusätzlich Command+N für die erste Aktion; Command+Delete schließt das Fenster. Gespeicherte oder gelöschte Belegungen bleiben erhalten.",
+        "permissions": "Verlauf und Erkennung sind lokal. Sondertasten/Maustasten benötigen Eingabeüberwachung, die optionale Kopiergeste Bedienungshilfen. Übersetzung nutzt den gewählten Dienst.",
+        "output": "Verlauf in lokalen App-Daten. Text/Bild speichern nutzt Einstellungen → Speicherort → Schnellaktionen; neuer Standard: ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Bildschirm aufnehmen und bearbeiten",
+        "summary": "Bearbeite ein Bildschirmfoto oder eine Aufnahme und exportiere es.",
+        "entry": "Menüleiste → Bildschirmfoto/Aufnahme; Einstellungen → Aufnahme → Studio.",
+        "steps": [
+          "Wähle einen Bereich oder ein Fenster für ein Bildschirmfoto und bearbeite, kopiere, speichere oder parke es.",
+          "Wähle Bildschirm, Fenster oder Bereich für die Aufnahme und aktiviere nur benötigte Audio-/Kameraquellen.",
+          "Stoppe die Aufnahme, bearbeite und prüfe sie im Studio, dann exportiere das gewünschte Format."
+        ],
+        "shortcuts": "Control+1 Bildschirmfoto; Control+2 langes Bildschirmfoto. Control+Shift+1/2/3 nehmen Bildschirm/Fenster/Bereich auf; Control+Shift+6 öffnet das Studio. In Einstellungen änderbar.",
+        "permissions": "Bildschirmaufnahme erforderlich. Mikrofon und Kamera benötigen ihre eigenen Rechte; dies gilt auch für die Kameravorschau.",
+        "output": "Neue Standards: ~/Downloads/picture für Bilder, ~/Downloads/video für Aufnahmen/Projekte. Ordner separat einstellbar. Manche Exporte brauchen FFmpeg."
+      },
+      "shelf": {
+        "title": "Dateien über die Ablage weiterreichen",
+        "summary": "Halte Dateien bereit, ohne die Originale zu kopieren.",
+        "entry": "Insel → Ablage; an den oberen Auslöser ziehen.",
+        "steps": [
+          "Ziehe eine Beispieldatei nach oben oder schüttle beim Ziehen, wenn die Geste aktiv ist.",
+          "Öffne die Ablage und wähle Kategorie oder benötigte Einträge.",
+          "Ziehe zur Ziel-App, zeige in Finder oder teile; geparkte Bildschirmfotos kannst du als PNG speichern.",
+          "Wähle Dateien oder Ordner und die ZIP-Komprimierung im Kontextmenü; das Archiv erscheint wieder in der Ablage.",
+          "Wähle Bilder in der Ablage und Größenänderung oder Formatkonvertierung; führe die Bildwerkzeuge aus, damit erfolgreiche Ergebnisse in die Ablage zurückkehren.",
+          "Wähle Bilder, Video oder Audio und importiere sie in die Medienbibliothek des Aufnahmestudios; das aktuelle Projekt und die Zeitleiste bleiben erhalten."
+        ],
+        "shortcuts": "Mit dem Zeiger ziehen. Die Schüttelgeste ist separat einstellbar; kein festes Tastenkürzel nötig.",
+        "permissions": "Dateiauswahl und sichere Lesezeichen erlauben Zugriff auf ausgewählte Dateien. Bildschirmfotos benötigen Bildschirmaufnahme.",
+        "output": "Originale bleiben am Ort. Verweise und geparkte Bilder bleiben lokal gespeichert; PNG geht an den gewählten Zielort. ZIP-Archive und erfolgreiche Bildergebnisse kehren in die Ablage zurück; importierte Medien kommen in die Bibliothek des Aufnahmeprojekts."
+      },
+      "meeting": {
+        "title": "An einem Meeting teilnehmen und Notizen behalten",
+        "summary": "Verknüpfe einen Kalendertermin mit einer Kontextnotiz.",
+        "entry": "Insel → Kalender; Kalender und Kontextnotizen in Einstellungen aktivieren.",
+        "steps": [
+          "Erstelle oder öffne einen Termin mit unterstütztem Meeting-Link und gültiger Start-/Endzeit.",
+          "Wähle Teilnehmen; der Countdown erscheint 10 Minuten vor Beginn.",
+          "Erstelle, speichere oder verknüpfe eine Notiz über die Terminaktion und öffne sie später über Termin oder Ablage."
+        ],
+        "shortcuts": "Teilnahme und Notizen sind Schaltflächen. Für andere Orte halte die konfigurierte Taste und schüttle; Standard ist Command.",
+        "permissions": "Kalenderzugriff nötig. Fensternotizen können Bedienungshilfen benötigen; angehängte Bildschirmfotos benötigen Bildschirmaufnahme.",
+        "output": "Meeting-Kontextnotizen sind lokale Ablagedaten. Schnellnotizen sind separat und verwenden Apple Notizen."
+      },
+      "ai": {
+        "title": "KI verbinden und Kontingente prüfen",
+        "summary": "Verfolge Aufgaben, aufgezeichnete Nutzung und Kontokontingente.",
+        "entry": "Einstellungen → KI; Insel → KI-Monitor.",
+        "steps": [
+          "Aktiviere ein unterstütztes lokales Werkzeug oder melde eine Aufgabe über zislactl gemäß CLI-Referenz.",
+          "Aktiviere Kontingentüberwachung für den Anbieter und trage Zugangsdaten nur bei Aufforderung ein.",
+          "Prüfe Abfrage-/Rücksetzzeit und Warnungen; öffne den Verlauf oder exportiere .xlsx."
+        ],
+        "shortcuts": "KI-Monitor oder Einstellungen verwenden; kein festes globales Kürzel nötig. zislactl nutzt dokumentierte Argumente.",
+        "permissions": "Lokale Erkennung liest strukturierte Zustände. Kontingente werden beim Anbieter abgefragt; optionale KI-Bearbeitung nutzt das gewählte Modell oder CLI.",
+        "output": "Aufgaben/Nutzung: ~/Library/Application Support/zisla/ai-state.sqlite. Kontingente sind Anbieterwerte statt token-Schätzungen; fehlende Daten bleiben nicht verfügbar."
+      },
+      "media-tools": {
+        "title": "Bilder, Audio und PDF verarbeiten",
+        "summary": "Nutze die unabhängigen lokalen Werkzeuge mit Beispieldateien.",
+        "entry": "Einstellungen → Bildwerkzeuge / Audiowerkzeuge / PDF-Werkzeuge.",
+        "steps": [
+          "Füge ein Bild hinzu, wähle Aktion und Optionen, führe sie aus und exportiere Ergebnis oder ZIP.",
+          "Wähle Bilder in der Ablage und Größenänderung oder Formatkonvertierung; führe die Bildwerkzeuge aus, damit erfolgreiche Ergebnisse in die Ablage zurückkehren.",
+          "Installiere FFmpeg und ffprobe über Abhängigkeiten, lade Audio, wähle Schneiden oder Mischen und eine Ausgabedatei oder einen Ordner.",
+          "Füge PDF in der gewünschten Reihenfolge hinzu, führe die Aktion aus und speichere. Office-Konvertierung benötigt LibreOffice oder OpenOffice."
+        ],
+        "shortcuts": "Werkzeugschaltflächen; kein festes globales Kürzel.",
+        "permissions": "Dateiauswahl erlaubt Zugriff auf gewählte Dateien und Ordner. Verarbeitung lokal; Abhängigkeiten werden heruntergeladen.",
+        "output": "Neue Standards: Bilder ~/Downloads/picture, PDF ~/Downloads/pdf, separat einstellbar. Audio nutzt den Exportdialog."
+      },
+      "daily-briefing": {
+        "title": "Einen Tagesbericht erstellen",
+        "summary": "Prüfe gewählte Statistiken vor dem PNG-Export.",
+        "entry": "Einstellungen → Tagesbericht.",
+        "steps": [
+          "Wähle Vorlage und Statistiken.",
+          "Prüfe verfügbare Daten in der Vorschau und wähle den Ausgabeordner.",
+          "Exportiere heute oder aktiviere tägliche Ausgabe mit Uhrzeit."
+        ],
+        "shortcuts": "Vorschau- und Exportknöpfe; kein festes Kürzel.",
+        "permissions": "Aktiviere die zugehörigen Statistikfunktionen. Bildschirmzeit kann Festplattenvollzugriff benötigen; Kontingente werden beim Anbieter abgefragt.",
+        "output": "PNG im Tagesberichtordner; neuer Standard ~/Downloads/daily. Fehlende Daten sind keine gemessene Null."
+      },
+      "desktop": {
+        "title": "Fenster ansehen und Kontextnotizen schreiben",
+        "summary": "Wechsle zum Fenster und hinterlasse eine Ortsnotiz.",
+        "entry": "Einstellungen → Fenstervorschau / Kontextnotizen; Dock, Command+Tab und Ablage.",
+        "steps": [
+          "Aktiviere und erlaube Vorschauen, zeige auf eine Dock-App oder nutze Command+Tab und klicke eine Karte.",
+          "Halte auf einer Beispielseite, einem Fenster oder Desktop die konfigurierte Taste und schüttle; schreibe und speichere die Notiz.",
+          "Kehre zurück oder öffne die Notiz über die Ablage; ergänze bei Bedarf Erinnerungen oder Fensterbilder."
+        ],
+        "shortcuts": "Command+Tab wechselt Apps. Kontextnotizen nutzen standardmäßig gehaltenes Command, in Einstellungen änderbar.",
+        "permissions": "Vorschauen brauchen Bedienungshilfen und Bildschirmaufnahme. Fenstererkennung nutzt Bedienungshilfen; Bildanhänge Bildschirmaufnahme.",
+        "output": "Notizen und Bilder in lokalen Ablagedaten unter ~/Library/Application Support/zisla."
+      },
+      "playback": {
+        "title": "Wiedergabe wählen und App-Lautstärke mischen",
+        "summary": "Wähle Ausgabe und passe spielende Apps an.",
+        "entry": "Medienbereich → Ausgabegerät; Einstellungen → Medienquelle; Insel → App-Mixer.",
+        "steps": [
+          "Spiele Beispielaudio und wähle ein verfügbares Ausgabegerät.",
+          "Wähle automatische Quelle oder bevorzugten Player und prüfe die Wiedergabeknöpfe.",
+          "Öffne unter macOS 14.4+ den Mixer, erlaube Systemaudioaufnahme und regle oder mute eine App."
+        ],
+        "shortcuts": "Wiedergabeknöpfe und Regler; kein festes Kürzel.",
+        "permissions": "Mixer benötigt macOS 14.4+ und Systemaudioaufnahme. Geräte hängen von Verbindungen ab; Bluetooth kann eine Berechtigung benötigen.",
+        "output": "Ausgabegerät ist die Systemwahl. App-Lautstärken werden lokal gespeichert; keine Dateiausgabe."
+      }
+    },
+    "workflowsTitle": "Kurze Ablaufdemos",
+    "workflows": {
+      "copy-next": {
+        "title": "Finden, kopieren und wiederverwenden",
+        "steps": [
+          "Suche im Verlauf nach dem Beispielwort „brew“.",
+          "Kopiere den passenden Eintrag.",
+          "Füge ihn in der Ziel-App ein. Der Ausschnitt zeigt Suche und Kopie; für neue Kopien sind Schnellaktionen separat verfügbar."
+        ]
+      },
+      "drop-output": {
+        "title": "Datei ablegen und Ausgabe vorbereiten",
+        "steps": [
+          "Ziehe ein Beispielbild aus Finder in die obere Ablage.",
+          "Öffne die Ablage und wähle das Bild.",
+          "Ziehe es zum Ziel oder speichere ein geparktes Bild als PNG. Der Ausschnitt zeigt das Ablegen."
+        ]
+      },
+      "meeting-note": {
+        "title": "Vom Meeting zur Notiz",
+        "steps": [
+          "Öffne das Meeting mit seinem Teilnahmelink.",
+          "Wähle neue Meeting-Notiz oder vorhandene Notiz verknüpfen.",
+          "Speichere und öffne sie über Termin oder Ablage. Der Ausschnitt zeigt Erstellen und Verknüpfen."
+        ]
+      }
+    },
+    "excerptLabel": "Ausschnitt abspielen",
+    "guideLinkLabel": "Anleitung lesen",
+    "videoNotice": "Ausschnitte der vorhandenen Produkttour mit Demodaten. Video-Untertitel sind Englisch, die Schritte folgen deiner Sprache. Die vollständige 2:40-Tour und Musikangaben stehen weiter unten.",
+    "preferencesTitle": "Nützliche Einstellungen",
+    "preferences": [
+      "Aktiviere Schütteln beim Ziehen, um die Ablage einzublenden. Kontextnotizen nutzen eine eigene gehaltene Taste.",
+      "Wähle die Audioausgabe im Medienbereich und automatische Quelle oder bevorzugten Player in Einstellungen. Diese Wahl weist Apps keine getrennten Geräte zu.",
+      "Tastentöne und Tippstatistik sind unabhängig und nutzen Eingabeüberwachung. Der App-Mixer benötigt macOS 14.4+ und Systemaudioaufnahme.",
+      "Der Tagesbericht bietet 8 Vorlagen, Vorschau und manuelle oder tägliche PNG-Ausgabe mit eigenem Ordner."
+    ],
+    "documentLanguage": "Dokumentsprache: {language}"
   },
   download: {
     eyebrow: 'JEDERZEIT EINSATZBEREIT',

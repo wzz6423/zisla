@@ -17,6 +17,7 @@ export const it = createCatalog({
     menuCloseLabel: 'Chiudi la navigazione',
     menuButtonTitle: 'Apri la navigazione',
     navItems: {
+      help: "Aiuto",
       showcase: 'Funzioni',
       ai: 'Flusso IA',
       download: 'Download',
@@ -313,6 +314,179 @@ export const it = createCatalog({
         desc: 'Allontana il puntatore e si ritrae; l’espansione non attiva l’app né prende il focus.',
       },
     },
+  },
+  help: {
+    "title": "Inizia a usare zisla",
+    "lede": "Scegli un’attività e segui accesso, passaggi, permessi e destinazione.",
+    "labels": {
+      "entry": "Accesso",
+      "shortcuts": "Scorciatoie",
+      "permissions": "Permessi",
+      "output": "Risultato e salvataggio"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Riutilizza ciò che hai copiato",
+        "summary": "Trova un elemento o scegli un’azione dopo la copia.",
+        "entry": "Isola → Appunti; Impostazioni → Azioni rapide.",
+        "steps": [
+          "Attiva cronologia o azioni rapide e copia un testo o link di esempio.",
+          "Apri gli appunti, filtra o cerca e copia un elemento.",
+          "Copia un’immagine di esempio con testo leggibile, attendi il riconoscimento locale in background e cerca una parola dell’immagine per ritrovare l’originale.",
+          "Fai clic destro sull’immagine per riconoscere o copiare il testo; puoi annullare durante il riconoscimento. Il riconoscimento in background non copia automaticamente il testo.",
+          "Incolla nell’app di destinazione; per una nuova copia, scegli l’azione successiva nella finestra rapida."
+        ],
+        "shortcuts": "Command+1…9 e Command+0 seguono l’ordine delle azioni. Le nuove configurazioni aggiungono Command+N per la prima; Command+Delete chiude. Le combinazioni salvate o rimosse restano tali.",
+        "permissions": "Cronologia e riconoscimento sono locali. Tasti modificatori/mouse richiedono Monitoraggio input; il gesto facoltativo di copia richiede Accessibilità. Traduzione usa il servizio scelto.",
+        "output": "Cronologia nei dati locali. Salva testo/immagine usa Impostazioni → Posizione di salvataggio → Azioni rapide; nuovo valore: ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Cattura e modifica lo schermo",
+        "summary": "Modifica una cattura o registrazione ed esportala.",
+        "entry": "Barra dei menu → Cattura/Registrazione; Impostazioni → Registrazione → Studio.",
+        "steps": [
+          "Cattura una regione o finestra; modifica, copia, salva o metti nel vassoio.",
+          "Scegli schermo, finestra o regione e attiva solo le fonti audio/video necessarie.",
+          "Ferma la registrazione, modifica e visualizza nello studio, poi esporta il formato scelto."
+        ],
+        "shortcuts": "Control+1 cattura; Control+2 cattura lunga. Control+Shift+1/2/3 registrano schermo/finestra/regione; Control+Shift+6 apre lo studio. Modificabili nelle impostazioni.",
+        "permissions": "Registrazione schermo necessaria. Microfono e fotocamera richiedono i rispettivi permessi, anche per l’anteprima fotocamera.",
+        "output": "Nuovi valori: ~/Downloads/picture per catture, ~/Downloads/video per registrazioni/progetti. Cartelle indipendenti. Alcuni formati richiedono FFmpeg."
+      },
+      "shelf": {
+        "title": "Passa i file attraverso il vassoio",
+        "summary": "Prepara file per un’altra app senza copiarne gli originali.",
+        "entry": "Isola → Vassoio; trascina nella zona superiore.",
+        "steps": [
+          "Trascina un file di esempio in alto o scuoti mentre trascini se il gesto è attivo.",
+          "Apri il vassoio e scegli categoria o elementi necessari.",
+          "Trascina alla destinazione, mostra in Finder o condividi; una cattura conservata si può salvare in PNG.",
+          "Seleziona file o cartelle e scegli la compressione ZIP dal menu contestuale; l’archivio torna sullo scaffale.",
+          "Seleziona immagini sullo scaffale e scegli il ridimensionamento o la conversione del formato; esegui gli strumenti immagini e i risultati riusciti tornano sullo scaffale.",
+          "Seleziona immagini, video o audio e importali nella libreria dello studio di registrazione; il progetto e la timeline attuali vengono mantenuti."
+        ],
+        "shortcuts": "Trascina con il puntatore. Il gesto di scuotimento si imposta separatamente; nessuna scorciatoia fissa richiesta.",
+        "permissions": "Selettore file e segnalibri sicuri permettono l’accesso ai file scelti. Le catture richiedono Registrazione schermo.",
+        "output": "Gli originali restano al loro posto. Riferimenti e catture restano locali; il PNG usa la destinazione scelta. Gli ZIP e i risultati immagini riusciti tornano sullo scaffale; i media importati entrano nella libreria del progetto di registrazione."
+      },
+      "meeting": {
+        "title": "Partecipa a una riunione e conserva note",
+        "summary": "Collega una riunione del calendario a una nota di contesto.",
+        "entry": "Isola → Agenda; abilita calendario e note di contesto nelle Impostazioni.",
+        "steps": [
+          "Crea o apri un evento con link riunione supportato e inizio/fine validi.",
+          "Premi Partecipa; il conto alla rovescia compare 10 minuti prima.",
+          "Crea, salva o collega una nota dall’evento e riaprila da agenda o vassoio."
+        ],
+        "shortcuts": "Partecipa e note sono pulsanti. Per altri luoghi, tieni premuto il tasto impostato e scuoti; il valore predefinito è Command.",
+        "permissions": "Accesso al calendario necessario. Le note di finestra possono richiedere Accessibilità; le catture allegate richiedono Registrazione schermo.",
+        "output": "Note di riunione nei dati locali del vassoio. Note rapide è una funzione separata basata su Note di Apple."
+      },
+      "ai": {
+        "title": "Collega l’IA e controlla le quote",
+        "summary": "Segui attività, uso registrato e quote del conto.",
+        "entry": "Impostazioni → IA; isola → Monitor IA.",
+        "steps": [
+          "Abilita uno strumento locale supportato o segnala l’attività con zislactl secondo il riferimento CLI.",
+          "Abilita il controllo quota del fornitore e inserisci credenziali solo quando richiesto.",
+          "Controlla rilevamento, ripristino e avvisi; visualizza la cronologia o esporta .xlsx."
+        ],
+        "shortcuts": "Usa monitor o Impostazioni, senza scorciatoia globale fissa. zislactl accetta gli argomenti documentati.",
+        "permissions": "Il rilevamento locale legge stato strutturato. Le quote contattano il fornitore; modifiche IA facoltative usano il modello o CLI scelto.",
+        "output": "Attività/uso: ~/Library/Application Support/zisla/ai-state.sqlite. Quote rilevate dal fornitore, non stimate dai token; dati mancanti restano indisponibili."
+      },
+      "media-tools": {
+        "title": "Elabora immagini, audio e PDF",
+        "summary": "Usa gli strumenti locali indipendenti con esempi.",
+        "entry": "Impostazioni → Strumenti immagine / Audio / PDF.",
+        "steps": [
+          "Aggiungi un’immagine, scegli operazione e opzioni, esegui ed esporta risultato o ZIP.",
+          "Seleziona immagini sullo scaffale e scegli il ridimensionamento o la conversione del formato; esegui gli strumenti immagini e i risultati riusciti tornano sullo scaffale.",
+          "Installa FFmpeg e ffprobe nei componenti, aggiungi audio, scegli taglio o mixaggio e file o cartella di esportazione.",
+          "Aggiungi PDF nell’ordine richiesto, esegui e salva. La conversione Office richiede LibreOffice o OpenOffice."
+        ],
+        "shortcuts": "Pulsanti degli strumenti; nessuna scorciatoia globale fissa.",
+        "permissions": "Il selettore dà accesso ai file e alle cartelle scelti. Elaborazione locale; installare componenti scarica file.",
+        "output": "Nuovi valori: immagini ~/Downloads/picture, PDF ~/Downloads/pdf, impostabili separatamente. Audio usa la finestra di esportazione."
+      },
+      "daily-briefing": {
+        "title": "Crea un riepilogo giornaliero",
+        "summary": "Controlla le statistiche prima di esportare PNG.",
+        "entry": "Impostazioni → Riepilogo giornaliero.",
+        "steps": [
+          "Scegli modello e statistiche.",
+          "Apri l’anteprima, verifica dati disponibili e cartella di uscita.",
+          "Esporta oggi o attiva l’esportazione giornaliera con orario."
+        ],
+        "shortcuts": "Pulsanti Anteprima ed Esporta; nessuna scorciatoia fissa.",
+        "permissions": "Abilita le relative statistiche. Tempo di utilizzo può richiedere Accesso completo al disco; quote consultano il fornitore.",
+        "output": "PNG nella cartella del riepilogo; nuovo valore ~/Downloads/daily. Dati assenti non sono zero misurato."
+      },
+      "desktop": {
+        "title": "Visualizza finestre e annota il contesto",
+        "summary": "Passa a una finestra e lascia una nota per quel luogo.",
+        "entry": "Impostazioni → Anteprime finestre / Note di contesto; Dock, Command+Tab e vassoio.",
+        "steps": [
+          "Abilita anteprime e permessi, passa sul Dock o usa Command+Tab e scegli la scheda.",
+          "Su una pagina, finestra o scrivania di esempio, tieni il tasto configurato e scuoti; scrivi e salva.",
+          "Torna al luogo o apri dal vassoio; puoi aggiungere promemoria ricorrenti o una cattura della finestra."
+        ],
+        "shortcuts": "Command+Tab cambia app. Note: Command tenuto per impostazione predefinita, modificabile nelle Impostazioni.",
+        "permissions": "Anteprime: Accessibilità e Registrazione schermo. Rilevare finestre usa Accessibilità; catture allegate Registrazione schermo.",
+        "output": "Note e catture nei dati locali del vassoio sotto ~/Library/Application Support/zisla."
+      },
+      "playback": {
+        "title": "Scegli la riproduzione e i volumi delle app",
+        "summary": "Seleziona uscita e regola le app in riproduzione.",
+        "entry": "Area media → Uscita; Impostazioni → Sorgente media; isola → Mixer.",
+        "steps": [
+          "Riproduci audio di esempio e scegli un’uscita disponibile.",
+          "Scegli sorgente automatica o lettore preferito e prova i controlli.",
+          "Su macOS 14.4+, apri il mixer, consenti Registrazione audio di sistema e regola o silenzia un’app."
+        ],
+        "shortcuts": "Pulsanti e cursori; nessuna scorciatoia fissa.",
+        "permissions": "Mixer: macOS 14.4+ e Registrazione audio di sistema. Dispositivi secondo le connessioni; Bluetooth può richiedere permesso.",
+        "output": "L’uscita è la scelta del sistema. Volumi per app salvati localmente; nessun file esportato."
+      }
+    },
+    "workflowsTitle": "Brevi dimostrazioni",
+    "workflows": {
+      "copy-next": {
+        "title": "Trova, copia e riutilizza",
+        "steps": [
+          "Cerca la parola di esempio “brew” nella cronologia.",
+          "Copia l’elemento corrispondente.",
+          "Incolla nell’app di destinazione. Il filmato mostra ricerca e copia; le nuove copie hanno azioni rapide separate."
+        ]
+      },
+      "drop-output": {
+        "title": "Deposita un file e prepara l’uscita",
+        "steps": [
+          "Trascina un’immagine di esempio da Finder al vassoio superiore.",
+          "Apri il vassoio e seleziona l’immagine.",
+          "Trascina alla destinazione o salva una cattura in PNG. Il filmato mostra l’inserimento nel vassoio."
+        ]
+      },
+      "meeting-note": {
+        "title": "Dalla riunione alla nota",
+        "steps": [
+          "Apri la riunione con il link di partecipazione.",
+          "Scegli Nuova nota o Collega nota esistente.",
+          "Salva e riapri da evento o vassoio. Il filmato mostra creazione e collegamento."
+        ]
+      }
+    },
+    "excerptLabel": "Riproduci estratto",
+    "guideLinkLabel": "Leggi la guida",
+    "videoNotice": "Estratti della presentazione esistente con dati dimostrativi. I sottotitoli del video sono in inglese; i passaggi seguono la tua lingua. Il video completo di 2:40 e i crediti musicali sono sotto.",
+    "preferencesTitle": "Preferenze utili",
+    "preferences": [
+      "Attiva lo scuotimento durante il trascinamento per mostrare il vassoio. Le note di contesto usano un proprio tasto da tenere premuto.",
+      "Scegli l’uscita audio nell’area multimediale e sorgente automatica o lettore preferito nelle impostazioni. Questo non assegna dispositivi distinti alle app.",
+      "Suoni e statistiche tastiera sono indipendenti e usano Monitoraggio input. Il mixer richiede macOS 14.4+ e Registrazione audio di sistema.",
+      "Il riepilogo giornaliero offre 8 modelli, anteprima ed esportazione PNG manuale o giornaliera con cartella indipendente."
+    ],
+    "documentLanguage": "Lingua del documento: {language}"
   },
   download: {
     eyebrow: 'PRONTO QUANDO LO SEI TU',

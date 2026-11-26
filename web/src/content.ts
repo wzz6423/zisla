@@ -6,7 +6,7 @@ import type { SiteLocale } from './locales';
  * and so grouping never depends on matching a translated string.
  */
 
-export const navIds = ['showcase', 'ai', 'download', 'faq', 'developers', 'changelog'] as const;
+export const navIds = ['showcase', 'ai', 'download', 'help', 'faq', 'developers', 'changelog'] as const;
 export type NavId = (typeof navIds)[number];
 
 export const themeModes = ['auto', 'light', 'dark'] as const;
@@ -23,6 +23,7 @@ export const navHrefs: Record<NavId, string> = {
   ai: '#ai',
   download: '#download',
   changelog: '#changelog',
+  help: '#help',
   faq: '#faq',
   developers: '#developers',
 };
@@ -166,6 +167,37 @@ export const documentationUrls: Record<DocumentationId, string> = {
   releasing: 'https://github.com/wzz6423/zisla/blob/main/mac/Docs/releasing.md',
   contributing: 'https://github.com/wzz6423/zisla/blob/main/CONTRIBUTING.md',
 };
+
+export const documentationLink = (id: DocumentationId, locale: SiteLocale): { url: string; language: SiteLocale } => {
+  const url = documentationUrls[id];
+  return {
+    url: locale === 'en' ? url : locale === 'zh-Hans' ? url.replace(/\.md$/, '.zh-CN.md') :
+      url.replace('/blob/main/', '/blob/main/docs/locales/' + locale + '/'),
+    language: locale,
+  };
+};
+
+export const guideIds = ['clipboard', 'capture', 'shelf', 'meeting', 'ai', 'media-tools', 'daily-briefing', 'desktop', 'playback'] as const;
+export type GuideId = (typeof guideIds)[number];
+export const workflowIds = ['copy-next', 'drop-output', 'meeting-note'] as const;
+export type WorkflowId = (typeof workflowIds)[number];
+
+/** Existing feature-tour excerpts use its authored timeline, with synthetic demonstration content. */
+export const workflowExcerpts: Record<WorkflowId, { guide: GuideId; start: number; end: number }> = {
+  'copy-next': { guide: 'clipboard', start: 60.4, end: 62.9 },
+  'drop-output': { guide: 'shelf', start: 38.3, end: 40.7 },
+  'meeting-note': { guide: 'meeting', start: 65.7, end: 70.7 },
+};
+
+export interface UserGuideCopy {
+  title: string;
+  summary: string;
+  entry: string;
+  steps: readonly string[];
+  shortcuts: string;
+  permissions: string;
+  output: string;
+}
 
 /** The four docs cards rendered in the developers grid, in order. */
 export const documentationCardIds = documentationIds.slice(0, 4) as readonly DocumentationId[];
@@ -596,6 +628,20 @@ export interface SiteContent {
     summaryLede: string;
     summaryNote: string;
     steps: Record<FlowStepId, FlowStepCopy>;
+  };
+  help: {
+    title: string;
+    lede: string;
+    labels: { entry: string; shortcuts: string; permissions: string; output: string };
+    guides: Record<GuideId, UserGuideCopy>;
+    workflowsTitle: string;
+    workflows: Record<WorkflowId, { title: string; steps: readonly string[] }>;
+    excerptLabel: string;
+    guideLinkLabel: string;
+    videoNotice: string;
+    preferencesTitle: string;
+    preferences: readonly string[];
+    documentLanguage: string;
   };
   download: {
     eyebrow: string;

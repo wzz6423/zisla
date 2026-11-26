@@ -17,6 +17,7 @@ export const vi = createCatalog({
     menuCloseLabel: 'Đóng điều hướng',
     menuButtonTitle: 'Mở điều hướng',
     navItems: {
+      help: "Trợ giúp",
       showcase: 'Tính năng',
       ai: 'Quy trình AI',
       download: 'Tải xuống',
@@ -198,6 +199,179 @@ export const vi = createCatalog({
       review: { phase: 'Xem', title: 'Liếc nhanh trạng thái hiện tại', desc: 'Phương tiện, tệp, AI, lịch và công cụ hệ thống ở cùng một nơi.' },
       dismiss: { phase: 'Đóng', title: 'Quay lại công việc', desc: 'Đưa con trỏ ra ngoài và thanh sẽ thu lại; mở rộng không kích hoạt ứng dụng hay lấy tiêu điểm.' },
     },
+  },
+  help: {
+    "title": "Bắt đầu dùng zisla",
+    "lede": "Chọn việc cần làm rồi xem lối vào, các bước, quyền và nơi lưu.",
+    "labels": {
+      "entry": "Lối vào",
+      "shortcuts": "Phím tắt",
+      "permissions": "Quyền",
+      "output": "Kết quả và lưu trữ"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Dùng lại nội dung đã sao chép",
+        "summary": "Tìm trong lịch sử hoặc chọn hành động sau khi sao chép.",
+        "entry": "Đảo → Bảng nhớ tạm; Cài đặt → Thao tác nhanh.",
+        "steps": [
+          "Bật lịch sử hoặc thao tác nhanh rồi sao chép văn bản hay liên kết mẫu.",
+          "Mở bảng nhớ tạm, lọc hoặc tìm kiếm rồi sao chép mục.",
+          "Sao chép ảnh mẫu có chữ rõ, chờ nhận dạng cục bộ trong nền rồi tìm một từ trong ảnh để tìm lại ảnh gốc.",
+          "Nhấp chuột phải vào ảnh để nhận dạng hoặc sao chép chữ; có thể hủy khi đang nhận dạng. Nhận dạng trong nền không tự sao chép chữ.",
+          "Dán vào ứng dụng đích; với nội dung mới sao chép, chọn bước tiếp theo trong cửa sổ nhanh."
+        ],
+        "shortcuts": "Command+1…9 rồi Command+0 theo thứ tự hành động. Cấu hình mới có thêm Command+N cho hành động đầu; Command+Delete đóng cửa sổ. Giữ nguyên phím đã lưu hoặc xóa.",
+        "permissions": "Lịch sử và nhận dạng chạy cục bộ. Phím bổ trợ/chuột cần Giám sát đầu vào; cử chỉ sao chép tùy chọn cần Trợ năng. Dịch dùng dịch vụ đã chọn.",
+        "output": "Lịch sử trong dữ liệu ứng dụng cục bộ. Lưu văn bản/ảnh theo Cài đặt → Nơi lưu → Thao tác nhanh; mặc định mới ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Chụp và chỉnh sửa màn hình",
+        "summary": "Chỉnh sửa ảnh chụp hoặc bản ghi rồi xuất kết quả.",
+        "entry": "Thanh menu → Chụp/Ghi màn hình; Cài đặt → Ghi màn hình → Studio.",
+        "steps": [
+          "Chụp vùng hoặc cửa sổ; sửa, sao chép, lưu hoặc cất lên kệ.",
+          "Chọn màn hình, cửa sổ hoặc vùng và chỉ bật nguồn âm thanh/camera cần thiết.",
+          "Dừng ghi, sửa và xem trước trong studio rồi xuất định dạng đã chọn."
+        ],
+        "shortcuts": "Control+1 chụp; Control+2 chụp dài. Control+Shift+1/2/3 ghi màn hình/cửa sổ/vùng; Control+Shift+6 mở studio. Có thể đổi trong cài đặt.",
+        "permissions": "Cần quyền Ghi màn hình. Micro và camera cần quyền riêng, kể cả xem trước camera.",
+        "output": "Mặc định mới: ~/Downloads/picture cho ảnh, ~/Downloads/video cho bản ghi/dự án. Đổi thư mục riêng biệt. Một số định dạng cần FFmpeg."
+      },
+      "shelf": {
+        "title": "Chuyển tiếp tệp qua kệ",
+        "summary": "Chuẩn bị tệp cho ứng dụng khác mà không sao chép bản gốc.",
+        "entry": "Đảo → Kệ; kéo vào vùng kích hoạt trên cùng.",
+        "steps": [
+          "Kéo tệp mẫu lên trên hoặc lắc khi kéo nếu đã bật cử chỉ.",
+          "Mở kệ và chọn nhóm hoặc mục cần thiết.",
+          "Kéo tới đích, hiện trong Finder hoặc chia sẻ; ảnh chụp cất trên kệ có thể lưu PNG.",
+          "Chọn tệp hoặc thư mục và nén thành ZIP trong menu chuột phải; tệp ZIP trở lại kệ.",
+          "Chọn ảnh trên kệ rồi đổi kích thước hoặc định dạng; chạy công cụ ảnh và kết quả thành công trở lại kệ.",
+          "Chọn ảnh, video hoặc âm thanh và nhập vào thư viện studio ghi hình; dự án và dòng thời gian hiện tại được giữ nguyên."
+        ],
+        "shortcuts": "Kéo bằng con trỏ. Bật lắc để thả riêng trong cài đặt; không cần phím tắt cố định.",
+        "permissions": "Bộ chọn tệp và dấu trang an toàn cho quyền truy cập tệp đã chọn. Chụp cần quyền Ghi màn hình.",
+        "output": "Bản gốc ở nguyên chỗ. Tham chiếu và ảnh cất được lưu cục bộ; PNG dùng vị trí đã chọn. Tệp ZIP và kết quả ảnh thành công trở lại kệ; phương tiện đã nhập được thêm vào thư viện dự án ghi hình."
+      },
+      "meeting": {
+        "title": "Tham gia cuộc họp và giữ ghi chú",
+        "summary": "Gắn cuộc họp trong lịch với ghi chú ngữ cảnh.",
+        "entry": "Đảo → Lịch; bật lịch và ghi chú ngữ cảnh trong Cài đặt.",
+        "steps": [
+          "Tạo hoặc mở sự kiện có liên kết họp hỗ trợ và thời gian bắt đầu/kết thúc hợp lệ.",
+          "Nhấn Tham gia; đếm ngược xuất hiện trước 10 phút.",
+          "Tạo, lưu hoặc liên kết ghi chú từ sự kiện rồi mở lại qua lịch hoặc kệ."
+        ],
+        "shortcuts": "Tham gia và ghi chú dùng nút. Ở vị trí khác, giữ phím đã cấu hình và lắc; mặc định Command.",
+        "permissions": "Cần quyền lịch. Ghi chú cửa sổ có thể cần Trợ năng; ảnh đính kèm cần Ghi màn hình.",
+        "output": "Ghi chú họp ở dữ liệu kệ cục bộ. Ghi chú nhanh là chức năng riêng dùng Apple Notes."
+      },
+      "ai": {
+        "title": "Kết nối AI và xem hạn mức",
+        "summary": "Theo dõi tác vụ, mức dùng đã ghi và hạn mức tài khoản.",
+        "entry": "Cài đặt → AI; đảo → Theo dõi AI.",
+        "steps": [
+          "Bật công cụ cục bộ hỗ trợ hoặc báo tác vụ bằng zislactl theo tài liệu CLI.",
+          "Bật theo dõi hạn mức của nhà cung cấp cần dùng, chỉ nhập thông tin xác thực khi được yêu cầu.",
+          "Xem thời điểm lấy mẫu/đặt lại và cảnh báo; mở lịch sử hoặc xuất .xlsx."
+        ],
+        "shortcuts": "Dùng bảng theo dõi hoặc Cài đặt, không cần phím toàn cục cố định. zislactl nhận tham số theo tài liệu.",
+        "permissions": "Phát hiện cục bộ đọc trạng thái có cấu trúc. Hạn mức truy vấn nhà cung cấp; sửa bằng AI tùy chọn dùng mô hình hoặc CLI đã chọn.",
+        "output": "Tác vụ/mức dùng: ~/Library/Application Support/zisla/ai-state.sqlite. Hạn mức lấy từ nhà cung cấp, không ước tính bằng token; dữ liệu thiếu vẫn không khả dụng."
+      },
+      "media-tools": {
+        "title": "Xử lý ảnh, âm thanh và PDF",
+        "summary": "Dùng công cụ cục bộ độc lập với tệp mẫu.",
+        "entry": "Cài đặt → Công cụ ảnh / Âm thanh / PDF.",
+        "steps": [
+          "Thêm ảnh, chọn thao tác và tùy chọn, chạy rồi xuất kết quả hoặc ZIP.",
+          "Chọn ảnh trên kệ rồi đổi kích thước hoặc định dạng; chạy công cụ ảnh và kết quả thành công trở lại kệ.",
+          "Cài FFmpeg và ffprobe trong thành phần, thêm âm thanh, chọn cắt hay trộn rồi chọn tệp hoặc thư mục xuất.",
+          "Thêm PDF theo thứ tự, chạy và lưu. Chuyển Office cần LibreOffice hoặc OpenOffice cục bộ."
+        ],
+        "shortcuts": "Nút công cụ; không có phím toàn cục cố định.",
+        "permissions": "Bộ chọn cho quyền truy cập tệp và thư mục đã chọn. Xử lý cục bộ; cài thành phần sẽ tải xuống.",
+        "output": "Mặc định mới: ảnh ~/Downloads/picture, PDF ~/Downloads/pdf, cài riêng. Âm thanh dùng hộp thoại xuất."
+      },
+      "daily-briefing": {
+        "title": "Tạo tổng kết hằng ngày",
+        "summary": "Xem trước thống kê rồi xuất PNG.",
+        "entry": "Cài đặt → Tổng kết hằng ngày.",
+        "steps": [
+          "Chọn mẫu và thống kê.",
+          "Mở xem trước, kiểm tra dữ liệu có sẵn và chọn thư mục xuất.",
+          "Xuất hôm nay hoặc bật xuất hằng ngày và giờ chạy."
+        ],
+        "shortcuts": "Nút Xem trước và Xuất; không có phím cố định.",
+        "permissions": "Bật các thống kê liên quan. Lịch sử Thời gian sử dụng có thể cần Toàn quyền truy cập ổ đĩa; hạn mức truy vấn nhà cung cấp.",
+        "output": "PNG trong thư mục tổng kết; mặc định mới ~/Downloads/daily. Dữ liệu thiếu không là số 0 đo được."
+      },
+      "desktop": {
+        "title": "Xem cửa sổ và ghi chú ngữ cảnh",
+        "summary": "Chuyển cửa sổ rồi để ghi chú tại vị trí đó.",
+        "entry": "Cài đặt → Xem trước cửa sổ / Ghi chú ngữ cảnh; Dock, Command+Tab và kệ.",
+        "steps": [
+          "Bật xem trước và quyền, trỏ vào app Dock hoặc dùng Command+Tab rồi nhấn thẻ.",
+          "Tại trang, cửa sổ hoặc màn hình mẫu, giữ phím cấu hình và lắc; viết rồi lưu.",
+          "Quay lại vị trí hoặc mở từ kệ; có thể thêm nhắc định kỳ hoặc ảnh cửa sổ."
+        ],
+        "shortcuts": "Command+Tab chuyển app. Ghi chú mặc định giữ Command, có thể thay đổi.",
+        "permissions": "Xem trước cần Trợ năng và Ghi màn hình. Nhận cửa sổ dùng Trợ năng; ảnh đính kèm Ghi màn hình.",
+        "output": "Ghi chú và ảnh trong dữ liệu kệ cục bộ dưới ~/Library/Application Support/zisla."
+      },
+      "playback": {
+        "title": "Chọn phát và trộn âm lượng app",
+        "summary": "Chọn đầu ra và điều chỉnh app đang phát.",
+        "entry": "Vùng media → Thiết bị đầu ra; Cài đặt → Nguồn media; đảo → Bộ trộn.",
+        "steps": [
+          "Phát âm thanh mẫu và chọn đầu ra có sẵn.",
+          "Chọn nguồn tự động hoặc trình phát ưu tiên rồi thử điều khiển.",
+          "Trên macOS 14.4+, mở bộ trộn, cho phép Ghi âm thanh hệ thống rồi chỉnh hoặc tắt tiếng một app."
+        ],
+        "shortcuts": "Nút và thanh trượt; không có phím cố định.",
+        "permissions": "Bộ trộn cần macOS 14.4+ và Ghi âm thanh hệ thống. Thiết bị tùy kết nối; Bluetooth có thể cần quyền.",
+        "output": "Đầu ra là lựa chọn hệ thống. Âm lượng app được nhớ cục bộ; không xuất tệp."
+      }
+    },
+    "workflowsTitle": "Minh họa quy trình ngắn",
+    "workflows": {
+      "copy-next": {
+        "title": "Tìm, sao chép và dùng lại",
+        "steps": [
+          "Tìm từ mẫu “brew” trong lịch sử.",
+          "Sao chép mục khớp.",
+          "Dán vào ứng dụng đích. Đoạn phim minh họa tìm và sao chép; nội dung mới có thao tác nhanh riêng."
+        ]
+      },
+      "drop-output": {
+        "title": "Thả tệp và chuẩn bị đầu ra",
+        "steps": [
+          "Kéo ảnh mẫu từ Finder lên kệ phía trên.",
+          "Mở kệ và chọn ảnh.",
+          "Kéo tới đích hoặc lưu ảnh chụp thành PNG. Đoạn phim minh họa đưa tệp lên kệ."
+        ]
+      },
+      "meeting-note": {
+        "title": "Từ cuộc họp đến ghi chú",
+        "steps": [
+          "Mở cuộc họp có liên kết tham gia.",
+          "Chọn ghi chú họp mới hoặc liên kết ghi chú sẵn có.",
+          "Lưu rồi mở qua sự kiện hoặc kệ. Đoạn phim minh họa tạo và liên kết."
+        ]
+      }
+    },
+    "excerptLabel": "Phát đoạn phim",
+    "guideLinkLabel": "Đọc hướng dẫn",
+    "videoNotice": "Các đoạn từ video giới thiệu hiện có dùng dữ liệu minh họa. Chữ trong video là tiếng Anh; các bước ở đây theo ngôn ngữ bạn chọn. Video đầy đủ 2:40 và ghi công âm nhạc ở dưới.",
+    "preferencesTitle": "Tùy chọn hữu ích",
+    "preferences": [
+      "Bật lắc khi kéo để hiện kệ. Ghi chú ngữ cảnh dùng phím giữ riêng.",
+      "Chọn thiết bị âm thanh đầu ra ở vùng media và nguồn tự động hoặc trình phát ưu tiên trong Cài đặt. Tùy chọn này không gán thiết bị riêng cho từng ứng dụng.",
+      "Âm phím và thống kê gõ bật độc lập, dùng Giám sát đầu vào. Bộ trộn ứng dụng cần macOS 14.4+ và quyền Ghi âm thanh hệ thống.",
+      "Tổng kết hằng ngày có 8 mẫu, xem trước và xuất PNG thủ công hoặc mỗi ngày vào thư mục riêng."
+    ],
+    "documentLanguage": "Ngôn ngữ tài liệu: {language}"
   },
   download: {
     eyebrow: 'SẴN SÀNG KHI BẠN SẴN SÀNG',

@@ -1,6 +1,6 @@
 # Signing and release design
 
-**English** | [简体中文](releasing.zh-CN.md)
+**English** | [简体中文](releasing.zh-CN.md) | [Other languages](../../docs/locales/README.md)
 
 The complete release process, dual update channels, and GitHub/Gitee asset synchronization are maintained by [`skills/zisla-release`](../../skills/zisla-release/SKILL.md). This page documents only the design constraints for signing, notarization, and update packages; follow the skill when publishing a release.
 

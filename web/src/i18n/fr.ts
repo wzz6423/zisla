@@ -17,6 +17,7 @@ export const fr: SiteContent = {
     menuCloseLabel: 'Fermer la navigation',
     menuButtonTitle: 'Ouvrir la navigation',
     navItems: {
+      help: "Aide",
       showcase: 'Fonctions',
       ai: 'Flux IA',
       download: 'Télécharger',
@@ -336,6 +337,179 @@ export const fr: SiteContent = {
         desc: 'Éloignez le pointeur et elle se referme ; s’ouvrir n’active jamais l’app et ne prend pas le focus.',
       },
     },
+  },
+  help: {
+    "title": "Commencer avec zisla",
+    "lede": "Choisissez une tâche, puis suivez son accès, ses étapes, ses autorisations et son dossier de sortie.",
+    "labels": {
+      "entry": "Accès",
+      "shortcuts": "Raccourcis",
+      "permissions": "Autorisations",
+      "output": "Résultat et stockage"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Réutiliser un contenu copié",
+        "summary": "Retrouvez un élément ou choisissez une action après la copie.",
+        "entry": "Îlot → Presse-papiers ; Réglages → Actions rapides.",
+        "steps": [
+          "Activez l’historique ou les actions rapides et copiez un texte ou lien d’exemple.",
+          "Ouvrez le presse-papiers, filtrez ou cherchez, puis copiez un élément.",
+          "Copiez une image d’exemple avec du texte lisible, attendez la reconnaissance locale en arrière-plan, puis cherchez un mot de l’image pour retrouver l’original.",
+          "Faites un clic droit sur l’image pour reconnaître ou copier son texte ; annulez si nécessaire pendant la reconnaissance. Celle en arrière-plan ne copie pas le texte automatiquement.",
+          "Collez dans l’application cible ; pour une nouvelle copie, choisissez une action dans la fenêtre rapide."
+        ],
+        "shortcuts": "Command+1…9 puis Command+0 suivent l’ordre des actions. Pour une nouvelle configuration, Command+N déclenche aussi la première action et Command+Delete ferme la fenêtre. Les choix enregistrés ou effacés sont conservés.",
+        "permissions": "Historique et reconnaissance restent locaux. Les déclencheurs souris/touche modificatrice nécessitent Surveillance de l’entrée ; le geste de copie utilise Accessibilité. La traduction utilise le service choisi.",
+        "output": "Historique dans les données locales. Le dossier Actions rapides se règle dans Emplacement de sauvegarde ; nouveau défaut : ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Capturer et monter l’écran",
+        "summary": "Modifiez une capture ou un enregistrement, puis exportez.",
+        "entry": "Barre de menus → Capture/Enregistrement ; Réglages → Enregistrement → Studio.",
+        "steps": [
+          "Capturez une région ou une fenêtre ; modifiez, copiez, sauvegardez ou rangez-la.",
+          "Choisissez écran, fenêtre ou région et activez uniquement les sources audio/caméra nécessaires.",
+          "Arrêtez, montez et prévisualisez dans le studio, puis exportez au format choisi."
+        ],
+        "shortcuts": "Control+1 capture ; Control+2 capture longue. Control+Shift+1/2/3 enregistrent écran/fenêtre/région ; Control+Shift+6 ouvre le studio. Modifiables dans les réglages.",
+        "permissions": "Enregistrement de l’écran requis. Microphone et caméra demandent leurs autorisations, y compris l’aperçu caméra.",
+        "output": "Nouveaux dossiers : ~/Downloads/picture pour les captures, ~/Downloads/video pour enregistrements/projets. Réglables séparément. Certains exports nécessitent FFmpeg."
+      },
+      "shelf": {
+        "title": "Transmettre des fichiers par le relais",
+        "summary": "Gardez les fichiers prêts sans copier les originaux.",
+        "entry": "Îlot → Relais ; glissez vers la zone supérieure.",
+        "steps": [
+          "Déposez un fichier d’exemple en haut, ou secouez pendant le glissement si ce geste est activé.",
+          "Ouvrez le relais et choisissez une catégorie ou les éléments nécessaires.",
+          "Glissez vers la destination, affichez dans Finder ou partagez ; une capture rangée peut être exportée en PNG.",
+          "Sélectionnez des fichiers ou dossiers et choisissez la compression ZIP dans le menu contextuel ; l’archive revient sur l’étagère.",
+          "Sélectionnez les images de l’étagère et choisissez le redimensionnement ou la conversion de format ; lancez les outils d’image pour renvoyer les résultats réussis sur l’étagère.",
+          "Sélectionnez des images, vidéos ou fichiers audio et importez-les dans la bibliothèque du studio ; le projet et la chronologie actuels sont conservés."
+        ],
+        "shortcuts": "Glissement au pointeur. Le geste de secousse se règle séparément ; aucun raccourci fixe requis.",
+        "permissions": "Le sélecteur et les signets sécurisés donnent accès aux fichiers choisis. Une capture nécessite Enregistrement de l’écran.",
+        "output": "Les originaux restent en place. Références et captures rangées persistent localement ; le PNG va vers la destination choisie. Les ZIP et les résultats d’image réussis reviennent sur l’étagère ; les médias importés rejoignent la bibliothèque du projet d’enregistrement."
+      },
+      "meeting": {
+        "title": "Rejoindre une réunion et prendre une note",
+        "summary": "Associez une réunion du calendrier à une note de contexte.",
+        "entry": "Îlot → Agenda ; activez calendrier et notes de contexte dans Réglages.",
+        "steps": [
+          "Créez ou ouvrez un événement avec un lien de réunion pris en charge et des horaires valides.",
+          "Cliquez sur Rejoindre ; le compte à rebours commence 10 minutes avant.",
+          "Créez, sauvegardez ou associez une note depuis l’événement ; rouvrez-la depuis l’agenda ou le relais."
+        ],
+        "shortcuts": "Boutons de réunion et de note. Pour un autre lieu, maintenez la touche configurée et secouez ; touche par défaut : Command.",
+        "permissions": "Calendrier requis. Les notes liées aux fenêtres peuvent nécessiter Accessibilité ; les captures jointes nécessitent Enregistrement de l’écran.",
+        "output": "Notes de réunion dans les données locales du relais. Les notes rapides sont une fonction distincte utilisant Apple Notes."
+      },
+      "ai": {
+        "title": "Connecter l’IA et vérifier les quotas",
+        "summary": "Suivez tâches, usage enregistré et quotas du compte.",
+        "entry": "Réglages → IA ; îlot → Moniteur IA.",
+        "steps": [
+          "Activez un outil local compatible ou déclarez une tâche avec zislactl selon la référence CLI.",
+          "Activez le suivi du quota du fournisseur voulu et fournissez des identifiants seulement si demandés.",
+          "Consultez prélèvement, réinitialisation et alerte de quota ; affichez l’historique ou exportez en .xlsx."
+        ],
+        "shortcuts": "Utilisez le moniteur ou Réglages, sans raccourci global fixe. zislactl prend les arguments documentés.",
+        "permissions": "La détection locale lit un état structuré. Les quotas contactent le fournisseur ; les modifications IA facultatives utilisent le modèle ou CLI choisi.",
+        "output": "Tâches et usage : ~/Library/Application Support/zisla/ai-state.sqlite. Quotas issus du fournisseur, sans estimation par token ; données absentes indiquées indisponibles."
+      },
+      "media-tools": {
+        "title": "Traiter images, audio et PDF",
+        "summary": "Utilisez les outils locaux indépendants sur un exemple.",
+        "entry": "Réglages → Outils image / Outils audio / Outils PDF.",
+        "steps": [
+          "Ajoutez une image, choisissez opération et options, exécutez puis exportez le résultat ou ZIP.",
+          "Sélectionnez les images de l’étagère et choisissez le redimensionnement ou la conversion de format ; lancez les outils d’image pour renvoyer les résultats réussis sur l’étagère.",
+          "Installez FFmpeg et ffprobe dans les composants, ajoutez un audio, choisissez découpage ou mixage et la destination d’export.",
+          "Ajoutez les PDF dans l’ordre voulu, exécutez l’opération et sauvegardez. La conversion Office nécessite LibreOffice ou OpenOffice."
+        ],
+        "shortcuts": "Boutons des outils ; aucun raccourci global fixe.",
+        "permissions": "Le sélecteur donne accès aux fichiers et dossiers choisis. Traitement local ; installation des composants par téléchargement.",
+        "output": "Nouveaux dossiers : images ~/Downloads/picture, PDF ~/Downloads/pdf, réglables séparément. L’audio utilise la fenêtre d’export."
+      },
+      "daily-briefing": {
+        "title": "Créer un bilan quotidien",
+        "summary": "Prévisualisez les statistiques avant l’export PNG.",
+        "entry": "Réglages → Bilan quotidien.",
+        "steps": [
+          "Choisissez le modèle et les statistiques.",
+          "Prévisualisez les données disponibles et choisissez le dossier de sortie.",
+          "Exportez aujourd’hui ou activez l’export quotidien et son horaire."
+        ],
+        "shortcuts": "Boutons Aperçu et Export ; aucun raccourci fixe.",
+        "permissions": "Activez les fonctions de statistiques concernées. L’historique Temps d’écran peut nécessiter Accès complet au disque ; les quotas consultent le fournisseur.",
+        "output": "PNG dans le dossier du bilan ; nouveau défaut ~/Downloads/daily. Une donnée absente ne devient pas un zéro mesuré."
+      },
+      "desktop": {
+        "title": "Prévisualiser une fenêtre et noter son contexte",
+        "summary": "Passez à une fenêtre puis laissez une note à cet endroit.",
+        "entry": "Réglages → Aperçus de fenêtres / Notes de contexte ; Dock, Command+Tab et relais.",
+        "steps": [
+          "Activez les aperçus et autorisez-les ; survolez une app du Dock ou utilisez Command+Tab puis cliquez sur sa carte.",
+          "Sur une page, fenêtre ou bureau d’exemple, maintenez la touche configurée et secouez ; saisissez et sauvegardez la note.",
+          "Revenez au lieu ou ouvrez la note depuis le relais ; ajoutez éventuellement rappel récurrent ou capture de fenêtre."
+        ],
+        "shortcuts": "Command+Tab change d’app. Les notes utilisent Command maintenu par défaut, modifiable dans Réglages.",
+        "permissions": "Aperçus : Accessibilité et Enregistrement de l’écran. Détection de fenêtre : Accessibilité ; captures jointes : Enregistrement de l’écran.",
+        "output": "Notes et captures dans les données locales du relais sous ~/Library/Application Support/zisla."
+      },
+      "playback": {
+        "title": "Choisir la lecture et mixer les applications",
+        "summary": "Sélectionnez la sortie et réglez les apps en lecture.",
+        "entry": "Zone média → Sortie audio ; Réglages → Source média ; îlot → Mélangeur.",
+        "steps": [
+          "Lancez un audio d’exemple et choisissez une sortie disponible.",
+          "Choisissez source automatique ou lecteur préféré dans Réglages, puis vérifiez les contrôles de lecture.",
+          "Sous macOS 14.4+, ouvrez le mélangeur, autorisez l’audio système et réglez ou coupez une app en lecture."
+        ],
+        "shortcuts": "Boutons de lecture et curseurs ; aucun raccourci fixe.",
+        "permissions": "Le mélangeur nécessite macOS 14.4+ et Enregistrement audio système. Les appareils dépendent des connexions ; Bluetooth peut demander une autorisation.",
+        "output": "La sortie est le choix du système. Les volumes par app sont mémorisés localement ; aucun fichier exporté."
+      }
+    },
+    "workflowsTitle": "Démonstrations courtes",
+    "workflows": {
+      "copy-next": {
+        "title": "Retrouver, copier et réutiliser",
+        "steps": [
+          "Cherchez le mot d’exemple « brew » dans l’historique.",
+          "Copiez l’élément correspondant.",
+          "Collez dans l’application cible. L’extrait montre recherche et copie ; une nouvelle copie permet une action rapide séparée."
+        ]
+      },
+      "drop-output": {
+        "title": "Déposer un fichier et préparer la sortie",
+        "steps": [
+          "Glissez une image d’exemple de Finder vers le relais supérieur.",
+          "Ouvrez le relais et sélectionnez l’image.",
+          "Glissez vers la cible ou exportez une capture rangée en PNG. L’extrait montre le dépôt dans le relais."
+        ]
+      },
+      "meeting-note": {
+        "title": "Passer de la réunion à la note",
+        "steps": [
+          "Ouvrez la réunion avec son lien de participation.",
+          "Choisissez Nouvelle note ou Associer une note existante.",
+          "Sauvegardez et rouvrez depuis l’événement ou le relais. L’extrait montre création et association."
+        ]
+      }
+    },
+    "excerptLabel": "Lire l’extrait",
+    "guideLinkLabel": "Lire le guide",
+    "videoNotice": "Extraits de la présentation existante, avec données de démonstration. Les sous-titres vidéo sont en anglais ; les étapes suivent votre langue. La présentation complète de 2 min 40 et les crédits musicaux sont plus bas.",
+    "preferencesTitle": "Préférences utiles",
+    "preferences": [
+      "Activez le dépôt par secousse dans Réglages. Les notes de contexte utilisent leur propre touche maintenue.",
+      "Choisissez la sortie audio dans la zone média, puis la source automatique ou le lecteur préféré dans Réglages. Ce choix ne répartit pas les applications entre appareils.",
+      "Sons et statistiques clavier ont des interrupteurs distincts et utilisent Surveillance de l’entrée. Le mélangeur nécessite macOS 14.4+ et Enregistrement audio système.",
+      "Le bilan quotidien propose 8 modèles, une prévisualisation et un export PNG manuel ou journalier, avec un dossier indépendant."
+    ],
+    "documentLanguage": "Langue du document : {language}"
   },
   download: {
     eyebrow: 'DISPONIBLE QUAND VOUS VOULEZ',

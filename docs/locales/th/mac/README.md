@@ -1,0 +1,274 @@
+# zisla สำหรับ macOS
+
+[English](../../../../mac/README.md) | [简体中文](../../../../mac/README.zh-CN.md) | **ไทย** | [ภาษาอื่น](../../README.md)
+
+โฟลเดอร์นี้มี zisla สำหรับ macOS เลื่อนตัวชี้ไปกลางขอบบนเพื่อขยายเกาะและออกเพื่อซ่อน ใช้ AppKit `NSPanel`, SwiftUI และบริการตามเหตุการณ์ ไม่มีหน้าต่างโปร่งใสรับตัวชี้ถาวรหรือวงจรเฟรมขณะซ่อน
+
+Swift targets, bundle ID, โฟลเดอร์ข้อมูล และ `zislactl` ใช้ชื่อ zisla อัปเกรดย้ายข้อมูลและการตั้งค่ารุ่นก่อนให้อัตโนมัติ
+
+รองรับ macOS 14 ขึ้นไป macOS 26 ใช้ Liquid Glass; macOS 14/15 ใช้วัสดุระบบเดิม
+
+## ฟีเจอร์
+
+### 12 โมดูลในเกาะ
+
+| โมดูล | ความสามารถ |
+| --- | --- |
+| หน้าแรก | สรุป Pomodoro งาน AI แรก ดาวน์โหลดเนทีฟและหลายเบราว์เซอร์เมื่อขอ |
+| เสียงและสถิติแป้นพิมพ์ | 20 เสียง สวิตช์สถิติในเครื่อง แนวโน้ม ไทม์ไลน์แอป ฮีตแมปต่อปุ่ม |
+| ส่งต่อ | ลากไฟล์/สื่อ/ลิงก์สู่ขอบบน เก็บถาด แสดง Finder แชร์ระบบ ภาพเก็บเป็นการ์ดสีน้ำเงินกว้างสองเท่าและหมวดแยก คัดลอก/ส่งออก PNG/ลบได้ บีบอัดไฟล์และโฟลเดอร์เป็น ZIP ปรับ/แปลงภาพแล้วนำผลสำเร็จกลับถาด หรือนำภาพ วิดีโอ เสียงเข้าคลังสื่อโดยคงโปรเจกต์และไทม์ไลน์ |
+| คลิปบอร์ด | ประวัติค้นได้ กรองภาพ URL ไฟล์ และรายการโปรด; ประวัติและลิงก์แยกกัน ภาพใหม่เข้าคิวอ่านข้อความในเครื่อง ค้นข้อความหาภาพต้นฉบับหรือคลิกขวาอ่าน/คัดลอก ยกเลิกงานอ่านได้ งานเบื้องหลังไม่คัดลอกเอง |
+| ตรวจดู AI | รวมงาน สถานะ โทเคน ฮีตแมป และแจ้งเตือนจาก CLI แอป IDE ที่รองรับ |
+| ดาวน์โหลด | `yt-dlp` วิดีโอ/เสียง; ไม่มี `ffmpeg` ใช้ AVFoundation ห่อแทร็กและ Bilibili API อ่านอย่างเดียวสำรอง |
+| กำหนดการ | อากาศปัจจุบันและที่บันทึกสูงสุดหก ดู/สร้าง/ลบเหตุการณ์และเตือนความจำ/ทำเครื่องหมายเสร็จ |
+| จดหมาย | บัญชี Mail.app เลือก ดูเข้า อ่านแล้ว ตอบ เขียน ย้ายถังขยะ |
+| โน้ต | Apple Notes แหล่งเดียว ดู แก้ สร้าง ลบ Markdown พร้อมตัวอย่างสดและเขียนกลับ |
+| มิกเซอร์แอป | macOS 14.4+ ปรับ/ปิดเสียงแต่ละแอปและจำค่า ต้องสิทธิ์บันทึกเสียงระบบ |
+| เครื่องมือ | Pomodoro เสียงครั้งเดียว+แจ้งเตือนจบ ไม่หลับ ป้องกันพักว่าง ทำความสะอาดจอ/คีย์บอร์ด บอกบท กระจก และล้างถังขยะเมื่อยืนยัน |
+| ระบบ | CPU GPU หน่วยความจำ ดิสก์ เครือข่าย อุณหภูมิ พัดลม คืนหน่วยความจำ ตรวจแคช/บันทึก/ชั่วคราวปลอดภัย สุขภาพแบตเตอรี่และอุปกรณ์ |
+
+### ความสามารถข้ามโมดูล
+
+- **กำลังเล่น:** MediaRemote ปก ชื่อ ความคืบหน้า เนื้อเพลงเลื่อนและควบคุม; Core Audio สำรองระบุแอปออกเสียง แหล่งพัก/หยุด/เงียบซ่อน
+- **ดาวน์โหลดเบราว์เซอร์:** Safari Chrome Edge Firefox Brave Vivaldi Opera Arc แสดงแหล่ง/ความคืบหน้าในหน้าแรก ยุบ และด้านข้าง
+- **ป้อนเสียง:** กดสลับ/กดพูด ปุ่มลัดเอง speech ระบบ จัดข้อความในเครื่อง/ไกล ประวัติบันทึกในเครื่อง
+- **งานด่วน:** ทุกการคัดลอกแสดงเกาะเล็กพร้อมตัวอย่าง เปิดลิงก์ Finder ค้นด้วยเอนจินเลือก แปล คำนวณ สร้างเหตุการณ์จากวันที่ บันทึกข้อความยาว/ภาพ ดาวน์โหลดเสร็จหรือ AirDrop ใช้ปุ่มเดียวเปิดโฟลเดอร์ แยกจาก progress เบราว์เซอร์ รู้จำ URL เส้นทาง อีเมล โทรศัพท์ สี CSS ตัวอย่างสด คำนวณ วันเวลา ภาษาต่างระบบ โค้ด ข้อความพร้อมจำนวน ภาพย่อ และไฟล์ ใช้ปุ่มงาน Command+N เพิ่มเติม หรือ modifier/ปุ่มข้างที่ตั้ง มีท่ากดซ้าย+คลิกขวาคัดลอก (ปิดเดิม) blacklist แอป สวิตช์ชนิดและโหมดเตือนเบา
+- **CLI และ Skills:** ตรวจ ติดตั้ง อัปเดต ลบ CLI AI และจัด Skills ในการตั้งค่า
+- **สัตว์เลี้ยง:** เลือกในตัว/นำเข้าและวางซ้ายหรือขวาเกาะ
+- **อัปเดต:** Release/Preview ตรวจประเทศ IP ออกครั้งเดียว `CN` เริ่ม Gitee signed appcast แล้วย้อน GitHub ครั้งเดียว; อื่นกลับกัน ไม่มีคำตอบเริ่ม Gitee Sparkle ดาวน์โหลด ตรวจ ติดตั้ง เปิดใหม่ เปลี่ยนช่องมีผลอัตโนมัติ/ด้วยมือ
+- **หน้าตา/การใช้:** ระบบ สว่าง มืด โปร่งใส/ฝ้า ปักขยาย หลายจอ Spaces และจอไม่มีรอยบาก
+- **ค่าเริ่มต้น:** ใหม่เปิดโมดูล ฟีเจอร์ สถานะยุบ แจ้งเตือนด้านข้าง ตัวชี้แถบเมนู อัปเดตปรับแยก; ของเดิมเก็บค่าปัจจุบัน
+
+### เครื่องมือแยกและขั้นตอน
+
+- **สตูดิโอบันทึก:** เปิดเมนู/ตั้งค่า บันทึกจอ หน้าต่าง พื้นที่ พร้อมเสียงระบบ ไมค์ กล้องตามเลือก แก้วิดีโอ เสียง ภาพ ข้อความหลายแทร็ก รวมคำบรรยาย ซูม เคลื่อนไหว เอฟเฟกต์บุคคล/เสียง ดูก่อนส่งวิดีโอ GIF Live Photo หรือเสียง บางรูปแบบต้อง FFmpeg; HDR ขึ้นกับอุปกรณ์ นำสื่อชั้นเข้าคลังโดยคงโปรเจกต์/ไทม์ไลน์
+- **ภาพ เสียง PDF:** เปิดตั้งค่า ภาพ 9 งานในเครื่อง batch/ZIP; เสียง 27 รวมมิกซ์ LUFS ลดเสียงรบกวนต้อง FFmpeg/ffprobe; PDF 14 งาน Office ต้อง LibreOffice/OpenOffice
+- **สรุปรายวัน:** 8 แม่แบบ เลือกเมตริก ดูก่อน ส่ง PNG เอง/ทุกวัน ข้อมูลไม่มีไม่แสดงศูนย์วัดได้
+- **ตัวอย่างหน้าต่าง:** hover Dock/Command+Tab คลิกเปิดหน้าต่าง จัดฟีเจอร์/สิทธิ์ตั้งค่า
+- **โน้ตบริบทและประชุม:** กดปุ่มโน้ตพร้อมเขย่า แนบเว็บ/หน้าต่าง/เดสก์ท็อป เหตุการณ์มีลิงก์นับก่อน 10 นาที เข้าร่วม สร้าง/เชื่อมโน้ต จัดบนชั้น
+- **เขย่าวาง:** ลากไฟล์พร้อมเขย่าเผยเป้า สวิตช์แยก
+- **เสียงออก/ผู้เล่น:** อุปกรณ์เลือกส่วนสื่อ ตั้งค่าอัตโนมัติ/ผู้เล่นชอบ รูปแบบกะทัดรัด เงื่อนไขหยุดเสียงบรรยากาศ
+- **โควตา AI:** แสดงโควตา เวลาเก็บ/รีเซ็ต เตือนต่ำ รวม 5h/7d และ Cursor USD แยกประวัติโทเคน
+
+### ลำดับปุ่มงานด่วน
+
+ป๊อปอัปให้ `Command+1`–`Command+9` แล้ว `Command+0` ตามลำดับงาน ใหม่เพิ่ม `Command+N` ทำงานแรก; `Command+Delete` ปิด ตั้ง trigger ปุ่มเมาส์ข้าง ลำดับในตั้งค่า อัปเกรดเก็บทุกค่าที่บันทึกชัดรวมเก่า `Command+1` และที่ล้าง เฉพาะใหม่หรือไม่เคยมีฟิลด์ใช้ `Command+N`
+
+### ที่บันทึก
+
+ตั้งค่า → ตำแหน่งบันทึก แยกโฟลเดอร์ดาวน์โหลด ภาพหน้าจอ ภาพ บันทึก PDF งานด่วน รายวัน ใหม่ใช้ `~/Downloads` ย่อย `picture` ภาพ/ภาพหน้าจอ `video` บันทึก `pdf` `quick` `daily` เสียงเลือกไฟล์/โฟลเดอร์ใน dialog ชั้นเก็บอ้างอิงเดิม ภาพพักและโน้ตบริบทอยู่ `~/Library/Application Support/zisla` โปรเจกต์อยู่โฟลเดอร์บันทึก โน้ตข้อความ Apple Notes
+
+[ช่วยเหลือและขั้นตอน](https://wzz6423.github.io/zisla/?lang=th#help) สำหรับคลิปบอร์ด จับภาพ ชั้น ประชุม AI สื่อ สรุปรายวัน โน้ต/ตัวอย่างหน้าต่าง เล่น/มิกซ์ พร้อมคลิปสั้น
+
+### ปุ่มลัดและพักภาพหน้าจอ
+
+**Stash** อยู่ระหว่าง **Pin** และ **Copy** เก็บภาพแก้สุดท้ายรวมเครื่องหมาย/จับเลื่อนเสร็จในถาดโดยไม่คัดลอก เก็บ PNG และแอปต้นทาง/เวลาจับใน SQLite ทนรีสตาร์ต **Stashed screenshots** แสดงเฉพาะการ์ดเหล่านี้
+
+**Highlighter** หลัง **Brush** วาดโปร่งแสง เส้นปลายและจุดกลมเก็บเดิม ปิดเมนูได้ **Extract** หลัง **Blur** ใช้ macOS แยกวัตถุ/พื้นหลังหรือวงเอง หลายวงรวมพื้นที่ มี Select All/Clear นอกเลือกโปร่งใสและ undo ได้ มุมเดิมรัศมี 0 ลากจับเหนือเลือกหรือ **Corner radius** badge `r` PNG มุมโปร่งใส กลับ 0 คืนพิกเซลเดิม
+
+| บริบท | งาน | ปุ่มเริ่มต้น |
+| --- | --- | --- |
+| ทั่วระบบ | ภาพหน้าจอ | `Control+1` |
+| ทั่วระบบ | ภาพเลื่อน | `Control+2` |
+| ตัวแก้ภาพ | ปัก | `Control+1` |
+| ตัวแก้ภาพ | พักถาด | `Control+2` |
+| ตัวแก้ภาพ | สี่เหลี่ยม | `Control+3` |
+| ตัวแก้ภาพ | วงรี | `Control+4` |
+| ตัวแก้ภาพ | แปรง | `Control+5` |
+| ตัวแก้ภาพ | ไฮไลต์ | `Control+6` |
+| ตัวแก้ภาพ | ลูกศร | `Control+7` |
+| ตัวแก้ภาพ | เลข | `Control+8` |
+| ตัวแก้ภาพ | ข้อความ | `Control+9` |
+| ตัวแก้ภาพ | เบลอ | `Control+0` |
+| ตัวแก้ภาพ | แยกภาพ | `Control+A` |
+| ตัวแก้ภาพ | จับเลื่อน | `Control+B` |
+| ตัวแก้ภาพ | คัดลอก | `Enter` |
+| ตัวแก้ภาพ | บันทึก | `Command+S` |
+| ตัวแก้ภาพ | ย้อน | `Command+Z` |
+| ตัวแก้ภาพ | ทำซ้ำ | `Command+Shift+Z` |
+
+ตั้งค่าดู/บันทึกปุ่มทั่วไปและแก้ภาพ คัดลอก บันทึก ย้อน ทำซ้ำดูได้แต่เปลี่ยนไม่ได้ ปุ่มผู้ใช้คงตอนอัปเกรด Pin เป็นงาน editor ไม่ global แยก แต่เมนูยังอยู่
+
+เดิมตาม toolbar `Control+1`–`Control+9` แล้ว `Control+0` `Control+A` `Control+B` และอักษรถัดไป ข้าม `Q` `M` `N` `W` เพราะเผลอ Command อาจออก ย่อ เปิด ปิดหน้าต่าง ผู้ใช้บันทึกเองได้
+
+อัปเกรด layout เก่าไม่แก้รวม Pin/Stash เปลี่ยนครั้งเดียว หากปรับปุ่มใดจะคงเดิม ใหม่ขัดเลือก Control ว่างตามลำดับปลอดภัย บันทึกอีกได้
+
+## เริ่มเร็ว
+
+### สภาพแวดล้อม
+
+- macOS 14+
+- Swift 6 / Xcode 16+ (Command Line Tools เพียงอย่างเดียวสร้างได้)
+- เลือก `yt-dlp` `ffmpeg`; Office PDF ต้อง LibreOffice/OpenOffice
+
+Homebrew:
+
+```bash
+brew install yt-dlp ffmpeg
+brew install --cask libreoffice
+```
+
+### รันซอร์ส
+
+```bash
+swift run zisla
+```
+
+เริ่มเป็นแอปแถบเมนู ตัวชี้เขต 6 px กลางบนจอปัจจุบันหรือ “Show Island” เพื่อขยาย
+
+### สร้าง `.app`
+
+```bash
+Scripts/generate-icon.sh
+Scripts/build-app.sh
+open "dist/zisla.app"
+```
+
+บรรจุ helper `yt-dlp` ทางการ:
+
+```bash
+Scripts/fetch-yt-dlp.sh
+Scripts/build-app.sh
+```
+
+`fetch-yt-dlp.sh` ดึง standalone macOS เวอร์ชันตรึง ตรวจ `SHA2-256SUMS` ทางการก่อนลง `Tools/yt-dlp`
+
+## เชื่อมเครื่องมือ AI
+
+### ตรวจอัตโนมัติ
+
+อ่านสถานะ local เปิดเผย/คงที่เฉพาะเหตุการณ์และเมทาดาทาระบุงาน ไม่พรอมป์ต์/คำตอบ
+
+| สภาพแวดล้อม | ตรวจพบ |
+| --- | --- |
+| OpenAI / Anthropic | Codex CLI/Desktop Claude Code และ host |
+| GitHub / Google / xAI | GitHub Copilot CLI/VS Code Gemini CLI/Desktop Grok CLI |
+| อิสระและภูมิภาค | Pi Kimi Code Qwen Code Qoder ZCode Desktop/CLI TRAE OpenCode Harnext/Harness WorkBuddy |
+
+รออนุมัติ/ตอบเหลือง เครื่องมือ/คำสั่งผิดแดง ปกติเขียว รวมตามแดงเหลืองเขียว Qwen sidecar active เมื่อ PID มีชีวิตเท่านั้น ไม่ค้างหลังออก
+
+แอปแชตไม่เก็บ structured event แยกเปิดเฉยกับกำลังสร้างไม่ได้ รวม ChatGPT ใช้ `zislactl` hook ไม่เอา process resident แสร้งกิจกรรม
+
+### โปรโตคอล local `zislactl`
+
+เขียนงาน/ประวัติใช้ลง SQLite:
+
+```text
+~/Library/Application Support/zisla/ai-state.sqlite
+```
+
+คงหลังรีสตาร์ต อัปเดตทับ ล้างงาน หายเมื่อผู้ใช้ลบข้อมูลเอง
+
+ตัวอย่าง:
+
+```bash
+swift run zislactl update \
+  --id build-42 \
+  --provider claude \
+  --title "Refactor index" \
+  --progress 68 \
+  --detail "17/25"
+
+swift run zislactl usage \
+  --provider claude \
+  --input-tokens 12400 \
+  --output-tokens 2100 \
+  --model claude-opus-4-8
+
+swift run zislactl finish --id build-42 --detail "Complete"
+```
+
+provider `claude` `codex` `gemini` `grok` `gpt` `copilot` `kimi` `qwen` `coder` `zcode` `trae` `opencode` `pi` `harness` `doubao` alias normalize ใช้ hook shell wrapper task script ได้
+
+รายการ/ยุบใช้ logo ทางการระบุแหล่ง
+
+ดู [อ้างอิง CLI](Docs/cli-reference.md)
+
+## ดาวน์โหลดเบราว์เซอร์
+
+ฟัง progress macOS ใน Downloads รวม temporary extensions, source attributes และเบราว์เซอร์รัน ไม่อ่าน history/ขอเครือข่ายเพื่อ progress จบแสดงประมาณสามวินาที งานด่วนใช้ event เดียว เปิดโฟลเดอร์เมื่อสำเร็จถึงที่ท้าย ระยะตามตั้งค่า prompt ล่าสุดแทนก่อน
+
+## ตัวดาวน์โหลด
+
+ลำดับ executable:
+
+1. `zisla.app/Contents/Helpers/yt-dlp`
+2. `/opt/homebrew/bin/yt-dlp`
+3. `/usr/local/bin/yt-dlp`
+4. `~/.local/bin/yt-dlp`
+
+URL argv แยกให้ `Process` ไม่ผ่าน shell ละเลย config/plugin ปิด `--exec` จำกัดหนึ่งรายการและตรวจไฟล์อยู่โฟลเดอร์สิทธิ์
+
+ไม่มี `ffmpeg`:
+
+- วิดีโอ AVC/MP4+M4A แล้ว AVFoundation ห่อ MP4; single file คง
+- เสียง M4A ก่อนหรือเดิม
+- yt-dlp HTTP 412 ไม่มี format/เครื่องมือ ใช้ Bilibili API อ่าน DASH แล้วห่อ native เดิมไม่ติดตั้งเพิ่ม
+
+## โน้ต
+
+Apple Notes แหล่ง Markdown เดียว สร้าง ดู แก้ ลบที่มี ไม่ใช่เพิ่มอย่างเดียว
+
+- **รายการ:** JXA (`osascript -l JavaScript`) ชื่อ/แก้ล่าสุดโน้ตไม่ลบ เรียงใหม่ กลับ Notes refresh ซ่อน Recently Deleted เลือก แก้ refresh สร้าง ลบ context
+- **ดู/แก้:** AppleScript อ่าน `plaintext` ต้น Markdown ตัว `TextEditor` เขียนเมื่อหยุดราว 0.8 วินาทีไม่ทุกปุ่ม ใหม่สร้าง/เลือก Apple Notes
+- **ตัวอย่าง:** parser หัวข้อ รายการทั่วไป/เลข/งาน อ้างอิง fenced code เส้น bold italic inline strike links เป็น `AttributedString`
+- **เก็บ:** Markdown plain ใน `body` escape HTML/คงบรรทัดว่าง `plaintext` คืน source Notes แสดง plain ไม่ render
+- **สิทธิ์:** อ่าน/เขียนแรกขอ automation Notes ปฏิเสธ list/editor แจ้งผิด
+
+ไม่เก็บสำเนาที่สอง Apple Notes backend
+
+## สิทธิ์/ส่วนตัว
+
+- **ปฏิทิน:** ปฏิทิน/เตือนแยกตอนเข้า refresh หลังสร้าง/ลบ/เสร็จ
+- **ตำแหน่ง:** ครั้งเดียวไม่ตาม ค้น/เก็บ/ลบที่อื่นตั้งค่า
+- **ไฟล์:** bookmark security-scoped โฟลเดอร์เลือก ส่งต่อไม่สำเนา
+- **คลิปบอร์ด:** ใหม่เปิด history/link แยก ทุก `changeCount` ไม่เกินลิงก์เดียว local ไม่ log query ไม่ clear/declare/write ไม่แทน universal
+- **งานด่วน:** local `changeCount` และดาวน์โหลด/AirDrop เสร็จ modifier/mouse อาจ Input Monitoring ท่าคัดลอกส่ง ⌘C สังเคราะห์ต้อง Accessibility รู้จำไม่เครือข่าย เปิด/ค้น/แปล/เก็บเฉพาะคลิก/กด blacklist/types คุม copy switch รวมคุม transfer
+- **AI:** เหตุการณ์ structured และ metadata จำเป็น
+- **เสียง:** ไมค์/speech เมื่อผู้ใช้สั่ง บันทึก/ถอด/จัดในเครื่อง ส่งเฉพาะ local model/remote/CLI เลือก credentials ฐานส่วนตัว
+- **Bluetooth/อุปกรณ์:** ดูแบตฯอุปกรณ์และ Apple trusted เมื่อมุมมองแบตในระบบเปิดเท่านั้น
+- **กล้อง/อินพุต:** กระจก/สตูดิโอขอกล้อง เสียง/สถิติ/ล้าง/modifier-side ใช้ Input Monitoring สถิติ local สวิตช์แยก
+- **จอ/เสียง:** ภาพ/บันทึก/preview ขอ Screen Recording เก็บ source เลือก ไมค์กล้องเฉพาะเปิด มิกซ์ macOS 14.4+ System Audio Recording Core Audio taps local
+- **เบราว์เซอร์:** progress สาธารณะ/ไฟล์ชั่วคราว ไม่ history/เนื้อหา
+- **สื่อ:** MediaRemote metadata Core Audio process confirm private framework ไม่ส่ง Mac App Store ตรง ไม่มี metadata ใช้แอปเสียง
+- **เครือข่าย:** Open-Meteo/เตือนจีน public ที่เกี่ยวอื่น WeatherKit อัปเดต `ipinfo.io/country` ครั้งเดียว `CN` Gitee→GitHub อื่นกลับ ไม่มีเริ่ม Gitee Bilibili readonly info/play/CDN ลิงก์ไม่ network โควตาติดต่อ provider แปล/AI edits/transcript โมเดล/CLI speech Apple ตามภาษา ติดตั้ง/อัปเดต dependencies CLI IP และ network ผู้ใช้เลือกมี request
+- **Automation:** AppleScript/JXA list/view/edit/create/delete Notes ต้องสิทธิ์ ไม่ network เก็บ Notes
+
+## ทดสอบ
+
+Xcode ครบ:
+
+```bash
+swift test
+```
+
+Command Line Tools เท่านั้น:
+
+```bash
+swift test \
+  -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing \
+  -Xlinker -rpath -Xlinker /Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+  -Xlinker -rpath -Xlinker /Library/Developer/CommandLineTools/Library/Developer/usr/lib
+```
+
+## เอกสาร
+
+- [สถาปัตยกรรมและประสิทธิภาพ](Docs/architecture.md)
+- [อ้างอิง CLI](Docs/cli-reference.md)
+- [ลงนาม/เผยแพร่](Docs/releasing.md)
+- [ส่วนพึ่งพาที่รวม — อังกฤษ](../../../../mac/Vendor/README.md)
+- [ประกาศบุคคลที่สาม — อังกฤษ](../../../../mac/Resources/ThirdPartyLicenses/README.md)
+
+## ข้อจำกัดระบบ
+
+- ไม่มี Dynamic Island API public ตรวจรอยบาก `safeAreaInsets`/top auxiliary ไม่มีใช้ overlay จำลองเดียว
+- DRM login lock และ full-screen exclusive บางตัวไม่ให้ media/overlay
+- แอปไม่เข้าศูนย์สื่ออาจให้แหล่งเสียงไม่แน่ชื่อ/ปก/progress พักหยุดเงียบวิดีโอซ่อนตั้งใจ
+- percent ต้องเบราว์เซอร์ public macOS progress หรือไฟล์ชั่วคราว Downloads รู้จัก
+- battery health อุณหภูมิ power อุปกรณ์ตามฮาร์ดแวร์/เชื่อม/ข้อมูล macOS ไม่มีแสดงไม่พร้อม
+- Office PDF ต้อง LibreOffice/OpenOffice อื่น local
+- แพ็กไม่ notarized ครั้งแรกอาจ **Open Anyway** เสถียร self-signed เดียวคง permissions Sparkle ตรวจทุก update EdDSA ก่อน extract replace relaunch
+
+## ใบอนุญาต
+
+[PolyForm Noncommercial License 1.0.0](../../../../LICENSE.md) ใช้ไม่เชิงพาณิชย์ได้ ห้ามขาย/เชิงพาณิชย์อื่น

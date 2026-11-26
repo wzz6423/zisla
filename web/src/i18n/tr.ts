@@ -17,6 +17,7 @@ export const tr = createCatalog({
     menuCloseLabel: 'Gezinmeyi kapat',
     menuButtonTitle: 'Gezinmeyi aç',
     navItems: {
+      help: "Yardım",
       showcase: 'Özellikler',
       ai: 'AI iş akışı',
       download: 'İndir',
@@ -203,6 +204,179 @@ export const tr = createCatalog({
       review: { phase: 'İncele', title: 'Mevcut duruma göz atın', desc: 'Medya, dosyalar, AI, gündem ve sistem araçları aynı yerde bulunur.' },
       dismiss: { phase: 'Kapat', title: 'Yaptığınız işe dönün', desc: 'İşaretçiyi uzaklaştırdığınızda kapanır; genişletme uygulamayı etkinleştirmez ve odağı almaz.' },
     },
+  },
+  help: {
+    "title": "zisla kullanmaya başlayın",
+    "lede": "Bir görev seçin; giriş, adımlar, izinler ve kayıt konumunu izleyin.",
+    "labels": {
+      "entry": "Giriş",
+      "shortcuts": "Kısayollar",
+      "permissions": "İzinler",
+      "output": "Sonuç ve depolama"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Kopyaladığınızı yeniden kullanın",
+        "summary": "Geçmişten bulun veya kopyalama sonrası bir işlem seçin.",
+        "entry": "Ada → Pano; Ayarlar → Hızlı işlemler.",
+        "steps": [
+          "Geçmişi veya hızlı işlemleri açıp örnek metin ya da bağlantı kopyalayın.",
+          "Panoyu açın, süzün veya arayın ve bir öğeyi kopyalayın.",
+          "Okunaklı metin içeren örnek bir resmi kopyalayın, cihazda arka plan tanımasını bekleyin ve asıl resmi bulmak için içindeki bir sözcüğü arayın.",
+          "Metni tanımak veya kopyalamak için resme sağ tıklayın; tanıma sürerken iptal edebilirsiniz. Arka plan tanıması metni otomatik kopyalamaz.",
+          "Hedef uygulamaya yapıştırın; yeni kopyada hızlı işlem penceresinden sonraki adımı seçin."
+        ],
+        "shortcuts": "Command+1…9 ve Command+0 işlem sırasını izler. Yeni ayarlarda Command+N ayrıca ilk işlemi çalıştırır; Command+Delete kapatır. Kayıtlı veya temizlenmiş kısayollar korunur.",
+        "permissions": "Geçmiş ve tanıma yereldir. Değiştirici/fare tetikleyicileri Giriş İzleme, isteğe bağlı kopyalama hareketi Erişilebilirlik ister. Çeviri seçilen hizmeti kullanır.",
+        "output": "Geçmiş yerel uygulama verisindedir. Metin/resim kaydı Ayarlar → Kayıt konumu → Hızlı işlemler kullanır; yeni varsayılan ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Ekranı yakalayın ve düzenleyin",
+        "summary": "Ekran görüntüsü veya kaydı düzenleyip dışa aktarın.",
+        "entry": "Menü çubuğu → Görüntü/Kayıt; Ayarlar → Kayıt → Stüdyo.",
+        "steps": [
+          "Bölge veya pencere yakalayın; düzenleyin, kopyalayın, kaydedin veya rafa koyun.",
+          "Ekran, pencere veya bölge seçin; yalnızca gereken ses/kamera kaynaklarını açın.",
+          "Kaydı durdurun, stüdyoda düzenleyip önizleyin ve istediğiniz biçimde dışa aktarın."
+        ],
+        "shortcuts": "Control+1 görüntü; Control+2 uzun görüntü. Control+Shift+1/2/3 ekran/pencere/bölge kaydı; Control+Shift+6 stüdyo. Ayarlarda değiştirilebilir.",
+        "permissions": "Ekran Kaydı izni gerekir. Mikrofon ve kamera kendi izinlerini ister; kamera önizlemesi de buna dahildir.",
+        "output": "Yeni varsayılanlar: görüntüler ~/Downloads/picture, kayıt/projeler ~/Downloads/video. Klasörler ayrı ayarlanır. Bazı biçimler FFmpeg ister."
+      },
+      "shelf": {
+        "title": "Dosyaları raf üzerinden aktarın",
+        "summary": "Asılları kopyalamadan dosyaları başka uygulama için hazırlayın.",
+        "entry": "Ada → Raf; üst tetikleme alanına sürükleyin.",
+        "steps": [
+          "Örnek dosyayı yukarı sürükleyin veya hareket açıksa sürüklerken işaretçiyi sallayın.",
+          "Rafı açıp kategori veya gereken öğeleri seçin.",
+          "Hedefe sürükleyin, Finder’da gösterin veya paylaşın; saklanan ekran görüntüsü PNG olarak kaydedilebilir.",
+          "Dosya veya klasör seçip bağlam menüsünden ZIP sıkıştırmasını seçin; arşiv rafa döner.",
+          "Raftan resim seçip boyutlandırma veya biçim dönüştürmeyi seçin; resim araçlarını çalıştırın ve başarılı çıktılar rafa dönsün.",
+          "Resim, video veya ses seçip kayıt stüdyosunun medya kitaplığına aktarın; geçerli proje ve zaman çizelgesi korunur."
+        ],
+        "shortcuts": "İşaretçiyle sürükleyin. Sallama hareketi ayrı ayarlanır; sabit kısayol gerekmez.",
+        "permissions": "Dosya seçici ve güvenli yer imleri seçili dosyalara erişim sağlar. Yakalama Ekran Kaydı ister.",
+        "output": "Asıllar yerinde kalır. Başvurular ve görüntüler yerelde saklanır; PNG seçili hedefe yazılır. ZIP arşivleri ve başarılı resim çıktıları rafa döner; aktarılan medya kayıt projesinin kitaplığına eklenir."
+      },
+      "meeting": {
+        "title": "Toplantıya katılın ve notları saklayın",
+        "summary": "Takvim toplantısını bağlam notuyla ilişkilendirin.",
+        "entry": "Ada → Takvim; Ayarlar’da takvim ve bağlam notlarını açın.",
+        "steps": [
+          "Desteklenen toplantı bağlantısı ve geçerli başlangıç/bitiş zamanı olan etkinlik oluşturun veya açın.",
+          "Katıl’a basın; geri sayım 10 dakika önce görünür.",
+          "Etkinlikten not oluşturun, kaydedin veya ilişkilendirin; takvimden ya da raftan yeniden açın."
+        ],
+        "shortcuts": "Katılma ve notlar düğmelerle yapılır. Başka konumlarda ayarlanan tuşu basılı tutup sallayın; varsayılan Command.",
+        "permissions": "Takvim erişimi gerekir. Pencere notları Erişilebilirlik, eklenen görüntüler Ekran Kaydı gerektirebilir.",
+        "output": "Toplantı notları yerel raf verisindedir. Hızlı Notlar ayrı özelliktir ve Apple Notlar’ı kullanır."
+      },
+      "ai": {
+        "title": "AI bağlayın ve kotaları kontrol edin",
+        "summary": "Görevleri, kayıtlı kullanımı ve hesap kotalarını izleyin.",
+        "entry": "Ayarlar → AI; ada → AI izleyici.",
+        "steps": [
+          "Desteklenen yerel aracı açın veya CLI başvurusuna göre zislactl ile görev bildirin.",
+          "İstenen sağlayıcının kota izlemesini açın; kimlik bilgilerini yalnızca istendiğinde girin.",
+          "Örnekleme/sıfırlama zamanı ve uyarıları görün; geçmişi açın veya .xlsx dışa aktarın."
+        ],
+        "shortcuts": "İzleyici veya Ayarlar’ı kullanın; sabit genel kısayol gerekmez. zislactl belgelenmiş bağımsız değişkenleri kullanır.",
+        "permissions": "Yerel algılama yapılandırılmış durum okur. Kota kontrolü sağlayıcıya bağlanır; isteğe bağlı AI düzenlemesi seçilen model veya CLI’ı kullanır.",
+        "output": "Görev/kullanım: ~/Library/Application Support/zisla/ai-state.sqlite. Kotalar sağlayıcı örnekleridir, token tahmini değildir; eksik veri kullanılamaz kalır."
+      },
+      "media-tools": {
+        "title": "Resim, ses ve PDF işleyin",
+        "summary": "Bağımsız yerel araçları örneklerle kullanın.",
+        "entry": "Ayarlar → Resim / Ses / PDF araçları.",
+        "steps": [
+          "Resim ekleyin, işlem ve seçenekleri seçin, çalıştırıp sonucu veya ZIP dışa aktarın.",
+          "Raftan resim seçip boyutlandırma veya biçim dönüştürmeyi seçin; resim araçlarını çalıştırın ve başarılı çıktılar rafa dönsün.",
+          "Bileşenlerden FFmpeg ve ffprobe kurun, ses ekleyin, kesme veya karıştırma seçip çıktı dosyası ya da klasörü belirleyin.",
+          "PDF’leri sırayla ekleyin, çalıştırıp kaydedin. Office dönüşümü yerel LibreOffice veya OpenOffice ister."
+        ],
+        "shortcuts": "Araç düğmeleri; sabit genel kısayol yok.",
+        "permissions": "Seçici, seçili dosya ve klasörlere erişim verir. İşlem yerel; bileşen kurulumu indirme yapar.",
+        "output": "Yeni varsayılanlar: resim ~/Downloads/picture, PDF ~/Downloads/pdf; ayrı ayarlanır. Ses, dışa aktarma penceresini kullanır."
+      },
+      "daily-briefing": {
+        "title": "Günlük özet oluşturun",
+        "summary": "İstatistikleri önizleyip PNG aktarın.",
+        "entry": "Ayarlar → Günlük özet.",
+        "steps": [
+          "Şablon ve istatistik seçin.",
+          "Önizlemeyi açıp mevcut verileri ve çıktı klasörünü kontrol edin.",
+          "Bugünü aktarın veya günlük aktarımı açıp saat seçin."
+        ],
+        "shortcuts": "Önizleme ve aktarım düğmeleri; sabit kısayol yok.",
+        "permissions": "İlgili istatistikleri açın. Ekran Süresi geçmişi Tam Disk Erişimi isteyebilir; kotalar sağlayıcıdan sorgulanır.",
+        "output": "PNG özet klasöründe; yeni varsayılan ~/Downloads/daily. Eksik veri ölçülmüş sıfır değildir."
+      },
+      "desktop": {
+        "title": "Pencereleri önizleyip bağlam notu yazın",
+        "summary": "Pencereye geçip o konuma not bırakın.",
+        "entry": "Ayarlar → Pencere önizleme / Bağlam notları; Dock, Command+Tab ve raf.",
+        "steps": [
+          "Önizleme ve izinleri açın, Dock uygulamasına gidin veya Command+Tab kullanıp karta tıklayın.",
+          "Örnek sayfa, pencere veya masaüstünde ayarlı tuşu tutup sallayın; yazıp kaydedin.",
+          "Konuma dönün veya raftan açın; isterseniz yinelenen hatırlatma ya da pencere resmi ekleyin."
+        ],
+        "shortcuts": "Command+Tab uygulama değiştirir. Notlar varsayılan olarak Command tutar; değiştirilebilir.",
+        "permissions": "Önizleme Erişilebilirlik ve Ekran Kaydı ister. Pencere algılama Erişilebilirlik, ek resimler Ekran Kaydı kullanır.",
+        "output": "Notlar ve resimler ~/Library/Application Support/zisla altındaki yerel raf verisindedir."
+      },
+      "playback": {
+        "title": "Oynatmayı seçip uygulama sesini karıştırın",
+        "summary": "Çıkışı seçin ve ses çalan uygulamaları ayarlayın.",
+        "entry": "Medya alanı → Çıkış; Ayarlar → Medya kaynağı; ada → Mikser.",
+        "steps": [
+          "Örnek ses oynatıp mevcut çıkışı seçin.",
+          "Otomatik kaynak veya tercih edilen oynatıcı seçip kontrolleri deneyin.",
+          "macOS 14.4+ üzerinde mikseri açın, Sistem Sesi Kaydı izni verip uygulamayı ayarlayın veya susturun."
+        ],
+        "shortcuts": "Düğmeler ve kaydırıcılar; sabit kısayol yok.",
+        "permissions": "Mikser macOS 14.4+ ve Sistem Sesi Kaydı ister. Cihazlar bağlantıya bağlıdır; Bluetooth izin isteyebilir.",
+        "output": "Çıkış sistem seçimidir. Uygulama sesleri yerelde hatırlanır; dosya aktarılmaz."
+      }
+    },
+    "workflowsTitle": "Kısa iş akışı gösterimleri",
+    "workflows": {
+      "copy-next": {
+        "title": "Bulun, kopyalayın ve yeniden kullanın",
+        "steps": [
+          "Geçmişte örnek “brew” sözcüğünü arayın.",
+          "Eşleşen öğeyi kopyalayın.",
+          "Hedef uygulamaya yapıştırın. Kesit arama ve kopyalamayı gösterir; yeni kopyalarda ayrı hızlı işlemler vardır."
+        ]
+      },
+      "drop-output": {
+        "title": "Dosya bırakın ve çıktıyı hazırlayın",
+        "steps": [
+          "Finder’dan örnek resmi üst rafa sürükleyin.",
+          "Rafı açıp resmi seçin.",
+          "Hedefe sürükleyin veya ekran görüntüsünü PNG kaydedin. Kesit rafa bırakmayı gösterir."
+        ]
+      },
+      "meeting-note": {
+        "title": "Toplantıdan nota",
+        "steps": [
+          "Katılma bağlantısı olan toplantıyı açın.",
+          "Yeni toplantı notu veya mevcut notu ilişkilendirmeyi seçin.",
+          "Kaydedip etkinlikten ya da raftan açın. Kesit oluşturma ve ilişkilendirmeyi gösterir."
+        ]
+      }
+    },
+    "excerptLabel": "Kesiti oynat",
+    "guideLinkLabel": "Kılavuzu oku",
+    "videoNotice": "Mevcut özellik turundan, gösterim verili kesitler. Video yazıları İngilizce; buradaki adımlar seçtiğiniz dilde. Tam 2:40 tur ve müzik bilgileri aşağıdadır.",
+    "preferencesTitle": "Yararlı tercihler",
+    "preferences": [
+      "Sürüklerken sallamayı açarak rafı gösterin. Bağlam notları kendi basılı tutma tuşunu kullanır.",
+      "Medya alanında ses çıkışı, Ayarlar’da otomatik kaynak veya tercih edilen oynatıcı seçin. Bu seçim uygulamalara ayrı cihaz atamaz.",
+      "Tuş sesleri ve yazma istatistikleri bağımsızdır, Giriş İzleme kullanır. Uygulama mikseri macOS 14.4+ ve Sistem Sesi Kaydı ister.",
+      "Günlük özet 8 şablon, önizleme ve bağımsız klasöre elle veya günlük PNG aktarımı sunar."
+    ],
+    "documentLanguage": "Belge dili: {language}"
   },
   download: {
     eyebrow: 'SİZ HAZIR OLDUĞUNUZDA HAZIR',

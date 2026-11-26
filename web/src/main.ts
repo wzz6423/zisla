@@ -29,13 +29,16 @@ import {
   crossModuleFeatureIcons,
   crossModuleFeatureIds,
   documentationCardIds,
-  documentationUrls,
+  documentationLink,
   downloadLinks,
   downloadNoteIds,
   faqIds,
   flowStepIds,
   format,
   getSiteContent,
+  guideIds,
+  workflowIds,
+  workflowExcerpts,
   launchFilmMedia,
   latestRelease,
   license,
@@ -111,6 +114,8 @@ const escapeHtml = (value: string): string =>
   );
 
 const readInitialLocale = (): SiteLocale => {
+  const requested = new URLSearchParams(window.location.search).get('lang');
+  if (isSiteLocale(requested)) return requested;
   try {
     const stored = window.localStorage.getItem(localeStorageKey);
     if (isSiteLocale(stored)) return stored;
@@ -667,6 +672,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     ['ai', content.ai.eyebrow],
     ['how-it-works', content.flow.eyebrow],
     ['download', content.download.eyebrow],
+    ['help', content.help.title],
     ['faq', content.faq.eyebrow],
     ['developers', content.developers.eyebrow],
     ['changelog', content.changelog.eyebrow],
@@ -750,21 +756,53 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
   const docsMarkup = documentationCardIds
     .map((docId, index) => {
       const doc = content.developers.docs[docId];
+      const link = documentationLink(docId, locale);
       return (
         '<a class="doc-link reveal-step" style="--reveal-index: ' +
         index +
         '" href="' +
-        documentationUrls[docId] +
+        escapeHtml(link.url) +
         '" target="_blank" rel="noreferrer"><span><span class="mono-label">' +
         escapeHtml(doc.title) +
         '</span><span class="doc-description">' +
         escapeHtml(doc.description) +
+        '</span><span class="doc-description">' +
+        escapeHtml(format(content.help.documentLanguage, { language: localeNativeNames[link.language] })) +
         '</span></span>' +
         icon('arrow-up-right', 16) +
         '</a>'
       );
     })
     .join('');
+
+  const helpMarkup =
+    '<section class="section help-section" id="help"><div class="section-wrap"><div class="section-heading reveal"><div><h2 class="section-title">' +
+    escapeHtml(content.help.title) + '</h2></div><p class="section-lede">' + escapeHtml(content.help.lede) +
+    '</p></div><nav class="guide-nav" aria-label="' + escapeHtml(content.help.title) + '">' +
+    guideIds.map((id) => '<a href="#guide-' + id + '">' + escapeHtml(content.help.guides[id].title) + '</a>').join('') +
+    '</nav><div class="guide-list">' + guideIds.map((id) => {
+      const guide = content.help.guides[id];
+      return '<article class="user-guide reveal" id="guide-' + id + '"><h3><a href="#guide-' + id + '">' +
+        escapeHtml(guide.title) + '</a></h3><p>' + escapeHtml(guide.summary) + '</p><dl><dt>' +
+        escapeHtml(content.help.labels.entry) + '</dt><dd>' + escapeHtml(guide.entry) +
+        '</dd></dl><ol>' + guide.steps.map((step) => '<li>' + escapeHtml(step) + '</li>').join('') + '</ol><dl>' +
+        (['shortcuts', 'permissions', 'output'] as const).map((field) => '<dt>' +
+          escapeHtml(content.help.labels[field]) + '</dt><dd>' + escapeHtml(guide[field]) + '</dd>').join('') +
+        '</dl></article>';
+    }).join('') + '</div><h3 class="help-subtitle">' + escapeHtml(content.help.workflowsTitle) +
+    '</h3><p class="section-lede">' + escapeHtml(content.help.videoNotice) + '</p><div class="help-workflows">' +
+    workflowIds.map((id) => {
+      const workflow = content.help.workflows[id];
+      const excerpt = workflowExcerpts[id];
+      return '<article class="workflow-example reveal" id="workflow-' + id + '"><h4>' +
+        escapeHtml(workflow.title) + '</h4><ol>' + workflow.steps.map((step) => '<li>' + escapeHtml(step) + '</li>').join('') +
+        '</ol><video class="workflow-video" controls playsinline preload="none" width="1920" height="1080" aria-label="' +
+        escapeHtml(workflow.title) + '" src="' + launchFilmMedia.video + '#t=' + excerpt.start + ',' + excerpt.end + '"></video><p><a href="' + launchFilmMedia.video + '#t=' + excerpt.start + ',' + excerpt.end + '">' +
+        escapeHtml(content.help.excerptLabel) + ' <bdi>' + excerpt.start + '–' + excerpt.end + '</bdi></a> · <a href="#guide-' +
+        excerpt.guide + '">' + escapeHtml(content.help.guideLinkLabel) + '</a></p></article>';
+    }).join('') + '</div><h3 class="help-subtitle">' + escapeHtml(content.help.preferencesTitle) +
+    '</h3><ul class="help-preferences">' + content.help.preferences.map((item) => '<li>' + escapeHtml(item) + '</li>').join('') +
+    '</ul></div></section>';
 
   const faqMarkup = faqIds
     .map((faqId) => {
@@ -970,6 +1008,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     .join('');
 
   document.querySelector<HTMLVideoElement>('#launchFilm')?.pause();
+  document.querySelectorAll<HTMLVideoElement>('.workflow-video').forEach((video) => video.pause());
   app.innerHTML =
     '<nav class="section-progress-nav" aria-label="' + escapeHtml(content.header.navAriaLabel) + '">' +
     sectionProgressMarkup + '</nav><main><section class="hero" id="top"><header class="site-header">' +
@@ -1161,7 +1200,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     '</p></div></div><dl class="download-notes reveal-step" style="--reveal-index: 1">' +
     downloadNoteIds.map(renderDownloadNote).join('') +
     '</dl></div></section>' +
-    '<section class="section faq-section" id="faq"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
+    helpMarkup + '<section class="section faq-section" id="faq"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
     escapeHtml(content.faq.eyebrow) +
     '</p><h2 class="section-title">' +
     escapeHtml(content.faq.title) +
@@ -1217,7 +1256,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     '" target="_blank" rel="noreferrer">' +
     escapeHtml(content.footer.previewChannelLabel) +
     '</a><a href="' +
-    documentationUrls.contributing +
+    escapeHtml(documentationLink('contributing', locale).url) +
     '" target="_blank" rel="noreferrer">' +
     escapeHtml(content.developers.docs.contributing.title) +
     '</a></div></div><div class="footer-bottom reveal-step" style="--reveal-index: 1"><span>' +
@@ -1262,6 +1301,9 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     } catch {
       // Keep the in-memory selection when persistence is unavailable.
     }
+    const address = new URL(window.location.href);
+    address.searchParams.set('lang', value);
+    window.history.replaceState(null, '', address);
     void showLocale(value, true);
   });
 
@@ -1304,6 +1346,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
       const headerOffset =
         document.querySelector<HTMLElement>('.site-header')?.getBoundingClientRect().height ?? 82;
       const y = target.getBoundingClientRect().top + window.pageYOffset - headerOffset - 16;
+      window.history.pushState(null, '', href);
       window.scrollTo({
         top: y,
         behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
@@ -1315,6 +1358,9 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
   updateScrollProgress();
   if (preserveScroll) {
     window.requestAnimationFrame(() => window.scrollTo({ top: previousScroll, behavior: 'auto' }));
+  } else if (window.location.hash) {
+    const target = document.getElementById(window.location.hash.substring(1));
+    target?.scrollIntoView();
   }
 };
 
@@ -1346,6 +1392,7 @@ const updateScrollWithIntro = () => {
 
 window.addEventListener('scroll', updateScrollWithIntro, { passive: true });
 window.addEventListener('resize', updateScrollProgress);
+window.addEventListener('popstate', () => showLocale(readInitialLocale()));
 desktopQuery.addEventListener?.('change', () => setMenuOpen(false));
 reducedMotionQuery.addEventListener?.('change', bindReveals);
 colorSchemeQuery.addEventListener('change', () => {

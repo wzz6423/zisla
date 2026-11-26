@@ -62,6 +62,7 @@ function createPage(t, { available = true, reducedMotion = true, hidden = false,
   let now = 0;
   const window = Object.assign(new Events(), {
     innerWidth: 1280, innerHeight: 800, devicePixelRatio: 1, scrollY: 0,
+    location: new URL('https://example.test/zisla/'),
     localStorage: { getItem: () => null },
     matchMedia: (query) => query.includes('reduced-motion') ? media : Object.assign(new Events(), { matches: false }),
     requestAnimationFrame(callback) { frames.set(++nextFrame, callback); return nextFrame; },
@@ -151,7 +152,7 @@ function createPage(t, { available = true, reducedMotion = true, hidden = false,
         forceContextLoss() { this.contextLosses++; }
       },
     },
-    document, window, navigator: { languages: [] }, Event,
+    document, window, navigator: { languages: [] }, Event, URL, URLSearchParams,
     Math: Object.assign(Object.create(Math), { random: () => 0.5 }),
     requestAnimationFrame: window.requestAnimationFrame,
     cancelAnimationFrame: window.cancelAnimationFrame,
