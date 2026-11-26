@@ -224,11 +224,27 @@ public struct PomodoroEngine: Equatable, Sendable {
     }
 }
 
+public struct CountdownTimer: Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public fileprivate(set) var name: String
+    public fileprivate(set) var engine: PomodoroEngine
+    public fileprivate(set) var displayClock: String
+
+    public init(id: UUID = UUID(), name: String = "", duration: TimeInterval = PomodoroMode.focus.duration) {
+        self.id = id
+        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        engine = PomodoroEngine(focusDuration: duration)
+        displayClock = PomodoroEngine.formatMMSS(engine: engine)
+    }
+}
+
 @MainActor
 public final class PomodoroService: ObservableObject {
     @Published public private(set) var engine = PomodoroEngine()
     @Published public private(set) var displayClock = "25:00"
     @Published public private(set) var focusCountdownRunID = UUID()
+    @Published public private(set) var name = ""
+    @Published public private(set) var countdowns: [CountdownTimer] = []
     /// When "mute notifications" is on, Pomodoro completion signals are suppressed; synced by `AppModel` from settings.
     public var notificationsMuted = false
     public var onDailyBriefingActivity: DailyBriefingActivityHandler?
@@ -246,6 +262,7 @@ public final class PomodoroService: ObservableObject {
     private let defaults: UserDefaults
     private let focusDurationKey = "zisla.pomodoro.focusDuration"
     private let restDurationKey = "zisla.pomodoro.restDuration"
+    private let nameKey = "zisla.pomodoro.name"
     private var authorizationPromptHost: NSWindow?
 
     public init(
@@ -279,6 +296,7 @@ public final class PomodoroService: ObservableObject {
             defaults.set(restDuration, forKey: restDurationKey)
         }
         engine = PomodoroEngine(focusDuration: focusDuration, restDuration: restDuration)
+        name = defaults.string(forKey: nameKey) ?? ""
         refreshDisplay()
     }
 
@@ -296,15 +314,140 @@ public final class PomodoroService: ObservableObject {
         "\(Self.focusCountdownNoticeIDPrefix)\(focusCountdownRunID.uuidString)-\(side.rawValue)"
     }
 
-    public func focusCountdownNotice(for side: NoticeSide) -> IslandNotice {
+    public var hasActiveCountdowns: Bool {
+        engine.phase != .idle || countdowns.contains { $0.engine.phase != .idle }
+    }
+
+    public func setName(_ name: String) {
+        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        defaults.set(self.name, forKey: nameKey)
+    }
+
+    @discardableResult
+    public func addCountdown(name: String = "", duration: TimeInterval = PomodoroMode.focus.duration) -> UUID {
+        let countdown = CountdownTimer(name: name, duration: duration)
+        countdowns.append(countdown)
+        return countdown.id
+    }
+
+    public func renameCountdown(id: UUID, name: String) {
+        guard let index = countdowns.firstIndex(where: { $0.id == id }) else { return }
+        countdowns[index].name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public func setCountdownDuration(id: UUID, duration: TimeInterval) {
+        guard let index = countdowns.firstIndex(where: { $0.id == id }),
+              countdowns[index].engine.phase == .idle else { return }
+        countdowns[index].engine = PomodoroEngine(focusDuration: duration)
+        refreshDisplay()
+    }
+
+    public func toggleCountdown(id: UUID) {
         let date = now()
+        tick(at: date)
+        guard let index = countdowns.firstIndex(where: { $0.id == id }) else { return }
+        if countdowns[index].engine.phase == .running {
+            countdowns[index].engine.pause(at: date)
+        } else {
+            requestNotificationAuthorizationIfNeeded()
+            countdowns[index].engine.start(at: date)
+        }
+        synchronizeTimer()
+        refreshDisplay()
+    }
+
+    public func cancelCountdown(id: UUID) {
+        countdowns.removeAll { $0.id == id }
+        synchronizeTimer()
+    }
+
+    public func toggleCountdownGroup(_ members: [String]) {
+        let date = now()
+        tick(at: date)
+        let includesPomodoro = members.contains("pomodoro") && engine.phase != .idle
+        let indices = countdowns.indices.filter { members.contains(countdowns[$0].id.uuidString) }
+        let pauses = includesPomodoro ? engine.phase == .running
+            : indices.first.map { countdowns[$0].engine.phase == .running } ?? false
+        if !pauses { requestNotificationAuthorizationIfNeeded() }
+        if includesPomodoro {
+            if pauses { engine.pause(at: date) }
+            else { engine.start(at: date) }
+        }
+        for index in indices {
+            if pauses { countdowns[index].engine.pause(at: date) }
+            else { countdowns[index].engine.start(at: date) }
+        }
+        synchronizeTimer()
+        refreshDisplay(at: date)
+    }
+
+    public func cancelCountdownGroup(_ members: [String]) {
+        if members.contains("pomodoro") { engine.reset() }
+        countdowns.removeAll { members.contains($0.id.uuidString) }
+        synchronizeTimer()
+        refreshDisplay()
+    }
+
+    public func focusCountdownNotice(for side: NoticeSide) -> IslandNotice {
+        countdownNotice(nil, for: side, at: now(), order: 0)
+    }
+
+    public func countdownNotices(for side: NoticeSide, limit: Int = 1) -> [IslandNotice] {
+        let date = now()
+        let candidates: [CountdownTimer?] = (engine.phase == .idle ? [] : [nil])
+            + countdowns.filter { $0.engine.phase != .idle }.map { Optional($0) }
+        let ordered = candidates.enumerated().sorted { lhs, rhs in
+            let left = lhs.element?.engine ?? engine
+            let right = rhs.element?.engine ?? engine
+            if (left.phase == .running) != (right.phase == .running) {
+                return left.phase == .running
+            }
+            let leftRemaining = left.remaining(at: date)
+            let rightRemaining = right.remaining(at: date)
+            return leftRemaining == rightRemaining ? lhs.offset < rhs.offset : leftRemaining < rightRemaining
+        }
+        var groups: [IslandNotice] = []
+        for candidate in ordered {
+            let notice = countdownNotice(candidate.element, for: side, at: date, order: 0)
+            if let index = groups.firstIndex(where: {
+                $0.detail == notice.detail && $0.metadata?["timerPhase"] == notice.metadata?["timerPhase"]
+            }) {
+                groups[index].title += " & " + notice.title
+                let names = [groups[index].metadata?["timerName"] ?? "", notice.metadata?["timerName"] ?? ""]
+                groups[index].metadata?["timerName"] = names.filter { !$0.isEmpty }.joined(separator: " & ")
+                let existing = groups[index].metadata?["timerIDs"]
+                    ?? groups[index].metadata?["timerID"] ?? "pomodoro"
+                groups[index].metadata?["timerIDs"] = existing + "," + (notice.metadata?["timerID"] ?? "pomodoro")
+            } else {
+                groups.append(notice)
+            }
+        }
+        return groups.prefix(max(0, limit)).enumerated().map { index, notice in
+            var notice = notice
+            notice.metadata?["timerOrder"] = String(index)
+            return notice
+        }
+    }
+
+    private func countdownNotice(_ countdown: CountdownTimer?, for side: NoticeSide, at date: Date, order: Int) -> IslandNotice {
+        let engine = countdown?.engine ?? self.engine
+        let name = countdown?.name ?? self.name
+        var metadata = [
+            "timerKey": (countdown?.id ?? focusCountdownRunID).uuidString,
+            "timerName": name,
+            "timerPhase": engine.phase == .running ? "running" : "paused",
+            "timerOrder": String(order),
+        ]
+        if let countdown { metadata["timerID"] = countdown.id.uuidString }
         return IslandNotice(
-            id: focusCountdownNoticeID(for: side),
-            title: AppLocalization.string(mode.title, language: language()),
+            id: countdown.map { "\(Self.focusCountdownNoticeIDPrefix)timer-\($0.id.uuidString)-\(side.rawValue)" }
+                ?? focusCountdownNoticeID(for: side),
+            title: name.isEmpty ? AppLocalization.string(countdown == nil ? engine.mode.title : "计时器", language: language()) : name,
             detail: PomodoroEngine.formatHHMMSS(at: date, engine: engine),
             side: side,
             createdAt: date,
-            progress: engine.progress(at: date)
+            progress: engine.progress(at: date),
+            metadata: metadata
         )
     }
 
@@ -317,7 +460,7 @@ public final class PomodoroService: ObservableObject {
         defaults.set(normalized, forKey: focusDurationKey)
         if engine.mode == .focus {
             engine.reset()
-            stopTimer()
+            synchronizeTimer()
         }
         refreshDisplay()
     }
@@ -331,7 +474,7 @@ public final class PomodoroService: ObservableObject {
         defaults.set(normalized, forKey: restDurationKey)
         if engine.mode == .rest {
             engine.reset()
-            stopTimer()
+            synchronizeTimer()
         }
         refreshDisplay()
     }
@@ -346,7 +489,7 @@ public final class PomodoroService: ObservableObject {
         if startsRun {
             focusCountdownRunID = UUID()
         }
-        ensureTimer()
+        synchronizeTimer()
         refreshDisplay()
     }
 
@@ -354,7 +497,7 @@ public final class PomodoroService: ObservableObject {
         let date = now()
         tick(at: date)
         engine.pause(at: date)
-        stopTimer()
+        synchronizeTimer()
         refreshDisplay()
     }
 
@@ -369,14 +512,23 @@ public final class PomodoroService: ObservableObject {
 
     public func reset() {
         engine.reset()
-        stopTimer()
+        synchronizeTimer()
         refreshDisplay()
     }
 
     public func stop() {
         engine.reset()
+        countdowns.removeAll()
         stopTimer()
         refreshDisplay()
+    }
+
+    private func synchronizeTimer() {
+        if engine.phase == .running || countdowns.contains(where: { $0.engine.phase == .running }) {
+            ensureTimer()
+        } else {
+            stopTimer()
+        }
     }
 
     private func ensureTimer() {
@@ -410,18 +562,25 @@ public final class PomodoroService: ObservableObject {
             if completedMode == .focus {
                 onDailyBriefingActivity?(.pomodoroCompleted, 1, completedDuration, date)
             }
-            stopTimer()
             notifyCompletion(of: completedMode)
-            refreshDisplay()
-            return
         }
-        refreshDisplay()
+        let completed = countdowns.filter { $0.engine.phase == .running && $0.engine.remaining(at: date) <= 0 }
+        for countdown in completed {
+            countdowns.removeAll { $0.id == countdown.id }
+            notifyCountdownCompletion(countdown)
+        }
+        synchronizeTimer()
+        refreshDisplay(at: date)
     }
 
-    func refreshDisplay() {
-        let clock = PomodoroEngine.formatMMSS(at: now(), engine: engine)
-        guard displayClock != clock else { return }
-        displayClock = clock
+    func refreshDisplay(at date: Date? = nil) {
+        let date = date ?? now()
+        let clock = PomodoroEngine.formatMMSS(at: date, engine: engine)
+        if displayClock != clock { displayClock = clock }
+        for index in countdowns.indices {
+            let clock = PomodoroEngine.formatMMSS(at: date, engine: countdowns[index].engine)
+            if countdowns[index].displayClock != clock { countdowns[index].displayClock = clock }
+        }
     }
 
     private func requestNotificationAuthorizationIfNeeded() {
@@ -446,11 +605,7 @@ public final class PomodoroService: ObservableObject {
 
     private func notifyCompletion(of mode: PomodoroMode) {
         guard !notificationsMuted else { return }
-        if let completionSoundHandler {
-            completionSoundHandler()
-        } else {
-            PomodoroCompletionSoundPlayer.shared.play()
-        }
+        playCompletionSound()
         if userCareEnabled {
             onUserCareReminder?(mode == .focus ? .focusCompleted : .restCompleted)
             return
@@ -466,11 +621,28 @@ public final class PomodoroService: ObservableObject {
             content.title = AppLocalization.string("休息结束", language: language)
             content.body = AppLocalization.string("开始下一段专注", language: language)
         }
-        let request = UNNotificationRequest(
-            identifier: "zisla.pomodoro.\(UUID().uuidString)",
-            content: content,
-            trigger: nil
-        )
+        sendCompletionNotification(content, identifier: "zisla.pomodoro.\(UUID().uuidString)")
+    }
+
+    private func notifyCountdownCompletion(_ countdown: CountdownTimer) {
+        guard !notificationsMuted else { return }
+        playCompletionSound()
+        let content = UNMutableNotificationContent()
+        content.title = countdown.name.isEmpty ? AppLocalization.string("计时器", language: language()) : countdown.name
+        content.body = AppLocalization.string("计时结束", language: language())
+        sendCompletionNotification(content, identifier: "zisla.countdown.\(countdown.id.uuidString)")
+    }
+
+    private func playCompletionSound() {
+        if let completionSoundHandler {
+            completionSoundHandler()
+        } else {
+            PomodoroCompletionSoundPlayer.shared.play()
+        }
+    }
+
+    private func sendCompletionNotification(_ content: UNNotificationContent, identifier: String) {
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         if let notificationRequestHandler {
             notificationRequestHandler(request)
         } else {

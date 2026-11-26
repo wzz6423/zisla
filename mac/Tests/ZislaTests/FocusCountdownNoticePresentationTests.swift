@@ -7,6 +7,37 @@ import ZislaKit
 
 struct FocusCountdownNoticePresentationTests {
     @Test @MainActor
+    func reorderingAndCancelingCountdownsRefreshesBothSidesWithoutLeavingStaleControls() throws {
+        let suite = "FocusCountdownNoticePresentation.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let pomodoro = PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults)
+        defer { pomodoro.stop() }
+        let queue = SideNoticeQueue()
+        defer { queue.removeAll() }
+        let first = pomodoro.addCountdown(name: "Tea", duration: 30)
+        let second = pomodoro.addCountdown(name: "Meeting", duration: 60)
+        pomodoro.toggleCountdown(id: first)
+        pomodoro.toggleCountdown(id: second)
+        AppModel.refreshFocusCountdownNotices(for: pomodoro, in: queue)
+        #expect(queue.left.count == 2 && queue.right.count == 2)
+        #expect(SideNoticeLayoutEngine.orderedFocusCountdownNotices(for: queue.left + queue.right).map(\.title) == ["Tea", "Meeting"])
+        pomodoro.toggleCountdown(id: first)
+        AppModel.refreshFocusCountdownNotices(for: pomodoro, in: queue)
+        #expect(SideNoticeLayoutEngine.orderedFocusCountdownNotices(for: queue.left + queue.right).map(\.title) == ["Meeting", "Tea"])
+        pomodoro.renameCountdown(id: second, name: "Call")
+        AppModel.refreshFocusCountdownNotices(for: pomodoro, in: queue)
+        #expect(SideNoticeLayoutEngine.orderedFocusCountdownNotices(for: queue.left + queue.right).first?.title == "Call")
+        pomodoro.cancelCountdown(id: second)
+        AppModel.refreshFocusCountdownNotices(for: pomodoro, in: queue)
+        #expect(queue.left.count == 1 && queue.right.count == 1)
+        #expect(queue.left.first?.metadata?["timerID"] == first.uuidString)
+        pomodoro.cancelCountdown(id: first)
+        AppModel.refreshFocusCountdownNotices(for: pomodoro, in: queue)
+        #expect(queue.left.isEmpty && queue.right.isEmpty)
+    }
+
+    @Test @MainActor
     func pausingWithinTheDisplayedSecondRefreshesProgressAndResumingReplacesBothNotices() throws {
         let suiteName = "FocusCountdownNoticePresentation.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))

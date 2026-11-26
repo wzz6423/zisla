@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import Testing
@@ -584,15 +585,18 @@ struct SideNoticeLayoutTests {
         #expect(engine.compactBarSizing(for: [notice, ai], settings: settings)?.progressGlowEnabled == false)
     }
 
-    @Test(arguments: IslandEdge.allCases)
-    func countdownPillsReserveTwoButtonsWithoutShrinkingTheTime(edge: IslandEdge) throws {
-        let notice = IslandNotice(id: "focus-countdown-layout", title: "Focus", detail: "00:24:57")
+    @Test(arguments: IslandEdge.allCases, ["00:24:57", "100:00:00"])
+    func countdownPillsReserveTwoButtonsWithoutShrinkingTheTime(edge: IslandEdge, clock: String) throws {
+        let notice = IslandNotice(id: "focus-countdown-layout", title: "Focus", detail: clock)
         let settings = FeatureSettings(islandLayoutStyle: .pill,
                                        islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         let presentation = try #require(engine.compactBarSizing(for: [notice], settings: settings)?.customPillPresentation)
-        let reference = CompactPillStatusPresentation(priority: .toolboxReminder, notice: notice, text: presentation.text)
+        let textLength = edge.isVertical
+            ? CGFloat(CompactPillStatusPresentation.verticalTextRows(clock, availableWidth: 32, availableHeight: 168).count) * 14
+            : ceil((clock as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)]).width)
         #expect(presentation.length(thickness: 32, edge: edge)
-            == reference.length(thickness: 32, edge: edge) + CompactPillStatusPresentation.pomodoroControlsLength + 6)
+            == 24 + 24 + 12 + CompactPillStatusPresentation.pomodoroControlsLength + textLength,
+            "The clock's actual font and both 24pt buttons must fit without shrinking the time")
     }
 
     @Test

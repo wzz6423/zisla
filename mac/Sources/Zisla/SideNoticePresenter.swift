@@ -643,7 +643,7 @@ final class SideNoticePresenter {
         let showsControls = information?.primary.contains {
             $0.presentation.priority == .focusCountdown || $0.presentation.priority == .meeting
         } == true
-        return !statusIcons.isEmpty && !showsControls
+        return !statusIcons.isEmpty && !showsControls && information?.countdowns.isEmpty != false
     }
 
     func containsCompactPomodoroControl(at point: CGPoint) -> Bool {

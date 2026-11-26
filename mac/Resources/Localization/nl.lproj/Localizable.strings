@@ -3792,3 +3792,9 @@
 "无法压缩同名项目：%@" = "Items met dezelfde naam kunnen niet worden ingepakt: %@";
 "素材库导入完成" = "Importeren in de mediabibliotheek voltooid";
 "%ld 个结果未能加入中转站" = "%ld resultaten konden niet aan de plank worden toegevoegd";
+
+/* Independent countdown timers */
+"计时器" = "Timer";
+"计时结束" = "Timer afgelopen";
+"计时器名称" = "Timernaam";
+"添加计时器" = "Timer toevoegen";

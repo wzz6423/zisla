@@ -62,7 +62,7 @@ struct CompactPomodoroControlsTests {
                     "Measuring a button must not intercept its mouse events")
             let pill = try #require(coordinator.activeLayout).collapsedFrame
             #expect(try #require(coordinator.activeLayout).containsTrigger(point))
-            let entry = edge.isVertical ? CGPoint(x: pill.minX + 0.5, y: point.y)
+            let entry = edge.isVertical && iconCount == 0 ? CGPoint(x: pill.minX + 0.5, y: point.y)
                 : CGPoint(x: point.x, y: pill.minY + 0.5)
             coordinator.handlePointer(at: entry)
             #expect(!expanded, "The pointer must be able to reach a button across the pill's padding")
@@ -292,13 +292,13 @@ struct CompactPomodoroControlsTests {
             .deletingLastPathComponent().deletingLastPathComponent()
         let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
         let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
-        for key in ["暂停", "继续", "重置番茄钟"] {
+        for key in ["暂停", "继续", "取消"] {
             let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
             #expect(!value.isEmpty)
             #expect(AppLocalization.string(key, language: language) == value)
         }
         #expect(try fixture.label("pomodoro.toggleStartPause") == table["暂停"])
-        #expect(try fixture.label("pomodoro.reset") == table["重置番茄钟"])
+        #expect(try fixture.label("pomodoro.reset") == table["取消"])
         for identifier in ["pomodoro.toggleStartPause", "pomodoro.reset", "pomodoro.countdown", "pomodoro.clock"] {
             let button = try #require(fixture.element(identifier) as? any NSAccessibilityElementProtocol)
             let frame = button.accessibilityFrame()

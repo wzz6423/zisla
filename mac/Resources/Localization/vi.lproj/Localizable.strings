@@ -3792,3 +3792,9 @@
 "无法压缩同名项目：%@" = "Không thể nén các mục có cùng tên: %@";
 "素材库导入完成" = "Đã nhập xong vào thư viện phương tiện";
 "%ld 个结果未能加入中转站" = "Không thể thêm %ld kết quả vào khay";
+
+/* Independent countdown timers */
+"计时器" = "Bộ hẹn giờ";
+"计时结束" = "Đã hết giờ";
+"计时器名称" = "Tên bộ hẹn giờ";
+"添加计时器" = "Thêm bộ hẹn giờ";

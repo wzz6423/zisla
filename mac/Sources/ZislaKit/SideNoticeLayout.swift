@@ -249,7 +249,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             ? notices.first(where: { $0.id.hasPrefix("background-sound-") })
             : nil
         let activeFocusCountdownNotice = compactWingsEnabled
-            ? notices.first(where: { $0.id.hasPrefix("focus-countdown-") })
+            ? Self.orderedFocusCountdownNotices(for: notices).first
             : nil
         let activeFocusModeNotice = compactWingsEnabled
             ? notices.first(where: { $0.id.hasPrefix("focus-mode-") })
@@ -717,9 +717,27 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     public func compactPillPresentations(
         for notices: [IslandNotice], settings: FeatureSettings
     ) -> [CompactPillStatusPresentation] {
-        CompactStatusPriority.normalized(settings.compactStatusPriority).compactMap {
-            compactPillPresentation(for: $0, notices: notices, settings: settings)
+        CompactStatusPriority.normalized(settings.compactStatusPriority).flatMap { priority in
+            if priority == .focusCountdown {
+                return Self.orderedFocusCountdownNotices(for: notices).prefix(2).map {
+                    CompactPillStatusPresentation(priority: priority, notice: $0, text: $0.detail ?? "")
+                }
+            }
+            return compactPillPresentation(for: priority, notices: notices, settings: settings).map { [$0] } ?? []
         }
+    }
+
+    public static func orderedFocusCountdownNotices(for notices: [IslandNotice]) -> [IslandNotice] {
+        var keys: Set<String> = []
+        return notices.enumerated()
+            .filter { $0.element.id.hasPrefix("focus-countdown-") }
+            .sorted {
+                let left = Int($0.element.metadata?["timerOrder"] ?? "") ?? 0
+                let right = Int($1.element.metadata?["timerOrder"] ?? "") ?? 0
+                return left == right ? $0.offset < $1.offset : left < right
+            }
+            .map(\.element)
+            .filter { keys.insert($0.metadata?["timerKey"] ?? $0.id).inserted }
     }
 
     /// Selects the latest transient consistently with sizing and restricts persistent quota to custom placement.
@@ -735,7 +753,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         case .mail: notices.filter { $0.id.hasPrefix("mail-notification-") }.max { $0.createdAt < $1.createdAt }
         case .videoDownload: notices.first { $0.id.hasPrefix("video-download-") }
         case .browserDownload: notices.first { $0.id.hasPrefix("browser-download-") }
-        case .focusCountdown: notices.first { $0.id.hasPrefix("focus-countdown-") }
+        case .focusCountdown: Self.orderedFocusCountdownNotices(for: notices).first
         case .meeting: notices.first { $0.id.hasPrefix(MeetingCountdown.noticePrefix) }
         case .toolboxReminder: notices.first { $0.id.hasPrefix("toolbox-reminder-") }
         case .aiActivity: notices.first { $0.id.hasPrefix("ai-active-") }

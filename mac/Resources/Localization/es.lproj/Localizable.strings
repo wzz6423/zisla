@@ -3792,3 +3792,9 @@
 "无法压缩同名项目：%@" = "No se pueden comprimir elementos con el mismo nombre: %@";
 "素材库导入完成" = "Importación a la biblioteca completada";
 "%ld 个结果未能加入中转站" = "No se pudieron añadir %ld resultados a la bandeja";
+
+/* Independent countdown timers */
+"计时器" = "Temporizador";
+"计时结束" = "Temporizador finalizado";
+"计时器名称" = "Nombre del temporizador";
+"添加计时器" = "Añadir temporizador";

@@ -12,7 +12,7 @@ struct KeyboardFocusPolicyTests {
 
     @Test
     func otherModulesKeepTheExistingKeyboardFocusPolicy() {
-        let allowedModules: Set<IslandModule> = [.shelf, .clipboard, .download, .mail, .quickNotes]
+        let allowedModules: Set<IslandModule> = [.shelf, .clipboard, .download, .mail, .quickNotes, .toolbox]
         for module in IslandModule.allCases {
             #expect(module.allowsIslandKeyboardFocus == allowedModules.contains(module))
         }

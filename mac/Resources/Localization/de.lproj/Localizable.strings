@@ -3793,3 +3793,9 @@
 "无法压缩同名项目：%@" = "Gleichnamige Elemente können nicht archiviert werden: %@";
 "素材库导入完成" = "Import in die Mediathek abgeschlossen";
 "%ld 个结果未能加入中转站" = "%ld Ergebnisse konnten nicht zur Ablage hinzugefügt werden";
+
+/* Independent countdown timers */
+"计时器" = "Timer";
+"计时结束" = "Timer abgelaufen";
+"计时器名称" = "Timername";
+"添加计时器" = "Timer hinzufügen";

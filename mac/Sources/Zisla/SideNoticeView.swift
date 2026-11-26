@@ -261,8 +261,8 @@ struct CompactStatusBarView: View {
     private func compactSurfaceContent(size: CGSize, at date: Date, animatesLogo: Bool) -> some View {
         let information = compactInformation(at: date)
         let progressPriority = compactProgressPriority(for: information)
-        let pillCornerRadius: CGFloat? = information?.secondary == nil
-            ? nil : VoiceRecordingIslandGeometry.bottomCornerRadius
+        let pillCornerRadius: CGFloat? = information.map { $0.rowCount > 1 } == true
+            ? VoiceRecordingIslandGeometry.bottomCornerRadius : nil
         let shape = CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle,
                                        pillCornerRadius: pillCornerRadius)
         return ZStack {
@@ -511,7 +511,7 @@ struct CompactStatusBarView: View {
     }
 
     private var focusCountdownNotice: IslandNotice? {
-        presentationNotices.first { $0.id.hasPrefix("focus-countdown-") }
+        SideNoticeLayoutEngine.orderedFocusCountdownNotices(for: presentationNotices).first
     }
 
     private var meetingNotice: IslandNotice? {
@@ -2539,18 +2539,27 @@ private struct CompactFocusCountdownBar: View {
                 HStack(spacing: 6) {
                     Image(systemName: "clock")
                         .accessibilityIdentifier("pomodoro.clock")
-                    Text(notice.detail ?? "00:00:00")
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                        .accessibilityLabel(Text("\(notice.title) \(notice.detail ?? "00:00:00")"))
-                        .accessibilityIdentifier("pomodoro.countdown")
+                    VStack(alignment: .leading, spacing: 1) {
+                        if let name = notice.metadata?["timerName"], !name.isEmpty {
+                            Text(name)
+                                .font(.system(size: 9, weight: .medium))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(notice.detail ?? "00:00:00")
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                            .accessibilityLabel(Text("\(notice.title) \(notice.detail ?? "00:00:00")"))
+                            .accessibilityIdentifier("pomodoro.countdown")
+                    }
                 }
                 .padding(.leading, 12)
                 .frame(width: sideWidth, height: height, alignment: .leading)
                 Spacer(minLength: 0)
                     .frame(width: centerInset)
-                CompactPomodoroControls(edge: .top)
+                CompactPomodoroControls(edge: .top, notice: notice)
                     .padding(.trailing, 12)
                     .frame(width: sideWidth, height: height, alignment: .trailing)
             }

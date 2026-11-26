@@ -60,12 +60,24 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
         let visualLength = (showsWaveform || priority == .updateAvailable ? iconSize * 2 + 6 : iconSize)
             + Self.trailingInset + leadingInset
             + (priority == .focusCountdown ? Self.pomodoroControlsLength + 6 : 0)
+        if priority == .focusCountdown {
+            return visualLength + 6 + countdownTextLength(thickness: thickness, edge: edge)
+        }
         let identityLength = mediaIdentityLength(thickness: thickness, edge: edge, text: text, item: item)
         let lyricLength = Self.textLength(text, availableWidth: thickness, edge: edge,
                                           font: NSFont.systemFont(ofSize: 11, weight: .medium))
         let textLength = identityLength + lyricLength + (identityLength > 0 && !text.isEmpty ? 6 : 0)
         guard textLength > 0 else { return visualLength }
         return visualLength + 6 + min(Self.maximumTextLength, textLength)
+    }
+
+    public func countdownTextLength(thickness: CGFloat, edge: IslandEdge) -> CGFloat {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        let clockLength = Self.textLength(text, availableWidth: thickness, edge: edge, font: font)
+        let name = notice.metadata?["timerName"] ?? ""
+        let nameLength = name.isEmpty ? 0
+            : min(96, Self.textLength(name, availableWidth: thickness, edge: edge, font: font)) + 6
+        return clockLength + nameLength
     }
 
     /// Camera wings share a physical gap, so each side must fit the larger of the ring or summary.
