@@ -130,7 +130,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
                     row.accountName = credential.accountName
                     row.windows = try await fetch(provider, credential: credential, now: time)
                 } else if provider == .gemini, let snapshot = try await antigravityProbe() {
-                    let geminiWindows = snapshot.windows.filter { $0.name?.lowercased().contains("gemini") == true }
+                    let geminiWindows = Self.canonicalizeGeminiDesktopWindows(snapshot.windows)
                     guard !geminiWindows.isEmpty, geminiWindows.allSatisfy(\.isValid) else { throw AIAccountBalanceError.noQuota }
                     if let accountID = snapshot.accountID {
                         row.id = provider.rawValue + ":" + DesktopAIStorage.identity([provider.rawValue, "", accountID])
@@ -369,6 +369,46 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         guard let separator = decoded.range(of: "::") else { return nil }
         let token = String(decoded[separator.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
         return token.split(separator: ".", omittingEmptySubsequences: false).count == 3 ? token : nil
+    }
+
+    /// Promotes the primary Gemini group's 5h/7d windows to canonical IDs so Gemini cards and compact bars use the concentric ring.
+    private static func canonicalizeGeminiDesktopWindows(_ windows: [AIAccountQuotaWindow]) -> [AIAccountQuotaWindow] {
+        var sawFiveHour = false
+        var sawWeekly = false
+        return windows.compactMap { window -> AIAccountQuotaWindow? in
+            guard let lower = window.name?.lowercased(), lower.contains("gemini") else { return nil }
+            if lower == "gemini", window.nameKey == nil {
+                if window.kind == .fiveHours, !sawFiveHour {
+                    sawFiveHour = true
+                    return AIAccountQuotaWindow(
+                        id: "five_hour",
+                        kind: window.kind,
+                        remainingPercent: window.remainingPercent,
+                        remaining: window.remaining,
+                        limit: window.limit,
+                        unit: window.unit,
+                        resetsAt: window.resetsAt,
+                        durationSeconds: window.durationSeconds,
+                        unlimited: window.unlimited
+                    )
+                }
+                if window.kind == .weekly, !sawWeekly {
+                    sawWeekly = true
+                    return AIAccountQuotaWindow(
+                        id: "weekly",
+                        kind: window.kind,
+                        remainingPercent: window.remainingPercent,
+                        remaining: window.remaining,
+                        limit: window.limit,
+                        unit: window.unit,
+                        resetsAt: window.resetsAt,
+                        durationSeconds: window.durationSeconds,
+                        unlimited: window.unlimited
+                    )
+                }
+            }
+            return window
+        }
     }
 
     private static func geminiProjectID(from root: [String: Any]) -> String? {

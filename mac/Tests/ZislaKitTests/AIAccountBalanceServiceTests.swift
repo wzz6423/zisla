@@ -316,6 +316,9 @@ struct AIAccountBalanceServiceTests {
         let snapshot = AIAccountAntigravitySnapshot(
             windows: [
                 .init(id: "additional:gemini:five_hour", kind: .fiveHours, remainingPercent: 80, durationSeconds: 18_000, name: "Gemini"),
+                .init(id: "additional:gemini:weekly", kind: .weekly, remainingPercent: 45, durationSeconds: 604_800, name: "Gemini"),
+                .init(id: "additional:gemini-4-argon:five_hour", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000, name: "Gemini 4 Argon"),
+                .init(id: "additional:claude-gpt:five_hour", kind: .fiveHours, remainingPercent: 50, durationSeconds: 18_000, name: "Claude/GPT"),
                 .init(id: "additional:claude-gpt:weekly", kind: .weekly, remainingPercent: 60, durationSeconds: 604_800, name: "Claude/GPT"),
             ],
             accountID: "dev@example.test",
@@ -326,8 +329,13 @@ struct AIAccountBalanceServiceTests {
         let rows = try await service.accountBalances(for: [.antigravity, .gemini])
         let ag = try #require(rows.first { $0.providers == [.antigravity] })
         let gem = try #require(rows.first { $0.providers == [.gemini] })
-        #expect(ag.status == .available && ag.windows.count == 2)
-        #expect(gem.status == .available && gem.windows.map(\.name) == ["Gemini"])
+        #expect(ag.status == .available && ag.windows.count == 5)
+        #expect(gem.status == .available && gem.windows.count == 3)
+        #expect(gem.fiveHourWindow?.id == "five_hour" && gem.fiveHourWindow?.remainingPercent == 80 && gem.fiveHourWindow?.name == nil)
+        #expect(gem.weeklyWindow?.id == "weekly" && gem.weeklyWindow?.remainingPercent == 45 && gem.weeklyWindow?.name == nil)
+        #expect(gem.windows.last?.name == "Gemini 4 Argon")
+        #expect(gem.compactLines(language: .english).first == "5h 80%")
+        #expect(gem.compactLines(language: .english).last?.hasPrefix("7d 45%") == true)
 
         // Expired Gemini CLI credentials must fail without falling back to the local Antigravity daemon.
         let expiredCLI = makeService(credentials: { _, _, _ in throw AIAccountBalanceError.credentialsExpired }, antigravity: {
