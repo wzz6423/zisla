@@ -555,6 +555,86 @@ struct AIAgentArtifactCleanupTests {
         #expect(fixture.files.trashedURLs == [authorized])
     }
 
+    @Test
+    func recentTaskBackupFilesDoNotReceiveTheDirectoryAgeExemption() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let file = try fixture.file(".gemini/tasks/current/notes.bak", contents: "keep current notes")
+        let candidate = DiskCleanupCandidate(url: file, kind: .temporaryFiles, byteSize: 0, displayName: "notes")
+
+        #expect(fixture.scan().isEmpty)
+        #expect(SystemDiskCleanup.trashSelected(candidates: [candidate], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func backupPathsNeverDisplaceAnOrdinaryDuplicateOriginal(includeBackups: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let backup = try fixture.file("Downloads/source.bak", contents: "identical contents")
+        let original = try fixture.file("Documents/original.txt", contents: "identical contents")
+        let hidden = try fixture.file("Documents/.copy", contents: "identical contents")
+        let kinds: Set<DiskCleanupKind> = includeBackups ? [.temporaryFiles, .duplicateFile] : [.duplicateFile]
+
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: fixture.files, kinds: kinds)
+
+        #expect(Set(candidates.map(\.url)) == Set([backup, hidden]))
+        #expect(candidates.allSatisfy { $0.detail?.contains(original.path) == true })
+        #expect(!candidates.contains { $0.url == original })
+    }
+
+    @Test(arguments: [DiskCleanupKind.diskImage, .largeFile, .unfinishedDownload])
+    func retainedDuplicateCopiesStayOutOfOtherCleanupCategories(kind: DiskCleanupKind) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let name = kind == .diskImage ? "original.dmg" : kind == .largeFile ? "original.dat" : "original.crdownload"
+        let original = try fixture.file("Downloads/" + name, contents: "identical contents", age: 40 * 86400)
+        let copy = try fixture.file("Documents/.copy", contents: "identical contents")
+        let options = DiskCleanupScanOptions(largeFileThreshold: 1, referenceDate: fixture.referenceDate)
+
+        let standalone = SystemDiskCleanup.scanCandidates(fileManager: fixture.files, kinds: [kind], options: options)
+        #expect(standalone.contains { $0.url == original })
+        let candidates = SystemDiskCleanup.scanCandidates(fileManager: fixture.files, kinds: [kind, .duplicateFile], options: options)
+        #expect(candidates.map(\.url) == [copy])
+        #expect(candidates.first?.detail?.contains(original.path) == true)
+        #expect(SystemDiskCleanup.trashSelected(candidates: candidates, fileManager: fixture.files).successCount == 1)
+        #expect(!fixture.files.trashedURLs.contains(original))
+    }
+
+    @Test
+    func replacingABackupParentWithATemporaryLinkCannotBypassBackupChecks() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let file = try fixture.file("Documents/backups/copy.bak", contents: "saved copy", age: 8 * 86400)
+        let candidate = try #require(fixture.scan().first { $0.url == file })
+        let target = URL(fileURLWithPath: "/tmp", isDirectory: true).appendingPathComponent("zisla-backup-target-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: target) }
+        try Data("keep target".utf8).write(to: target.appendingPathComponent("copy.bak"))
+        try FileManager.default.removeItem(at: file.deletingLastPathComponent())
+        try FileManager.default.createSymbolicLink(at: file.deletingLastPathComponent(), withDestinationURL: target)
+
+        #expect(SystemDiskCleanup.trashSelected(candidates: [candidate], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+        #expect(try String(contentsOf: target.appendingPathComponent("copy.bak"), encoding: .utf8) == "keep target")
+    }
+
+    @Test
+    func cleanupCannotCombineADuplicateWithItsRetainedOriginal() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = try fixture.file("Downloads/original.dmg", contents: "identical contents")
+        try fixture.file("Documents/.copy", contents: "identical contents")
+        let duplicate = try #require(SystemDiskCleanup.scanCandidates(fileManager: fixture.files, kinds: [.duplicateFile]).first)
+        let installer = try #require(SystemDiskCleanup.scanCandidates(fileManager: fixture.files, kinds: [.diskImage]).first)
+
+        let result = SystemDiskCleanup.trashSelected(candidates: [installer, duplicate], fileManager: fixture.files)
+
+        #expect(result.successCount == 1)
+        #expect(fixture.files.trashedURLs == [duplicate.url])
+        #expect(!fixture.files.trashedURLs.contains(original))
+    }
+
     private final class ProgressResults: @unchecked Sendable {
         private let lock = NSLock()
         private var storage: [[DiskCleanupCandidate]] = []

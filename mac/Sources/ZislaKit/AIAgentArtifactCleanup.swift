@@ -138,6 +138,7 @@ struct AIAgentArtifactCleanup: Sendable {
             guard let modified = attributes[.modificationDate] as? Date,
                   referenceDate.timeIntervalSince(modified) >= minimumAge else { return false }
         }
+        if !empty, minimumAge == nil, depth == 0, type != .typeDirectory { return false }
         if type == .typeRegular { return !empty || depth > 0 && url.lastPathComponent == ".DS_Store" }
         guard type == .typeDirectory, let contents = children(of: url) else { return false }
         return contents.allSatisfy { treeMatches($0, empty: empty, minimumAge: minimumAge, depth: depth + 1, remaining: &remaining) }

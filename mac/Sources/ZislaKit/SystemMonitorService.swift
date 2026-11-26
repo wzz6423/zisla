@@ -401,6 +401,8 @@ public struct DiskCleanupCandidate: Equatable, Identifiable, Sendable {
     public var detail: String?
     public var source: String?
 
+    var retainedCopyURL: URL? = nil
+
     public var isActionable: Bool {
         safetyLevel != .analysisOnly && kind.safetyLevel != .analysisOnly
     }
@@ -2379,8 +2381,12 @@ public enum SystemDiskCleanup {
 
     /// Keeps only the more specific candidate for each path.
     public static func deduplicateCandidates(_ candidates: [DiskCleanupCandidate]) -> [DiskCleanupCandidate] {
+        let retainedCopies = candidates.compactMap(\.retainedCopyURL)
         var bestByPath: [String: DiskCleanupCandidate] = [:]
         for candidate in candidates {
+            guard !retainedCopies.contains(where: {
+                SystemMonitorPathSafety.isURL($0, withinAllowedRoots: [candidate.url])
+            }) else { continue }
             let path = candidate.url.standardizedFileURL.path
             if let existing = bestByPath[path] {
                 if candidate.kind.classificationPriority > existing.kind.classificationPriority {
@@ -2788,7 +2794,7 @@ public enum SystemDiskCleanup {
     ) -> [DiskCleanupCandidate] {
         guard !repeatedFileSizes.isEmpty else { return [] }
         var groups: [DuplicateFileKey: [URL]] = [:]
-        let homeComponentCount = fileManager.homeDirectoryForCurrentUser().standardizedFileURL.pathComponents.count
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
         enumerateUserFiles(
             in: directories,
             fileManager: fileManager,
@@ -2810,16 +2816,19 @@ public enum SystemDiskCleanup {
         }
         return groups.flatMap { key, files -> [DiskCleanupCandidate] in
             let original = files.first {
-                $0.pathComponents.dropFirst(homeComponentCount).allSatisfy { !$0.hasPrefix(".") }
-            } ?? files[0]
+                !AIAgentArtifactCleanup.isBackupFile($0, home: home)
+                    && $0.pathComponents.dropFirst(home.pathComponents.count).allSatisfy { !$0.hasPrefix(".") }
+            } ?? files.first { !AIAgentArtifactCleanup.isBackupFile($0, home: home) } ?? files[0]
             return files.filter { $0 != original }.map { file in
-                DiskCleanupCandidate(
+                var candidate = DiskCleanupCandidate(
                     url: file,
                     kind: .duplicateFile,
                     byteSize: key.byteSize,
                     displayName: file.lastPathComponent,
                     detail: AppLocalization.text("与 %@ 重复 · 保留副本：%@", original.lastPathComponent, original.path)
                 )
+                candidate.retainedCopyURL = original
+                return candidate
             }
         }
     }
@@ -3549,6 +3558,10 @@ public enum SystemDiskCleanup {
         fileManager: SystemMonitorFileManaging,
         sizeProvider: ((URL) -> UInt64)? = nil
     ) -> DiskCleanupResult {
+        let retainedCopies = candidates.compactMap(\.retainedCopyURL)
+        let candidates = candidates.filter { candidate in
+            !retainedCopies.contains { SystemMonitorPathSafety.isURL($0, withinAllowedRoots: [candidate.url]) }
+        }
         let installedResidualOwners = candidates.contains { $0.kind == .applicationResidual }
             ? installedBundleIdentifiers(fileManager: fileManager, home: fileManager.homeDirectoryForCurrentUser())
             : Set<String>()
@@ -3663,7 +3676,9 @@ public enum SystemDiskCleanup {
         case .temporaryFiles:
             if let eligible = AIAgentArtifactCleanup(fileManager: fileManager).canTrash(candidate.url) { return eligible }
             if AIAgentArtifactCleanup.isBackupFile(candidate.url, home: fileManager.homeDirectoryForCurrentUser()),
-               SystemMonitorPathSafety.isURL(candidate.url, withinAllowedRoots: userFileDirectories(fileManager: fileManager)) {
+               userFileDirectories(fileManager: fileManager).contains(where: {
+                   candidate.url.standardizedFileURL.path.hasPrefix($0.standardizedFileURL.path + "/")
+               }) {
                 guard SystemMonitorPathSafety.standardizedPath(candidate.url) == candidate.url.standardizedFileURL.path,
                       let attributes = try? fileManager.attributesOfItem(atPath: candidate.url.path),
                       attributes[.type] as? FileAttributeType == .typeRegular,
