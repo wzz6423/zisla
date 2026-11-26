@@ -20,6 +20,15 @@ public final class IslandPanel: NSPanel {
     internal var applicationActivationHandler: () -> Void = {
         NSApp.activate(ignoringOtherApps: true)
     }
+    internal var panelOrderOutHandler: (IslandPanel) -> Void = { panel in
+        panel.orderOut(nil)
+    }
+    internal var panelOrderFrontHandler: (IslandPanel) -> Void = { panel in
+        panel.orderFrontRegardless()
+    }
+    internal var panelFrameApplier: (IslandPanel, CGRect) -> Void = { panel, frame in
+        panel.setFrame(frame, display: true)
+    }
     public var allowsKeyWindow = false
     public weak var pageNavigationShortcutView: NSView?
     /// Records that the transparent style's native glass surface is on screen. The active-appearance
@@ -61,13 +70,18 @@ public final class IslandPanel: NSPanel {
 
     /// Moves the panel without leaving the window server's ordering. The zero-duration context
     /// suppresses the ambient implicit-animation transaction that otherwise smears the frame change
-    /// across intermediate positions; ordering the panel out and back in cured the same smear but
-    /// dropped the window from the server's ordering, costing a frame and a Space rejoin.
+    /// across intermediate positions; ordering the panel out and back in cured the same smear on the
+    /// same display but dropped the window from the server's ordering, costing a frame and a Space rejoin.
+    /// When AppKit adjusts the first `setFrame` across mixed-DPI displays, re-apply once to lock in
+    /// the target geometry.
     private func setFrameWithoutReordering(_ frame: CGRect) {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0
             context.allowsImplicitAnimation = false
-            setFrame(frame, display: true)
+            panelFrameApplier(self, frame)
+            if self.frame != frame {
+                panelFrameApplier(self, frame)
+            }
         }
     }
 
@@ -149,41 +163,54 @@ public final class IslandPanel: NSPanel {
 
     /// How `present(at:)` reaches a target frame from the panel's current state.
     enum PresentationPlan: Equatable {
-        /// Already visible at the target frame: re-assert window ordering without touching the frame.
+        /// Already visible on the target display at the target frame: re-assert window ordering without touching the frame.
         case refront
         /// Not on screen yet: position it, then order it in.
         case show
-        /// Visible at a different frame: move it, then re-assert ordering.
+        /// Visible on the same display at a different frame: move it, then re-assert ordering.
         case reposition
+        /// Visible on another display: detach from the old display's Space before moving and ordering in.
+        case reattach
     }
 
     /// A visible panel at the target frame must still be re-fronted, never skipped: when another app
     /// opens a full-screen Space, WindowServer drops this window from that Space's ordering even with
-    /// `canJoinAllSpaces`, and `orderFrontRegardless()` is the only thing that rejoins it. The
-    /// active-Space observer's re-present is the recovery path, so it may not resolve to a no-op.
-    static func presentationPlan(isVisible: Bool, currentFrame: CGRect, targetFrame: CGRect)
-        -> PresentationPlan {
+    /// `canJoinAllSpaces`, and `orderFrontRegardless()` is the only thing that rejoins it. Moving a
+    /// visible panel to a different display detaches it first so macOS attaches it cleanly to the
+    /// destination display's active Space under "Displays have separate Spaces".
+    static func presentationPlan(
+        isVisible: Bool,
+        currentFrame: CGRect,
+        targetFrame: CGRect,
+        crossesDisplay: Bool = false
+    ) -> PresentationPlan {
         guard isVisible else { return .show }
+        if crossesDisplay { return .reattach }
         return currentFrame == targetFrame ? .refront : .reposition
     }
 
     public func present(
         at frame: CGRect,
         from collapsedFrame: CGRect? = nil,
-        animated: Bool = true
+        animated: Bool = true,
+        crossesDisplay: Bool = false
     ) {
         _ = collapsedFrame
         _ = animated
         let plan = Self.presentationPlan(
             isVisible: isVisible,
             currentFrame: self.frame,
-            targetFrame: frame
+            targetFrame: frame,
+            crossesDisplay: crossesDisplay
         )
         // Supersedes any in-flight dismiss fade so its completion cannot order this panel back out.
         transitionGeneration &+= 1
         alphaValue = 1
+        if plan == .reattach {
+            panelOrderOutHandler(self)
+        }
         if plan != .refront { setFrameWithoutReordering(frame) }
-        orderFrontRegardless()
+        panelOrderFrontHandler(self)
     }
 
     public func resize(to frame: CGRect, animated: Bool = true) {
@@ -191,7 +218,7 @@ public final class IslandPanel: NSPanel {
         transitionGeneration &+= 1
         _ = animated
         setFrameWithoutReordering(frame)
-        if isVisible { orderFrontRegardless() }
+        if isVisible { panelOrderFrontHandler(self) }
     }
 
     public func dismiss(to collapsedFrame: CGRect? = nil, animated: Bool = true) {

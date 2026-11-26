@@ -676,10 +676,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 && self.onboardingLifecycle?.isPresenting != true
         }
         noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, sideWidth, iconSize in
-            guard coordinator?.activeDisplayID == displayID else { return }
-            coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,
-                                             compactStatusSideWidth: sideWidth,
-                                             statusIconSize: iconSize)
+            coordinator?.updateCompactStatus(
+                for: displayID,
+                expandsForDetailedStatus: expanded,
+                compactStatusLength: length,
+                compactStatusSideWidth: sideWidth,
+                statusIconSize: iconSize
+            )
         }
         configureMainMenu()
         registerScreenshotHotkeys()

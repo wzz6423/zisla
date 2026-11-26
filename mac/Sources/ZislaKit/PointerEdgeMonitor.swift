@@ -41,8 +41,17 @@ public final class PointerEdgeMonitor {
     private var payloadClassifier: DragPayloadSessionClassifier
     private var cachedDragResult: (changeCount: Int, hasSupportedPayload: Bool)?
     private var eventThrottle = PointerEdgeEventThrottle()
+    private var cancelTrailingMove: (@MainActor () -> Void)?
     private var globalMonitor: Any?
     private var localMonitor: Any?
+    internal var pointerLocationProvider: @MainActor () -> CGPoint = { NSEvent.mouseLocation }
+    internal var trailingMoveScheduler: @MainActor (TimeInterval, @escaping @MainActor () -> Void) -> @MainActor () -> Void = { delay, action in
+        let timer = Timer(timeInterval: delay, repeats: false) { _ in
+            MainActor.assumeIsolated { action() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        return { timer.invalidate() }
+    }
 
     public var isRunning: Bool {
         globalMonitor != nil || localMonitor != nil
@@ -92,6 +101,8 @@ public final class PointerEdgeMonitor {
     }
 
     public func stop() {
+        cancelTrailingMove?()
+        cancelTrailingMove = nil
         if let globalMonitor {
             NSEvent.removeMonitor(globalMonitor)
         }
@@ -103,6 +114,8 @@ public final class PointerEdgeMonitor {
     }
 
     isolated deinit {
+        cancelTrailingMove?()
+        cancelTrailingMove = nil
         if let globalMonitor {
             NSEvent.removeMonitor(globalMonitor)
         }
@@ -124,7 +137,20 @@ public final class PointerEdgeMonitor {
             guard eventThrottle.shouldEmit(
                 eventType: eventType,
                 timestamp: timestamp
-            ) else { return }
+            ) else {
+                // Schedule one trailing emit so a fast flick that stops inside a display's trigger
+                // during the throttle window is delivered promptly instead of waiting for recovery polling.
+                if cancelTrailingMove == nil {
+                    cancelTrailingMove = trailingMoveScheduler(eventThrottle.minimumMoveInterval) { [weak self] in
+                        guard let self else { return }
+                        self.cancelTrailingMove = nil
+                        self.handler(self.pointerLocationProvider(), .moved)
+                    }
+                }
+                return
+            }
+            cancelTrailingMove?()
+            cancelTrailingMove = nil
             let interaction: Interaction
             switch PointerEdgeEventAction(eventType: eventType) {
             case .dragging:
@@ -149,7 +175,7 @@ public final class PointerEdgeMonitor {
             case .moved:
                 interaction = .moved
             }
-            handler(NSEvent.mouseLocation, interaction)
+            handler(pointerLocationProvider(), interaction)
         }
     }
 }

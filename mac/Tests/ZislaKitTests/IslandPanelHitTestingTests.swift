@@ -181,6 +181,26 @@ struct IslandPanelHitTestingTests {
     }
 
     @Test @MainActor
+    func visiblePanelCrossingDisplaysIsClassifiedAsReattach() {
+        #expect(
+            IslandPanel.presentationPlan(
+                isVisible: true,
+                currentFrame: CGRect(x: 40, y: 600, width: 420, height: 180),
+                targetFrame: CGRect(x: 2_000, y: 900, width: 420, height: 180),
+                crossesDisplay: true
+            ) == .reattach
+        )
+        #expect(
+            IslandPanel.presentationPlan(
+                isVisible: false,
+                currentFrame: CGRect(x: 40, y: 600, width: 420, height: 180),
+                targetFrame: CGRect(x: 2_000, y: 900, width: 420, height: 180),
+                crossesDisplay: true
+            ) == .show
+        )
+    }
+
+    @Test @MainActor
     func reassertingOrderKeepsPanelVisibleAtSameFrameAndFullyOpaque() {
         let frame = CGRect(x: 40, y: 600, width: 240, height: 34)
         let panel = IslandPanel(contentView: NSView(), frame: frame)

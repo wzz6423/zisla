@@ -663,6 +663,51 @@ struct SideNoticePresenterPillTests {
                 "A notification from another display cannot change the current animation anchor")
     }
 
+    @Test(arguments: IslandEdge.allCases)
+    func perDisplayCompactLayoutUpdatesNonActiveDisplayTriggerWithoutMovingActiveDisplay(edge: IslandEdge) throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        let other = ScreenSnapshot(displayID: 8,
+                                   frame: CGRect(x: 22_000, y: 0, width: 1_440, height: 900),
+                                   visibleFrame: CGRect(x: 22_000, y: 0, width: 1_440, height: 876))
+        let content = NSView()
+        let coordinator = OverlayCoordinator(
+            contentView: content,
+            layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration),
+            collapseDelay: .zero
+        )
+        coordinator.screenSnapshotProvider = { [fixture.screen, other] }
+        coordinator.start()
+        defer { coordinator.stop() }
+        fixture.presenter.onCompactLayoutChanged = { displayID, details, length, sideWidth, iconSize in
+            coordinator.updateCompactStatus(
+                for: displayID,
+                expandsForDetailedStatus: details,
+                compactStatusLength: length,
+                compactStatusSideWidth: sideWidth,
+                statusIconSize: iconSize
+            )
+        }
+        coordinator.selectActiveDisplay(at: CGPoint(x: other.frame.midX, y: other.frame.midY))
+        fixture.queue.enqueue(IslandNotice(id: "voice-processing-left", title: "语音", detail: "正在处理"), expiresAfter: nil)
+        fixture.presenter.setVoiceProcessingDisplayID(7)
+        fixture.presenter.publishCompactLayout(on: 8)
+        fixture.presenter.publishCompactLayout(on: 7)
+
+        #expect(coordinator.activeLayout?.displayID == 8)
+        #expect(coordinator.activeLayout?.collapsedFrame.size == CGSize(width: 24, height: 24))
+        let recordedLayout = try #require(coordinator.layouts.first { $0.displayID == 7 })
+        #expect(recordedLayout.collapsedFrame.size == (edge.isVertical
+                ? CGSize(width: 32, height: 110) : CGSize(width: 98, height: 32)))
+        let outerTrigger = edge.isVertical
+            ? CGPoint(x: recordedLayout.collapsedFrame.midX, y: recordedLayout.collapsedFrame.maxY - 2)
+            : CGPoint(x: recordedLayout.collapsedFrame.maxX - 2, y: recordedLayout.collapsedFrame.midY)
+        coordinator.handlePointer(at: outerTrigger)
+        let panel = try #require(content.window as? IslandPanel)
+        #expect(coordinator.activeDisplayID == 7)
+        #expect(!panel.ignoresMouseEvents)
+    }
+
     @Test
     func cameraHeadphoneLayoutFollowsItsNoticeAcrossScreensAndRestoresThePreviousStatus() throws {
         let fixture = try Fixture(edge: .top)
