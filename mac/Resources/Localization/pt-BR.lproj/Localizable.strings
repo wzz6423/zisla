@@ -3779,6 +3779,20 @@
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Resíduos de atualização · Versão antiga %@ · %@ · Versão atual: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "A cópia do aplicativo ou a versão atual mudou. O item foi mantido.";
 
+"识别图片文字" = "Reconhecer texto da imagem";
+"复制图片文字" = "Copiar texto da imagem";
+"取消图片文字识别" = "Cancelar reconhecimento de texto";
+"等待识别图片文字" = "Aguardando reconhecimento do texto";
+"正在识别图片文字" = "Reconhecendo texto da imagem";
+
+"缩放图片" = "Redimensionar imagens";
+"转换图片格式" = "Converter formato de imagem";
+"导入录屏素材库" = "Importar para a biblioteca do estúdio";
+"图片工具当前不可用，请稍后重试" = "As ferramentas de imagem estão indisponíveis. Tente novamente mais tarde.";
+"无法压缩同名项目：%@" = "Não é possível compactar itens com o mesmo nome: %@";
+"素材库导入完成" = "Importação para a biblioteca concluída";
+"%ld 个结果未能加入中转站" = "Não foi possível adicionar %ld resultados à bandeja";
+
 /* Independent countdown timers */
 "计时器" = "Temporizador";
 "计时结束" = "Temporizador concluído";

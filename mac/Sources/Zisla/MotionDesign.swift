@@ -2,7 +2,7 @@ import SwiftUI
 import ZislaCore
 import ZislaKit
 
-/// Zisla's motion system: spring tokens, button press feedback, and directional module
+/// Zisla's motion system: spring tokens, button press feedback, and page
 /// transitions.
 ///
 /// Design principles (Apple HIG Motion / Dynamic Island conventions):
@@ -13,9 +13,8 @@ import ZislaKit
 // MARK: - Motion tokens
 
 enum ZislaMotion {
-    /// Directional module page switch.
+    /// Module page crossfade.
     static let moduleSwitch: Animation = .smooth(duration: 0.32)
-    static let moduleDepthScale: CGFloat = 0.985
     /// Island surface size change between module layouts; a hint of bounce gives the
     /// resize a breathing quality without overshooting text layout noticeably.
     static let surfaceResize: Animation = .snappy(duration: 0.34, extraBounce: 0.02)
@@ -89,7 +88,7 @@ struct PressableStyle: ButtonStyle {
     }
 }
 
-// MARK: - Directional module transition
+// MARK: - Page transitions
 
 private struct ModulePushModifier: ViewModifier {
     var offsetX: CGFloat
@@ -107,33 +106,6 @@ private struct ModulePushModifier: ViewModifier {
 }
 
 extension AnyTransition {
-    /// Directional push between module pages: the incoming page slides in from the
-    /// navigation direction with a slight blur, the outgoing page continues onward.
-    /// `direction` is +1 when moving right in the module order, -1 when moving left.
-    static func modulePush(direction: CGFloat) -> AnyTransition {
-        let d: CGFloat = direction >= 0 ? 1 : -1
-        return .asymmetric(
-            insertion: .modifier(
-                active: ModulePushModifier(
-                    offsetX: 26 * d,
-                    blurRadius: 5,
-                    scale: ZislaMotion.moduleDepthScale,
-                    opacity: 0
-                ),
-                identity: ModulePushModifier(offsetX: 0, blurRadius: 0, scale: 1, opacity: 1)
-            ),
-            removal: .modifier(
-                active: ModulePushModifier(
-                    offsetX: -26 * d,
-                    blurRadius: 5,
-                    scale: ZislaMotion.moduleDepthScale,
-                    opacity: 0
-                ),
-                identity: ModulePushModifier(offsetX: 0, blurRadius: 0, scale: 1, opacity: 1)
-            )
-        )
-    }
-
     /// Lightweight directional transition for the settings window's long, scrollable pages.
     static func settingsPagePush(direction: CGFloat) -> AnyTransition {
         let d: CGFloat = direction >= 0 ? 1 : -1
@@ -154,10 +126,13 @@ extension AnyTransition {
 
 /// Defers expensive content construction until SwiftUI has completed the current update pass.
 struct DeferredMount<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isMounted = false
+    private let animation: Animation?
     private let content: () -> Content
 
-    init(@ViewBuilder content: @escaping () -> Content) {
+    init(animation: Animation? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.animation = animation
         self.content = content
     }
 
@@ -165,7 +140,7 @@ struct DeferredMount<Content: View>: View {
     var body: some View {
         Group {
             if isMounted {
-                content()
+                content().transition(.opacity)
             } else {
                 Color.clear
                     .allowsHitTesting(false)
@@ -182,8 +157,9 @@ struct DeferredMount<Content: View>: View {
     @MainActor
     private func mountIfNeeded() {
         guard !Task.isCancelled, !isMounted else { return }
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
+        let mountAnimation = reduceMotion ? nil : animation
+        var transaction = Transaction(animation: mountAnimation)
+        transaction.disablesAnimations = mountAnimation == nil
         withTransaction(transaction) {
             isMounted = true
         }

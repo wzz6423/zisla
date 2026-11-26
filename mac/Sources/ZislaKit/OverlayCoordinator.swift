@@ -47,6 +47,17 @@ public final class OverlayCoordinator: NSObject {
     private let persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)?
     private let persistentContentViewUpdater: ((NSView, ScreenOverlayLayout) -> Void)?
     private var layoutEngine: ScreenLayoutEngine
+    private struct CompactStatusOverride: Equatable {
+        var expandsForDetailedStatus: Bool
+        var compactStatusLength: CGFloat?
+        var compactStatusSideWidth: CGFloat?
+        var statusIconSize: CGSize?
+    }
+    private var compactStatusByDisplayID: [CGDirectDisplayID: CompactStatusOverride] = [:]
+    private var lastObservedProviderSnapshots: [ScreenSnapshot]?
+    private var lastSnapshots: [ScreenSnapshot] = []
+    private var lastPhysicalNotchSnapshots: [CGDirectDisplayID: ScreenSnapshot] = [:]
+    private var presentedDisplayID: CGDirectDisplayID?
     private var lastReportedActiveLayout: ScreenOverlayLayout?
     private let collapseDelay: Duration
     private let pointerEntryGrace: Duration
@@ -73,6 +84,7 @@ public final class OverlayCoordinator: NSObject {
     private var stopsAfterTransientReveal = false
     private var isPinned = false
     private var allowsKeyWindow = false
+    private var focusesKeyboardInputSurface = false
     private var keepsNativeGlassActive = false
     private var isExternalDragging = false
     private var isTransientInteractionVisible = false
@@ -141,6 +153,7 @@ public final class OverlayCoordinator: NSObject {
         let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.pressedMouseButtonsProvider() == 0 else { return }
+                self.refreshScreensIfNeeded()
                 let point = self.pointerLocationProvider()
                 self.handlePointer(at: point, interaction: .moved)
             }
@@ -161,6 +174,18 @@ public final class OverlayCoordinator: NSObject {
             name: NSWorkspace.activeSpaceDidChangeNotification,
             object: NSWorkspace.shared
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(workspaceDidWake),
+            name: NSWorkspace.screensDidWakeNotification,
+            object: NSWorkspace.shared
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(workspaceDidWake),
+            name: NSWorkspace.didWakeNotification,
+            object: NSWorkspace.shared
+        )
     }
 
     public func stop() {
@@ -173,6 +198,16 @@ public final class OverlayCoordinator: NSObject {
             NSWorkspace.shared.notificationCenter.removeObserver(
                 self,
                 name: NSWorkspace.activeSpaceDidChangeNotification,
+                object: NSWorkspace.shared
+            )
+            NSWorkspace.shared.notificationCenter.removeObserver(
+                self,
+                name: NSWorkspace.screensDidWakeNotification,
+                object: NSWorkspace.shared
+            )
+            NSWorkspace.shared.notificationCenter.removeObserver(
+                self,
+                name: NSWorkspace.didWakeNotification,
                 object: NSWorkspace.shared
             )
             isRunning = false
@@ -189,6 +224,11 @@ public final class OverlayCoordinator: NSObject {
         panel?.keepsNativeGlassActive = false
         panel?.allowsKeyWindow = false
         panel?.orderOut(nil)
+        presentedDisplayID = nil
+        lastObservedProviderSnapshots = nil
+        lastSnapshots.removeAll()
+        lastPhysicalNotchSnapshots.removeAll()
+        compactStatusByDisplayID.removeAll()
         hidePersistentPanels()
         if wasVisible { onVisibilityChanged?(false) }
         reducer = IslandPresentationReducer()
@@ -213,7 +253,16 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func refreshScreens() {
-        updateScreens(screenSnapshotProvider())
+        let snapshots = screenSnapshotProvider()
+        lastObservedProviderSnapshots = snapshots
+        updateScreens(snapshots)
+    }
+
+    private func refreshScreensIfNeeded() {
+        let snapshots = screenSnapshotProvider()
+        guard snapshots != lastObservedProviderSnapshots else { return }
+        lastObservedProviderSnapshots = snapshots
+        updateScreens(snapshots)
     }
 
     /// Builds the island panel and lays out its content ahead of the first presentation.
@@ -243,23 +292,34 @@ public final class OverlayCoordinator: NSObject {
         repositionVisiblePanel: Bool = true,
         refreshPersistentPanels: Bool = true
     ) {
-        layouts = layoutEngine.layouts(for: snapshots)
+        let resolvedSnapshots = snapshots.map(preservingPhysicalNotch)
+        lastSnapshots = resolvedSnapshots
+        let connectedIDs = Set(resolvedSnapshots.map(\.displayID))
+        if !connectedIDs.isEmpty {
+            lastPhysicalNotchSnapshots = lastPhysicalNotchSnapshots.filter { connectedIDs.contains($0.key) }
+            compactStatusByDisplayID = compactStatusByDisplayID.filter { connectedIDs.contains($0.key) }
+        }
+        layouts = resolvedSnapshots.map(layout(for:))
         guard !layouts.isEmpty else {
+            let wasExpanded = reducer.state.visibility == .expanded
+                || reducer.state.visibility == .pinned
             transientWindows.removeAll()
             cancelScheduledCollapse()
             cancelPendingPanelCollapse()
             panel?.orderOut(nil)
+            presentedDisplayID = nil
             reducer = IslandPresentationReducer()
             activeDisplayID = nil
             isPointerInside = false
             hidePersistentPanels()
+            if wasExpanded { onVisibilityChanged?(false) }
             return
         }
 
         if let activeDisplayID,
            !layouts.contains(where: { $0.displayID == activeDisplayID }) {
             self.activeDisplayID =
-                preferredLayout(at: NSEvent.mouseLocation)?.displayID
+                preferredLayout(at: pointerLocationProvider())?.displayID
                     ?? layouts.first?.displayID
         }
 
@@ -267,7 +327,7 @@ public final class OverlayCoordinator: NSObject {
         if isVisible, repositionVisiblePanel {
             if activeDisplayID == nil {
                 activeDisplayID =
-                    preferredLayout(at: NSEvent.mouseLocation)?.displayID
+                    preferredLayout(at: pointerLocationProvider())?.displayID
                         ?? layouts.first?.displayID
             }
             presentCurrentLayout()
@@ -301,8 +361,10 @@ public final class OverlayCoordinator: NSObject {
     public func updateExpandedSize(_ size: CGSize) {
         guard layoutEngine.configuration.expandedSize != size else { return }
         layoutEngine.configuration.expandedSize = size
+        let snapshots = screenSnapshotProvider()
+        lastObservedProviderSnapshots = snapshots
         updateScreens(
-            screenSnapshotProvider(),
+            snapshots,
             repositionVisiblePanel: false,
             refreshPersistentPanels: false
         )
@@ -325,13 +387,41 @@ public final class OverlayCoordinator: NSObject {
         }
     }
 
-    public func updateCompactStatus(expandsForDetailedStatus: Bool, compactStatusLength: CGFloat? = nil,
-                                    compactStatusSideWidth: CGFloat? = nil,
-                                    statusIconSize: CGSize? = nil) {
+    public func updateCompactStatus(
+        for displayID: CGDirectDisplayID? = nil,
+        expandsForDetailedStatus: Bool,
+        compactStatusLength: CGFloat? = nil,
+        compactStatusSideWidth: CGFloat? = nil,
+        statusIconSize: CGSize? = nil
+    ) {
+        if let displayID {
+            let override = CompactStatusOverride(
+                expandsForDetailedStatus: expandsForDetailedStatus,
+                compactStatusLength: compactStatusLength,
+                compactStatusSideWidth: compactStatusSideWidth,
+                statusIconSize: statusIconSize
+            )
+            guard compactStatusByDisplayID[displayID] != override else { return }
+            compactStatusByDisplayID[displayID] = override
+            refreshScreensIfNeeded()
+            let snapshots = lastSnapshots.isEmpty ? screenSnapshotProvider() : lastSnapshots
+            updateScreens(
+                snapshots,
+                repositionVisiblePanel: presentedDisplayID == displayID,
+                refreshPersistentPanels: true
+            )
+            if !isVisible, displayID == activeDisplayID, let layout = activeLayout {
+                onCollapsedSizeChanged?(layout.collapsedFrame.size)
+                panel?.resize(to: layout.expandedFrame)
+            }
+            return
+        }
         guard layoutEngine.configuration.expandsForDetailedStatus != expandsForDetailedStatus
             || layoutEngine.configuration.compactStatusLength != compactStatusLength
             || layoutEngine.configuration.compactStatusSideWidth != compactStatusSideWidth
-            || layoutEngine.configuration.statusIconSize != statusIconSize else { return }
+            || layoutEngine.configuration.statusIconSize != statusIconSize
+            || !compactStatusByDisplayID.isEmpty else { return }
+        compactStatusByDisplayID.removeAll()
         layoutEngine.configuration.expandsForDetailedStatus = expandsForDetailedStatus
         layoutEngine.configuration.compactStatusLength = compactStatusLength
         layoutEngine.configuration.compactStatusSideWidth = compactStatusSideWidth
@@ -351,15 +441,26 @@ public final class OverlayCoordinator: NSObject {
               !isScreenshotCaptureInProgress
         else { return }
         lastPointerLocation = point
+        if !layouts.contains(where: { contains(point, in: $0.screenFrame) }) {
+            refreshScreensIfNeeded()
+        }
         if let triggerLayout = layoutEngine.layout(containing: point, in: layouts),
            collapsedControlContainsPoint?(point) != true {
             let changedDisplay = activeDisplayID != triggerLayout.displayID
             activeDisplayID = triggerLayout.displayID
-            if changedDisplay, isVisible {
-                presentCurrentLayout()
-            }
             endPointerEntryGrace()
-            setPointerInside(true)
+            let isExpanded = reducer.state.visibility == .expanded
+                || reducer.state.visibility == .pinned
+            if changedDisplay, !isExpanded {
+                isPointerInside = false
+            }
+            if isPointerInside {
+                if changedDisplay, isVisible {
+                    presentCurrentLayout()
+                }
+            } else {
+                setPointerInside(true)
+            }
             return
         }
 
@@ -404,7 +505,7 @@ public final class OverlayCoordinator: NSObject {
     /// entry points such as the menu bar: the panel expands for inspection and collapses
     /// normally once the pointer leaves.
     public func showExpanded() {
-        showExpanded(at: NSEvent.mouseLocation)
+        showExpanded(at: pointerLocationProvider())
     }
 
     /// Expands the panel on the screen containing the given point; used for cross-screen entry
@@ -571,7 +672,7 @@ public final class OverlayCoordinator: NSObject {
             cancelPointerRevalidation()
             cancelPendingPanelCollapse()
         } else {
-            handlePointer(at: NSEvent.mouseLocation)
+            handlePointer(at: pointerLocationProvider())
         }
     }
 
@@ -586,7 +687,7 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func setVoiceRecording(_ recording: Bool) {
-        setVoiceRecording(recording, at: NSEvent.mouseLocation)
+        setVoiceRecording(recording, at: pointerLocationProvider())
     }
 
     public func setVoiceRecording(_ recording: Bool, at point: CGPoint) {
@@ -631,8 +732,9 @@ public final class OverlayCoordinator: NSObject {
         }
     }
 
-    public func setAllowsKeyWindow(_ allows: Bool) {
+    public func setAllowsKeyWindow(_ allows: Bool, focusesKeyboardInputSurface: Bool = true) {
         allowsKeyWindow = allows
+        self.focusesKeyboardInputSurface = focusesKeyboardInputSurface
         applyPanelFocusPolicy()
         if allows { focusKeyboardInputSurfaceIfNeeded() }
     }
@@ -725,7 +827,7 @@ public final class OverlayCoordinator: NSObject {
     /// changes, notices, repositioning — are never pinned, so they cannot reach this and cannot pull
     /// the caret out of whatever the user is typing in.
     private func focusKeyboardInputSurfaceIfNeeded() {
-        guard isPinned, allowsKeyWindow, let panel, panel.isVisible, !panel.isKeyWindow else {
+        guard isPinned, allowsKeyWindow, focusesKeyboardInputSurface, let panel, panel.isVisible, !panel.isKeyWindow else {
             return
         }
         panel.takeKeyboardFocus()
@@ -874,7 +976,7 @@ public final class OverlayCoordinator: NSObject {
                   reducer.state.visibility == .expanded || reducer.state.visibility == .pinned
             else { return }
             pointerRevalidationTask = nil
-            handlePointer(at: NSEvent.mouseLocation)
+            handlePointer(at: pointerLocationProvider())
         }
     }
 
@@ -920,11 +1022,14 @@ public final class OverlayCoordinator: NSObject {
     private func ensureActiveDisplay() {
         guard activeDisplayID == nil else { return }
         activeDisplayID =
-            preferredLayout(at: NSEvent.mouseLocation)?.displayID
+            preferredLayout(at: pointerLocationProvider())?.displayID
                 ?? layouts.first?.displayID
     }
 
     public func selectActiveDisplay(at point: CGPoint) {
+        if !layouts.contains(where: { contains(point, in: $0.screenFrame) }) {
+            refreshScreensIfNeeded()
+        }
         activeDisplayID = preferredLayout(at: point)?.displayID ?? activeDisplayID
         if let layout = layout(for: activeDisplayID) {
             // Compact surfaces size themselves from the collapsed pill, so its metrics must land
@@ -936,6 +1041,36 @@ public final class OverlayCoordinator: NSObject {
 
     private func preferredLayout(at point: CGPoint) -> ScreenOverlayLayout? {
         layoutEngine.screenLayout(containing: point, in: layouts)
+    }
+
+    private func preservingPhysicalNotch(_ snapshot: ScreenSnapshot) -> ScreenSnapshot {
+        if ScreenLayoutEngine().layout(for: snapshot).topology.hasPhysicalNotch {
+            lastPhysicalNotchSnapshots[snapshot.displayID] = snapshot
+            return snapshot
+        }
+        guard snapshot.auxiliaryTopLeftArea == nil || snapshot.auxiliaryTopRightArea == nil,
+              let cached = lastPhysicalNotchSnapshots[snapshot.displayID],
+              cached.frame == snapshot.frame
+        else {
+            lastPhysicalNotchSnapshots.removeValue(forKey: snapshot.displayID)
+            return snapshot
+        }
+        var resolved = snapshot
+        resolved.auxiliaryTopLeftArea = cached.auxiliaryTopLeftArea
+        resolved.auxiliaryTopRightArea = cached.auxiliaryTopRightArea
+        return resolved
+    }
+
+    private func layout(for snapshot: ScreenSnapshot) -> ScreenOverlayLayout {
+        guard let override = compactStatusByDisplayID[snapshot.displayID] else {
+            return layoutEngine.layout(for: snapshot)
+        }
+        var configuration = layoutEngine.configuration
+        configuration.expandsForDetailedStatus = override.expandsForDetailedStatus
+        configuration.compactStatusLength = override.compactStatusLength
+        configuration.compactStatusSideWidth = override.compactStatusSideWidth
+        configuration.statusIconSize = override.statusIconSize
+        return ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
     }
 
     private func reportActiveLayout() {
@@ -950,7 +1085,7 @@ public final class OverlayCoordinator: NSObject {
         return layouts.first { $0.displayID == displayID }
     }
 
-    private func presentCurrentLayout() {
+    private func presentCurrentLayout(forcePresentPersistentPanels: Bool = false) {
         guard !isScreenLocked,
               !isScreenshotActive,
               !isHoverActivationSuspended,
@@ -974,14 +1109,17 @@ public final class OverlayCoordinator: NSObject {
         }
         panel.applicationActivationHandler = applicationActivationHandler
         applyPanelFocusPolicy()
+        applyPanelInteractionPolicy()
+        applyPanelLevel()
+        let crossesDisplay = presentedDisplayID != nil && presentedDisplayID != layout.displayID
         panel.present(
             at: targetFrame,
             from: layout.collapsedFrame,
-            animated: !panel.isVisible
+            animated: !panel.isVisible,
+            crossesDisplay: crossesDisplay
         )
-        applyPanelInteractionPolicy()
-        applyPanelLevel()
-        updatePersistentPanels()
+        presentedDisplayID = layout.displayID
+        updatePersistentPanels(forcePresent: forcePresentPersistentPanels)
     }
 
     private func updatePersistentPanels(forcePresent: Bool = false) {
@@ -1060,7 +1198,9 @@ public final class OverlayCoordinator: NSObject {
     }
 
     private func contains(_ point: CGPoint, in frame: CGRect) -> Bool {
-        frame.contains(point)
+        !frame.isNull
+            && point.x >= frame.minX && point.x <= frame.maxX
+            && point.y >= frame.minY && point.y <= frame.maxY
     }
 
     @objc
@@ -1069,9 +1209,15 @@ public final class OverlayCoordinator: NSObject {
     }
 
     @objc
+    private func workspaceDidWake(_ notification: Notification) {
+        refreshScreensIfNeeded()
+    }
+
+    @objc
     private func activeSpaceDidChange(_ notification: Notification) {
+        refreshScreensIfNeeded()
         if isVisible {
-            presentCurrentLayout()
+            presentCurrentLayout(forcePresentPersistentPanels: true)
         } else {
             updatePersistentPanels(forcePresent: true)
         }

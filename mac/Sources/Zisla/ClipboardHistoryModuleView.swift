@@ -68,6 +68,8 @@ struct ClipboardHistoryModuleView: View {
     @FocusState private var isDraftTextFocused: Bool
     @FocusState private var isSearchFocused: Bool
     private let copyItem: (ClipboardHistoryItem) -> Void
+    private let copyImageText: (ClipboardHistoryItem) -> Void
+    private let recognizeImageText: (ClipboardHistoryItem) -> Void
     private let sendToQuickNote: (ClipboardHistoryItem) -> Void
     private static let surfaceShape = IslandSurfaceGeometry.moduleContentShape(
         bottomLeadingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius,
@@ -78,6 +80,8 @@ struct ClipboardHistoryModuleView: View {
         self.init(
             store: model.clipboardHistory,
             copyItem: { model.copyClipboardHistoryItem($0) },
+            copyImageText: { model.recognizeClipboardHistoryImageText($0, copyText: true) },
+            recognizeImageText: { model.recognizeClipboardHistoryImageText($0, copyText: false) },
             sendToQuickNote: { model.sendClipboardHistoryItemToQuickNote($0) }
         )
     }
@@ -85,11 +89,15 @@ struct ClipboardHistoryModuleView: View {
     init(
         store: ClipboardHistoryStore,
         copyItem: @escaping (ClipboardHistoryItem) -> Void,
+        copyImageText: @escaping (ClipboardHistoryItem) -> Void = { _ in },
+        recognizeImageText: @escaping (ClipboardHistoryItem) -> Void = { _ in },
         sendToQuickNote: @escaping (ClipboardHistoryItem) -> Void
     ) {
         _store = ObservedObject(wrappedValue: store)
         _grouping = State(initialValue: store.currentQuery.grouping)
         self.copyItem = copyItem
+        self.copyImageText = copyImageText
+        self.recognizeImageText = recognizeImageText
         self.sendToQuickNote = sendToQuickNote
     }
 
@@ -528,6 +536,11 @@ struct ClipboardHistoryModuleView: View {
         ClipboardHistoryItemRow(
             item: item,
             onCopy: copyItem,
+            recognitionState: store.imageRecognitionStates[item.id],
+            recognitionError: store.imageRecognitionError?.id == item.id ? store.imageRecognitionError?.message : nil,
+            onCopyImageText: copyImageText,
+            onRecognizeImageText: { recognizeImageText(item) },
+            onCancelRecognition: { store.cancelImageRecognition(id: item.id) },
             onSendToQuickNote: sendToQuickNote,
             onSetPinned: { store.setPinned(id: item.id, isPinned: $0) },
             onRemove: { store.remove(id: item.id) }
@@ -689,12 +702,17 @@ private struct ClipboardFilterSegmentedControl: View {
 private struct ClipboardHistoryItemRow: View, Equatable {
     let item: ClipboardHistoryItem
     let onCopy: (ClipboardHistoryItem) -> Void
+    let recognitionState: ClipboardImageRecognitionState?
+    let recognitionError: String?
+    let onCopyImageText: (ClipboardHistoryItem) -> Void
+    let onRecognizeImageText: () -> Void
+    let onCancelRecognition: () -> Void
     let onSendToQuickNote: (ClipboardHistoryItem) -> Void
     let onSetPinned: (Bool) -> Void
     let onRemove: () -> Void
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.item == rhs.item
+        lhs.item == rhs.item && lhs.recognitionState == rhs.recognitionState && lhs.recognitionError == rhs.recognitionError
     }
 
     var body: some View {
@@ -709,7 +727,7 @@ private struct ClipboardHistoryItemRow: View, Equatable {
                         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(item.content.previewText)
+                        Text(item.recognizedImageText.flatMap { $0.isEmpty ? nil : $0 } ?? (item.content.isImage ? AppLocalization.text("图片") : item.content.previewText))
                             .font(.system(size: 11, weight: .medium))
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
@@ -780,6 +798,14 @@ private struct ClipboardHistoryItemRow: View, Equatable {
         .onDrag { dragProvider }
         .contextMenu {
             Button(AppLocalization.text("复制")) { onCopy(item) }
+            if item.content.isImage {
+                if recognitionState != nil {
+                    Button(AppLocalization.text("取消图片文字识别"), action: onCancelRecognition)
+                } else {
+                    Button(AppLocalization.text("识别图片文字"), action: onRecognizeImageText)
+                    Button(AppLocalization.text("复制图片文字")) { onCopyImageText(item) }
+                }
+            }
             Button(AppLocalization.text("发送到随记")) { onSendToQuickNote(item) }
             Button(item.isPinned ? AppLocalization.text("移出常用") : AppLocalization.text("设为常用")) {
                 onSetPinned(!item.isPinned)
@@ -817,6 +843,11 @@ private struct ClipboardHistoryItemRow: View, Equatable {
     }
 
     private var subtitle: String {
+        if let recognitionState {
+            return AppLocalization.text(recognitionState == .queued ? "等待识别图片文字" : "正在识别图片文字")
+        }
+        if let recognitionError { return recognitionError }
+        if item.recognizedImageText?.isEmpty == true { return AppLocalization.text("未识别到文字") }
         let detail = AppLocalization.text(contentTypeName)
             + " · "
             + AppLocalization.text("拷贝于 %@", item.lastCopiedAtText())

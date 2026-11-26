@@ -1,3 +1,4 @@
+import CryptoKit
 import Darwin
 import Foundation
 import LocalAuthentication
@@ -184,25 +185,148 @@ struct AIAccountBalanceCredentialsTests {
         if let data { #expect(try Data(contentsOf: target) == data, "Reading linked settings must not change dotfiles") }
     }
 
-    /// Modern selections and sealed stores must supersede legacy provider hints and plaintext credential mirrors.
-    @Test func zcodeSelectionUsesAuthoritativeRegistryAndNeverStaleEncryptedMirror() throws {
-        let config = try JSONSerialization.data(withJSONObject: ["provider": ["builtin:zai-coding-plan": ["options": ["apiKey": "fixture-key"]]]])
-        let settings = try JSONSerialization.data(withJSONObject: ["providerFamilyConnectionSelections": ["zai": ["kind": "individual-coding-plan"]],
-                                                                   "modelProviderFamilySelectedKeys": ["zai": "preset:builtin:zai"]])
+    /// Modern selections, `setting.json`, and encrypted stores supersede legacy hints and plaintext mirrors.
+    @Test func zcodeSelectionUsesAuthoritativeRegistryAndDecryptsCredentialsStore() throws {
+        let config = try JSONSerialization.data(withJSONObject: [
+            "provider": [
+                "builtin:zai-coding-plan": ["options": ["apiKey": "fixture-mirror-key"]],
+                "builtin:bigmodel-coding-plan": ["options": ["apiKey": "fixture-bigmodel-mirror"]],
+                "builtin:zai-start-plan": ["options": ["apiKey": "fixture-start-mirror"]],
+            ],
+        ])
+        let settings = try JSONSerialization.data(withJSONObject: [
+            "providerFamilyDomain": "zai",
+            "providerFamilyConnectionSelections": ["zai": ["kind": "individual-coding-plan"]],
+            "modelProviderFamilySelectedKeys": ["zai": "preset:builtin:zai"],
+        ])
         var source = makeSource()
+        source.username = "fixtureuser"
         source.fileRead = { url in
-            switch url.lastPathComponent { case "config.json": config; case "settings.json": settings; default: nil }
+            switch url.lastPathComponent { case "config.json": config; case "setting.json": settings; default: nil }
         }
-        #expect(try source.load(for: .zcode, at: now)?.token == "fixture-key")
+        #expect(try source.load(for: .zcode, at: now)?.token == "fixture-mirror-key")
+
+        // Unreadable credentials.json must fail closed and never fall back to plaintext mirror.
         source.fileRead = { url in
-            switch url.lastPathComponent { case "config.json": config; case "settings.json": settings;
+            switch url.lastPathComponent { case "config.json": config; case "setting.json": settings;
             case "credentials.json": Data(#"{"profile":"enc:v1:fixture"}"#.utf8); default: nil }
         }
         #expect(throws: AIAccountBalanceError.credentialsUnavailable) { try source.load(for: .zcode, at: now) }
-        let unknown = try JSONSerialization.data(withJSONObject: ["providerFamilyConnectionSelections": ["zai": ["kind": "unknown"]],
-                                                                  "modelProviderFamilySelectedKeys": ["zai": "coding-plan:builtin:zai-coding-plan"]])
-        source.fileRead = { $0.lastPathComponent == "config.json" ? config : unknown }
+
+        // Valid AES-256-GCM encrypted credentials.json decrypts the active account's coding-plan key.
+        let secret = "zcode-credential-fallback:darwin:/fixture:fixtureuser"
+        let zaiProfile = try encryptZcode(#"{"user_id":"user/42"}"#, secret: secret)
+        let zaiKey = try encryptZcode("fixture-live-zai-key", secret: secret)
+        let storeData = try JSONSerialization.data(withJSONObject: [
+            "oauth:zai:user_info": zaiProfile,
+            "account-provider:coding-plan:account:zai-individual-coding-plan:account:user%2F42:api-key": zaiKey,
+        ])
+        source.fileRead = { url in
+            switch url.lastPathComponent {
+            case "config.json": config
+            case "setting.json": settings
+            case "credentials.json": storeData
+            default: nil
+            }
+        }
+        let liveCoding = try #require(try source.load(for: .zcode, at: now))
+        #expect(liveCoding.token == "fixture-live-zai-key" && liveCoding.region == "zai")
+
+        // providerFamilyDomain selects bigmodel over zai and ZCODE_DATA_BASE_DIR redirects root only for absolute paths.
+        let bigmodelSettings = try JSONSerialization.data(withJSONObject: [
+            "providerFamilyDomain": "bigmodel",
+            "providerFamilyConnectionSelections": ["bigmodel": ["kind": "team-coding-plan"]],
+        ])
+        source.environment = ["ZCODE_DATA_BASE_DIR": "/custom/zcode-base"]
+        source.fileRead = { url in
+            #expect(url.path.hasPrefix("/custom/zcode-base/.zcode/v2/"))
+            return switch url.lastPathComponent {
+            case "config.json": config
+            case "setting.json": bigmodelSettings
+            default: nil
+            }
+        }
+        let bigmodel = try #require(try source.load(for: .zcode, at: now))
+        #expect(bigmodel.token == "fixture-bigmodel-mirror" && bigmodel.region == "bigmodel")
+
+        // Start plan decrypts zcodejwttoken and attaches X-Device-Mid from telemetry-state.json.
+        let startSettings = try JSONSerialization.data(withJSONObject: [
+            "providerFamilyDomain": "zai",
+            "providerFamilyConnectionSelections": ["zai": ["kind": "start-plan"]],
+        ])
+        let jwtEncrypted = try encryptZcode("fixture-start-jwt", secret: "explicit-secret")
+        let startStore = try JSONSerialization.data(withJSONObject: ["zcodejwttoken": jwtEncrypted])
+        let telemetry = Data(#"{"deviceMid":"mid-1234"}"#.utf8)
+        source.environment = ["ZCODE_CREDENTIAL_SECRET": "explicit-secret"]
+        source.fileRead = { url in
+            switch url.lastPathComponent {
+            case "config.json": config
+            case "setting.json": startSettings
+            case "credentials.json": startStore
+            case "telemetry-state.json": telemetry
+            default: nil
+            }
+        }
+        let startPlan = try #require(try source.load(for: .zcode, at: now))
+        #expect(startPlan.token == "fixture-start-jwt" && startPlan.region == "start-plan")
+        #expect(startPlan.headers["X-Device-Mid"] == "mid-1234")
+
+        let unknown = try JSONSerialization.data(withJSONObject: [
+            "providerFamilyDomain": "zai",
+            "providerFamilyConnectionSelections": ["zai": ["kind": "unknown"]],
+            "modelProviderFamilySelectedKeys": ["zai": "coding-plan:builtin:zai-coding-plan"],
+        ])
+        source.environment = [:]
+        source.fileRead = { $0.lastPathComponent == "config.json" ? config : ($0.lastPathComponent == "setting.json" ? unknown : nil) }
         #expect(throws: AIAccountBalanceError.unsupportedLogin) { try source.load(for: .zcode, at: now) }
+    }
+
+    /// Provider env overrides, fallback paths, opaque Grok tokens, and flexible expiry units must load cleanly.
+    @Test func providerCredentialFallbacksAndFlexibleExpiriesWorkAcrossProviders() throws {
+        // Copilot falls through to hosts.json when apps.json has no matching github.com entry.
+        var source = makeSource()
+        let enterpriseOnlyApps = Data(#"{"enterprise.example:Iv1.b507a08c87ecfe98":{"access_token":"must-not-use"}}"#.utf8)
+        let hosts = Data(#"{"github.com":{"oauth_token":"fixture-hosts-token","user":"hosts-user"}}"#.utf8)
+        source.fileRead = { url in
+            switch url.lastPathComponent {
+            case "apps.json": enterpriseOnlyApps
+            case "hosts.json": hosts
+            default: nil
+            }
+        }
+        #expect(try source.load(for: .copilot, at: now)?.token == "fixture-hosts-token")
+
+        // Claude supports CLAUDE_CODE_OAUTH_TOKEN, oauth wrapper, and Unix-seconds expiresAt.
+        source = makeSource()
+        source.environment = ["CLAUDE_CODE_OAUTH_TOKEN": "fixture-claude-env"]
+        #expect(try source.load(for: .claude, at: now)?.token == "fixture-claude-env")
+        source = makeSource()
+        let claudeSeconds = Data(#"{"oauth":{"accessToken":"fixture-claude-sec","expiresAt":2000000000}}"#.utf8)
+        source.fileRead = { $0.lastPathComponent == ".credentials.json" ? claudeSeconds : nil }
+        #expect(try source.load(for: .claude, at: now)?.token == "fixture-claude-sec")
+
+        // Gemini honors GEMINI_CLI_HOME and allows absent expiry_date.
+        source = makeSource()
+        source.environment = ["GEMINI_CLI_HOME": "/custom/gemini"]
+        let geminiData = Data(#"{"access_token":"fixture-gemini-token"}"#.utf8)
+        source.fileRead = { $0.path == "/custom/gemini/.gemini/oauth_creds.json" ? geminiData : nil }
+        #expect(try source.load(for: .gemini, at: now)?.token == "fixture-gemini-token")
+
+        // Grok accepts opaque tokens and sign-in scope fallback.
+        source = makeSource()
+        let grokData = Data(#"{"https://accounts.x.ai/custom/sign-in":{"key":"opaque-grok-token","email":"user@example.test"}}"#.utf8)
+        source.fileRead = { $0.lastPathComponent == "auth.json" ? grokData : nil }
+        let grok = try #require(try source.load(for: .grok, at: now))
+        #expect(grok.token == "opaque-grok-token" && grok.accountName == "user@example.test")
+
+        // Kimi supports KIMI_CODE_API_KEY and millisecond expires_at.
+        source = makeSource()
+        source.environment = ["KIMI_CODE_API_KEY": "fixture-kimi-env"]
+        #expect(try source.load(for: .kimi, at: now)?.token == "fixture-kimi-env")
+        source = makeSource()
+        let kimiMs = Data(#"{"access_token":"fixture-kimi-ms","expires_at":2000000000000}"#.utf8)
+        source.fileRead = { $0.path == "/fixture/.kimi/credentials/kimi-code.json" ? kimiMs : nil }
+        #expect(try source.load(for: .kimi, at: now)?.token == "fixture-kimi-ms")
     }
 
     /// Realm-specific tenant headers, inaccessible encryption, and a logout marker must yield distinct login outcomes.
@@ -277,6 +401,19 @@ struct AIAccountBalanceCredentialsTests {
         source.keychainRead = { _, _ in nil }
         source.websiteCookie = { _ in nil }
         return source
+    }
+
+    private func encryptZcode(_ plain: String, secret: String) throws -> String {
+        let key = SymmetricKey(data: SHA256.hash(data: Data(secret.utf8)))
+        let nonce = try AES.GCM.Nonce(data: Data(repeating: 7, count: 12))
+        let sealed = try AES.GCM.seal(Data(plain.utf8), using: key, nonce: nonce)
+        func b64url(_ data: Data) -> String {
+            data.base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+        }
+        return "enc:v1:\(b64url(Data(nonce))).\(b64url(sealed.tag)).\(b64url(sealed.ciphertext))"
     }
 
     private func jwt(_ payload: [String: Any]) -> String {

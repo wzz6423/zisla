@@ -297,6 +297,8 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             ["Grok Bot"]
         case .muse:
             ["Muse Code"]
+        case .antigravity:
+            ["Antigravity", "Google Antigravity"]
         }
     }
 

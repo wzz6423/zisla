@@ -17,6 +17,7 @@ export const nl = createCatalog({
     menuCloseLabel: 'Navigatie sluiten',
     menuButtonTitle: 'Navigatie openen',
     navItems: {
+      help: "Hulp",
       showcase: 'Functies',
       ai: 'AI-workflow',
       download: 'Download',
@@ -83,13 +84,13 @@ export const nl = createCatalog({
       shelf: {
         name: 'Plank',
         caption:
-          'Sleep bestanden, audio, video of links naar de bovenkant van het scherm. Zoek en filter items, selecteer er meerdere en kopieer, deel of stuur ze naar Snelle notities. Zet afbeeldingen om naar PDF, stuur herkende tekst naar Snelle notities of bewerk video’s in de opnamestudio. Je kunt bestanden ook in Finder tonen.',
+          "Bewaar bestanden op de plank om te zoeken, selecteren en delen. Maak ZIP of PDF, wijzig of converteer afbeeldingen en stuur media naar notities of studio.",
         points: ['Zoeken en batchacties', 'Afbeeldingen naar PDF en Snelle notities', 'Video’s bewerken in de studio'],
       },
       clipboard: {
         name: 'Klembord',
         caption:
-          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het. Je kunt geschiedenis ouder dan 7, 15 of 30 dagen automatisch verwijderen en favorieten behouden. Automatisch verwijderen staat standaard uit. Zoek en groepeer de geschiedenis op bronapplicatie.',
+          "Doorzoek lokale geschiedenis en tekst in afbeeldingen. Filter op type of bronapp, bewaar favorieten en stuur items naar Snelle notities.",
         points: ['Geschiedenis in het eiland', 'Filteren op type', 'Snelle notities en favorieten'],
       },
       aiMonitor: {
@@ -165,7 +166,7 @@ export const nl = createCatalog({
       },
       dailyBriefing: {
         title: 'Uw dag in een dagoverzicht',
-        description: 'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul. Kies een aparte exportmap onder Instellingen → Opslaglocatie. Je kunt ook echte accountquota en de tijd van de meting opnemen.',
+        description: "Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar. Kies een aparte exportmap onder Instellingen → Opslaglocatie. Je kunt ook echte accountquota en de tijd van de meting opnemen.",
         detail: '8 sjablonen · Inhoud kiezen · Voorvertoning en geplande PNG-export',
       },
       userCare: {
@@ -180,13 +181,13 @@ export const nl = createCatalog({
       },
       recording: {
         title: 'Opnemen en bewerken in de studio',
-        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen met animaties, zoom en ondertitels. Pas huidverzachting, helderheid, versmalling van gezicht en lichaam, stemeffecten en vloeiende cursorsporen in je eigen kleur aan. Speel de bewerking af in de studio. Kies origineel, 16:9, 9:16, 1:1 of 4:3; exporteer video, GIF, Live Photo of audio. Sommige formaten vereisen FFmpeg. Bekijk optionele AI-plannen voordat je ze toepast. De opnamemap kies je apart onder Instellingen → Opslaglocatie. Neem HDR op met ondersteunde apparaten.',
+        description: "Neem scherm, venster of gebied op, bewerk sporen, ondertitels en portret-/stemeffecten en exporteer. Met HDR op geschikte apparaten en media-import van de plank.",
         detail: 'Portret- en stemeffecten · Gekleurde cursorsporen · Meersporenweergave en export',
       },
       permissions: {
         title: 'Systeemtoestemmingen op één plek',
-        description: 'Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. Het eerste welkomstscherm gebruikt dezelfde lijst en markeert handmatige instellingen. De status van machtigingen wordt vernieuwd nadat toegang is verleend. Een sleephulp helpt bij machtigingen waarvoor de app moet worden toegevoegd.',
-        detail: 'Toestemmingsstatus · Aanvragen en links · Gedeeld met het welkom',
+        description: "Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. De status van machtigingen wordt vernieuwd nadat toegang is verleend. Een sleephulp helpt bij machtigingen waarvoor de app moet worden toegevoegd.",
+        detail: "Toestemmingsstatus · Aanvragen en links",
       },
       imageTools: {
         title: 'Afbeeldingstools',
@@ -200,7 +201,7 @@ export const nl = createCatalog({
       },
       pdf: {
         title: 'PDF-tools',
-        description: 'Beschikbaar in Instellingen, buiten de modulecarrousel van het eiland. Veertien bewerkingen op je Mac: samenvoegen, splitsen, draaien, bijsnijden, afbeeldingen en Office-bestanden converteren, renderen, tekst exporteren, watermerken en paginanummers toevoegen, versleutelen, wachtwoord verwijderen en metadata bewerken.',
+        description: "Beschikbaar in Instellingen. Veertien bewerkingen op je Mac: samenvoegen, splitsen, draaien, bijsnijden, afbeeldingen en Office-bestanden converteren, renderen, tekst exporteren, watermerken en paginanummers toevoegen, versleutelen, wachtwoord verwijderen en metadata bewerken.",
         detail: '14 lokale tools · Samenvoegen in eigen volgorde · Niets verlaat je Mac',
       },
 
@@ -254,8 +255,8 @@ export const nl = createCatalog({
       lockScreen: {
         title: 'Informatie op het vergrendelscherm',
         description:
-          'Toon optioneel datum, status en huidige media op het macOS-vergrendelscherm. Het is een aparte overlay en verschijnt nooit in de modulelijst of carrousel.',
-        detail: 'Aparte vergrendeloverlay · Opt-in · Neemt geen focus',
+          "Toon optioneel datum, status en huidige media op het macOS-vergrendelscherm.",
+        detail: "Opt-in · Neemt geen focus",
       },
       recommendedTools: {
         title: 'Aanbevolen apps',
@@ -266,25 +267,23 @@ export const nl = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'AI ZONDER BLACK BOX',
-    title: 'Zie AI-status <span>zonder het gesprek te lezen.</span>',
+    eyebrow: "AI-WORKFLOW",
+    title: "Volg AI-taken, <span>gebruik en quota.</span>",
     lede:
-      'Bekijk taken per app, modelgebruik per datum en echte accountquota. Status en numerieke gegevens blijven op je Mac; gesprekken worden niet gelezen.',
-    summaryMono: 'LOKALE STATUS / DUIDELIJKE GRENZEN',
-    summaryLede: 'Verbind de AI-tools die je gebruikt en houd de contextgrenzen van je werk intact.',
-    summaryNote: 'Alleen detectiebereik, gegevensgrenzen en verbinding worden uitgelegd; er wordt geen sessie nagebootst.',
+      "Bekijk taken per app, modelgebruik per datum en resterende accountquota.",
+    summaryMono: "TAKEN / GEBRUIK / QUOTA",
+    summaryLede: "AI-taken, gebruik en quota op één plek.",
     toolsHeading: 'Ondersteunde AI-tools',
-    toolsLede: 'Detecteert activiteit van ondersteunde CLI’s, desktopapps en IDE’s en bundelt de taakstatus.',
+    toolsLede: "Detecteert taken van ondersteunde CLI’s, desktopapps en IDE’s.",
     toolsAriaLabel: 'Ondersteunde AI-tools',
-    usageNote: 'Sessiedetectie, tokengeschiedenis en accountquota gebruiken aparte bronnen. Delta gebruikt zijn lokale cijferregister; Orca ontdubbelt het gebruik van de gekoppelde CLI en wijst het toe aan de oorspronkelijke aanbieder. WorkBuddy AI kan sessies detecteren en credits opvragen; contextbezetting en credits worden niet omgerekend naar tokens of kosten in dollars. Beschikbare quota hangen af van de aanbieder en inlogmethode.',
-    boundariesHeading: 'Alleen statusgrenzen worden vastgelegd',
+    boundariesHeading: "Privacy",
     privacyPoints: [
-      'Leest uit gestructureerde gebeurtenissen alleen type, status, tijd, model en sessie-ID',
-      'Leest nooit de tekst van prompts of antwoorden',
-      'Protocol en status worden op je Mac opgeslagen',
+      "Taakstatus en gebruik blijven op je Mac",
+      "Prompts en antwoorden worden niet gelezen",
+      "Gesprekken worden niet geüpload",
     ],
     bridgeHeading: 'Verbind je eigen taken',
-    bridgeLede: 'Gebruik zislactl om gestructureerde status van externe taken naar de statusbalk te sturen.',
+    bridgeLede: "Gebruik zislactl om scripts en bouwtaken in de statusbalk te tonen.",
     zislactlTaskTitle: 'Build en release',
   },
   flow: {
@@ -296,10 +295,182 @@ export const nl = createCatalog({
     summaryLede: 'Klapt uit wanneer je haar nodig hebt en in wanneer je klaar bent.',
     summaryNote: 'Wordt door de cursorpositie geactiveerd, neemt geen ruimte in als ze leeg is en steelt nooit de focus.',
     steps: {
-      trigger: { phase: 'Activeren', title: 'Beweeg naar het midden bovenaan', desc: 'Schermen met notch en externe schermen gebruiken dezelfde trigger; verborgen draait er geen frameloop.' },
+      trigger: { phase: 'Activeren', title: 'Beweeg naar het midden bovenaan', desc: "Werkt op schermen met een notch en externe schermen." },
       review: { phase: 'Bekijken', title: 'Bekijk de huidige status', desc: 'Media, bestanden, AI, agenda en systeemtools staan op één plek.' },
       dismiss: { phase: 'Sluiten', title: 'Ga terug naar je werk', desc: 'Beweeg de cursor weg en het eiland klapt in; uitklappen activeert de app niet en neemt geen focus.' },
     },
+  },
+  help: {
+    "title": "Begin met zisla",
+    "lede": "Kies een taak en volg toegang, stappen, rechten en opslaglocatie.",
+    "labels": {
+      "entry": "Toegang",
+      "shortcuts": "Sneltoetsen",
+      "permissions": "Rechten",
+      "output": "Resultaat en opslag"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Gebruik gekopieerde inhoud opnieuw",
+        "summary": "Zoek een item of kies een actie na het kopiëren.",
+        "entry": "Eiland → Klembord; Instellingen → Snelle acties.",
+        "steps": [
+          "Schakel geschiedenis of snelle acties in en kopieer een voorbeeldtekst of link.",
+          "Open het klembord, filter of zoek en kopieer een item.",
+          "Kopieer een voorbeeldafbeelding met leesbare tekst, wacht op lokale herkenning op de achtergrond en zoek een woord uit de afbeelding om het origineel terug te vinden.",
+          "Klik met rechts op de afbeelding om tekst te herkennen of te kopiëren; je kunt lopende herkenning annuleren. Herkenning op de achtergrond kopieert tekst niet automatisch.",
+          "Plak in de doelapp; kies bij een nieuwe kopie de volgende actie in het actievenster."
+        ],
+        "shortcuts": "Command+1…9 en Command+0 volgen de actievolgorde. Nieuwe instellingen voegen Command+N toe voor de eerste actie; Command+Delete sluit. Opgeslagen of gewiste toetsen blijven behouden.",
+        "permissions": "Geschiedenis en herkenning zijn lokaal. Modificatietoets/muis vereist Invoercontrole; de optionele kopieerbeweging Toegankelijkheid. Vertaling gebruikt de gekozen dienst.",
+        "output": "Geschiedenis in lokale appgegevens. Tekst/afbeelding opslaan gebruikt Instellingen → Opslaglocatie → Snelle acties; nieuw standaardpad: ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Leg het scherm vast en bewerk het",
+        "summary": "Bewerk een schermafbeelding of opname en exporteer het resultaat.",
+        "entry": "Menubalk → Schermafbeelding/Opname; Instellingen → Opname → Studio.",
+        "steps": [
+          "Leg een gebied of venster vast; bewerk, kopieer, bewaar of zet het op de plank.",
+          "Kies scherm, venster of gebied en schakel alleen benodigde audio-/camerabronnen in.",
+          "Stop, bewerk en bekijk in de studio, en exporteer het gekozen formaat."
+        ],
+        "shortcuts": "Control+1 schermafbeelding; Control+2 lange afbeelding. Control+Shift+1/2/3 nemen scherm/venster/gebied op; Control+Shift+6 opent de studio. Aanpasbaar in instellingen.",
+        "permissions": "Schermopname vereist. Microfoon en camera vereisen hun eigen rechten, ook voor cameravoorbeeld.",
+        "output": "Nieuwe paden: ~/Downloads/picture voor beelden, ~/Downloads/video voor opnamen/projecten. Apart instelbaar. Sommige exports vereisen FFmpeg."
+      },
+      "shelf": {
+        "title": "Geef bestanden door via de plank",
+        "summary": "Houd bestanden klaar zonder originelen te kopiëren.",
+        "entry": "Eiland → Plank; sleep naar de bovenste zone.",
+        "steps": [
+          "Sleep een voorbeeldbestand naar boven of schud tijdens slepen als dat is ingeschakeld.",
+          "Open de plank en kies een categorie of benodigde items.",
+          "Sleep naar de bestemming, toon in Finder of deel; bewaarde schermafbeeldingen kun je als PNG opslaan.",
+          "Selecteer bestanden of mappen en kies ZIP-compressie in het contextmenu; het archief keert terug naar de plank.",
+          "Selecteer afbeeldingen op de plank en kies formaat wijzigen of omzetten; voer de afbeeldingstools uit en geslaagde resultaten keren terug naar de plank.",
+          "Selecteer afbeeldingen, video of audio en importeer ze in de mediabibliotheek van de opnamestudio; het huidige project en de tijdlijn blijven behouden."
+        ],
+        "shortcuts": "Sleep met de aanwijzer. Schudden is apart instelbaar; geen vaste sneltoets nodig.",
+        "permissions": "Bestandskiezer en beveiligde bladwijzers geven toegang tot gekozen bestanden. Vastleggen vereist Schermopname.",
+        "output": "Originelen blijven waar ze zijn. Verwijzingen en beelden blijven lokaal bewaard; PNG gaat naar de gekozen bestemming. ZIP-archieven en geslaagde afbeeldingsresultaten keren terug naar de plank; geïmporteerde media worden aan de bibliotheek van het opnameproject toegevoegd."
+      },
+      "meeting": {
+        "title": "Neem deel aan een vergadering en bewaar notities",
+        "summary": "Koppel een agendavergadering aan een contextnotitie.",
+        "entry": "Eiland → Agenda; schakel agenda en contextnotities in bij Instellingen.",
+        "steps": [
+          "Maak of open een afspraak met ondersteunde vergaderlink en geldige begin-/eindtijd.",
+          "Kies Deelnemen; aftellen verschijnt 10 minuten voor het begin.",
+          "Maak, bewaar of koppel een notitie via de afspraak en open die later vanuit agenda of plank."
+        ],
+        "shortcuts": "Deelnemen en notities zijn knoppen. Houd elders de ingestelde toets vast en schud; standaard is Command.",
+        "permissions": "Agendatoegang vereist. Vensternotities kunnen Toegankelijkheid nodig hebben; bijgevoegde beelden vereisen Schermopname.",
+        "output": "Vergadernotities staan in lokale plankgegevens. Snelle notities is een aparte functie met Apple Notities."
+      },
+      "ai": {
+        "title": "Verbind AI en controleer tegoeden",
+        "summary": "Volg taken, vastgelegd gebruik en accountlimieten.",
+        "entry": "Instellingen → AI; eiland → AI-monitor.",
+        "steps": [
+          "Schakel een ondersteund lokaal hulpmiddel in of meld een taak met zislactl volgens de CLI-referentie.",
+          "Schakel limietcontrole voor de gewenste aanbieder in en vul alleen gevraagde inloggegevens in.",
+          "Bekijk meet-/hersteltijd en waarschuwingen; open de geschiedenis of exporteer .xlsx."
+        ],
+        "shortcuts": "Gebruik monitor of Instellingen; geen vaste globale toets nodig. zislactl gebruikt gedocumenteerde argumenten.",
+        "permissions": "Lokale detectie leest gestructureerde status. Limietcontrole benadert de aanbieder; optionele AI-bewerking gebruikt het gekozen model of CLI.",
+        "output": "Taken/gebruik: ~/Library/Application Support/zisla/ai-state.sqlite. Limieten komen van de aanbieder en zijn geen token-schattingen; ontbrekende gegevens blijven niet beschikbaar."
+      },
+      "media-tools": {
+        "title": "Verwerk beelden, audio en PDF",
+        "summary": "Gebruik de zelfstandige lokale tools met voorbeelden.",
+        "entry": "Instellingen → Beeldtools / Audiotools / PDF-tools.",
+        "steps": [
+          "Voeg een beeld toe, kies bewerking en opties, voer uit en exporteer resultaat of ZIP.",
+          "Selecteer afbeeldingen op de plank en kies formaat wijzigen of omzetten; voer de afbeeldingstools uit en geslaagde resultaten keren terug naar de plank.",
+          "Installeer FFmpeg en ffprobe bij afhankelijkheden, voeg audio toe, kies knippen of mengen en een uitvoerbestand of map.",
+          "Voeg PDF in de juiste volgorde toe, voer de bewerking uit en bewaar. Office-conversie vereist LibreOffice of OpenOffice."
+        ],
+        "shortcuts": "Toolknoppen; geen vaste globale sneltoets.",
+        "permissions": "De kiezer geeft toegang tot gekozen bestanden en mappen. Verwerking lokaal; installatie downloadt componenten.",
+        "output": "Nieuwe paden: beelden ~/Downloads/picture, PDF ~/Downloads/pdf, apart instelbaar. Audio gebruikt het exportvenster."
+      },
+      "daily-briefing": {
+        "title": "Maak een dagoverzicht",
+        "summary": "Bekijk statistieken voordat je PNG exporteert.",
+        "entry": "Instellingen → Dagoverzicht.",
+        "steps": [
+          "Kies sjabloon en statistieken.",
+          "Open het voorbeeld, controleer beschikbare data en kies uitvoermap.",
+          "Exporteer vandaag of schakel dagelijkse uitvoer in met een tijdstip."
+        ],
+        "shortcuts": "Voorbeeld- en exportknoppen; geen vaste toets.",
+        "permissions": "Schakel bijbehorende statistieken in. Schermtijd kan Volledige schijftoegang vereisen; limieten worden bij de aanbieder opgevraagd.",
+        "output": "PNG in de dagoverzichtmap; nieuw standaardpad ~/Downloads/daily. Ontbrekende data is geen gemeten nul."
+      },
+      "desktop": {
+        "title": "Bekijk vensters en schrijf een contextnotitie",
+        "summary": "Wissel naar een venster en laat er een notitie achter.",
+        "entry": "Instellingen → Venstervoorbeelden / Contextnotities; Dock, Command+Tab en plank.",
+        "steps": [
+          "Schakel voorbeelden en rechten in, wijs op een Dock-app of gebruik Command+Tab en klik de kaart.",
+          "Houd op een voorbeeldpagina, venster of bureaublad de ingestelde toets vast en schud; schrijf en bewaar.",
+          "Keer terug of open via de plank; voeg zo nodig herhaalde herinnering of vensterbeeld toe."
+        ],
+        "shortcuts": "Command+Tab wisselt apps. Contextnotities gebruiken standaard vastgehouden Command, instelbaar in voorkeuren.",
+        "permissions": "Voorbeelden vereisen Toegankelijkheid en Schermopname. Vensterdetectie gebruikt Toegankelijkheid; beeldbijlagen Schermopname.",
+        "output": "Notities en beelden in lokale plankdata onder ~/Library/Application Support/zisla."
+      },
+      "playback": {
+        "title": "Kies weergave en meng appvolume",
+        "summary": "Selecteer uitvoer en regel spelende apps.",
+        "entry": "Mediagebied → Uitvoer; Instellingen → Mediabron; eiland → Appmixer.",
+        "steps": [
+          "Speel voorbeeldaudio en kies beschikbare uitvoer.",
+          "Kies automatische bron of favoriete speler en test de knoppen.",
+          "Open op macOS 14.4+ de mixer, sta systeemaudio-opname toe en regel of demp een app."
+        ],
+        "shortcuts": "Knoppen en schuifregelaars; geen vaste toets.",
+        "permissions": "Mixer vereist macOS 14.4+ en systeemaudio-opname. Apparaten hangen af van verbindingen; Bluetooth kan rechten vragen.",
+        "output": "Uitvoer is de systeemkeuze. Appvolumes worden lokaal onthouden; geen bestanden geëxporteerd."
+      }
+    },
+    "workflowsTitle": "Korte demonstraties",
+    "workflows": {
+      "copy-next": {
+        "title": "Vind, kopieer en hergebruik",
+        "steps": [
+          "Zoek het voorbeeldwoord “brew” in de geschiedenis.",
+          "Kopieer het gevonden item.",
+          "Plak in de doelapp. Het fragment toont zoeken en kopiëren; nieuwe kopieën bieden afzonderlijke snelle acties."
+        ]
+      },
+      "drop-output": {
+        "title": "Zet een bestand klaar voor uitvoer",
+        "steps": [
+          "Sleep een voorbeeldafbeelding uit Finder naar de bovenste plank.",
+          "Open de plank en selecteer het beeld.",
+          "Sleep naar het doel of bewaar een afbeelding als PNG. Het fragment toont neerzetten op de plank."
+        ]
+      },
+      "meeting-note": {
+        "title": "Van vergadering naar notitie",
+        "steps": [
+          "Open de vergadering met de deelnamelink.",
+          "Kies Nieuwe notitie of Bestaande notitie koppelen.",
+          "Bewaar en open via afspraak of plank. Het fragment toont maken en koppelen."
+        ]
+      }
+    },
+    "excerptLabel": "Speel fragment",
+    "guideLinkLabel": "Lees de gids",
+    "videoNotice": "Fragmenten uit de bestaande rondleiding met demogegevens. Video-onderschriften zijn Engels; deze stappen volgen je taal. De volledige 2:40-rondleiding en muziekvermelding staan hieronder.",
+    "preferencesTitle": "Handige voorkeuren",
+    "preferences": [
+      "Schakel schudden tijdens slepen in om de plank te tonen. Contextnotities gebruiken een eigen vastgehouden toets.",
+      "Kies audio-uitvoer in het mediagebied en automatische bron of favoriete speler in instellingen. Dit wijst apps geen aparte apparaten toe.",
+      "Toetsgeluiden en typstatistiek zijn onafhankelijk en gebruiken Invoercontrole. De appmixer vereist macOS 14.4+ en systeemaudio-opname.",
+      "Het dagoverzicht biedt 8 sjablonen, voorbeeld en handmatige of dagelijkse PNG-export met eigen map."
+    ]
   },
   download: {
     eyebrow: 'KLAAR WANNEER JIJ KLAAR BENT',
@@ -448,10 +619,8 @@ export const nl = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Ondersteunt meerdere schermen, Spaces en gewone apps op volledig scherm; uitklappen activeert de app niet en neemt geen focus',
-      'Verborgen wordt geen permanente transparante hotspot en geen frameloop gebruikt; uitbreiding werkt via globale gebeurtenissen en geometrie',
-      'Gebruikt één laag systeemmateriaal en schakelt naar een ondoorzichtige achtergrond bij Verminder transparantie',
+      "Gebruikt een ondoorzichtige achtergrond als Verminder transparantie aanstaat",
       'Liquid Glass op macOS 26+, met automatische terugval naar native materialen op macOS 14 en 15',
-      'Een fysieke notch wordt afgeleid uit de veilige systeemzone; externe schermen zonder notch krijgen een gesimuleerde statusbalk in een eigen overlay',
     ],
   },
   film: {

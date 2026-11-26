@@ -134,8 +134,8 @@ Additional account quota schemas and endpoint mappings are adapted from:
 
 https://github.com/Javis603/token-monitor
 
-Pinned revision: `235a77c3fd3f63926a8fc50e879ada5a80029275`.
-Relevant sources are `src/shared/providers/{codex,copilot,grok,kimi,cursor,qoder,trae,zcode,zed,workbuddy,opencode,muse}`.
+Pinned revision: `59154147a7ba9acd4eddeea5f166444bf12090a0`.
+Relevant sources are `src/shared/providers/{antigravity,claude,codex,copilot,grok,kimi,cursor,qoder,trae,zai,zed,workbuddy,opencode,muse}`.
 Licensed under the MIT License. See `TokenMonitor-LICENSE.txt` in this directory.
 Zisla implements these mappings natively; browser credential scanning,
 upstream UI, automatic login, and remote build dependencies are not included.

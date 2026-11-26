@@ -319,6 +319,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var combinedIconReadTask: Task<Void, Never>?
     private var lastMonitorStatusRefreshAt = Date.distantPast
     private var settingsWindowController: NSWindowController?
+    private var settingsInput: SettingsInput?
     private var settingsWindowScreen: NSScreen?
     private var quickNotesEditorController: NSWindowController?
     private var screenshotSelectionController: ScreenshotSelectionController?
@@ -676,17 +677,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 && self.onboardingLifecycle?.isPresenting != true
         }
         noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, sideWidth, iconSize in
-            guard coordinator?.activeDisplayID == displayID else { return }
-            coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,
-                                             compactStatusSideWidth: sideWidth,
-                                             statusIconSize: iconSize)
+            coordinator?.updateCompactStatus(
+                for: displayID,
+                expandsForDetailedStatus: expanded,
+                compactStatusLength: length,
+                compactStatusSideWidth: sideWidth,
+                statusIconSize: iconSize
+            )
         }
         configureMainMenu()
         registerScreenshotHotkeys()
         model.onScreenRecordingRequested = { [weak self] in self?.showScreenRecording() }
-        model.onShelfVideosRequested = { [weak self] urls in
-            guard let self else { return false }
-            return recordingStudio().importShelfVideos(urls)
+        model.onShelfVideosRequested = { [weak self] urls, libraryOnly in
+            guard let self else { throw ShelfContextActionError.studioUnavailable }
+            try await recordingStudio().importShelfVideos(urls, libraryOnly: libraryOnly)
+        }
+        model.onShelfImagesRequested = { [weak self, weak model] urls, operation in
+            guard let self, let model else { throw ShelfContextActionError.imageToolsUnavailable }
+            let input = settingsInput ?? SettingsInput()
+            guard !input.imageRecognition.isProcessing else {
+                throw ShelfContextActionError.imageToolsUnavailable
+            }
+            try input.imageTools.receiveShelfInputs(urls, shelf: model.shelf)
+            input.imageRecognition.clear()
+            input.select(.imageTools, searchTarget: .imageOperation(operation))
+            settingsInput = input
+            showSettings()
         }
         registerRecordingHotkeys()
         startSystemScreenshotMonitoring()
@@ -867,7 +883,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        // Allow the island panel to become the keyboard focus only when a text input interface is visible, preventing it from stealing focus from the frontmost app in other cases.
+        // Every page accepts navigation after a deliberate click; only pinned text surfaces claim focus automatically.
         Publishers.CombineLatest3(
             model.$selectedModule,
             model.$isIslandVisible,
@@ -876,9 +892,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         .sink { [weak coordinator] module, visible, isTeleprompterPresented in
             Task { @MainActor in
                 coordinator?.setAllowsKeyWindow(
-                    visible && (
-                        module.allowsIslandKeyboardFocus || isTeleprompterPresented
-                    )
+                    visible,
+                    focusesKeyboardInputSurface: module.allowsIslandKeyboardFocus || isTeleprompterPresented
                 )
             }
         }
@@ -1028,6 +1043,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         screenRecordingController = nil
         runningModel.onScreenRecordingRequested = nil
         runningModel.onShelfVideosRequested = nil
+        runningModel.onShelfImagesRequested = nil
         setScreenshotSessionActive(false)
         screenshotSelectionController?.cancel()
         screenshotEditorController?.close()
@@ -2046,7 +2062,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let targetScreen = WindowPlacement.screenUnderMouse()
         if settingsWindowController == nil {
-            let rootView = SettingsView(model: AppModel.shared)
+            let input = settingsInput ?? SettingsInput()
+            settingsInput = input
+            let rootView = SettingsView(model: AppModel.shared, input: input)
             let window = SettingsWindow(
                 contentRect: CGRect(x: 0, y: 0, width: 960, height: 680),
                 styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
@@ -2085,6 +2103,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         if notification.object as? SettingsWindow != nil {
+            let input = settingsInput
+            settingsInput = nil
+            if let input {
+                input.imageTools.cancelAndDiscard(after: input.imageRecognition.cancel())
+            }
             settingsWindowController = nil
             settingsWindowScreen = nil
         } else if let window = notification.object as? QuickNotesEditorWindow {

@@ -401,6 +401,8 @@ public struct DiskCleanupCandidate: Equatable, Identifiable, Sendable {
     public var detail: String?
     public var source: String?
 
+    var retainedCopyURL: URL? = nil
+
     public var isActionable: Bool {
         safetyLevel != .analysisOnly && kind.safetyLevel != .analysisOnly
     }
@@ -2132,6 +2134,12 @@ public enum SystemDiskCleanup {
             tasks.append(CleanupScanTask { sessionWorkspaces.candidates() })
         }
 
+        if requestedKinds.contains(.temporaryFiles) {
+            tasks.append(CleanupScanTask {
+                AIAgentArtifactCleanup(fileManager: fileManager, referenceDate: options.referenceDate ?? Date()).candidates()
+            })
+        }
+
         if !requestedKinds.isDisjoint(with: [.appCache, .cache]) {
             tasks.append(CleanupScanTask {
                 scanApplicationCaches(fileManager: fileManager, kinds: requestedKinds)
@@ -2161,7 +2169,7 @@ public enum SystemDiskCleanup {
             })
         }
 
-        let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile]
+        let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile, .temporaryFiles]
         let activeUserFileKinds = requestedKinds.intersection(userFileKinds)
         if !activeUserFileKinds.isEmpty {
             tasks.append(CleanupScanTask {
@@ -2219,6 +2227,12 @@ public enum SystemDiskCleanup {
             tasks.append(CleanupScanTask { sessionWorkspaces.candidates() })
         }
 
+        if requestedKinds.contains(.temporaryFiles) {
+            tasks.append(CleanupScanTask {
+                AIAgentArtifactCleanup(fileManager: fileManager, referenceDate: options.referenceDate ?? Date()).candidates()
+            })
+        }
+
         if !requestedKinds.isDisjoint(with: [.appCache, .cache]) {
             tasks.append(CleanupScanTask {
                 scanApplicationCaches(fileManager: fileManager, kinds: requestedKinds)
@@ -2247,7 +2261,7 @@ public enum SystemDiskCleanup {
             })
         }
 
-        let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile]
+        let userFileKinds: Set<DiskCleanupKind> = [.diskImage, .largeFile, .duplicateFile, .temporaryFiles]
         let activeUserFileKinds = requestedKinds.intersection(userFileKinds)
         if !activeUserFileKinds.isEmpty {
             tasks.append(CleanupScanTask {
@@ -2367,8 +2381,12 @@ public enum SystemDiskCleanup {
 
     /// Keeps only the more specific candidate for each path.
     public static func deduplicateCandidates(_ candidates: [DiskCleanupCandidate]) -> [DiskCleanupCandidate] {
+        let retainedCopies = candidates.compactMap(\.retainedCopyURL)
         var bestByPath: [String: DiskCleanupCandidate] = [:]
         for candidate in candidates {
+            guard !retainedCopies.contains(where: {
+                SystemMonitorPathSafety.isURL($0, withinAllowedRoots: [candidate.url])
+            }) else { continue }
             let path = candidate.url.standardizedFileURL.path
             if let existing = bestByPath[path] {
                 if candidate.kind.classificationPriority > existing.kind.classificationPriority {
@@ -2673,10 +2691,6 @@ public enum SystemDiskCleanup {
         let digest: Data
     }
 
-    private struct DuplicateFileOriginal: Sendable {
-        let url: URL
-    }
-
     private static func scanUserFileCandidates(
         fileManager: SystemMonitorFileManaging,
         kinds: Set<DiskCleanupKind>,
@@ -2699,9 +2713,11 @@ public enum SystemDiskCleanup {
 
         let needsLargeFiles = kinds.contains(.largeFile)
         let needsDuplicates = kinds.contains(.duplicateFile)
-        guard needsLargeFiles || needsDuplicates else { return result }
+        let needsBackups = kinds.contains(.temporaryFiles)
+        guard needsLargeFiles || needsDuplicates || needsBackups else { return result }
 
         let allowed = allowedUserFileRoots(fileManager: fileManager, directories: directories)
+        let backupRoots = userFileDirectories(fileManager: fileManager)
         let referenceDate = options.referenceDate ?? Date()
         let largeFileCutoff = referenceDate.addingTimeInterval(-options.oldFileAge)
         var firstFileSizes = Set<UInt64>()
@@ -2716,6 +2732,17 @@ public enum SystemDiskCleanup {
             autoreleasepool {
                 let standardized = fileURL.standardizedFileURL
                 let size = allocatedByteSize(of: standardized, fileManager: fileManager)
+                if needsBackups, AIAgentArtifactCleanup.isBackupFile(standardized, home: fileManager.homeDirectoryForCurrentUser()),
+                   SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: backupRoots),
+                   let modified = (try? fileManager.attributesOfItem(atPath: standardized.path)[.modificationDate]) as? Date,
+                   referenceDate.timeIntervalSince(modified) >= AIAgentArtifactCleanup.backupMinAge {
+                    result.append(DiskCleanupCandidate(
+                        url: standardized, kind: .temporaryFiles, byteSize: size,
+                        displayName: standardized.lastPathComponent,
+                        detail: AppLocalization.text("%ld 天未修改", Int(referenceDate.timeIntervalSince(modified) / 86400))
+                    ))
+                    return
+                }
                 guard size > 0 else { return }
 
                 if needsLargeFiles,
@@ -2748,24 +2775,26 @@ public enum SystemDiskCleanup {
                     directories: directories,
                     maxDepth: options.userFileMaxDepth,
                     allowed: allowed,
-                    repeatedFileSizes: repeatedFileSizes
+                    repeatedFileSizes: repeatedFileSizes,
+                    excludedPaths: Set(result.filter { $0.kind == .temporaryFiles }.map { $0.url.path })
                 )
             )
         }
         return result
     }
 
-    /// Finds repeated allocated sizes first, then retains only the first SHA256 match for each duplicate group.
+    /// Selects the retained copy after reading each group so visible paths win across scan roots.
     private static func duplicateFileCandidates(
         fileManager: SystemMonitorFileManaging,
         directories: [URL],
         maxDepth: Int,
         allowed: [URL],
-        repeatedFileSizes: Set<UInt64>
+        repeatedFileSizes: Set<UInt64>,
+        excludedPaths: Set<String>
     ) -> [DiskCleanupCandidate] {
         guard !repeatedFileSizes.isEmpty else { return [] }
-        var originals: [DuplicateFileKey: DuplicateFileOriginal] = [:]
-        var result: [DiskCleanupCandidate] = []
+        var groups: [DuplicateFileKey: [URL]] = [:]
+        let home = fileManager.homeDirectoryForCurrentUser().standardizedFileURL
         enumerateUserFiles(
             in: directories,
             fileManager: fileManager,
@@ -2774,6 +2803,7 @@ public enum SystemDiskCleanup {
         ) { fileURL in
             autoreleasepool {
                 let standardized = fileURL.standardizedFileURL
+                guard !excludedPaths.contains(standardized.path) else { return }
                 let size = allocatedByteSize(of: standardized, fileManager: fileManager)
                 guard repeatedFileSizes.contains(size),
                       let digest = fileManager.sha256Digest(at: standardized)
@@ -2781,22 +2811,26 @@ public enum SystemDiskCleanup {
                     return
                 }
                 let key = DuplicateFileKey(byteSize: size, digest: digest)
-                if let original = originals[key] {
-                    result.append(
-                        DiskCleanupCandidate(
-                            url: standardized,
-                            kind: .duplicateFile,
-                            byteSize: size,
-                            displayName: standardized.lastPathComponent,
-                            detail: AppLocalization.text("与 %@ 重复 · 保留副本：%@", original.url.lastPathComponent, original.url.path)
-                        )
-                    )
-                } else {
-                    originals[key] = DuplicateFileOriginal(url: standardized)
-                }
+                groups[key, default: []].append(standardized)
             }
         }
-        return result
+        return groups.flatMap { key, files -> [DiskCleanupCandidate] in
+            let original = files.first {
+                !AIAgentArtifactCleanup.isBackupFile($0, home: home)
+                    && $0.pathComponents.dropFirst(home.pathComponents.count).allSatisfy { !$0.hasPrefix(".") }
+            } ?? files.first { !AIAgentArtifactCleanup.isBackupFile($0, home: home) } ?? files[0]
+            return files.filter { $0 != original }.map { file in
+                var candidate = DiskCleanupCandidate(
+                    url: file,
+                    kind: .duplicateFile,
+                    byteSize: key.byteSize,
+                    displayName: file.lastPathComponent,
+                    detail: AppLocalization.text("与 %@ 重复 · 保留副本：%@", original.lastPathComponent, original.path)
+                )
+                candidate.retainedCopyURL = original
+                return candidate
+            }
+        }
     }
 
     private static func scanUnfinishedDownloads(
@@ -3445,7 +3479,7 @@ public enum SystemDiskCleanup {
             children = try fileManager.contentsOfDirectory(
                 at: url,
                 includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-                options: [.skipsHiddenFiles]
+                options: []
             )
         } catch {
             return
@@ -3455,6 +3489,7 @@ public enum SystemDiskCleanup {
             autoreleasepool {
                 guard !isSymbolicLink(child) else { return }
                 let standardized = child.standardizedFileURL
+                guard ![".git", ".svn", ".hg"].contains(standardized.lastPathComponent) else { return }
                 guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: allowed) else { return }
 
                 if isDirectory(standardized, fileManager: fileManager) {
@@ -3523,6 +3558,10 @@ public enum SystemDiskCleanup {
         fileManager: SystemMonitorFileManaging,
         sizeProvider: ((URL) -> UInt64)? = nil
     ) -> DiskCleanupResult {
+        let retainedCopies = candidates.compactMap(\.retainedCopyURL)
+        let candidates = candidates.filter { candidate in
+            !retainedCopies.contains { SystemMonitorPathSafety.isURL($0, withinAllowedRoots: [candidate.url]) }
+        }
         let installedResidualOwners = candidates.contains { $0.kind == .applicationResidual }
             ? installedBundleIdentifiers(fileManager: fileManager, home: fileManager.homeDirectoryForCurrentUser())
             : Set<String>()
@@ -3634,6 +3673,19 @@ public enum SystemDiskCleanup {
         switch candidate.kind {
         case .aiSessionWorkspace:
             return true
+        case .temporaryFiles:
+            if let eligible = AIAgentArtifactCleanup(fileManager: fileManager).canTrash(candidate.url) { return eligible }
+            if AIAgentArtifactCleanup.isBackupFile(candidate.url, home: fileManager.homeDirectoryForCurrentUser()),
+               userFileDirectories(fileManager: fileManager).contains(where: {
+                   candidate.url.standardizedFileURL.path.hasPrefix($0.standardizedFileURL.path + "/")
+               }) {
+                guard SystemMonitorPathSafety.standardizedPath(candidate.url) == candidate.url.standardizedFileURL.path,
+                      let attributes = try? fileManager.attributesOfItem(atPath: candidate.url.path),
+                      attributes[.type] as? FileAttributeType == .typeRegular,
+                      let modified = attributes[.modificationDate] as? Date else { return false }
+                return Date().timeIntervalSince(modified) >= AIAgentArtifactCleanup.backupMinAge
+            }
+            return SystemMonitorPathSafety.isURL(candidate.url, withinAllowedRoots: candidateAllowedRoots(for: .temporaryFiles, fileManager: fileManager))
         case .applicationResidual:
             guard !isSymbolicLink(candidate.url) else { return false }
             guard !installedResidualOwners.isEmpty else { return false }

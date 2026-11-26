@@ -122,6 +122,44 @@ extension IslandModule {
     }
 }
 
+struct IslandModuleNavigation {
+    enum Direction: Int {
+        case previous = -1
+        case next = 1
+    }
+
+    private(set) var pendingSelection: IslandModule?
+
+    mutating func select(
+        _ module: IslandModule,
+        selectedModule: IslandModule
+    ) -> Bool {
+        let module = module.navigationTarget
+        let current = pendingSelection ?? selectedModule.navigationTarget
+        guard module != current else { return false }
+        pendingSelection = module
+        return true
+    }
+
+    func adjacentTarget(
+        in direction: Direction,
+        selectedModule: IslandModule,
+        settings: FeatureSettings,
+        isRightToLeft: Bool = false
+    ) -> IslandModule {
+        let order = IslandModule.enabledOrder(settings)
+        let current = pendingSelection ?? selectedModule.navigationTarget
+        let index = order.firstIndex(of: current) ?? 0
+        let offset = isRightToLeft ? -direction.rawValue : direction.rawValue
+        return order[(index + offset + order.count) % order.count]
+    }
+
+    mutating func takePendingSelection() -> IslandModule? {
+        defer { pendingSelection = nil }
+        return pendingSelection
+    }
+}
+
 struct IslandModuleLayout: Equatable {
     let islandSize: CGSize
     let panelSize: CGSize
@@ -417,30 +455,25 @@ final class AppModel: ObservableObject {
             }
         }
     }
-    /// Module switch direction (+1 rightward in module order, -1 leftward) driving the
-    /// directional page transition. Committed one run-loop turn before `selectedModule`
-    /// changes so the outgoing view's removal transition also carries the fresh direction.
-    @Published private(set) var moduleSwitchDirection: CGFloat = 1
-    private var pendingModuleSelection: IslandModule?
+    private var moduleNavigation = IslandModuleNavigation()
 
-    /// Preferred entry point for switching modules: records the navigation direction for
-    /// the directional transition, then applies the switch on the next run-loop turn.
+    /// Coalesces page commands before applying the latest selection on the next run-loop turn.
     func selectModule(_ module: IslandModule) {
-        let module = module.navigationTarget
-        let current = pendingModuleSelection ?? selectedModule
-        guard module != current else { return }
-        let order = IslandModule.configuredOrder(settingsStore.settings)
-        if let from = order.firstIndex(of: current),
-           let to = order.firstIndex(of: module) {
-            moduleSwitchDirection = to > from ? 1 : -1
-        }
-        pendingModuleSelection = module
+        guard moduleNavigation.select(module, selectedModule: selectedModule)
+        else { return }
         DispatchQueue.main.async { [weak self] in
-            guard let self, let target = self.pendingModuleSelection else { return }
-            self.pendingModuleSelection = nil
+            guard let self, let target = self.moduleNavigation.takePendingSelection() else { return }
             guard target != self.selectedModule else { return }
             self.selectedModule = target
         }
+    }
+
+    func selectAdjacentModule(in direction: IslandModuleNavigation.Direction, isRightToLeft: Bool) {
+        selectModule(
+            moduleNavigation.adjacentTarget(
+                in: direction, selectedModule: selectedModule, settings: settingsStore.settings, isRightToLeft: isRightToLeft
+            )
+        )
     }
 
     @Published var isPinned = false
@@ -554,7 +587,7 @@ final class AppModel: ObservableObject {
     var onContextNoteSaved: ((FileShelfItem) -> Void)?
     let weatherLocations = WeatherLocationStore()
     let clipboardMonitor = ClipboardLinkMonitor()
-    let clipboardHistory = ClipboardHistoryStore()
+    let clipboardHistory = ClipboardHistoryStore(imageTextRecognizer: { try await ClipboardImageTextRecognition.recognize($0) })
     let clipboardHistoryMonitor = ClipboardHistoryMonitor()
     /// Copy assistant: recognizes copied content and shows a toast with a next-step action.
     let clipboardAssistant = ClipboardAssistantController()
@@ -653,7 +686,8 @@ final class AppModel: ObservableObject {
     /// recording-start cleanup can reorder windows.
     var onVoiceInputWillStart: (() -> Void)?
     var onScreenRecordingRequested: (() -> Void)?
-    var onShelfVideosRequested: (([URL]) -> Bool)?
+    var onShelfVideosRequested: (([URL], Bool) async throws -> Void)?
+    var onShelfImagesRequested: (([URL], ImageToolOperation) throws -> Void)?
 
     /// Model discovery state: used by the settings page to show connection test results and the available model list.
     @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
@@ -1294,6 +1328,7 @@ final class AppModel: ObservableObject {
         islandClipboardHandoff.cancel()
         managedTools.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
         keyboardSound.stop()
+        clipboardHistory.setImageRecognitionEnabled(false)
         clipboardHistory.flushPendingChanges()
         clipboardHistory.stopCleanup()
         aiAgent.store.flushPendingChanges()
@@ -1880,12 +1915,26 @@ final class AppModel: ObservableObject {
     }
 
     func performShelfContextAction(_ action: ShelfContextAction, items: [FileShelfItem]) {
+        guard action != .editVideo && action != .importToStudioLibrary || settingsStore.settings.screenRecordingEnabled else {
+            transientMessage = ShelfContextActionError.studioUnavailable.localizedDescription
+            return
+        }
+        guard action != .resizeImages && action != .convertImages || settingsStore.settings.imageToolsEnabled else {
+            transientMessage = ShelfContextActionError.imageToolsUnavailable.localizedDescription
+            return
+        }
         let task = shelfContextActions.perform(action, items: items, createQuickNote: { [weak self] text in
             guard let self else { return false }
             let created = await quickNotes.create(markdown: text)
             if created { selectModule(.quickNotes) }
             return created
-        }, openStudio: { [weak self] urls in self?.onShelfVideosRequested?(urls) ?? false })
+        }, openStudio: { [weak self] urls, libraryOnly in
+            guard let importMedia = self?.onShelfVideosRequested else { throw ShelfContextActionError.studioUnavailable }
+            try await importMedia(urls, libraryOnly)
+        }, openImageTools: { [weak self] urls, operation in
+            guard let open = self?.onShelfImagesRequested else { throw ShelfContextActionError.imageToolsUnavailable }
+            try open(urls, operation)
+        })
         guard let task else {
             transientMessage = shelfContextActions.message
             return
@@ -1965,12 +2014,15 @@ final class AppModel: ObservableObject {
     }
 
     func joinMeetingNotice(_ eventID: String) {
-        calendar.refreshMeetings()
-        guard let event = calendar.meetingEvents.first(where: { $0.id == eventID }) else {
-            transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
-            return
+        Task { [weak self] in
+            guard let self else { return }
+            await calendar.refreshMeetings().value
+            guard let event = calendar.meetingEvents.first(where: { $0.id == eventID }) else {
+                transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
+                return
+            }
+            joinMeeting(event)
         }
-        joinMeeting(event)
     }
 
     func openMeetingNote(_ note: FileShelfItem) {
@@ -2002,6 +2054,35 @@ final class AppModel: ObservableObject {
         }
         dailyBriefing.recordActivity(.clipboardReused)
         transientMessage = AppLocalization.text("已复制到剪贴板")
+    }
+
+    func recognizeClipboardHistoryImageText(_ item: ClipboardHistoryItem, copyText: Bool) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let text = try await clipboardHistory.recognizeImageText(id: item.id)
+                try Task.checkCancellation()
+                guard settingsStore.settings.clipboardHistoryEnabled else { return }
+                guard !text.isEmpty else {
+                    transientMessage = AppLocalization.text("未识别到文字")
+                    return
+                }
+                if !copyText {
+                    transientMessage = AppLocalization.text("识图完成")
+                    return
+                }
+                guard ClipboardHistoryPasteboard.write(.text(text)) else {
+                    transientMessage = AppLocalization.text("无法写入剪贴板")
+                    return
+                }
+                dailyBriefing.recordActivity(.clipboardReused)
+                transientMessage = AppLocalization.text("已复制到剪贴板")
+            } catch {
+                if !(error is CancellationError) {
+                    transientMessage = AppLocalization.text("识别失败：%@", error.localizedDescription)
+                }
+            }
+        }
     }
 
     // MARK: - Clipboard Assistant
@@ -2684,6 +2765,68 @@ final class AppModel: ObservableObject {
                 self.transientMessage = self.clipboardAssistantMessage("已保存到 %@", destination.path)
             }
         }
+    }
+
+    nonisolated static func zipArchiveError(
+        sources: [URL], destination: URL,
+        runArchive: @escaping @Sendable ([String], URL) async throws -> AIAgentProcessOutput = { arguments, directory in
+            try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/zip"), arguments: arguments,
+                                               workingDirectoryURL: directory, timeout: 5 * 60,
+                                               maximumOutputBytes: 1, maximumErrorBytes: 256 * 1_024)
+        }
+    ) async -> String? {
+        let manager = FileManager.default
+        var seen = Set<URL>()
+        let sources = sources.filter { seen.insert($0.standardizedFileURL).inserted }
+        guard !sources.isEmpty else { return ShelfContextActionError.unsupportedSelection.localizedDescription }
+        let output = destination.resolvingSymlinksInPath().standardizedFileURL
+        if manager.fileExists(atPath: destination.path)
+            || (try? destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+            return CocoaError(.fileWriteFileExists).localizedDescription
+        }
+        var names = Set<String>()
+        var conflicts: [String] = []
+        for source in sources {
+            guard source.isFileURL,
+                  let values = try? source.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey]),
+                  values.isSymbolicLink != true, values.isRegularFile == true || values.isDirectory == true,
+                  source.lastPathComponent != "/", manager.isReadableFile(atPath: source.path) else {
+                return ShelfContextActionError.unavailableFile(source.lastPathComponent).localizedDescription
+            }
+            let resolved = source.resolvingSymlinksInPath().standardizedFileURL
+            guard output != resolved, values.isDirectory != true || !output.path.hasPrefix(resolved.path + "/") else {
+                return CocoaError(.fileWriteInvalidFileName).localizedDescription
+            }
+            let name = source.lastPathComponent.precomposedStringWithCanonicalMapping
+                .folding(options: [.caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            if !names.insert(name).inserted { conflicts.append(source.lastPathComponent) }
+        }
+        guard conflicts.isEmpty else {
+            return ShelfContextActionError.conflictingArchiveNames(conflicts.joined(separator: ", ")).localizedDescription
+        }
+        var completed = false
+        defer { if !completed { try? manager.removeItem(at: destination) } }
+        if sources.count == 1, !sources[0].lastPathComponent.hasPrefix("-") {
+            let error = await zipArchiveError(source: sources[0], destination: destination)
+            completed = error == nil && !Task.isCancelled
+            return Task.isCancelled ? CancellationError().localizedDescription : error
+        }
+        do {
+            for source in sources {
+                try Task.checkCancellation()
+                let scoped = source.startAccessingSecurityScopedResource()
+                defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+                let result = try await runArchive(["-q", "-r", "-y", destination.path, "--", "./" + source.lastPathComponent],
+                                                  source.deletingLastPathComponent())
+                if result.didTimeout { return AppLocalization.text("压缩操作超时") }
+                guard result.status == 0 else {
+                    return result.standardError.isEmpty ? AppLocalization.text("无法创建 ZIP 文件") : result.standardError
+                }
+            }
+            try Task.checkCancellation()
+            completed = true
+            return nil
+        } catch { return error.localizedDescription }
     }
 
     nonisolated static func zipArchiveError(source: URL, destination: URL) async -> String? {
@@ -3525,6 +3668,7 @@ final class AppModel: ObservableObject {
         clipboardMonitor.setEnabled(
             settings.clipboardDetectionEnabled
         )
+        clipboardHistory.setImageRecognitionEnabled(settings.clipboardHistoryEnabled)
         // The shared pasteboard monitor feeds both history recording and the copy assistant.
         clipboardHistoryMonitor.setEnabled(
             settings.clipboardHistoryEnabled || settings.clipboardAssistantEnabled
@@ -4785,7 +4929,7 @@ final class AppModel: ObservableObject {
 
     private func noticeSide(for provider: AIProvider) -> NoticeSide {
         switch provider {
-        case .claude, .gemini, .qwen, .trae, .doubao: .left
+        case .claude, .gemini, .antigravity, .qwen, .trae, .doubao: .left
         case .pi, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot, .muse: .right
         case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .zed, .opencode, .harness: .right
         }

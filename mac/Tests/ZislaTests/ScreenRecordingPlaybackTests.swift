@@ -35,13 +35,18 @@ struct ScreenRecordingPlaybackTests {
             model.playSource()
             model.seekTimeline(to: start)
             await model.previewTask?.value
+            let seeked = XCTestExpectation(description: "Prepared playback completed its exact seek before playing")
+            let subscription = model.$isShowingTimelinePlayback.dropFirst().filter { $0 }.prefix(1).sink { _ in
+                // Published delivery is synchronous after the seek and before AVPlayer starts advancing.
+                let position = player.currentTime().seconds
+                #expect(abs(position - start) < 0.05,
+                        "Reused playback must seek to the edited output position")
+                seeked.fulfill()
+            }
+            defer { subscription.cancel() }
             let resumed = XCTestExpectation(description: "Prepared playback resumes after seeking")
-            let observation = player.observe(\.rate, options: .new) { player, change in
+            let observation = player.observe(\.rate, options: .new) { _, change in
                 if change.newValue == 1 {
-                    // The test task can resume after playback has already advanced.
-                    let position = player.currentTime().seconds
-                    #expect(abs(position - start) < 0.05,
-                            "Reused playback must seek to the edited output position")
                     resumed.fulfill()
                 }
             }
@@ -58,7 +63,7 @@ struct ScreenRecordingPlaybackTests {
             defer { if let boundary { player.removeTimeObserver(boundary) } }
             model.playTimeline()
             await model.operationTask?.value
-            try #require(await XCTWaiter.fulfillment(of: [resumed], timeout: 5) == .completed)
+            try #require(await XCTWaiter.fulfillment(of: [seeked, resumed], timeout: 5) == .completed)
             if delayedObservation {
                 try #require(await XCTWaiter.fulfillment(of: [advanced], timeout: 5) == .completed)
                 #expect(player.currentTime().seconds - start > 0.05,

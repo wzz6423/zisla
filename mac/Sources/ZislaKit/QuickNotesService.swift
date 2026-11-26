@@ -361,8 +361,7 @@ public final class QuickNotesService: ObservableObject {
     public func selectAdjacent(in direction: SelectionDirection) {
         let displayedIDs = [welcomeNote?.id].compactMap { $0 } + regularNotes.map(\.id)
         guard let selectedID, let index = displayedIDs.firstIndex(of: selectedID) else { return }
-        let adjacentIndex = index + (direction == .previous ? -1 : 1)
-        guard displayedIDs.indices.contains(adjacentIndex) else { return }
+        let adjacentIndex = (index + (direction == .previous ? -1 : 1) + displayedIDs.count) % displayedIDs.count
         select(id: displayedIDs[adjacentIndex])
     }
 

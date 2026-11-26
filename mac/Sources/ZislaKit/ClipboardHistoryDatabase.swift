@@ -25,9 +25,28 @@ enum ClipboardHistoryMutation: Sendable {
     case removeHistoryBefore(Date, generation: Int?)
 }
 
+final class ClipboardImageRecognitionCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool { lock.withLock { cancelled } }
+
+    func cancel() {
+        lock.withLock { cancelled = true }
+    }
+
+    func commit<T>(_ operation: () throws -> T) throws -> T {
+        try lock.withLock {
+            guard !cancelled else { throw CancellationError() }
+            return try operation()
+        }
+    }
+}
+
 final class ClipboardHistoryDatabase: @unchecked Sendable {
     private static let categorySchemaVersion = 4
-    private static let currentSchemaVersion = 6
+    private static let textDigestSchemaVersion = 6
+    private static let currentSchemaVersion = 7
 
     private let storageURL: URL
     private let connectionObserver: (@Sendable (OpaquePointer) -> Void)?
@@ -150,6 +169,87 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
+    func imageIsPinned(id: UUID) async throws -> Bool? {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { [self] in
+                do {
+                    let database = try database()
+                    let statement = try prepare("SELECT is_pinned FROM clipboard_history WHERE id = ? AND content_type = 1", on: database)
+                    defer { sqlite3_finalize(statement) }
+                    try bind(id.uuidString, to: statement, index: 1, database: database)
+                    switch sqlite3_step(statement) {
+                    case SQLITE_ROW: continuation.resume(returning: sqlite3_column_int(statement, 0) != 0)
+                    case SQLITE_DONE: continuation.resume(returning: nil)
+                    default: throw ClipboardHistoryDatabaseError(message: sqliteMessage(database, fallback: AppLocalization.text("无法读取剪贴板数据库")))
+                    }
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func loadImageForRecognition(id: UUID, maximumBytes: Int) async throws -> (data: Data, text: String?, isPinned: Bool)? {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { [self] in
+                do {
+                    let database = try database()
+                    let statement = try prepare(
+                        "SELECT image_data, image_text, is_pinned FROM clipboard_history WHERE id = ? AND content_type = 1 AND length(image_data) <= ?",
+                        on: database
+                    )
+                    defer { sqlite3_finalize(statement) }
+                    try bind(id.uuidString, to: statement, index: 1, database: database)
+                    try check(sqlite3_bind_int64(statement, 2, sqlite3_int64(maximumBytes)), database: database)
+                    switch sqlite3_step(statement) {
+                    case SQLITE_ROW:
+                        continuation.resume(returning: (dataColumn(statement, index: 0), textColumn(statement, index: 1), sqlite3_column_int(statement, 2) != 0))
+                    case SQLITE_DONE:
+                        continuation.resume(returning: nil)
+                    default:
+                        throw ClipboardHistoryDatabaseError(message: sqliteMessage(database, fallback: AppLocalization.text("无法读取剪贴板数据库")))
+                    }
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func saveRecognizedImageText(_ text: String, id: UUID, imageData: Data, cancellation: ClipboardImageRecognitionCancellation) async throws -> Bool {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { [self] in
+                do {
+                    let database = try database()
+                    let statement = try prepare(
+                        "UPDATE clipboard_history SET image_text = ? WHERE id = ? AND content_type = 1 AND image_data = ?",
+                        on: database
+                    )
+                    defer { sqlite3_finalize(statement) }
+                    try bind(text, to: statement, index: 1, database: database)
+                    try bind(id.uuidString, to: statement, index: 2, database: database)
+                    try bind(imageData, to: statement, index: 3, database: database)
+                    // Acquire SQLite's write lock before ordering cancellation against this commit.
+                    try execute("BEGIN IMMEDIATE TRANSACTION", on: database)
+                    do {
+                        let changed = try cancellation.commit {
+                            try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+                            let changed = sqlite3_changes(database) != 0
+                            try execute("COMMIT", on: database)
+                            return changed
+                        }
+                        continuation.resume(returning: changed)
+                    } catch {
+                        try? execute("ROLLBACK", on: database)
+                        throw error
+                    }
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     func cancelCleanup() -> Int {
         cleanupLock.withLock {
             cleanupGeneration += 1
@@ -180,6 +280,13 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
 
         do {
             connectionObserver?(opened)
+            try check(sqlite3_create_function_v2(opened, "zisla_image_text_contains", 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC, nil, { context, _, arguments in
+                func text(at index: Int) -> String? {
+                    guard let value = arguments![index], let bytes = sqlite3_value_text(value) else { return nil }
+                    return String(decoding: UnsafeBufferPointer(start: bytes, count: Int(sqlite3_value_bytes(value))), as: UTF8.self)
+                }
+                sqlite3_result_int(context, ClipboardImageTextSearch.contains(text(at: 0), query: text(at: 1) ?? "") ? 1 : 0)
+            }, nil, nil, nil), database: opened)
             try restrictDatabaseFilePermissions()
             guard sqlite3_busy_timeout(opened, 1_000) == SQLITE_OK else {
                 throw ClipboardHistoryDatabaseError(
@@ -257,10 +364,23 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             ("content_category", "TEXT"),
             ("source_app_bundle_identifier", "TEXT"),
             ("source_app_name", "TEXT"),
+            ("image_text", "TEXT"),
         ]
         for (name, type) in additions where !existing.contains(name) {
             try execute("ALTER TABLE clipboard_history ADD COLUMN \(name) \(type)", on: database)
         }
+        try execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS clipboard_history_invalidate_image_text
+            AFTER UPDATE OF content_type, image_data ON clipboard_history
+            WHEN NEW.image_text IS OLD.image_text
+              AND (NEW.content_type IS NOT OLD.content_type OR NEW.image_data IS NOT OLD.image_data)
+            BEGIN
+                UPDATE clipboard_history SET image_text = NULL WHERE rowid = NEW.rowid;
+            END
+            """,
+            on: database
+        )
         try backfillMissingCategories(on: database)
         try migrateURLCategoriesIfNeeded(on: database)
         try migrateTextCategoriesIfNeeded(on: database)
@@ -294,7 +414,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             """,
             on: database
         )
-        if try schemaVersion(on: database) < Self.currentSchemaVersion {
+        if try schemaVersion(on: database) < Self.textDigestSchemaVersion {
             // Older readers hashed only the prefix of externally written NUL-containing text.
             try execute(
                 """
@@ -577,7 +697,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             """
             SELECT id, content_type, text_value, image_data, last_copied_at, is_pinned,
                    file_url, file_display_name, file_bookmark,
-                   source_app_bundle_identifier, source_app_name
+                   source_app_bundle_identifier, source_app_name, image_text
             FROM clipboard_history
             \(query.sql)
             ORDER BY \(order)
@@ -639,7 +759,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             """
             SELECT id, content_type, text_value, image_data, last_copied_at, is_pinned,
                    file_url, file_display_name, file_bookmark,
-                   source_app_bundle_identifier, source_app_name
+                   source_app_bundle_identifier, source_app_name, image_text
             FROM clipboard_history
             WHERE is_pinned = 1
                OR id IN (
@@ -724,8 +844,10 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 case .upsert(var item, let capacity):
                     try backfillMissingContentDigests(on: database)
                     let digest = contentDigest(item.content)
-                    if try matchingItemIsPinned(item.content, digest: digest, excluding: item.id, in: database) {
-                        item.isPinned = true
+                    let matching = try matchingItemMetadata(item.content, digest: digest, excluding: item.id, in: database)
+                    item.isPinned = item.isPinned || matching.isPinned
+                    if item.content.isImage, item.recognizedImageText == nil {
+                        item.recognizedImageText = matching.imageText
                     }
                     try deleteMatching(item.content, digest: digest, excluding: item.id, from: database)
                     try upsert(item, digest: digest, into: database)
@@ -793,7 +915,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             content: content,
             lastCopiedAt: Date(timeIntervalSinceReferenceDate: sqlite3_column_double(statement, 4)),
             isPinned: sqlite3_column_int(statement, 5) != 0,
-            sourceApp: sourceApp
+            sourceApp: sourceApp,
+            recognizedImageText: textColumn(statement, index: 11)
         )
     }
 
@@ -829,7 +952,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                     ELSE ''
                 END LIKE ? ESCAPE '\\' COLLATE NOCASE
                 OR source_app_name LIKE ? ESCAPE '\\' COLLATE NOCASE
-                OR source_app_bundle_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE)
+                OR source_app_bundle_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR (content_type = 1 AND zisla_image_text_contains(image_text, ?)))
                 """
             )
             let escaped = trimmed
@@ -839,21 +963,21 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             values.append("%\(escaped)%")
             values.append("%\(escaped)%")
             values.append("%\(escaped)%")
+            values.append(trimmed)
         }
         return (clauses.isEmpty ? "" : " WHERE " + clauses.joined(separator: " AND "), values)
     }
 
-    private func matchingItemIsPinned(
+    private func matchingItemMetadata(
         _ content: ClipboardHistoryContent,
         digest: Data,
         excluding id: UUID,
         in database: OpaquePointer
-    ) throws -> Bool {
+    ) throws -> (isPinned: Bool, imageText: String?) {
         let statement = try prepare(
             """
-            SELECT is_pinned FROM clipboard_history INDEXED BY clipboard_history_content_lookup
-            WHERE id <> ? AND content_digest = ? AND \(contentPredicate(content)) AND is_pinned = 1
-            LIMIT 1
+            SELECT MAX(is_pinned), MAX(image_text) FROM clipboard_history INDEXED BY clipboard_history_content_lookup
+            WHERE id <> ? AND content_digest = ? AND \(contentPredicate(content))
             """,
             on: database
         )
@@ -863,9 +987,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         try bind(content, to: statement, index: 3, database: database)
         switch sqlite3_step(statement) {
         case SQLITE_ROW:
-            return sqlite3_column_int(statement, 0) != 0
-        case SQLITE_DONE:
-            return false
+            return (sqlite3_column_int(statement, 0) != 0, textColumn(statement, index: 1))
         default:
             throw ClipboardHistoryDatabaseError(
                 message: sqliteMessage(database, fallback: AppLocalization.text("无法检查重复剪贴板记录"))
@@ -957,8 +1079,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             INSERT INTO clipboard_history (
                 id, content_type, text_value, image_data, last_copied_at, is_pinned,
                 file_url, file_display_name, file_bookmark, content_category, content_digest,
-                source_app_bundle_identifier, source_app_name
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source_app_bundle_identifier, source_app_name, image_text
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 content_type = excluded.content_type,
                 text_value = excluded.text_value,
@@ -971,7 +1093,13 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 content_category = excluded.content_category,
                 content_digest = excluded.content_digest,
                 source_app_bundle_identifier = excluded.source_app_bundle_identifier,
-                source_app_name = excluded.source_app_name
+                source_app_name = excluded.source_app_name,
+                image_text = CASE
+                    WHEN excluded.content_type = 1 AND clipboard_history.content_type = 1
+                      AND clipboard_history.image_data IS excluded.image_data
+                    THEN COALESCE(excluded.image_text, clipboard_history.image_text)
+                    ELSE excluded.image_text
+                END
             """,
             on: database
         )
@@ -1011,7 +1139,16 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             try check(sqlite3_bind_null(statement, 12), database: database)
             try check(sqlite3_bind_null(statement, 13), database: database)
         }
+        try check(sqlite3_bind_null(statement, 14), database: database)
         try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+        if item.content.isImage, let imageText = item.recognizedImageText {
+            // Legacy writers invalidate changed bytes; apply fresh OCR after that trigger within this transaction.
+            let update = try prepare("UPDATE clipboard_history SET image_text = ? WHERE id = ?", on: database)
+            defer { sqlite3_finalize(update) }
+            try bind(imageText, to: update, index: 1, database: database)
+            try bind(item.id.uuidString, to: update, index: 2, database: database)
+            try check(sqlite3_step(update), expected: SQLITE_DONE, database: database)
+        }
     }
 
     private func bindFileNull(_ statement: OpaquePointer, database: OpaquePointer) throws {

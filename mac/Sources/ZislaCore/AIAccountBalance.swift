@@ -265,6 +265,7 @@ public enum AIAccountBalanceCatalog {
         case .codex: "Codex"
         case .gpt: "GPT"
         case .gemini: "Gemini"
+        case .antigravity: "Antigravity"
         case .grok: "Grok"
         case .copilot: "Copilot"
         case .kimi: "Kimi"

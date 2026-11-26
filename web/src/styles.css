@@ -865,14 +865,6 @@ svg {
   white-space: nowrap;
 }
 
-.ai-detail .ai-usage-note {
-  margin-top: 24px;
-  padding-inline-start: 16px;
-  border-inline-start: 2px solid var(--accent);
-  font-size: 14px;
-  line-height: 1.7;
-}
-
 .tool-chip-dot {
   flex-shrink: 0;
   width: 5px;
@@ -2090,4 +2082,91 @@ html[dir="rtl"] :is(.hero-word, .footer-word) {
     opacity: 1;
     transform: none;
   }
+}
+
+.guide-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 32px;
+}
+
+.guide-nav a,
+.user-guide h2 a,
+.workflow-example a {
+  color: inherit;
+  text-underline-offset: 4px;
+}
+
+.guide-list,
+.help-workflows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 32px;
+}
+
+.user-guide,
+.workflow-example {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  scroll-margin-top: calc(var(--header-height) + 24px);
+}
+
+.user-guide h2,
+.workflow-example h3,
+.help-subtitle {
+  font-size: 22px;
+  line-height: 1.4;
+  margin-bottom: 16px;
+}
+
+.user-guide p,
+.user-guide dd,
+.user-guide li,
+.workflow-example li,
+.workflow-example p,
+.help-preferences li {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.user-guide dt {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 16px;
+}
+
+.user-guide dd {
+  margin: 4px 0 0;
+}
+
+.user-guide ol,
+.workflow-example ol,
+.help-preferences {
+  padding-inline-start: 24px;
+  margin-top: 16px;
+}
+
+.help-subtitle {
+  margin-top: 48px;
+}
+
+.help-section {
+  scroll-margin-top: calc(var(--header-height) + 24px);
+}
+
+.workflow-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  margin-top: 20px;
+  background: var(--background);
+}
+
+.help-page {
+  padding-top: var(--header-height);
 }

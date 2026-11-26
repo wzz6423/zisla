@@ -289,6 +289,37 @@ struct IslandAutomaticContentRefreshFocusTests {
         #expect(panel.canBecomeKey)
     }
 
+    @Test @MainActor
+    func pageNavigationEligibilityDoesNotActivateAPinnedNonTextSurface() async throws {
+        let recorder = ActivationRecorder()
+        let contentView = NSView()
+        let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        coordinator.applicationActivationHandler = { recorder.record() }
+        defer { coordinator.stop() }
+        coordinator.updateScreens([Self.screen], repositionVisiblePanel: false)
+        coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
+        coordinator.setDragging(true)
+        let panel = try #require(contentView.window as? IslandPanel)
+        panel.alphaValue = 0
+        await Self.drainMainActor()
+        recorder.reset()
+
+        coordinator.setAllowsKeyWindow(true, focusesKeyboardInputSurface: false)
+        coordinator.setPinned(true)
+        await Self.drainMainActor()
+        #expect(panel.canBecomeKey, "Every expanded page must remain eligible for command arrows")
+        #expect(recorder.count == 0, "Pinning a non-text page must not activate the application")
+
+        coordinator.setAllowsKeyWindow(true, focusesKeyboardInputSurface: false)
+        coordinator.updateExpandedSize(CGSize(width: 900, height: 360))
+        await Self.drainMainActor()
+        #expect(recorder.count == 0, "A refresh must not turn keyboard eligibility into activation")
+
+        coordinator.setAllowsKeyWindow(true)
+        await Self.drainMainActor()
+        #expect(recorder.count == 1, "Returning to a pinned text surface must retain its deliberate focus behavior")
+    }
+
     @MainActor
     private static func drainMainActor() async {
         await Task.yield()

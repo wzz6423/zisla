@@ -3775,6 +3775,20 @@
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Fichiers résiduels de mise à jour · Ancienne version %@ · %@ · Version actuelle : %@";
 "应用副本或当前版本状态已变化，已保留目标" = "La copie de l’application ou la version actuelle a changé. L’élément a été conservé.";
 
+"识别图片文字" = "Reconnaître le texte de l’image";
+"复制图片文字" = "Copier le texte de l’image";
+"取消图片文字识别" = "Annuler la reconnaissance du texte";
+"等待识别图片文字" = "En attente de reconnaissance du texte";
+"正在识别图片文字" = "Reconnaissance du texte de l’image";
+
+"缩放图片" = "Redimensionner les images";
+"转换图片格式" = "Convertir le format des images";
+"导入录屏素材库" = "Importer dans la bibliothèque du studio";
+"图片工具当前不可用，请稍后重试" = "Les outils d’image sont indisponibles. Réessayez plus tard.";
+"无法压缩同名项目：%@" = "Impossible de compresser des éléments de même nom : %@";
+"素材库导入完成" = "Importation dans la bibliothèque terminée";
+"%ld 个结果未能加入中转站" = "%ld résultats n’ont pas pu être ajoutés à l’étagère";
+
 /* Independent countdown timers */
 "计时器" = "Minuteur";
 "计时结束" = "Minuteur terminé";

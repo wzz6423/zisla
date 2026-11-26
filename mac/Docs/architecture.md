@@ -1,6 +1,6 @@
 # Architecture and performance design
 
-**English** | [简体中文](architecture.zh-CN.md)
+**English** | [简体中文](architecture.zh-CN.md) | [Other languages](../../docs/locales/README.md)
 
 ## Top-edge triggering
 
@@ -30,7 +30,11 @@ Left and right notification panels are created on demand and are hidden as soon 
 
 ## Media detection
 
-MediaRemote provides the title, artwork, progress, and controls. Process-object properties from Core Audio 14.4+ confirm whether an app has an active output stream and provide a fallback source app when metadata is missing. Process lists and output state are driven by property listeners rather than polling; audio content is never captured, and Screen Recording or Accessibility permission is not requested. Paused, stopped, and muted sources are not kept in the media area.
+MediaRemote provides the title, artwork, progress, and controls. Process-object properties from Core Audio 14.4+ confirm whether an app has an active output stream and provide a fallback source app when metadata is missing. Process lists and output state use property listeners plus bounded periodic verification; audio content is never captured, and Screen Recording or Accessibility permission is not requested. Paused, stopped, and muted sources are not kept in the media area.
+
+## Recording and application mixing
+
+Screen recording and the application volume mixer are separate from metadata detection. Recording requests Screen Recording and the enabled microphone/camera permissions, stores selected media locally, and manages projects in its selected recording folder. The application mixer uses Core Audio taps on macOS 14.4+ and requires System Audio Recording permission.
 
 ## Materials
 

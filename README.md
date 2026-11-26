@@ -1,6 +1,6 @@
 # zisla
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [简体中文](README.zh-CN.md) | [Other languages](docs/locales/README.md)
 
 **zisla is a native macOS workspace that appears when you need it, then gets out of the way.** Move the pointer to the top center of the screen to open one lightweight place for active AI work, media, handoff, downloads, and desktop utilities. Displays without a notch use the same simulated status area.
 
@@ -26,8 +26,8 @@ Music: “Funkorama” by Kevin MacLeod · [CC BY 4.0](https://creativecommons.o
 | Capability | What it does |
 | --- | --- |
 | Now Playing | Shows artwork, title, progress, lyrics, and playback controls; Core Audio can identify the app actually outputting audio when metadata is unavailable. |
-| Handoff and sharing | Drop files, media, or links on the top trigger area to keep them in a handoff tray, reveal them in Finder, or open the macOS share menu. |
-| Clipboard and notifications | Optionally records local clipboard history, recognizes new links locally, and surfaces media, AI activity, browser downloads, timers, mail, and updates in the collapsed state. Optional Quick Actions show a small island toast after every copy with a rich preview and smart next actions (open, reveal in Finder, search, translate, calculate, save). After a browser download completes or an AirDrop file arrives, the same shortcut can open its folder. |
+| Handoff and sharing | Drop files, media, or links on the top trigger area to keep them in a handoff tray, reveal them in Finder, or open the macOS share menu. Compress selected files and folders to ZIP, resize or convert selected images in Image Tools and return successful outputs to the tray, or import selected images, video and audio into the recording media library while keeping its current project and timeline. |
+| Clipboard and notifications | Optionally records local clipboard history, recognizes new links locally, and surfaces media, AI activity, browser downloads, timers, mail, and updates in the collapsed state. Optional Quick Actions show a small island toast after every copy with a rich preview and smart next actions (open, reveal in Finder, search, translate, calculate, save). After a browser download completes or an AirDrop file arrives, the same shortcut can open its folder. New history images are queued for on-device text recognition; search their text to find the original image, or right-click an image to recognize or copy its text. |
 | Everyday workspace | Includes weather, calendar, reminders, Mail.app, Markdown notes backed by Apple Notes, lock-screen information, and optional desktop pets. |
 
 ### Make AI work visible
@@ -44,6 +44,19 @@ For tools without a stable local activity source, `zislactl` lets scripts, CI, a
 | Focus and presentation | Pomodoro timer with one audible alert and a local notification when a session ends, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, and camera mirror. |
 | System and battery | CPU, GPU, memory, disk, network, fan, and battery information, plus cleanup of caches and logs that are safe to remove. |
 | Voice input | Global shortcuts for recording and transcription, optional local or remote transcript organization, and local voice history. |
+
+### Current entry points and workflows
+
+The island has 12 modules: Home, Handoff, Clipboard, AI monitoring, Keyboard sounds, Downloads, Schedule, Mail, Notes, Application volume mixer, Utilities, and System. Battery details live under System; lock-screen presentation is separate. Open PDF, image and audio tools from Settings; open the recording studio from Settings or the menu bar.
+
+- **Recording and creation:** Record a display, window, or region with optional system audio, microphone, and camera. Edit captions, zooms, portrait and voice effects across tracks, preview, then export video, GIF, Live Photo, or audio. Image tools offer 9 local operations; audio tools offer 27.
+- **Mixing and playback:** macOS 14.4+ supports per-app volume and mute. Choose audio output in the media area and player preferences in Settings.
+- **Desktop and meetings:** Dock and Command+Tab window previews, webpage/window/desktop context notes, a 10-minute meeting countdown, joining and linked notes. Shake while dragging files to reveal the shelf drop target.
+- **Daily briefing:** 8 templates, preview, manual or scheduled PNG export, selected metrics, and an independent save folder.
+- **AI accounts:** View supported account allowances, reset times, low-quota notices, and sampling times; export local token history as `.xlsx`.
+- **Quick Actions:** Popup actions use `Command+1` through `Command+0` in order. The additional default trigger for new configurations is `Command+N` for the first action. Upgrades retain saved shortcuts and cleared triggers.
+
+[User help](https://wzz6423.github.io/zisla/help.html?lang=en#help) provides nine step-by-step guides: clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/window previews, and playback/mixing. The [macOS guide](mac/README.md#save-locations) lists tool save folders and dependencies.
 
 ## Get started
 
@@ -104,8 +117,8 @@ zisla requests a permission only when an enabled feature first needs it. You can
 | AI activity | Reads only structured events and local activity metadata. Prompts and answer bodies are never read. |
 | Clipboard and files | Clipboard history, link detection, and Quick Actions are separate local switches; Quick Actions handles completed browser downloads and received AirDrop files independently of the browser download progress switch. Recognition runs entirely on-device, and opening links or running actions happens only after an explicit click or trigger press. Handoff uses security-scoped bookmarks and does not copy the original file. |
 | Notes, Mail, and voice | Notes and Mail use AppleScript/JXA with automation authorization. Voice records only while active; transcript organization sends text only to the selected local model, remote provider, or CLI profile. |
-| Browser downloads and media | Uses macOS public file-progress information, MediaRemote metadata, and Core Audio output state. It does not read browser history databases or capture audio content. |
-| Network | Weather, release checks, downloader requests, and optional remote voice organization access the network only for their respective enabled actions. |
+| Browser downloads and media | Uses macOS public file-progress information, MediaRemote metadata, and Core Audio output state. It does not read browser history databases. System waveforms and application mixing process audio locally; recording saves audio only when the corresponding source is enabled. |
+| Network | Weather, public-IP lookup, update mirror selection, downloads, enabled AI account-allowance checks, and dependency/CLI installation contact their services. Optional translation, voice cleanup, and recording AI edits use the selected provider or CLI. Apple speech recognition may use the network according to system and language support. |
 
 ### Permissions by feature
 
@@ -114,16 +127,16 @@ zisla requests the required authorization when a feature is first used. If you p
 | Permission or system setting | When it is needed | Authorized scope |
 | --- | --- | --- |
 | Device Control and Data Access (shown as Accessibility on some versions) | Automatically inserting voice transcripts into the current app's text field | Reads and locates non-password input fields, then delivers the transcript through Accessibility APIs or `Cmd+V`. Without authorization, the transcript is still copied to the clipboard. |
-| Microphone | Starting voice input | Captures sound only while actively recording. |
+| Microphone | Voice input or enabling the studio microphone | Captures the selected microphone for recording or enabled monitoring. |
 | Speech Recognition | Converting recorded speech to text | Processes only actively recorded speech. Voice input requires both Microphone and Speech Recognition authorization. |
 | Full Disk Access | Viewing mail while Mail.app is not running | Reads the local index in `~/Library/Mail` to show accounts, senders, subjects, summaries, timestamps, and read status. This Mail index access path requires authorization. |
 | Automation | Reading, composing, replying to, marking, or deleting Mail.app messages; reading and writing Apple Notes | Allows zisla to control the corresponding system apps. Mail and Notes authorization can be revoked separately in System Settings. |
 | Calendars; Reminders | Using the schedule module | Reads and manages calendar events and reminders with separate authorizations. |
 | Location Services | Using current-location weather | Requests the current location once without continuous tracking. Manually added locations do not require location access. |
-| Camera | Opening the camera mirror | Uses the camera only while the mirror window is open. |
-| Input Monitoring | Using voice shortcuts that distinguish left and right modifier keys, or keyboard cleaning | Monitors only the keyboard events required for these shortcuts. Ordinary global shortcuts do not require this authorization. |
-| Bluetooth | Viewing accessory battery levels in the battery module | Reads only publicly available battery information for connected or paired devices. |
-| Screen & System Audio Recording (shown as Screen Recording on older macOS versions) | Taking or editing screenshots, or showing the waveform of system audio playback | Reads screen images during capture. Audio waveforms analyze current system audio energy without saving or uploading audio content. |
+| Camera | Opening the mirror or enabling studio camera preview/recording | Uses the selected camera while the corresponding feature is active. |
+| Input Monitoring | Keyboard sounds, typing statistics, keyboard cleaning, and modifier-only or mouse-side shortcuts | Observes events for the enabled feature; typing statistics remain local. Ordinary global shortcuts do not require this authorization. |
+| Bluetooth | Viewing accessory battery levels under System → Battery | Reads only publicly available battery information for connected or paired devices. |
+| Screen & System Audio Recording (shown as Screen Recording on older macOS versions) | Screenshots, window previews, recording, system-audio waveforms, and the application mixer | Reads screen images and selected audio sources. Recording saves enabled sources locally; the mixer needs macOS 14.4+. |
 | Notifications | Using Pomodoro alerts | Plays one audible alert and shows a local notification when a timer ends. |
 | User-selected folders (no manual authorization required) | File handoff, imports and exports, or choosing a download directory | The system file picker grants access to the selected directory. These features do not require Full Disk Access. |
 

@@ -27,7 +27,7 @@ const iconNames = source.match(/const siteIcons = \{([\s\S]*?)\};/)[1].match(/\w
 const pageSource = stripTypeScriptTypes(source.slice(source.indexOf('const app = ')))
   .replace('void showLocale(currentLocale);', '');
 
-function createPage(t, { available = true, reducedMotion = true, hidden = false, setupError } = {}) {
+function createPage(t, { available = true, reducedMotion = true, hidden = false, setupError, pageKind = 'home' } = {}) {
   class Events extends EventTarget {
     listeners = new Map();
     addEventListener(type, callback, options) {
@@ -62,6 +62,7 @@ function createPage(t, { available = true, reducedMotion = true, hidden = false,
   let now = 0;
   const window = Object.assign(new Events(), {
     innerWidth: 1280, innerHeight: 800, devicePixelRatio: 1, scrollY: 0,
+    location: new URL(`https://example.test/zisla/${pageKind === 'help' ? 'help.html' : ''}`),
     localStorage: { getItem: () => null },
     matchMedia: (query) => query.includes('reduced-motion') ? media : Object.assign(new Events(), { matches: false }),
     requestAnimationFrame(callback) { frames.set(++nextFrame, callback); return nextFrame; },
@@ -71,7 +72,7 @@ function createPage(t, { available = true, reducedMotion = true, hidden = false,
   const images = [];
   const document = Object.assign(new Events(), {
     hidden,
-    documentElement: Object.assign(node(), { scrollHeight: 12000 }),
+    documentElement: Object.assign(node(), { scrollHeight: 12000, dataset: { page: pageKind } }),
     body: node(),
     head: Object.assign(node(), { querySelector: () => null }),
     querySelector(selector) {
@@ -151,7 +152,7 @@ function createPage(t, { available = true, reducedMotion = true, hidden = false,
         forceContextLoss() { this.contextLosses++; }
       },
     },
-    document, window, navigator: { languages: [] }, Event,
+    document, window, navigator: { languages: [] }, Event, URL, URLSearchParams,
     Math: Object.assign(Object.create(Math), { random: () => 0.5 }),
     requestAnimationFrame: window.requestAnimationFrame,
     cancelAnimationFrame: window.cancelAnimationFrame,
@@ -189,6 +190,23 @@ const assertStaticPage = (page, locale) => {
   assert.ok(page.app.innerHTML.includes(site.getSiteContent(locale).header.languageLabel));
   assert.ok(page.app.innerHTML.includes(`href="${site.latestRelease.dmg}" download`), 'the main download remains available');
 };
+
+test('help language switches render guides without starting the homepage scene or reporting a missing hero', async (t) => {
+  const page = createPage(t, { pageKind: 'help' });
+  for (const locale of ['en', 'zh-Hans', 'ar']) {
+    await page.show(locale);
+    assert.equal(page.document.documentElement.lang, locale);
+    assert.equal(page.document.documentElement.dir, locales.localeDirection(locale));
+    assert.equal(page.document.title, site.getSiteContent(locale).help.title + ' · zisla');
+    assert.ok(page.app.innerHTML.includes('id="guide-clipboard"'));
+    assert.ok(page.app.innerHTML.includes(`href="./?lang=${locale}#download"`));
+    assert.equal(page.warnings.length, 0, `${locale}: a help page has no hero by design`);
+    assert.equal(page.attempts(), 0);
+    assert.equal(heroCanvases(page).length, 0);
+    assert.equal(liveResources(page), 0);
+    assert.equal(page.frames.size, 0);
+  }
+});
 
 test('unavailable WebGL preserves localized content and downloads without attaching a canvas', async (t) => {
   const page = createPage(t, { available: false });

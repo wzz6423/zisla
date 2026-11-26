@@ -142,25 +142,35 @@ public struct ClipboardSourceApp: Codable, Equatable, Sendable {
     }
 }
 
+enum ClipboardImageTextSearch {
+    static func contains(_ text: String?, query: String) -> Bool {
+        guard let text else { return false }
+        return text.range(of: query, options: [.caseInsensitive], locale: Locale(identifier: "en_US_POSIX")) != nil
+    }
+}
+
 public struct ClipboardHistoryItem: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var content: ClipboardHistoryContent
     public var lastCopiedAt: Date
     public var isPinned: Bool
     public var sourceApp: ClipboardSourceApp?
+    public var recognizedImageText: String?
 
     public init(
         id: UUID = UUID(),
         content: ClipboardHistoryContent,
         lastCopiedAt: Date = Date(),
         isPinned: Bool = false,
-        sourceApp: ClipboardSourceApp? = nil
+        sourceApp: ClipboardSourceApp? = nil,
+        recognizedImageText: String? = nil
     ) {
         self.id = id
         self.content = content
         self.lastCopiedAt = lastCopiedAt
         self.isPinned = isPinned
         self.sourceApp = sourceApp
+        self.recognizedImageText = content.isImage ? recognizedImageText : nil
     }
 
     public func lastCopiedAtText(now: Date = Date(), calendar: Calendar = .current) -> String {

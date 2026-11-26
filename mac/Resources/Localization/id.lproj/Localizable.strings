@@ -3779,6 +3779,20 @@
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Sisa pembaruan · Versi lama %@ · %@ · Versi saat ini: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "Salinan aplikasi atau versi saat ini telah berubah. Item dipertahankan.";
 
+"识别图片文字" = "Kenali teks gambar";
+"复制图片文字" = "Salin teks gambar";
+"取消图片文字识别" = "Batalkan pengenalan teks gambar";
+"等待识别图片文字" = "Menunggu pengenalan teks gambar";
+"正在识别图片文字" = "Mengenali teks gambar";
+
+"缩放图片" = "Ubah ukuran gambar";
+"转换图片格式" = "Konversi format gambar";
+"导入录屏素材库" = "Impor ke pustaka media rekaman";
+"图片工具当前不可用，请稍后重试" = "Alat gambar saat ini tidak tersedia. Coba lagi nanti.";
+"无法压缩同名项目：%@" = "Tidak dapat mengarsipkan item dengan nama yang sama: %@";
+"素材库导入完成" = "Impor ke pustaka media selesai";
+"%ld 个结果未能加入中转站" = "%ld hasil tidak dapat ditambahkan ke rak";
+
 /* Independent countdown timers */
 "计时器" = "Pengatur waktu";
 "计时结束" = "Waktu selesai";

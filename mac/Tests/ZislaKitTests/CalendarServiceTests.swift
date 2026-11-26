@@ -1,10 +1,90 @@
 import EventKit
 import Foundation
 import Testing
+import os
 
 @testable import ZislaKit
 
 struct CalendarServiceTests {
+    @Test @MainActor
+    func agendaSourceRefreshAndEventQueriesLeaveTheMainThreadAvailable() async {
+        let store = CalendarResponsivenessEventStore()
+        let probe = CalendarResponsivenessProbe()
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        let service = CalendarService(store: store, mutations: .live(store: store), environment: CalendarServiceEnvironment(
+            authorizationStatus: { kind in kind == .event ? .fullAccess : .denied }, now: { date },
+            notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter(),
+            authorizationPromptHost: { nil }
+        ), queries: .live(makeStore: { CalendarResponsivenessEventStore(probe: probe) }))
+        defer { service.stop() }
+
+        await service.refresh(referenceDate: date)
+
+        #expect(probe.sourceRefreshMainThreads == [false], "Syncing calendar sources must not block the UI run loop")
+        #expect(probe.eventQueryMainThreads == [false, false], "Meeting and agenda EventKit queries must run outside the main thread")
+        #expect(probe.storeCreationMainThreads == [false], "The query store must belong to its background executor")
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
+    func blockedCalendarSourceRefreshStillLetsTheMainRunLoopRespond() async {
+        let store = CalendarResponsivenessEventStore()
+        let probe = CalendarResponsivenessProbe()
+        let gate = DispatchSemaphore(value: 0)
+        let entered = AsyncStream<Void>.makeStream()
+        let queries = CalendarQueryOperations.live(makeStore: {
+            CalendarResponsivenessEventStore(probe: probe, sourceRefresh: {
+                entered.continuation.yield(())
+                let release = gate.wait(timeout: .now() + 2)
+                #expect(release == .success, "The UI must release the blocked query before its failure budget expires")
+            })
+        })
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        let service = CalendarService(store: store, mutations: .live(store: store), environment: CalendarServiceEnvironment(
+            authorizationStatus: { kind in kind == .event ? .fullAccess : .denied }, now: { date },
+            notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter(),
+            authorizationPromptHost: { nil }
+        ), queries: queries)
+        defer { gate.signal(); entered.continuation.finish(); service.stop() }
+        let refresh = Task { await service.refresh(referenceDate: date) }
+        for await _ in entered.stream { break }
+
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                gate.signal()
+                continuation.resume()
+            }
+        }
+        await refresh.value
+
+        #expect(probe.sourceRefreshMainThreads == [false])
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
+    func reminderQueryConvertsSnapshotsBeforeReturningToTheMainThread() async {
+        let probe = CalendarResponsivenessProbe()
+        let queries = CalendarQueryOperations.live(makeStore: { CalendarResponsivenessEventStore(probe: probe) })
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        let snapshots = await withCheckedContinuation { continuation in
+            Task {
+                await queries.reminders(DateInterval(start: date, duration: 86_400), calendar) { snapshots in
+                    probe.recordReminderSnapshot()
+                    continuation.resume(returning: snapshots)
+                }
+            }
+        }
+
+        #expect(snapshots.map(\.title) == ["Fixture reminder"])
+        #expect(snapshots.first?.kind == .reminder)
+        #expect(probe.reminderQueryMainThreads == [false], "Starting a reminder query must not block the main thread")
+        #expect(!probe.reminderSnapshotMainThreads.isEmpty)
+        #expect(probe.reminderSnapshotMainThreads.allSatisfy { !$0 }, "Snapshot conversion must finish before the completion returns to the UI")
+        #expect(probe.storeCreationMainThreads == [false])
+    }
+
     @Test
     func legacyAuthorizedAndFullAccessStatusesCanReadEvents() throws {
         let legacyAuthorized = try #require(EKAuthorizationStatus(rawValue: 3))
@@ -681,6 +761,70 @@ struct CalendarServiceTests {
         #expect(recorder.deletedItems.isEmpty)
     }
 
+}
+
+private final class CalendarResponsivenessEventStore: EKEventStore {
+    private let probe: CalendarResponsivenessProbe
+    private let sourceRefresh: @Sendable () -> Void
+
+    init(probe: CalendarResponsivenessProbe = CalendarResponsivenessProbe(), sourceRefresh: @escaping @Sendable () -> Void = {}) {
+        self.probe = probe
+        self.sourceRefresh = sourceRefresh
+        super.init()
+        probe.recordStoreCreation()
+    }
+
+    override func refreshSourcesIfNecessary() {
+        probe.recordSourceRefresh()
+        sourceRefresh()
+    }
+
+    override func predicateForEvents(withStart start: Date, end: Date, calendars: [EKCalendar]?) -> NSPredicate {
+        NSPredicate(value: true)
+    }
+
+    override func events(matching predicate: NSPredicate) -> [EKEvent] {
+        probe.recordEventQuery()
+        return []
+    }
+
+    override func predicateForReminders(in calendars: [EKCalendar]?) -> NSPredicate { NSPredicate(value: true) }
+
+    override func fetchReminders(matching predicate: NSPredicate, completion: @escaping ([EKReminder]?) -> Void) -> Any {
+        probe.recordReminderQuery()
+        let reminder = EKReminder(eventStore: self)
+        reminder.title = "Fixture reminder"
+        let calendar = EKCalendar(for: .reminder, eventStore: self)
+        calendar.title = "Fixture"
+        reminder.calendar = calendar
+        reminder.dueDateComponents = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(secondsFromGMT: 0),
+                                                    year: 1970, month: 1, day: 13, hour: 0)
+        completion([reminder])
+        return NSObject()
+    }
+}
+
+final class CalendarResponsivenessProbe: Sendable {
+    private let storage = OSAllocatedUnfairLock(initialState: Records())
+
+    private struct Records {
+        var sourceRefreshMainThreads: [Bool] = []
+        var eventQueryMainThreads: [Bool] = []
+        var storeCreationMainThreads: [Bool] = []
+        var reminderQueryMainThreads: [Bool] = []
+        var reminderSnapshotMainThreads: [Bool] = []
+    }
+
+    var sourceRefreshMainThreads: [Bool] { storage.withLock { $0.sourceRefreshMainThreads } }
+    var eventQueryMainThreads: [Bool] { storage.withLock { $0.eventQueryMainThreads } }
+    var storeCreationMainThreads: [Bool] { storage.withLock { $0.storeCreationMainThreads } }
+    var reminderQueryMainThreads: [Bool] { storage.withLock { $0.reminderQueryMainThreads } }
+    var reminderSnapshotMainThreads: [Bool] { storage.withLock { $0.reminderSnapshotMainThreads } }
+    func recordSourceRefresh() { storage.withLock { $0.sourceRefreshMainThreads.append(Thread.isMainThread) } }
+    func recordEventQuery() { storage.withLock { $0.eventQueryMainThreads.append(Thread.isMainThread) } }
+    func recordStoreCreation() { storage.withLock { $0.storeCreationMainThreads.append(Thread.isMainThread) } }
+    func recordReminderQuery() { storage.withLock { $0.reminderQueryMainThreads.append(Thread.isMainThread) } }
+    func recordReminderSnapshot() { storage.withLock { $0.reminderSnapshotMainThreads.append(Thread.isMainThread) } }
 }
 
 @MainActor

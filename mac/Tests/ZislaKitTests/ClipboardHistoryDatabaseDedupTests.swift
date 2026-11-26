@@ -71,7 +71,7 @@ struct ClipboardHistoryDatabaseDedupTests {
 
         #expect(restored.items.sorted { $0.id.uuidString < $1.id.uuidString }
             == legacy.sorted { $0.id.uuidString < $1.id.uuidString })
-        #expect(try scalar("PRAGMA user_version", at: url) == 6)
+        #expect(try scalar("PRAGMA user_version", at: url) == 7)
         #expect(try readBlob("SELECT content_digest FROM clipboard_history WHERE id = '\(complete.id.uuidString)'", at: url)
             == Data(SHA256.hash(data: Data(complete.content.previewText.utf8))))
         #expect(trace.activeCursorDigestUpdates == 0)
@@ -125,7 +125,7 @@ struct ClipboardHistoryDatabaseDedupTests {
         try execute("DROP TRIGGER reject_null_digest_migration", at: url)
         #expect(try await loadAll(database).items.sorted { $0.id.uuidString < $1.id.uuidString }
             == legacy.sorted { $0.id.uuidString < $1.id.uuidString })
-        #expect(try scalar("PRAGMA user_version", at: url) == 6)
+        #expect(try scalar("PRAGMA user_version", at: url) == 7)
     }
 
     @Test
@@ -455,7 +455,7 @@ struct ClipboardHistoryDatabaseDedupTests {
         var database: ClipboardHistoryDatabase? = ClipboardHistoryDatabase(storageURL: url)
         #expect(try await loadAll(database!).items.sorted { $0.id.uuidString < $1.id.uuidString }
             == legacy.sorted { $0.id.uuidString < $1.id.uuidString })
-        #expect(try scalar("PRAGMA user_version", at: url) == 6)
+        #expect(try scalar("PRAGMA user_version", at: url) == 7)
         #expect(try scalar("SELECT COUNT(*) FROM clipboard_history WHERE length(content_digest) = 32", at: url) == legacy.count)
         database = nil
         let reopened = ClipboardHistoryDatabase(storageURL: url)
@@ -510,7 +510,7 @@ struct ClipboardHistoryDatabaseDedupTests {
             fault.disable()
         }
         #expect(try await loadAll(database).totalCount == legacy.count)
-        #expect(try scalar("PRAGMA user_version", at: url) == 6)
+        #expect(try scalar("PRAGMA user_version", at: url) == 7)
         #expect(try scalar("SELECT COUNT(*) FROM clipboard_history WHERE length(content_digest) = 32", at: url) == legacy.count)
     }
 

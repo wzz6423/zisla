@@ -549,12 +549,13 @@ public final class FileShelfStore: ObservableObject {
         }
     }
 
-    static let maximumImageBytes = 32 * 1_024 * 1_024
-    static let maximumImagePixels = 16_000_000
+    public nonisolated static let maximumImageBytes = 32 * 1_024 * 1_024
+    public nonisolated static let maximumImagePixels = 16_000_000
 
-    static func imageFormat(for data: Data, maximumBytes: Int = maximumImageBytes, maximumPixels: Int = maximumImagePixels,
-                            requiresExactPixelBytes: Bool = false) throws -> String {
+    public nonisolated static func imageFormat(for data: Data, maximumBytes: Int = maximumImageBytes, maximumPixels: Int = maximumImagePixels,
+                                               requiresExactPixelBytes: Bool = false) throws -> String {
         guard data.count <= maximumBytes else { throw CocoaError(.fileReadTooLarge) }
+        let data = Data(data)
         // Read dimensions without decoding first, so tiny compressed inputs cannot allocate huge bitmaps.
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               CGImageSourceGetCount(source) == 1,
@@ -574,7 +575,7 @@ public final class FileShelfStore: ObservableObject {
         return type == UTType.png.identifier ? "png" : "tiff"
     }
 
-    private static func pngPixelStreamBytes(_ data: Data, width: Int, height: Int) -> Int? {
+    private nonisolated static func pngPixelStreamBytes(_ data: Data, width: Int, height: Int) -> Int? {
         guard data.count >= 33 else { return nil }
         let depth = Int(data[24])
         let samples: Int
@@ -605,7 +606,7 @@ public final class FileShelfStore: ObservableObject {
         }
     }
 
-    private static func hasCompletePNGData(_ data: Data, maximumDecodedBytes: Int, expectedDecodedBytes: Int? = nil) -> Bool {
+    private nonisolated static func hasCompletePNGData(_ data: Data, maximumDecodedBytes: Int, expectedDecodedBytes: Int? = nil) -> Bool {
         // ImageIO repairs truncated PNGs and invalid pixel streams, which must not be saved as originals.
         var offset = 8
         var compressed = Data()

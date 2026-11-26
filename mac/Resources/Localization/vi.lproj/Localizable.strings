@@ -3779,6 +3779,20 @@
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Tệp còn lại sau cập nhật · Phiên bản cũ %@ · %@ · Phiên bản hiện tại: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "Bản sao ứng dụng hoặc phiên bản hiện tại đã thay đổi. Mục được giữ lại.";
 
+"识别图片文字" = "Nhận dạng chữ trong ảnh";
+"复制图片文字" = "Sao chép chữ trong ảnh";
+"取消图片文字识别" = "Hủy nhận dạng chữ trong ảnh";
+"等待识别图片文字" = "Đang chờ nhận dạng chữ trong ảnh";
+"正在识别图片文字" = "Đang nhận dạng chữ trong ảnh";
+
+"缩放图片" = "Đổi kích thước ảnh";
+"转换图片格式" = "Chuyển đổi định dạng ảnh";
+"导入录屏素材库" = "Nhập vào thư viện phương tiện ghi hình";
+"图片工具当前不可用，请稍后重试" = "Công cụ ảnh hiện không khả dụng. Vui lòng thử lại sau.";
+"无法压缩同名项目：%@" = "Không thể nén các mục có cùng tên: %@";
+"素材库导入完成" = "Đã nhập xong vào thư viện phương tiện";
+"%ld 个结果未能加入中转站" = "Không thể thêm %ld kết quả vào khay";
+
 /* Independent countdown timers */
 "计时器" = "Bộ hẹn giờ";
 "计时结束" = "Đã hết giờ";

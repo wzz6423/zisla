@@ -182,6 +182,14 @@ public enum AIMascotLibrary {
         case .workbuddyAI: identifier = "com.workbuddy.workbuddy-ai"; name = "WorkBuddy AI"
         case .cursor: identifier = "com.todesktop.230313mzl4w4u92"; name = "Cursor"
         case .grokBot: identifier = "com.anysphere.sand"; name = "Grok Bot"
+        case .antigravity:
+            return installedApplicationURL(
+                bundleIdentifiers: ["com.google.antigravity", "com.google.Antigravity"],
+                applicationNames: ["Antigravity", "Antigravity IDE"],
+                resolveBundleIdentifier: resolveBundleIdentifier,
+                applicationDirectories: applicationDirectories,
+                fileExists: fileExists
+            )
         default: return nil
         }
         return installedApplicationURL(
@@ -220,6 +228,7 @@ public enum AIMascotLibrary {
         case .claude: "claude-color.svg"
         case .codex: "codex-color.svg"
         case .gemini: "gemini-color.svg"
+        case .antigravity: "gemini-color.svg"
         case .grok: "grok.svg"
         case .gpt: "openai.svg"
         case .copilot: "copilot.svg"
@@ -268,6 +277,7 @@ public enum AIMascotLibrary {
         case .claude: "Claude"
         case .codex: "Codex"
         case .gemini: "Gemini"
+        case .antigravity: "Antigravity"
         case .grok: "Grok"
         case .gpt: "ChatGPT"
         case .copilot: "GitHub Copilot"

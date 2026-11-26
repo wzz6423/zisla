@@ -229,11 +229,11 @@ public enum ClipboardAssistantTranslate {
 
 /// Defaults for the clipboard assistant quick trigger.
 public enum ClipboardAssistantDefaults {
-    /// ⌘ 1; ordinary combinations are registered through the system global hotkey API.
+    /// Keep the additional trigger separate from the numbered action shortcuts.
     public static let triggerHotkey = VoiceInputHotkeyPreset(
-        keyCode: 18, // kVK_ANSI_1
+        keyCode: 45, // kVK_ANSI_N
         carbonModifiers: 0x0100, // cmdKey
-        keyDisplayName: "1"
+        keyDisplayName: "N"
     )
     public static let dismissHotkey = VoiceInputHotkeyPreset(
         keyCode: 51,

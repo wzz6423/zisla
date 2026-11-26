@@ -17,6 +17,7 @@ export const tr = createCatalog({
     menuCloseLabel: 'Gezinmeyi kapat',
     menuButtonTitle: 'Gezinmeyi aç',
     navItems: {
+      help: "Yardım",
       showcase: 'Özellikler',
       ai: 'AI iş akışı',
       download: 'İndir',
@@ -74,8 +75,8 @@ export const tr = createCatalog({
     pointsAriaLabel: '{name} öne çıkanları',
     modules: {
       dashboard: { name: 'Ana sayfa', caption: 'Canlı kartlar yalnızca odak oturumu, AI görevi veya indirme çalışırken görünür; hiçbir şey olmadığında yer kaplamaz. Ana sayfa, çalışan AI görevlerini uygulamaya göre gruplar.', points: ['İhtiyaç olduğunda görünür', 'Canlı ilerleme', 'Düzen otomatik uyarlanır'] },
-      shelf: { name: 'Raf', caption: 'Dosyaları, sesleri, videoları veya bağlantıları ekranın üstüne sürükleyin; arayın, filtreleyin ve birden fazla öğeyi kopyalamak, paylaşmak ya da Hızlı Notlar’a göndermek için seçin. Görselleri PDF’ye dönüştürün, tanınan metni Hızlı Notlar’a gönderin veya videoları kayıt stüdyosunda düzenleyin. Dosyaları Finder’da da gösterebilirsiniz.', points: ['Arama ve toplu işlemler', 'Görsellerden PDF ve Hızlı Notlar', 'Stüdyoda video düzenleme'] },
-      clipboard: { name: 'Pano', caption: 'Pano geçmişine ada içinden göz atın ve görüntü, URL, yol veya dosya türüne göre filtreleyin ve her öğenin ne zaman kopyalandığını görün. Bir öğeyi Hızlı Notlar\'a gönderin, favorilere ekleyin ya da silin. 7, 15 veya 30 günden eski geçmişi otomatik silebilir, favorileri koruyabilirsiniz. Otomatik silme varsayılan olarak kapalıdır. Geçmişi kaynak uygulamaya göre arayın ve gruplayın.', points: ['Ada içinde geçmiş', 'Türe göre filtreleme', 'Hızlı Notlar ve favoriler'] },
+      shelf: { name: 'Raf', caption: "Dosyaları rafta tutup arayın, seçin ve paylaşın. ZIP veya PDF oluşturun, resimleri boyutlandırıp dönüştürün, medyayı notlara veya stüdyoya gönderin.", points: ['Arama ve toplu işlemler', 'Görsellerden PDF ve Hızlı Notlar', 'Stüdyoda video düzenleme'] },
+      clipboard: { name: 'Pano', caption: "Yerel geçmişte ve resim metninde arayın. Tür veya uygulamaya göre süzün, favori kaydedin ve Hızlı Notlar’a gönderin.", points: ['Ada içinde geçmiş', 'Türe göre filtreleme', 'Hızlı Notlar ve favoriler'] },
       aiMonitor: { name: 'AI izleyici', caption: 'AI CLI’ları, masaüstü uygulamaları ve IDE’lerdeki görevleri ve durumları toplar. Güvenilir sayısal veriler token eğilimlerini ve etkinlik haritasını oluşturur; sağlayıcı ve modele göre giriş, çıkış ve toplam tokenları görmek için tarih seçin. Ayarlar’da geçmişi görün, tamamını .xlsx olarak dışa aktarın veya temizleyin. Gerçek hesap kotalarını, yenilenme zamanlarını ve düşük kota bildirimlerini; varsa 5h/7d pencerelerini ve Cursor’ın dolar bütçelerini gösterir. İstem ve yanıt metinlerini okumaz. Kompakt ada düzenleri de kalan kotayı halkalarla gösterir. Hesap bölgelerini ayrı ayrı seçin; günlük kullanım kayıtları ve kalan kota renkleri tüm düzenlerde tutarlı kalır.', points: ['Farklı AI araçlarından görevler', 'Model geçmişi ve .xlsx dışa aktarma', 'Hesap kotaları ve yenilenme zamanı'] },
       keyboardSound: { name: 'Klavye sesleri', caption: 'Global tuş vuruşları için ayarlanabilir ses ve doğal perde değişimiyle 20 yerleşik mekanik klavye sesi çalar; destekleyen seslerde tuş bırakma sesleri de bulunur. Yerel yazma istatistiklerini açarak bugünün özetini, eğilimleri, geçmişi, uygulama zaman çizelgesini ve F1-F12 tuşlarını içeren tuş ısı haritasını görün. Ses toplamı, dikte süresi, hız ve kazanılan zaman klavye panosunda da yer alır. Yeni yapılandırmalar sesleri ve yazma istatistiklerini açar; ayrı kapatılabilir.', points: ['20 yerleşik ses', 'Tuş bırakma sesleri ve perde değişimi', 'İstatistikler ayrı açılıp kapanır'] },
       download: { name: 'İndirici', caption: 'Bir bağlantı yapıştırın veya etkinleştirdikten sonra zisla\'nın panodan bağlantıları almasına izin verin. Video ya da ses seçip varsayılan klasöre veya istediğiniz bir klasöre indirin. Desteklenen bağlantılar kaynak simgesini, canlı ilerlemeyi ve tamamlanma durumunu gösterir. İndirme klasörünü Ayarlar → Kayıt Konumu altında ekran görüntülerinden ve kayıtlardan ayrı seçin. Bilibili bağlantıları seçilen video bölümünü indirir. Bileşenleri Ayarlar → Gerekli bileşenler altında yönetin ve kurulu bileşenlerin günlük güncellenmesini seçin.', points: ['Video / ses modları', 'Varsayılan veya özel klasör', 'Kaynak simgesi ve canlı ilerleme'] },
@@ -107,7 +108,7 @@ export const tr = createCatalog({
       },
       dailyBriefing: {
         title: 'Gününüz bir günlük özette',
-        description: 'Sekiz şablondan seçin; kullanım, yazma, sistem ve zisla etkinlik verilerini belirleyip önizleyin. PNG’yi elle veya günlük seçilen saatte dışa aktarın. Ekran Süresi geçmişi açık ve kullanılabilir olduğunda kullanılır; eksik veriler ölçülen sıfır sayılmaz. Ayarlar → Kayıt Konumu altında ayrı bir aktarma klasörü seçin. Gerçek hesap kotalarını ve ölçüm zamanlarını da ekleyebilirsiniz.',
+        description: "Sekiz şablondan seçin; kullanım, yazma, sistem ve zisla etkinlik verilerini belirleyip önizleyin. PNG’yi elle veya günlük seçilen saatte dışa aktarın. Ekran Süresi geçmişi açık ve kullanılabilir olduğunda kullanılır. Ayarlar → Kayıt Konumu altında ayrı bir aktarma klasörü seçin. Gerçek hesap kotalarını ve ölçüm zamanlarını da ekleyebilirsiniz.",
         detail: '8 şablon · İçerik seçimi · Önizleme ve zamanlı PNG aktarma',
       },
       userCare: {
@@ -122,13 +123,13 @@ export const tr = createCatalog({
       },
       recording: {
         title: 'Stüdyoda kaydedin ve düzenleyin',
-        description: 'Ekran, pencere veya bölgeyi isteğe bağlı sistem sesi, mikrofon ve kamerayla kaydedin. Video, ses, görüntü ve metni çoklu izlerde animasyon, yakınlaştırma ve altyazılarla düzenleyin. Cilt yumuşatma, parlaklık, yüz ve vücut inceltme, ses efektleri ve seçtiğiniz renkte akıcı imleç izlerini ayarlayın. Düzenlenen sonucu stüdyoda oynatın. Özgün oran, 16:9, 9:16, 1:1 veya 4:3 seçin; video, GIF, Live Photo veya ses aktarın. Bazı biçimler FFmpeg gerektirir. İsteğe bağlı AI önerilerini uygulamadan önce önizleyin. Kayıt klasörü Ayarlar → Kayıt Konumu altında ayrı seçilir. Desteklenen cihazlarda HDR kaydedin.',
+        description: "Ekran, pencere veya alanı kaydedin; izleri, altyazıları ve görüntü/ses efektlerini düzenleyip aktarın. Uyumlu aygıtlarda HDR ve raftan medya aktarımı.",
         detail: 'Portre ve ses efektleri · Renkli imleç izleri · Çoklu iz oynatma ve aktarma',
       },
       permissions: {
         title: 'Sistem izinleri tek yerde',
-        description: 'Ayarlar → İzinler bölümünde durumu inceleyin, desteklenen istekleri başlatın veya ilgili sistem sayfasını açın. İlk karşılama aynı listeyi kullanır ve elle ayarlanacak izinleri belirtir. Erişim verildikten sonra izin durumu yenilenir. Uygulama sürükleme yardımcısı, uygulamanın eklenmesini gerektiren izinlerde yardımcı olur.',
-        detail: 'İzin durumu · İstekler ve bağlantılar · Karşılamayla ortak',
+        description: "Ayarlar → İzinler bölümünde durumu inceleyin, desteklenen istekleri başlatın veya ilgili sistem sayfasını açın. Erişim verildikten sonra izin durumu yenilenir. Uygulama sürükleme yardımcısı, uygulamanın eklenmesini gerektiren izinlerde yardımcı olur.",
+        detail: "İzin durumu · İstekler ve bağlantılar",
       },
       imageTools: {
         title: 'Görsel Araçları',
@@ -142,7 +143,7 @@ export const tr = createCatalog({
       },
       pdf: {
         title: 'PDF araçları',
-        description: 'Ada modül karuselinin dışında, Ayarlar’da kullanılabilir. Mac\'inizde çalışan on dört işlem: birleştirme, bölme, döndürme, kırpma, görüntü ve Office dosyalarını dönüştürme, görüntü olarak oluşturma, metin çıkarma, metin veya görüntü filigranı ekleme, sayfa numarası ekleme, şifreleme, parolayı kaldırma ve meta verileri düzenleme.',
+        description: "Ayarlar’da kullanılabilir. Mac'inizde çalışan on dört işlem: birleştirme, bölme, döndürme, kırpma, görüntü ve Office dosyalarını dönüştürme, görüntü olarak oluşturma, metin çıkarma, metin veya görüntü filigranı ekleme, sayfa numarası ekleme, şifreleme, parolayı kaldırma ve meta verileri düzenleme.",
         detail: 'Cihazda çalışan 14 araç · Kendi sıranızla birleştirin · Hiçbir şey Mac\'inizden çıkmaz',
       },
 
@@ -159,7 +160,7 @@ export const tr = createCatalog({
       copyAssistant: { title: 'Hızlı Eylemler ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir. Tarayıcı indirmesi veya AirDrop aktarımı bittikten sonra Hızlı Eylemler ile dosyanın klasörünü açın. Chrome’un varsayılan ve seçilen indirme klasörleri desteklenir; indirme ilerlemesinden bağımsız açılıp kapatılır. IP adreslerinde sorgulama ve bağlantı açma ayrı eylemlerdir. Dönüşüm yerel küçük para birimlerini tanır; katalog Emoji 18.0 içerir. Kaydedilen metin ve görüntüler Ayarlar → Kayıt Konumu altındaki ayrı Hızlı Eylem klasörünü kullanır. Uygulama açılmadığında Hızlı Eylemler bütünlüğünü, imzasını ve macOS güvenlik politikasını kontrol eder; kontroller geçince karantina özniteliklerini kaldırıp uygulamayı açabilir. Ayarlar → Hızlı Eylemler altında tanınan türlerin eylem sırasını değiştirin. Tutarlar bölgesel para simgelerini ve önekli para birimi kodlarını destekler. Komut algılama here-document belgelerini destekler.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
       aiManagement: { title: 'AI CLI ve Skills yönetimi', description: 'Ayarlar\'dan popüler AI CLI\'larını algılayın, kurun, güncelleyin ve kaldırın; yerel Skills\'leri inceleyip yönetin, böylece terminaller ve araçlar arasında daha az geçiş yapın.', detail: 'Algıla ve kur · Güncelle ve kaldır · Yerel Skills' },
       pet: { title: 'Ada evcil hayvanı', description: 'Genişletilmiş hayvan ve karakter kataloğundan seçin ya da desteklenen görüntü, animasyon veya videoyu adlandırarak içe aktarın. Adanın iki yanına yerleştirin ve içe aktarılanları Ayarlar’dan kaldırın. Animasyonlar en fazla 30 saniye, dosyalar en fazla 100 MB olabilir.', detail: 'Genişletilmiş katalog · Görüntü ve video içe aktarma · Özel hayvanları kaldırma' },
-      lockScreen: { title: 'Kilit ekranı bilgileri', description: 'Tarihi, durumu ve çalan içeriği isteğe bağlı olarak macOS kilit ekranında gösterin. Bu ayrı bir kilit ekranı katmanıdır; ada modül listesinde veya döngüsünde görünmez.', detail: 'Ayrı kilit ekranı katmanı · İsteğe bağlı · Odağı almaz' },
+      lockScreen: { title: 'Kilit ekranı bilgileri', description: "Tarihi, durumu ve çalan içeriği isteğe bağlı olarak macOS kilit ekranında gösterin.", detail: "İsteğe bağlı · Odağı almaz" },
       recommendedTools: {
         title: 'Önerilen uygulamalar',
         description:
@@ -169,24 +170,22 @@ export const tr = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'KARA KUTU OLMAYAN AI',
-    title: 'AI durumunu görün <span>konuşmayı okumadan.</span>',
-    lede: 'Görevleri uygulamaya, model kullanımını tarihe göre ve gerçek hesap kotalarını izleyin. Durum ve sayısal kayıtlar Mac’te kalır; konuşma metinleri okunmaz.',
-    summaryMono: 'CİHAZDA DURUM / NET SINIRLAR',
-    summaryLede: 'Kullandığınız AI araçlarını bağlayın ve işinizin gerektirdiği bağlam sınırlarını koruyun.',
-    summaryNote: 'Bu sayfa yalnızca algılama kapsamını, veri sınırını ve bağlantı yöntemini açıklar; canlı bir oturumu taklit etmez.',
+    eyebrow: "AI İŞ AKIŞI",
+    title: "AI görevlerini, <span>kullanımı ve kotaları izleyin.</span>",
+    lede: "Görevleri uygulamaya, model kullanımını tarihe göre ve hesapların kalan kotalarını görüntüleyin.",
+    summaryMono: "GÖREVLER / KULLANIM / KOTALAR",
+    summaryLede: "AI görevleri, kullanım ve kotalar tek yerde.",
     toolsHeading: 'Desteklenen AI araçları',
-    toolsLede: 'Desteklenen CLI\'ların, masaüstü uygulamalarının ve IDE\'lerin etkinliğini algılar ve görev durumunu toplar.',
+    toolsLede: "Desteklenen CLI, masaüstü uygulaması ve IDE görevlerini algılar.",
     toolsAriaLabel: 'Desteklenen AI araçları',
-    usageNote: 'Oturum algılama, token geçmişi ve hesap kotaları farklı kaynaklar kullanır. Delta yerel sayısal defterini okur; Orca bağlı CLI kullanımını tekilleştirip asıl sağlayıcıya atar. WorkBuddy AI oturumları algılayabilir ve kredileri sorgulayabilir; bağlam doluluğu ve krediler tokena ya da dolar maliyetine çevrilmez. Kota erişimi sağlayıcıya ve giriş yöntemine bağlıdır.',
-    boundariesHeading: 'Yalnızca durum sınırları kaydedilir',
+    boundariesHeading: "Gizlilik",
     privacyPoints: [
-      'Yapılandırılmış olaylardan yalnızca olay türünü, durumu, zaman damgasını, modeli ve oturum kimliğini ayrıştırır',
-      'İstem veya yanıt metnini asla okumaz',
-      'Protokol ve durum Mac\'inizde saklanır',
+      "Görev durumu ve kullanım Mac’inizde saklanır",
+      "İstem ve yanıt metinleri okunmaz",
+      "Konuşmalar yüklenmez",
     ],
     bridgeHeading: 'Kendi görevlerinizi bağlayın',
-    bridgeLede: 'Harici görevlerin yapılandırılmış durumunu durum çubuğuna göndermek için zislactl kullanın.',
+    bridgeLede: "Komut dosyalarını ve derleme görevlerini durum çubuğunda göstermek için zislactl kullanın.",
     zislactlTaskTitle: 'Derleme ve yayınlama',
     copyZislactlAriaLabel: 'zislactl komutunu kopyala',
   },
@@ -199,10 +198,182 @@ export const tr = createCatalog({
     summaryLede: 'İhtiyaç duyduğunuzda genişler, okumanız bitince geri çekilir.',
     summaryNote: 'İşaretçi konumuyla tetiklenir. İçerik yokken yer kaplamaz ve kullandığınız uygulamanın odağını asla çalmaz.',
     steps: {
-      trigger: { phase: 'Tetikle', title: 'İşaretçiyi ekranın üst orta kısmına taşıyın', desc: 'Çentikli ve harici ekranlar aynı tetikleyiciyi kullanır; gizliyken kare döngüsü çalışmaz.' },
+      trigger: { phase: 'Tetikle', title: 'İşaretçiyi ekranın üst orta kısmına taşıyın', desc: "Çentikli ekranlarda ve harici monitörlerde çalışır." },
       review: { phase: 'İncele', title: 'Mevcut duruma göz atın', desc: 'Medya, dosyalar, AI, gündem ve sistem araçları aynı yerde bulunur.' },
       dismiss: { phase: 'Kapat', title: 'Yaptığınız işe dönün', desc: 'İşaretçiyi uzaklaştırdığınızda kapanır; genişletme uygulamayı etkinleştirmez ve odağı almaz.' },
     },
+  },
+  help: {
+    "title": "zisla kullanmaya başlayın",
+    "lede": "Bir görev seçin; giriş, adımlar, izinler ve kayıt konumunu izleyin.",
+    "labels": {
+      "entry": "Giriş",
+      "shortcuts": "Kısayollar",
+      "permissions": "İzinler",
+      "output": "Sonuç ve depolama"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Kopyaladığınızı yeniden kullanın",
+        "summary": "Geçmişten bulun veya kopyalama sonrası bir işlem seçin.",
+        "entry": "Ada → Pano; Ayarlar → Hızlı işlemler.",
+        "steps": [
+          "Geçmişi veya hızlı işlemleri açıp örnek metin ya da bağlantı kopyalayın.",
+          "Panoyu açın, süzün veya arayın ve bir öğeyi kopyalayın.",
+          "Okunaklı metin içeren örnek bir resmi kopyalayın, cihazda arka plan tanımasını bekleyin ve asıl resmi bulmak için içindeki bir sözcüğü arayın.",
+          "Metni tanımak veya kopyalamak için resme sağ tıklayın; tanıma sürerken iptal edebilirsiniz. Arka plan tanıması metni otomatik kopyalamaz.",
+          "Hedef uygulamaya yapıştırın; yeni kopyada hızlı işlem penceresinden sonraki adımı seçin."
+        ],
+        "shortcuts": "Command+1…9 ve Command+0 işlem sırasını izler. Yeni ayarlarda Command+N ayrıca ilk işlemi çalıştırır; Command+Delete kapatır. Kayıtlı veya temizlenmiş kısayollar korunur.",
+        "permissions": "Geçmiş ve tanıma yereldir. Değiştirici/fare tetikleyicileri Giriş İzleme, isteğe bağlı kopyalama hareketi Erişilebilirlik ister. Çeviri seçilen hizmeti kullanır.",
+        "output": "Geçmiş yerel uygulama verisindedir. Metin/resim kaydı Ayarlar → Kayıt konumu → Hızlı işlemler kullanır; yeni varsayılan ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Ekranı yakalayın ve düzenleyin",
+        "summary": "Ekran görüntüsü veya kaydı düzenleyip dışa aktarın.",
+        "entry": "Menü çubuğu → Görüntü/Kayıt; Ayarlar → Kayıt → Stüdyo.",
+        "steps": [
+          "Bölge veya pencere yakalayın; düzenleyin, kopyalayın, kaydedin veya rafa koyun.",
+          "Ekran, pencere veya bölge seçin; yalnızca gereken ses/kamera kaynaklarını açın.",
+          "Kaydı durdurun, stüdyoda düzenleyip önizleyin ve istediğiniz biçimde dışa aktarın."
+        ],
+        "shortcuts": "Control+1 görüntü; Control+2 uzun görüntü. Control+Shift+1/2/3 ekran/pencere/bölge kaydı; Control+Shift+6 stüdyo. Ayarlarda değiştirilebilir.",
+        "permissions": "Ekran Kaydı izni gerekir. Mikrofon ve kamera kendi izinlerini ister; kamera önizlemesi de buna dahildir.",
+        "output": "Yeni varsayılanlar: görüntüler ~/Downloads/picture, kayıt/projeler ~/Downloads/video. Klasörler ayrı ayarlanır. Bazı biçimler FFmpeg ister."
+      },
+      "shelf": {
+        "title": "Dosyaları raf üzerinden aktarın",
+        "summary": "Asılları kopyalamadan dosyaları başka uygulama için hazırlayın.",
+        "entry": "Ada → Raf; üst tetikleme alanına sürükleyin.",
+        "steps": [
+          "Örnek dosyayı yukarı sürükleyin veya hareket açıksa sürüklerken işaretçiyi sallayın.",
+          "Rafı açıp kategori veya gereken öğeleri seçin.",
+          "Hedefe sürükleyin, Finder’da gösterin veya paylaşın; saklanan ekran görüntüsü PNG olarak kaydedilebilir.",
+          "Dosya veya klasör seçip bağlam menüsünden ZIP sıkıştırmasını seçin; arşiv rafa döner.",
+          "Raftan resim seçip boyutlandırma veya biçim dönüştürmeyi seçin; resim araçlarını çalıştırın ve başarılı çıktılar rafa dönsün.",
+          "Resim, video veya ses seçip kayıt stüdyosunun medya kitaplığına aktarın; geçerli proje ve zaman çizelgesi korunur."
+        ],
+        "shortcuts": "İşaretçiyle sürükleyin. Sallama hareketi ayrı ayarlanır; sabit kısayol gerekmez.",
+        "permissions": "Dosya seçici ve güvenli yer imleri seçili dosyalara erişim sağlar. Yakalama Ekran Kaydı ister.",
+        "output": "Asıllar yerinde kalır. Başvurular ve görüntüler yerelde saklanır; PNG seçili hedefe yazılır. ZIP arşivleri ve başarılı resim çıktıları rafa döner; aktarılan medya kayıt projesinin kitaplığına eklenir."
+      },
+      "meeting": {
+        "title": "Toplantıya katılın ve notları saklayın",
+        "summary": "Takvim toplantısını bağlam notuyla ilişkilendirin.",
+        "entry": "Ada → Takvim; Ayarlar’da takvim ve bağlam notlarını açın.",
+        "steps": [
+          "Desteklenen toplantı bağlantısı ve geçerli başlangıç/bitiş zamanı olan etkinlik oluşturun veya açın.",
+          "Katıl’a basın; geri sayım 10 dakika önce görünür.",
+          "Etkinlikten not oluşturun, kaydedin veya ilişkilendirin; takvimden ya da raftan yeniden açın."
+        ],
+        "shortcuts": "Katılma ve notlar düğmelerle yapılır. Başka konumlarda ayarlanan tuşu basılı tutup sallayın; varsayılan Command.",
+        "permissions": "Takvim erişimi gerekir. Pencere notları Erişilebilirlik, eklenen görüntüler Ekran Kaydı gerektirebilir.",
+        "output": "Toplantı notları yerel raf verisindedir. Hızlı Notlar ayrı özelliktir ve Apple Notlar’ı kullanır."
+      },
+      "ai": {
+        "title": "AI bağlayın ve kotaları kontrol edin",
+        "summary": "Görevleri, kayıtlı kullanımı ve hesap kotalarını izleyin.",
+        "entry": "Ayarlar → AI; ada → AI izleyici.",
+        "steps": [
+          "Desteklenen yerel aracı açın veya CLI başvurusuna göre zislactl ile görev bildirin.",
+          "İstenen sağlayıcının kota izlemesini açın; kimlik bilgilerini yalnızca istendiğinde girin.",
+          "Örnekleme/sıfırlama zamanı ve uyarıları görün; geçmişi açın veya .xlsx dışa aktarın."
+        ],
+        "shortcuts": "İzleyici veya Ayarlar’ı kullanın; sabit genel kısayol gerekmez. zislactl belgelenmiş bağımsız değişkenleri kullanır.",
+        "permissions": "Yerel algılama yapılandırılmış durum okur. Kota kontrolü sağlayıcıya bağlanır; isteğe bağlı AI düzenlemesi seçilen model veya CLI’ı kullanır.",
+        "output": "Görev/kullanım: ~/Library/Application Support/zisla/ai-state.sqlite. Kotalar sağlayıcı örnekleridir, token tahmini değildir; eksik veri kullanılamaz kalır."
+      },
+      "media-tools": {
+        "title": "Resim, ses ve PDF işleyin",
+        "summary": "Bağımsız yerel araçları örneklerle kullanın.",
+        "entry": "Ayarlar → Resim / Ses / PDF araçları.",
+        "steps": [
+          "Resim ekleyin, işlem ve seçenekleri seçin, çalıştırıp sonucu veya ZIP dışa aktarın.",
+          "Raftan resim seçip boyutlandırma veya biçim dönüştürmeyi seçin; resim araçlarını çalıştırın ve başarılı çıktılar rafa dönsün.",
+          "Bileşenlerden FFmpeg ve ffprobe kurun, ses ekleyin, kesme veya karıştırma seçip çıktı dosyası ya da klasörü belirleyin.",
+          "PDF’leri sırayla ekleyin, çalıştırıp kaydedin. Office dönüşümü yerel LibreOffice veya OpenOffice ister."
+        ],
+        "shortcuts": "Araç düğmeleri; sabit genel kısayol yok.",
+        "permissions": "Seçici, seçili dosya ve klasörlere erişim verir. İşlem yerel; bileşen kurulumu indirme yapar.",
+        "output": "Yeni varsayılanlar: resim ~/Downloads/picture, PDF ~/Downloads/pdf; ayrı ayarlanır. Ses, dışa aktarma penceresini kullanır."
+      },
+      "daily-briefing": {
+        "title": "Günlük özet oluşturun",
+        "summary": "İstatistikleri önizleyip PNG aktarın.",
+        "entry": "Ayarlar → Günlük özet.",
+        "steps": [
+          "Şablon ve istatistik seçin.",
+          "Önizlemeyi açıp mevcut verileri ve çıktı klasörünü kontrol edin.",
+          "Bugünü aktarın veya günlük aktarımı açıp saat seçin."
+        ],
+        "shortcuts": "Önizleme ve aktarım düğmeleri; sabit kısayol yok.",
+        "permissions": "İlgili istatistikleri açın. Ekran Süresi geçmişi Tam Disk Erişimi isteyebilir; kotalar sağlayıcıdan sorgulanır.",
+        "output": "PNG özet klasöründe; yeni varsayılan ~/Downloads/daily. Eksik veri ölçülmüş sıfır değildir."
+      },
+      "desktop": {
+        "title": "Pencereleri önizleyip bağlam notu yazın",
+        "summary": "Pencereye geçip o konuma not bırakın.",
+        "entry": "Ayarlar → Pencere önizleme / Bağlam notları; Dock, Command+Tab ve raf.",
+        "steps": [
+          "Önizleme ve izinleri açın, Dock uygulamasına gidin veya Command+Tab kullanıp karta tıklayın.",
+          "Örnek sayfa, pencere veya masaüstünde ayarlı tuşu tutup sallayın; yazıp kaydedin.",
+          "Konuma dönün veya raftan açın; isterseniz yinelenen hatırlatma ya da pencere resmi ekleyin."
+        ],
+        "shortcuts": "Command+Tab uygulama değiştirir. Notlar varsayılan olarak Command tutar; değiştirilebilir.",
+        "permissions": "Önizleme Erişilebilirlik ve Ekran Kaydı ister. Pencere algılama Erişilebilirlik, ek resimler Ekran Kaydı kullanır.",
+        "output": "Notlar ve resimler ~/Library/Application Support/zisla altındaki yerel raf verisindedir."
+      },
+      "playback": {
+        "title": "Oynatmayı seçip uygulama sesini karıştırın",
+        "summary": "Çıkışı seçin ve ses çalan uygulamaları ayarlayın.",
+        "entry": "Medya alanı → Çıkış; Ayarlar → Medya kaynağı; ada → Mikser.",
+        "steps": [
+          "Örnek ses oynatıp mevcut çıkışı seçin.",
+          "Otomatik kaynak veya tercih edilen oynatıcı seçip kontrolleri deneyin.",
+          "macOS 14.4+ üzerinde mikseri açın, Sistem Sesi Kaydı izni verip uygulamayı ayarlayın veya susturun."
+        ],
+        "shortcuts": "Düğmeler ve kaydırıcılar; sabit kısayol yok.",
+        "permissions": "Mikser macOS 14.4+ ve Sistem Sesi Kaydı ister. Cihazlar bağlantıya bağlıdır; Bluetooth izin isteyebilir.",
+        "output": "Çıkış sistem seçimidir. Uygulama sesleri yerelde hatırlanır; dosya aktarılmaz."
+      }
+    },
+    "workflowsTitle": "Kısa iş akışı gösterimleri",
+    "workflows": {
+      "copy-next": {
+        "title": "Bulun, kopyalayın ve yeniden kullanın",
+        "steps": [
+          "Geçmişte örnek “brew” sözcüğünü arayın.",
+          "Eşleşen öğeyi kopyalayın.",
+          "Hedef uygulamaya yapıştırın. Kesit arama ve kopyalamayı gösterir; yeni kopyalarda ayrı hızlı işlemler vardır."
+        ]
+      },
+      "drop-output": {
+        "title": "Dosya bırakın ve çıktıyı hazırlayın",
+        "steps": [
+          "Finder’dan örnek resmi üst rafa sürükleyin.",
+          "Rafı açıp resmi seçin.",
+          "Hedefe sürükleyin veya ekran görüntüsünü PNG kaydedin. Kesit rafa bırakmayı gösterir."
+        ]
+      },
+      "meeting-note": {
+        "title": "Toplantıdan nota",
+        "steps": [
+          "Katılma bağlantısı olan toplantıyı açın.",
+          "Yeni toplantı notu veya mevcut notu ilişkilendirmeyi seçin.",
+          "Kaydedip etkinlikten ya da raftan açın. Kesit oluşturma ve ilişkilendirmeyi gösterir."
+        ]
+      }
+    },
+    "excerptLabel": "Kesiti oynat",
+    "guideLinkLabel": "Kılavuzu oku",
+    "videoNotice": "Mevcut özellik turundan, gösterim verili kesitler. Video yazıları İngilizce; buradaki adımlar seçtiğiniz dilde. Tam 2:40 tur ve müzik bilgileri aşağıdadır.",
+    "preferencesTitle": "Yararlı tercihler",
+    "preferences": [
+      "Sürüklerken sallamayı açarak rafı gösterin. Bağlam notları kendi basılı tutma tuşunu kullanır.",
+      "Medya alanında ses çıkışı, Ayarlar’da otomatik kaynak veya tercih edilen oynatıcı seçin. Bu seçim uygulamalara ayrı cihaz atamaz.",
+      "Tuş sesleri ve yazma istatistikleri bağımsızdır, Giriş İzleme kullanır. Uygulama mikseri macOS 14.4+ ve Sistem Sesi Kaydı ister.",
+      "Günlük özet 8 şablon, önizleme ve bağımsız klasöre elle veya günlük PNG aktarımı sunar."
+    ]
   },
   download: {
     eyebrow: 'SİZ HAZIR OLDUĞUNUZDA HAZIR',
@@ -350,10 +521,8 @@ export const tr = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Birden çok ekranı, Spaces\'i ve normal tam ekran uygulamalarını destekler; genişletme uygulamayı etkinleştirmez veya odağı almaz',
-      'Gizliyken kalıcı şeffaf sıcak bölge penceresi oluşturmaz ve kare döngüsü çalıştırmaz; genişletme global olay izleme ve geometri kontrolleriyle tetiklenir',
-      'Tek bir sistem malzemesi katmanı kullanır; Şeffaflığı Azalt etkin olduğunda opak arka plana geçer',
+      "Saydamlığı Azalt açıkken opak bir arka plan kullanır",
       'macOS 26+ üzerinde Liquid Glass kullanır; macOS 14 ve 15\'te yerel sistem malzemelerine otomatik olarak geri döner',
-      'Fiziksel çentik sistemin güvenli alanından çıkarılır; çentiksiz harici ekranlarda özel katmanda benzetilmiş durum çubuğu gösterilir',
     ],
   },
   film: {

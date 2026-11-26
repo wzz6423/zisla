@@ -179,6 +179,114 @@ struct AIAccountBalanceParserTests {
         #expect(throws: AIAccountBalanceError.invalidResponse) {
             try AIAccountBalanceParser.parse(grpc(message(1, Data([13]) + floatBytes(.nan))), provider: .grok, now: now)
         }
+
+        // Current Grok fields: 1.4.1 period start, 1.5.1 reset, 1.6 period marker, unframed protobuf, and gRPC auth trailers.
+        let modernStart = message(4, Data([8]) + varint(1_909_983_000))
+        let modernReset = message(5, Data([8]) + varint(1_910_001_000))
+        let modernPeriod = message(6, Data([8, 1]))
+        let unframedZero = message(1, modernStart + modernReset + modernPeriod)
+        let modern = try AIAccountBalanceParser.parse(unframedZero, provider: .grok, now: now)
+        #expect(modern.first?.remainingPercent == 100 && modern.first?.durationSeconds == 18_000)
+
+        let trailer = Data("grpc-status: 16\r\ngrpc-message: unauthenticated\r\n".utf8)
+        let trailerLength = UInt32(trailer.count)
+        let authFail = Data([0x80, UInt8(truncatingIfNeeded: trailerLength >> 24), UInt8(truncatingIfNeeded: trailerLength >> 16),
+                             UInt8(truncatingIfNeeded: trailerLength >> 8), UInt8(truncatingIfNeeded: trailerLength)]) + trailer
+        #expect(throws: AIAccountBalanceError.credentialsExpired) {
+            try AIAccountBalanceParser.parse(authFail, provider: .grok, now: now)
+        }
+    }
+
+    @Test func antigravitySummaryOrdersGroupsSkipsDisabledBucketsAndParsesNestedFractions() throws {
+        let payload = """
+        {
+          "response": {
+            "groups": [
+              {"displayName": "Gemini 4 Argon", "buckets": [
+                {"bucketId": "gemini-argon-wtu-weekly", "window": "weekly", "remainingFraction": 0.74, "resetTime": "2030-10-23T00:33:37Z"}
+              ]},
+              {"displayName": "Claude and GPT models", "buckets": [
+                {"bucketId": "3p-weekly", "window": "weekly", "remaining": {"remainingFraction": 0.64}},
+                {"bucketId": "3p-5h", "window": "5h", "remainingFraction": 1, "disabled": true}
+              ]},
+              {"displayName": "Gemini Models", "buckets": [
+                {"bucketId": "gemini-weekly", "window": "weekly", "remaining": {"case": "remainingFraction", "value": 0.82}},
+                {"bucketId": "gemini-5h", "window": "5h", "remainingFraction": 0.91}
+              ]}
+            ]
+          }
+        }
+        """
+        let windows = try parse(payload, .antigravity)
+        #expect(windows.map(\.name) == ["Gemini", "Gemini", "Gemini 4 Argon", "Claude/GPT"])
+        #expect(windows.map(\.kind) == [.fiveHours, .weekly, .weekly, .weekly])
+        #expect(windows.map(\.remainingPercent) == [91, 82, 74, 64])
+    }
+
+    @Test func providerEdgeCasesHandleNullLimitsOveragesZeroResetsAndBusinessErrors() throws {
+        // Claude extra_usage with null monthly_limit must not break five_hour / seven_day.
+        let claude = try parse(#"{"five_hour":{"utilization":25},"seven_day":{"utilization":40},"extra_usage":{"is_enabled":true,"used_credits":500,"monthly_limit":null}}"#, .claude)
+        #expect(claude.map(\.id) == ["five_hour", "seven_day", "extra_usage"])
+        #expect(claude[0].remainingPercent == 75 && claude[1].remainingPercent == 60 && claude[2].unlimited)
+
+        // Gemini skips buckets missing remainingFraction instead of failing the whole payload.
+        let gemini = try parse(#"{"buckets":[{"modelId":"gemini-null"},{"modelId":"gemini-pro","remainingFraction":0.6}]}"#, .gemini)
+        #expect(gemini.count == 1 && gemini[0].remainingPercent == 60)
+
+        // Kimi clamps over-consumed ratio > 1 to 0% remaining and accepts data envelope + TIME_UNIT_WEEK.
+        let kimi = try parse(#"{"data":{"usages":{"limit_5h":{"used_ratio":1.25}}}}"#, .kimi)
+        #expect(kimi.count == 1 && kimi[0].remainingPercent == 0)
+        let kimiWeek = try parse(#"{"limits":[{"window":{"duration":1,"timeUnit":"TIME_UNIT_WEEK"},"detail":{"limit":100,"used":30}}]}"#, .kimi)
+        #expect(kimiWeek.first?.kind == .weekly && kimiWeek.first?.remainingPercent == 70)
+
+        // Copilot clamps negative percent_remaining / remaining overage to 0%.
+        let copilot = try parse(#"{"quotaSnapshots":{"premium_interactions":{"entitlement":300,"remaining":-15,"percentRemaining":-5}}}"#, .copilot)
+        #expect(copilot.first?.remainingPercent == 0 && copilot.first?.remaining == 0)
+
+        // Qoder accepts nextResetAt: 0 and separates team credits when shared payload is supplied.
+        let qoder = try parse(#"{"data":{"nextResetAt":0,"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":20}}}}"#, .coder)
+        #expect(qoder.first?.remainingPercent == 80 && qoder.first?.resetsAt == nil)
+        let qoderRoot = try AIAccountBalanceCredentials.object(Data(#"{"data":{"totalQuota":{"quotaSummary":{"limitValue":0,"usedValue":0}}}}"#.utf8))
+        let qoderShared = try AIAccountBalanceCredentials.object(Data(#"{"data":{"sharedQuota":{"quotaSummary":{"limitValue":200,"usedValue":50}}}}"#.utf8))
+        let qoderTeam = try AIAccountBalanceParser.qoder(qoderRoot, shared: qoderShared)
+        #expect(qoderTeam.count == 1 && qoderTeam[0].id == "team_credits" && qoderTeam[0].remainingPercent == 75)
+
+        // WorkBuddy checks business code, optional Status, and cycleResetTime: 0.
+        #expect(throws: AIAccountBalanceError.credentialsExpired) {
+            try parse(#"{"code":401,"msg":"expired"}"#, .workbuddy)
+        }
+        let wbNoStatus = try parse(#"{"code":0,"data":{"Accounts":[{"CycleCapacitySizePrecise":100,"CycleCapacityRemainPrecise":40}]}}"#, .workbuddy)
+        #expect(wbNoStatus.first?.remainingPercent == 40)
+        let wbZeroReset = try parse(#"{"code":200,"data":{"limitNum":100,"credit":25,"cycleResetTime":0}}"#, .workbuddy)
+        #expect(wbZeroReset.first?.remainingPercent == 75 && wbZeroReset.first?.resetsAt == nil)
+
+        // ZCode checks business code 401 and parses Start Plan balances.
+        #expect(throws: AIAccountBalanceError.credentialsExpired) {
+            try parse(#"{"code":401,"msg":"token expired"}"#, .zcode)
+        }
+        let zcodeStart = try parse(#"{"code":200,"data":{"plans":[{"plan_id":"p1","entitlements":[{"entitlement_id":"e1","period":"daily"}]}],"balances":[{"plan_id":"p1","entitlement_id":"e1","show_name":"GLM-5","total_units":100,"remaining_units":60,"expires_at":0}]}}"#, .zcode)
+        #expect(zcodeStart.first?.kind == .daily && zcodeStart.first?.remainingPercent == 60 && zcodeStart.first?.resetsAt == nil)
+
+        // Cursor unified plan via get-plan-info + GetCurrentPeriodUsage + prepaid billing, and legacy auto/api models.
+        let cursorUnified = try AIAccountBalanceParser.cursor(
+            ["membershipType": "plus", "individualUsage": ["plan": ["used": 0, "limit": 2000]]],
+            now: now,
+            sand: ["isUnified": true, "usagePercent": 35],
+            planInfo: ["isMerged": true, "planInfo": ["includedUsagePeriod": "INCLUDED_USAGE_PERIOD_WEEKLY", "includedUsageResetsAt": "1910500000000"]],
+            currentPeriod: ["planUsage": ["totalPercentUsed": 60]],
+            prepaid: ["availableCents": "1250"]
+        )
+        #expect(cursorUnified.map(\.id) == ["included", "prepaid"])
+        #expect(cursorUnified[0].remainingPercent == 40 && cursorUnified[1].remaining == 12.5)
+        let cursorModels = try parse(#"{"individualUsage":{"plan":{"autoPercentUsed":20,"apiPercentUsed":50}}}"#, .cursor)
+        #expect(cursorModels.map(\.name) == ["Cursor Models", "Other Models"])
+        #expect(cursorModels.map(\.remainingPercent) == [80, 50])
+
+        // Zed website omits edit_predictions with missing limit and uses subscription reset date.
+        let zedRoot = try AIAccountBalanceCredentials.object(Data(#"{"current_usage":{"token_spend_in_cents":200,"token_spend":{"limit_in_cents":1000},"edit_predictions":{"used":5}}}"#.utf8))
+        let zedSub = try AIAccountBalanceCredentials.object(Data(#"{"subscription":{"period":{"end_at":"2030-09-01T00:00:00Z"}}}"#.utf8))
+        let zedWindows = try AIAccountBalanceParser.zed(zedRoot, subscription: zedSub)
+        #expect(zedWindows.count == 1 && zedWindows[0].remainingPercent == 80 && zedWindows[0].resetsAt != nil)
     }
 
     private func parse(_ text: String, _ provider: AIProvider) throws -> [AIAccountQuotaWindow] {

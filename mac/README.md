@@ -1,6 +1,6 @@
 # zisla for macOS
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [简体中文](README.zh-CN.md) | [Other languages](../docs/locales/README.md)
 
 This directory contains zisla's macOS implementation. Move the pointer to the top center of the screen to expand the island; move it away to hide it. The app uses AppKit `NSPanel`, SwiftUI, and event-driven services without a permanent transparent hit-area window or a frame loop while hidden.
 
@@ -10,35 +10,55 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 
 ## Features
 
-### 13 modules
+### 12 island modules
 
 | Module | Implemented capabilities |
 | --- | --- |
 | Home | Summarizes the current Pomodoro timer, first active AI task, native downloads, and multiple browser download progresses on demand. |
-| Handoff | Drag files, media, or links to the top trigger area to keep them in the handoff tray, reveal them in Finder, or open the system share menu. Stashed screenshots have blue, double-width cards and their own category, with image copy, PNG export, and deletion. |
-| Clipboard | Stores a searchable local history, filters by image, URL, and file, and marks favorites; history and link detection are independent switches. |
+| Keyboard sounds and stats | 20 built-in keyboard voices; independently switch local typing statistics, trends, application timeline, and per-key heatmap. |
+| Handoff | Drag files, media, or links to the top trigger area to keep them in the handoff tray, reveal them in Finder, or open the system share menu. Stashed screenshots have blue, double-width cards and their own category, with image copy, PNG export, and deletion. Compress selected files and folders to ZIP, resize or convert selected images in Image Tools and return successful outputs to the tray, or import selected images, video and audio into the recording media library while keeping its current project and timeline. |
+| Clipboard | Stores a searchable local history, filters by image, URL, and file, and marks favorites; history and link detection are independent switches. New history images are queued for on-device text recognition; search their text to find the original image, or right-click an image to recognize or copy its text. Running recognition can be cancelled; background recognition does not copy text automatically. |
 | AI monitoring | Aggregates activity tasks, status, token trends, contribution heatmaps, and side notices from supported CLIs, desktop apps, and IDEs. |
 | Downloads | Uses `yt-dlp` for video and audio; without `ffmpeg`, AVFoundation wraps compatible tracks and a read-only Bilibili fallback is available. |
 | Schedule | Shows weather for the current location and up to six saved locations; view, create, and delete calendar events and reminders and mark reminders complete. |
 | Mail | Reads selected Mail.app accounts to view inboxes, mark messages read, reply, compose, and move messages to the trash. |
 | Notes | Uses Apple Notes as the sole data source for viewing, editing, creating, and deleting Markdown notes with live preview and automatic write-back. |
-| PDF | Performs local merge, split, rotate, image/Office conversion, image rendering, text export, two watermark types, page numbering, crop, encryption, unlock, and metadata editing. |
+| Application volume mixer | On macOS 14.4+, adjust and mute each playing application and remember its volume; requires System Audio Recording permission. |
 | Utilities | Provides a Pomodoro timer that plays one audible alert and shows a local notification when a session ends, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, camera mirror, and confirmed trash emptying. |
-| System | Shows CPU, GPU, memory, disk, network, temperature, and fan status; releases memory and scans caches, logs, and temporary data that are safe to remove. |
-| Battery | Shows charge flow, health, cycles, temperature, capacity, current, voltage, charger information, and battery levels for Bluetooth accessories and trusted Apple mobile devices. |
-| Lock screen | Displays custom text, lunar dates, media, and related status information on the system lock screen. |
+| System | Shows CPU, GPU, memory, disk, network, temperature, and fan status; releases memory and scans caches, logs, and temporary data that are safe to remove; also includes battery health and accessory levels. |
 
 ### Cross-module capabilities
 
 - **Now Playing:** MediaRemote shows artwork, title, progress, scrolling lyrics, and controls; Core Audio identifies the actual audio source as a fallback. Paused, stopped, and muted sources are hidden.
 - **Browser downloads:** Shows download source and progress for Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera, and Arc in the home view, collapsed state, and side notices.
 - **Voice input:** Supports toggle or push-to-talk shortcuts, custom global shortcuts, system speech recognition, local or remote transcript organization, and local recording history.
-- **Quick Actions:** After every copy, a small island-style toast shows a rich preview and smart next actions — open links, reveal files in Finder, search (engine selectable), translate, calculate, create calendar events from recognized dates, and save long text or images. After a browser download completes or an AirDrop file is received, the same shortcut can open the containing folder; this is controlled by Quick Actions independently of browser download progress. Recognizes URLs, file paths, emails, phone numbers, CSS colors with live swatches, arithmetic, dates and times, text in a non-system language, code snippets, plain text with counts, images with thumbnails, and file references. Triggers: the action buttons, a double-tapped modifier key (default Left ⌃ Control), or a mouse side button; all user-configurable. Also offers a hold-left + right-click quick-copy mouse gesture (off by default), an app blacklist, per-type recognition switches, and a lightweight reminder mode.
+- **Quick Actions:** After every copy, a small island-style toast shows a rich preview and smart next actions — open links, reveal files in Finder, search (engine selectable), translate, calculate, create calendar events from recognized dates, and save long text or images. After a browser download completes or an AirDrop file is received, the same shortcut can open the containing folder; this is controlled by Quick Actions independently of browser download progress. Recognizes URLs, file paths, emails, phone numbers, CSS colors with live swatches, arithmetic, dates and times, text in a non-system language, code snippets, plain text with counts, images with thumbnails, and file references. Triggers: action buttons, the additional default Command+N shortcut, or a configured modifier-key/mouse-side trigger. Also offers a hold-left + right-click quick-copy mouse gesture (off by default), an app blacklist, per-type recognition switches, and a lightweight reminder mode.
 - **CLI and Skills management:** Detects, installs, updates, and removes common AI CLIs and manages local Skills from Settings.
 - **Desktop pets:** Select a built-in or imported pet and place it on either side of the island.
 - **Updates:** The selected Release or Preview channel resolves the public egress country code once per app run. `CN` checks its signed Gitee appcast first and retries GitHub once; other country codes check GitHub first and retry Gitee once. An unavailable lookup preserves the Gitee-first order. Sparkle then downloads, verifies, installs, and relaunches updates. Changing the channel applies to both automatic and manual checks.
 - **Appearance and interaction:** Settings can follow the system, light, or dark appearance. The island supports transparent or frosted surfaces, pinned expansion, multiple displays, Spaces, and external displays without a notch.
 - **Defaults:** New installations enable feature modules by default. Each feature, collapsed-state indicator, side notice, menu-bar metric, and update behavior can be adjusted independently; existing installations keep their current configuration.
+
+### Standalone tools and workflows
+
+- **Recording studio:** Open it from the menu bar or Settings. Record a display, window, or region with optional system audio, microphone, and camera. Edit video, audio, images, and text across tracks, including captions, zooms, animations, portrait and voice effects; preview before exporting video, GIF, Live Photo, or audio. Some formats require FFmpeg; HDR recording depends on device support. Import images, video and audio from the shelf into the media library while keeping the current project and timeline.
+- **Image, audio, and PDF tools:** Open the standalone tools from Settings. Images have 9 local operations and batch/ZIP export. Audio has 27 operations including mixing, LUFS normalization, and noise processing, and requires FFmpeg and ffprobe. PDF has 14 operations; Office conversion requires LibreOffice or OpenOffice.
+- **Daily briefing:** Choose among 8 templates and select metrics in Settings, preview, then export PNG manually or at a daily time. Unavailable metrics are not presented as measured zero.
+- **Window previews:** Hover the Dock or switch with Command+Tab, then click a preview to activate its window. Manage the feature and permissions in Settings.
+- **Context notes and meetings:** Hold the configured note shortcut and shake the pointer to attach a note to a webpage, window, or desktop. Calendar events with meeting links show a countdown 10 minutes before starting; join, create a note, or link an existing note. Manage context notes on the shelf.
+- **Shake to drop:** Shake the pointer while dragging files to reveal the drop target; switch this gesture independently in Settings.
+- **Audio output and player preferences:** Choose an output device in the media area. Settings select an automatic source or preferred player, compact media layout, and ambient-sound stop conditions.
+- **AI allowances and resets:** AI monitoring and Settings show supported account allowances, sampling times, reset times, and low-quota notices, including available 5h/7d windows and Cursor USD budgets. These are separate from locally recorded token history.
+
+### Quick Actions keyboard order
+
+The Quick Actions popup assigns `Command+1` through `Command+9`, then `Command+0`, in the current action order. The additional default trigger for new configurations is `Command+N`, which runs the first action; `Command+Delete` dismisses the popup. Configure the trigger, mouse side button, and action order in Settings. Upgrades retain every explicitly saved combination, including the old `Command+1`, custom shortcuts, and cleared triggers; only new configurations or an absent trigger field adopt `Command+N`.
+
+### Save locations
+
+Settings → Save Location selects separate folders for downloads, screenshots, image tools, recordings, PDF, Quick Actions, and daily briefings. New configurations default to `~/Downloads` subfolders: `picture` for screenshots/images, `video` for recordings, `pdf`, `quick`, and `daily`. Audio tools use an export dialog to select a file or folder. Shelf files retain references to the originals; stashed screenshots and context-note state are managed locally under `~/Library/Application Support/zisla`, while recording projects use the recording folder. Quick Notes text lives in Apple Notes.
+
+[User help and step-by-step guides](https://wzz6423.github.io/zisla/help.html?lang=en#help) cover nine topics: clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/window previews, and playback/mixing, with short film excerpts.
 
 ### Screenshot shortcuts and stashing
 
@@ -206,11 +226,12 @@ The Notes module does not keep a second local copy; Apple Notes is the storage b
 - **Quick Actions:** Runs locally on each `changeCount` when enabled and also handles completed browser downloads and received AirDrop files. The quick trigger may use Input Monitoring for modifier-only keys and mouse side buttons; the optional quick-copy gesture also posts a synthetic ⌘C and therefore requires Accessibility. Recognition never connects to the network; opening links, searching, translating, and saving happen only after an explicit click or trigger press. The app blacklist and per-type switches control copied-content prompts; the Quick Actions switch also controls completed-transfer prompts.
 - **AI state:** Automatic detection reads only structured events and local activity metadata needed to determine task state.
 - **Voice:** Microphone and speech recognition are accessed only after an explicit user action. Recordings, raw transcripts, and organized text are managed locally; organized text is sent only to the selected local model, remote provider, or CLI profile, and remote credentials are kept in a private database.
-- **Bluetooth and devices:** Accessory and trusted Apple mobile-device battery levels are read only when the battery module is open.
-- **Camera and Input Monitoring:** The camera is used only for the mirror; custom modifier-key shortcuts and keyboard cleaning may require Input Monitoring.
+- **Bluetooth and devices:** Accessory and trusted Apple mobile-device battery levels are read only when the battery view under System is open.
+- **Camera and Input Monitoring:** The mirror and recording-studio camera preview/recording request camera access. Keyboard sounds, typing statistics, keyboard cleaning, and modifier-only/mouse-side triggers use Input Monitoring; statistics stay local and the switches are independent.
+- **Screen and system audio:** Screenshots, recording, and window previews read screen content with Screen Recording permission. Recording saves selected sources locally; optional microphone/camera access is requested only for enabled sources. The application volume mixer requires macOS 14.4+ and System Audio Recording permission, and uses local Core Audio taps.
 - **Browser downloads:** Only public system file progress and download temporary files are inspected; browser history and page content are not read.
 - **Media:** MediaRemote supplies metadata and Core Audio process output state confirms playback. MediaRemote is a private framework, so the current build is not suitable for direct Mac App Store submission; missing metadata falls back to the active audio source app.
-- **Network:** Weather uses Open-Meteo and public China weather alerts where applicable, with WeatherKit preferred elsewhere. The selected update channel resolves the public egress country code once per app run through `ipinfo.io/country`: `CN` uses Gitee then GitHub, other country codes use GitHub then Gitee, and an unavailable lookup preserves Gitee first. The Bilibili fallback uses read-only video information, playback URLs, and its media CDN; recognizing clipboard links does not connect to the network.
+- **Network:** Weather uses Open-Meteo and public China weather alerts where applicable, with WeatherKit preferred elsewhere. The selected update channel resolves the public egress country code once per app run through `ipinfo.io/country`: `CN` uses Gitee then GitHub, other country codes use GitHub then Gitee, and an unavailable lookup preserves Gitee first. The Bilibili fallback uses read-only video information, playback URLs, and its media CDN; recognizing clipboard links does not connect to the network. Enabled account-allowance checks contact the selected providers; optional translation, AI recording edits, and transcript cleanup contact the selected model or CLI. Speech recognition may use Apple services depending on system/language support. Installing or updating dependency components and CLIs, public-IP lookup, and network actions explicitly selected by the user also make requests.
 - **Automation:** Notes uses AppleScript/JXA to list, view, edit, create, and delete Apple Notes. It requires automation authorization, does not use the network, and keeps data in Apple Notes.
 
 ## Tests

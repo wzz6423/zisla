@@ -100,11 +100,31 @@ struct AIAccountBalanceCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            ForEach(balance.windows.filter { $0.id != balance.fiveHourWindow?.id && $0.id != balance.weeklyWindow?.id }) { window in
-                HStack(alignment: .center, spacing: 8) {
-                    AIAccountQuotaRing(provider: balance.displayProvider, fraction: window.remainingFraction,
-                                       severity: window.severity, diameter: 42)
-                    quotaDetails(window, label: window.label(language: language))
+            ForEach(Self.extraRows(for: balance)) { row in
+                switch row {
+                case let .paired(name, fiveHour, weekly):
+                    HStack(alignment: .center, spacing: 8) {
+                        AIAccountQuotaRing(provider: balance.displayProvider,
+                                           fraction: weekly.remainingFraction,
+                                           severity: weekly.severity, diameter: 52,
+                                           innerFraction: fiveHour.remainingFraction,
+                                           innerSeverity: fiveHour.severity)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(name)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            quotaDetails(fiveHour, label: "5h")
+                            quotaDetails(weekly, label: "7d")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                case let .single(window):
+                    HStack(alignment: .center, spacing: 8) {
+                        AIAccountQuotaRing(provider: balance.displayProvider, fraction: window.remainingFraction,
+                                           severity: window.severity, diameter: 42)
+                        quotaDetails(window, label: window.label(language: language))
+                    }
                 }
             }
         }
@@ -114,6 +134,45 @@ struct AIAccountBalanceCard: View {
         .overlay {
             shape.strokeBorder(Color.strokeCard, lineWidth: 1)
         }
+    }
+
+    enum ExtraQuotaRow: Identifiable, Equatable {
+        case paired(name: String, fiveHour: AIAccountQuotaWindow, weekly: AIAccountQuotaWindow)
+        case single(AIAccountQuotaWindow)
+
+        var id: String {
+            switch self {
+            case let .paired(_, fiveHour, weekly): fiveHour.id + "|" + weekly.id
+            case let .single(window): window.id
+            }
+        }
+    }
+
+    /// Pairs same-named 5h and 7d extra windows into one concentric ring (inner 5h, outer 7d) while keeping unpaired windows separate.
+    static func extraRows(for balance: AIAccountBalance) -> [ExtraQuotaRow] {
+        let extras = balance.windows.filter { $0.id != balance.fiveHourWindow?.id && $0.id != balance.weeklyWindow?.id }
+        var consumed: Set<String> = []
+        var rows: [ExtraQuotaRow] = []
+        for (index, window) in extras.enumerated() {
+            guard !consumed.contains(window.id) else { continue }
+            if let name = window.name, !name.isEmpty, window.nameKey == nil,
+               window.kind == .fiveHours || window.kind == .weekly {
+                let partnerKind: AIAccountQuotaKind = window.kind == .fiveHours ? .weekly : .fiveHours
+                if let partner = extras[(index + 1)...].first(where: {
+                    !consumed.contains($0.id) && $0.name == name && $0.nameKey == nil && $0.kind == partnerKind
+                }) {
+                    consumed.insert(window.id)
+                    consumed.insert(partner.id)
+                    let fiveHour = window.kind == .fiveHours ? window : partner
+                    let weekly = window.kind == .weekly ? window : partner
+                    rows.append(.paired(name: name, fiveHour: fiveHour, weekly: weekly))
+                    continue
+                }
+            }
+            consumed.insert(window.id)
+            rows.append(.single(window))
+        }
+        return rows
     }
 
     private func quotaDetails(_ window: AIAccountQuotaWindow, label: String) -> some View {
