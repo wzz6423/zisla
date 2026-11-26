@@ -24,6 +24,7 @@ struct AISessionWorkspaceCleanup: Sendable {
     private let documentsRoot: URL
     private let workspaceDiscoveryFailed: Bool
     private let storageRoots: [URL]
+    private let agentArtifacts: AIAgentArtifactCleanup
     private var sessions: [Session] = []
     private var verifiedProviders: Set<AIProvider> = []
     private let referenceDate: Date
@@ -39,6 +40,7 @@ struct AISessionWorkspaceCleanup: Sendable {
         checking urls: [URL]? = nil
     ) {
         self.fileManager = fileManager
+        agentArtifacts = AIAgentArtifactCleanup(fileManager: fileManager, referenceDate: referenceDate)
         self.referenceDate = referenceDate
         self.environment = environment.filter { ["CODEX_HOME", "QWEN_HOME"].contains($0.key) }
         let home = fileManager.homeDirectoryForCurrentUser()
@@ -127,6 +129,7 @@ struct AISessionWorkspaceCleanup: Sendable {
     }
 
     func canTrash(_ url: URL, wholeWorkspaceOnly: Bool = false) -> Bool {
+        if let eligible = agentArtifacts.canTrash(url) { return eligible && !wholeWorkspaceOnly }
         if workspaceDiscoveryFailed, overlapsWorkspaceRoot(url) { return false }
         guard !overlapsSessionStorage(url) else { return false }
         for root in roots {
@@ -143,7 +146,8 @@ struct AISessionWorkspaceCleanup: Sendable {
 
     func filterCandidates(_ candidates: [DiskCleanupCandidate]) -> [DiskCleanupCandidate] {
         candidates.filter {
-            !overlapsSessionStorage($0.url)
+            if let eligible = agentArtifacts.canTrash($0.url) { return eligible && $0.kind == .temporaryFiles }
+            return !overlapsSessionStorage($0.url)
                 && ($0.kind == .aiSessionWorkspace || !overlapsWorkspaceRoot($0.url))
         }
     }
