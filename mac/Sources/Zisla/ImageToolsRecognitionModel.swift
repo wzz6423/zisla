@@ -118,13 +118,16 @@ final class ImageToolsRecognitionModel: ObservableObject {
         return task
     }
 
-    func cancel() {
+    @discardableResult
+    func cancel() -> Task<Void, Never>? {
         operation = nil
+        let pending = task
         task?.cancel()
         task = nil
         isProcessing = false
         currentInputURL = nil
         message = AppLocalization.text("已取消")
+        return pending
     }
 
     func clear() {

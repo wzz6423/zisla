@@ -60,11 +60,11 @@ struct ShelfContextActionTests {
         let text = FileShelfItem(id: UUID(), url: image.url, addedAt: .distantPast, bookmarkData: Data(), text: "text")
         for action in ShelfContextAction.allCases {
             #expect(!action.supports([]))
-            #expect(!action.supports([image, video]))
+            #expect(action.supports([image, video]) == (action == .compressFiles || action == .importToStudioLibrary))
             #expect(!action.supports([image, text]))
             #expect(fixture.actions.perform(action, items: [], createQuickNote: { _ in
                 Issue.record("Empty input must not write a note"); return false
-            }, openStudio: { _ in Issue.record("Empty input must not open the studio"); return false }) == nil)
+            }, openStudio: { _, _ in Issue.record("Empty input must not open the studio") }) == nil)
             #expect(!fixture.actions.isProcessing)
         }
         #expect(ShelfContextAction.imagesToPDF.supports([image]))
@@ -89,7 +89,7 @@ struct ShelfContextActionTests {
         }
         let configuredService = service
         let pending = fixture.actions.perform(.imagesToPDF, items: [second, first],
-                                              createQuickNote: { _ in false }, openStudio: { _ in false }, convertImages: {
+                                              createQuickNote: { _ in false }, openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, convertImages: {
                                                   try configuredService.convertImagesToPDF($0, to: $1)
                                               })
         let task = try #require(pending)
@@ -125,7 +125,7 @@ struct ShelfContextActionTests {
             try FileManager.default.removeItem(at: directory)
         }
         let pending = fixture.actions.perform(.imagesToPDF, items: [second, first],
-                                              createQuickNote: { _ in false }, openStudio: { _ in false }, convertImages: { inputs, output in
+                                              createQuickNote: { _ in false }, openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, convertImages: { inputs, output in
                                                   if outcome == "cancelled" { throw CancellationError() }
                                                   try PDFProcessingService().convertImagesToPDF(inputs, to: output)
                                               })
@@ -207,7 +207,7 @@ struct ShelfContextActionTests {
         let before = fixture.shelf.items
         let bytes = try Data(contentsOf: item.url)
         let failedTask = fixture.actions.perform(.imagesToPDF, items: [item], createQuickNote: { _ in false },
-                                                 openStudio: { _ in false }, convertImages: { _, output in
+                                                 openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, convertImages: { _, output in
                                                      try Data([1]).write(to: output)
                                                      throw CocoaError(.fileWriteOutOfSpace)
                                                  })
@@ -232,7 +232,7 @@ struct ShelfContextActionTests {
         defer { fixture.remove() }
         let item = try fixture.image(width: 24)
         let taskTask = fixture.actions.perform(.imagesToPDF, items: [item], createQuickNote: { _ in false },
-                                               openStudio: { _ in false }, convertImages: { _, output in
+                                               openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, convertImages: { _, output in
                                                    gate.pause()
                                                    try Data([1]).write(to: output)
                                                })
@@ -254,7 +254,7 @@ struct ShelfContextActionTests {
         defer { fixture.remove() }
         let item = try fixture.image(width: 24)
         let taskTask = fixture.actions.perform(.imagesToPDF, items: [item], createQuickNote: { _ in false },
-                                               openStudio: { _ in false }, convertImages: { _, _ in Issue.record("Cancelled work must not start conversion") })
+                                               openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, convertImages: { _, _ in Issue.record("Cancelled work must not start conversion") })
         let task = try #require(taskTask)
         fixture.actions.cancel()
         await task.value
@@ -270,7 +270,7 @@ struct ShelfContextActionTests {
         let second = try fixture.image(width: 36)
         var note: String?
         let taskTask = fixture.actions.perform(.recognizeToQuickNote, items: [second, first],
-                                               createQuickNote: { note = $0; return true }, openStudio: { _ in false }, recognizeImage: { image, _ in
+                                               createQuickNote: { note = $0; return true }, openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, recognizeImage: { image, _ in
                                                    #expect(Self.isOffMainThread())
                                                    return [.init(text: "Text \(image.width)", boundingBox: .init(x: 0, y: 0.2, width: 1, height: 0.2))]
                                                })
@@ -289,7 +289,7 @@ struct ShelfContextActionTests {
         let second = try fixture.image(width: 36)
         var attempts = 0
         let taskTask = fixture.actions.perform(.recognizeToQuickNote, items: [first, second],
-                                               createQuickNote: { _ in attempts += 1; return false }, openStudio: { _ in false }, recognizeImage: { image, _ in
+                                               createQuickNote: { _ in attempts += 1; return false }, openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, recognizeImage: { image, _ in
                                                    if failure == "worker failure" { throw CocoaError(.fileReadCorruptFile) }
                                                    return failure == "empty second" && image.width == 36 ? []
                                                        : [.init(text: "result", boundingBox: .init(x: 0, y: 0, width: 1, height: 1))]
@@ -309,7 +309,7 @@ struct ShelfContextActionTests {
         let item = try fixture.image(width: 24)
         var written = false
         let taskTask = fixture.actions.perform(.recognizeToQuickNote, items: [item],
-                                               createQuickNote: { _ in written = true; return true }, openStudio: { _ in false }, recognizeImage: { _, operation in
+                                               createQuickNote: { _ in written = true; return true }, openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, recognizeImage: { _, operation in
                                                    gate.pause()
                                                    #expect(throws: CancellationError.self) { try operation.checkCancellation() }
                                                    return [.init(text: "late text", boundingBox: .init(x: 0, y: 0, width: 1, height: 1))]
@@ -331,7 +331,7 @@ struct ShelfContextActionTests {
             #expect(fixture.actions.isProcessing && !fixture.actions.isCancellable)
             fixture.actions.cancel()
             return true
-        }, openStudio: { _ in false }, recognizeImage: { _, _ in
+        }, openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable }, recognizeImage: { _, _ in
             [.init(text: "result", boundingBox: .init(x: 0, y: 0, width: 1, height: 1))]
         })
         let task = try #require(taskTask)
@@ -347,13 +347,254 @@ struct ShelfContextActionTests {
         let second = try fixture.file("second.mp4", bytes: Data([2]))
         var handedOff: [URL] = []
         let taskTask = fixture.actions.perform(.editVideo, items: [second, first], createQuickNote: { _ in false },
-                                               openStudio: { handedOff = $0; return accepts })
+                                               openStudio: { urls, libraryOnly in
+                                                   handedOff = urls
+                                                   #expect(!libraryOnly)
+                                                   if !accepts { throw ShelfContextActionError.studioUnavailable }
+                                               })
         let task = try #require(taskTask)
         await task.value
         #expect(handedOff.map { $0.resolvingSymlinksInPath() } == [second.url, first.url].map { $0.resolvingSymlinksInPath() })
         #expect(fixture.shelf.items == [first, second])
         #expect(fixture.actions.message == (accepts ? AppLocalization.text("已发送到录屏工作室")
                 : AppLocalization.text("操作失败：%@", ShelfContextActionError.studioUnavailable.localizedDescription)))
+    }
+
+    @Test func ZIPContainsSelectedFilesAndFoldersInSelectionOrderWithoutCopyingSources() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let first = try fixture.file("first.txt", bytes: Data("first".utf8))
+        let folder = fixture.root.appendingPathComponent("Folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        let child = folder.appendingPathComponent("child.txt")
+        try Data("child".utf8).write(to: child)
+        #expect(fixture.shelf.add([folder]) == 1)
+        let directory = try #require(fixture.shelf.items.last)
+        try await #require(fixture.perform(.compressFiles, items: [directory, first, first])).value
+        let output = try #require(fixture.shelf.items.last)
+        #expect(output.isManaged && output.url.pathExtension == "zip")
+        #expect(fixture.shelf.items.count == 3 && fixture.actions.generatedItemID == output.id)
+        let listing = try await Self.unzip(output.url, arguments: ["-Z1"], in: fixture.root)
+        #expect(String(decoding: listing, as: UTF8.self).split(separator: "\n") == ["Folder/", "Folder/child.txt", "first.txt"])
+        #expect(try await Self.unzip(output.url, arguments: ["-p"], entries: ["Folder/child.txt"], in: fixture.root) == Data("child".utf8))
+        #expect(try Data(contentsOf: first.url) == Data("first".utf8))
+        #expect(try Data(contentsOf: child) == Data("child".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.stage.path).isEmpty)
+        #expect(FileShelfStore(storageURL: fixture.storage).items == fixture.shelf.items)
+    }
+
+    @Test(arguments: ["-option.txt", "space name.txt", "中文.txt", "line\nbreak.txt"])
+    func ZIPTreatsUntrustedFilenamesAsSingleArguments(_ name: String) async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let item = try fixture.file(name, bytes: Data("selected".utf8))
+        let other = try fixture.file("other.txt", bytes: Data("other".utf8))
+        try await #require(fixture.perform(.compressFiles, items: [item, other])).value
+        let output = try #require(fixture.shelf.items.last)
+        #expect(output.url.pathExtension == "zip")
+        #expect(try await Self.unzip(output.url, arguments: ["-p"], entries: [name], in: fixture.root) == Data("selected".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.stage.path).isEmpty)
+    }
+
+    @Test func leadingHyphenSingleFileUsesTheSafeSystemZIPPath() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let item = try fixture.file("-option.txt", bytes: Data("selected".utf8))
+        let oldOutput = fixture.stage.appendingPathComponent("ditto.zip")
+        #expect(await AppModel.zipArchiveError(source: item.url, destination: oldOutput) != nil,
+                "The old ditto path treats a leading hyphen as an option")
+        #expect(!FileManager.default.fileExists(atPath: oldOutput.path))
+        try await #require(fixture.perform(.compressFiles, items: [item])).value
+        let output = try #require(fixture.shelf.items.last)
+        #expect(output.isManaged && output.url.pathExtension == "zip")
+        #expect(try await Self.unzip(output.url, arguments: ["-p"], entries: [item.displayName], in: fixture.root) == Data("selected".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.stage.path).isEmpty)
+    }
+
+    @Test func ZIPRejectsSameNamesAndTopLevelLinksWithoutLeakingFolderNamesOrFollowingTargets() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let first = try fixture.file("same.txt", bytes: Data("first".utf8))
+        let parent = fixture.root.appendingPathComponent("PrivateParent", isDirectory: true)
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)
+        let second = parent.appendingPathComponent("SAME.txt")
+        try Data("second".utf8).write(to: second)
+        #expect(fixture.shelf.add([second]) == 1)
+        let item = try #require(fixture.shelf.items.last)
+        try await #require(fixture.perform(.compressFiles, items: [first, item])).value
+        #expect(fixture.shelf.items.count == 2 && fixture.actions.generatedItemID == nil)
+        #expect(fixture.actions.message?.contains("SAME.txt") == true)
+        #expect(fixture.actions.message?.contains("PrivateParent") == false)
+        let link = fixture.root.appendingPathComponent("link.txt")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: first.url)
+        let archive = fixture.stage.appendingPathComponent("link.zip")
+        #expect(await AppModel.zipArchiveError(sources: [link], destination: archive) != nil)
+        #expect(!FileManager.default.fileExists(atPath: archive.path))
+        #expect(try Data(contentsOf: first.url) == Data("first".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.stage.path).isEmpty)
+    }
+
+    @Test func ZIPStoresNestedLinksWithoutReadingTheirOutsideTarget() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let privateFile = try fixture.file("private.txt", bytes: Data("outside secret".utf8))
+        let other = try fixture.file("selected.txt", bytes: Data("selected".utf8))
+        let folder = fixture.root.appendingPathComponent("Folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        try FileManager.default.createSymbolicLink(at: folder.appendingPathComponent("link"), withDestinationURL: privateFile.url)
+        #expect(fixture.shelf.add([folder]) == 1)
+        let directory = try #require(fixture.shelf.items.last)
+        try await #require(fixture.perform(.compressFiles, items: [directory, other])).value
+        let output = try #require(fixture.shelf.items.last)
+        let linkBytes = try await Self.unzip(output.url, arguments: ["-p"], entries: ["Folder/link"], in: fixture.root)
+        #expect(linkBytes == Data(privateFile.url.path.utf8))
+        #expect(linkBytes != Data("outside secret".utf8))
+        let listing = String(decoding: try await Self.unzip(output.url, arguments: ["-Z1"], in: fixture.root), as: UTF8.self)
+        #expect(!listing.contains("private.txt"))
+    }
+
+    @Test(arguments: ["timeout", "permission", "cancel", "missing second"])
+    func ZIPRunnerFailuresRemovePartialArchiveAndNeverChangeSources(_ failure: String) async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let first = try fixture.file("first.txt", bytes: Data("first".utf8))
+        let second = try fixture.file("second.txt", bytes: Data("second".utf8))
+        let destination = fixture.stage.appendingPathComponent("partial.zip")
+        let root = fixture.root
+        let secondURL = second.url
+        let error = await AppModel.zipArchiveError(sources: [first.url, second.url], destination: destination) { arguments, parent in
+            #expect(parent.standardizedFileURL.path == root.standardizedFileURL.path)
+            #expect(arguments[4] == "--")
+            try Data("partial".utf8).write(to: destination)
+            if failure == "missing second" {
+                if arguments.last == "./first.txt" {
+                    try FileManager.default.removeItem(at: secondURL)
+                    return .init(status: 0, standardOutput: Data(), standardError: "", didTimeout: false)
+                }
+                throw CocoaError(.fileReadNoSuchFile)
+            }
+            if failure == "cancel" { throw CancellationError() }
+            return .init(status: 1, standardOutput: Data(), standardError: failure == "permission" ? "permission denied" : "",
+                         didTimeout: failure == "timeout")
+        }
+        #expect(error != nil)
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+        #expect(try Data(contentsOf: first.url) == Data("first".utf8))
+        if failure != "missing second" { #expect(try Data(contentsOf: second.url) == Data("second".utf8)) }
+    }
+
+    @Test func ZIPRejectsExistingOutputsAndDestinationsInsideSelectedFolders() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let item = try fixture.file("source.txt", bytes: Data("source".utf8))
+        let existing = fixture.stage.appendingPathComponent("existing.zip")
+        try Data("existing".utf8).write(to: existing)
+        #expect(await AppModel.zipArchiveError(sources: [item.url], destination: existing) != nil)
+        #expect(try Data(contentsOf: existing) == Data("existing".utf8))
+        #expect(await AppModel.zipArchiveError(sources: [item.url], destination: item.url) != nil)
+        #expect(try Data(contentsOf: item.url) == Data("source".utf8))
+        let nested = fixture.root.appendingPathComponent("inside.zip")
+        #expect(await AppModel.zipArchiveError(sources: [fixture.root], destination: nested) != nil)
+        #expect(!FileManager.default.fileExists(atPath: nested.path))
+    }
+
+    @Test(arguments: [false, true])
+    func ZIPFailureOrCancellationRejectsLateOutputAndCleansStaging(_ cancel: Bool) async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let item = try fixture.file("source.txt", bytes: Data("source".utf8))
+        let started = AsyncStream<Void>.makeStream()
+        let resume = AsyncStream<Void>.makeStream()
+        defer { started.continuation.finish(); resume.continuation.finish() }
+        let pending = fixture.actions.perform(.compressFiles, items: [item], createQuickNote: { _ in false },
+                                              openStudio: { _, _ in }, archiveFiles: { _, output in
+                                                  try Data("partial".utf8).write(to: output)
+                                                  started.continuation.yield()
+                                                  for await _ in resume.stream { break }
+                                                  if !cancel { throw CocoaError(.fileWriteOutOfSpace) }
+                                              })
+        let task = try #require(pending)
+        for await _ in started.stream { break }
+        #expect(fixture.perform(.compressFiles, items: [item]) == nil)
+        if cancel { fixture.actions.cancel() }
+        resume.continuation.yield()
+        await task.value
+        #expect(fixture.shelf.items == [item] && fixture.actions.generatedItemID == nil)
+        #expect(!fixture.actions.isProcessing)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.stage.path).isEmpty)
+        #expect(cancel ? fixture.actions.message == AppLocalization.text("已取消操作") : fixture.actions.message?.contains(AppLocalization.text("操作失败")) == true)
+    }
+
+    @Test func missingFileInBatchStopsBeforeArchivingAndPreservesSelection() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let first = try fixture.file("valid.txt", bytes: Data([1]))
+        let second = try fixture.file("missing.txt", bytes: Data([2]))
+        try FileManager.default.removeItem(at: second.url)
+        let pending = fixture.actions.perform(.compressFiles, items: [first, second], createQuickNote: { _ in false },
+                                              openStudio: { _, _ in }, archiveFiles: { _, _ in
+                                                  Issue.record("Preflight must reject the missing file before ZIP starts")
+                                              })
+        try await #require(pending).value
+        #expect(fixture.shelf.items == [first, second])
+        #expect(fixture.actions.message?.contains(second.displayName) == true)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.stage.path).isEmpty)
+    }
+
+    @Test(arguments: [ShelfContextAction.resizeImages, .convertImages])
+    func imageToolsReceiveOnlySelectedInputsInOrderAndResolveMovedBookmarks(_ action: ShelfContextAction) async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let first = try fixture.image(width: 24)
+        let second = try fixture.image(width: 36)
+        let moved = fixture.root.appendingPathComponent("moved.png")
+        try FileManager.default.moveItem(at: first.url, to: moved)
+        var received: [URL] = []
+        var operation: ImageToolOperation?
+        let pending = fixture.actions.perform(action, items: [second, first, second], createQuickNote: { _ in false },
+                                              openStudio: { _, _ in }, openImageTools: { urls, selectedOperation in
+                                                  received = urls; operation = selectedOperation
+                                              })
+        try await #require(pending).value
+        #expect(received.map { $0.resolvingSymlinksInPath() } == [second.url, moved].map { $0.resolvingSymlinksInPath() })
+        #expect(operation == (action == .resizeImages ? .resize : .convert))
+        #expect(fixture.shelf.items == [first, second] && fixture.actions.message == nil)
+    }
+
+    @Test func studioLibraryAcceptsMixedMediaWaitsForCompletionAndPropagatesPermissionDenial() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let image = try fixture.image(width: 24)
+        let video = try fixture.file("clip.mp4", bytes: Data([1]))
+        let audio = try fixture.file("sound.wav", bytes: Data([2]))
+        let unknown = try fixture.file("unknown.bin", bytes: Data([3]))
+        #expect(ShelfContextAction.importToStudioLibrary.supports([audio, image, video]))
+        #expect(!ShelfContextAction.importToStudioLibrary.supports([image, unknown]))
+        let started = AsyncStream<Void>.makeStream()
+        let resume = AsyncStream<Void>.makeStream()
+        defer { started.continuation.finish(); resume.continuation.finish() }
+        let pending = fixture.actions.perform(.importToStudioLibrary, items: [audio, image, video],
+                                              createQuickNote: { _ in false }, openStudio: { urls, libraryOnly in
+                                                  #expect(libraryOnly)
+                                                  #expect(urls.map(\.lastPathComponent) == ["sound.wav", "image-24.png", "clip.mp4"])
+                                                  started.continuation.yield()
+                                                  for await _ in resume.stream { break }
+                                                  throw CocoaError(.fileReadNoPermission)
+                                              })
+        let task = try #require(pending)
+        for await _ in started.stream { break }
+        #expect(fixture.actions.isProcessing && fixture.actions.message == AppLocalization.text("正在处理…"))
+        resume.continuation.yield()
+        await task.value
+        #expect(fixture.actions.message == AppLocalization.text("操作失败：%@", CocoaError(.fileReadNoPermission).localizedDescription))
+        #expect(fixture.shelf.items == [image, video, audio, unknown])
+    }
+
+    private nonisolated static func unzip(_ url: URL, arguments: [String], entries: [String] = [], in directory: URL) async throws -> Data {
+        let result = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/unzip"),
+                                                        arguments: arguments + [url.path] + entries, workingDirectoryURL: directory)
+        try #require(result.status == 0)
+        return result.standardOutput
     }
 
     private nonisolated static func isOffMainThread() -> Bool { !Thread.isMainThread }
@@ -386,7 +627,7 @@ struct ShelfContextActionTests {
         }
 
         func perform(_ action: ShelfContextAction, items: [FileShelfItem]) -> Task<Void, Never>? {
-            actions.perform(action, items: items, createQuickNote: { _ in false }, openStudio: { _ in false })
+            actions.perform(action, items: items, createQuickNote: { _ in false }, openStudio: { _, _ in throw ShelfContextActionError.studioUnavailable })
         }
 
         func remove() { actions.cancel(); try? FileManager.default.removeItem(at: root) }

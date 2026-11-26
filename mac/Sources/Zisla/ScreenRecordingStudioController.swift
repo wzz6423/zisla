@@ -112,10 +112,15 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func importShelfVideos(_ urls: [URL]) -> Bool {
-        guard model.importMedia(urls, returningExportsToShelf: true) else { return false }
+    func importShelfVideos(_ urls: [URL], libraryOnly: Bool = false) async throws {
+        var result: Result<Void, Error>?
+        guard model.importMedia(urls, returningExportsToShelf: !libraryOnly, completion: { result = $0 }) else {
+            throw ShelfContextActionError.studioUnavailable
+        }
+        let task = model.operationTask!
+        await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+        try result!.get()
         present()
-        return true
     }
 
     func perform(_ action: RecordingShortcutAction) {

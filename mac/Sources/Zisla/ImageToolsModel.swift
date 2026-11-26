@@ -12,7 +12,17 @@ struct ImageToolsEditorInput: Identifiable {
 
 @MainActor
 final class ImageToolsModel: ObservableObject {
-    @Published var inputs: [URL] = []
+    @Published var inputs: [URL] = [] {
+        didSet {
+            let retained = Set(inputs.map(\.standardizedFileURL))
+            for url in scopedInputs where !retained.contains(url.standardizedFileURL) {
+                stopAccessing(url)
+                scopedInputs.remove(url)
+            }
+            shelfInputs.formIntersection(retained)
+            if shelfInputs.isEmpty { resultShelf = nil }
+        }
+    }
     @Published private(set) var batch: ImageProcessingBatch?
     @Published private(set) var isProcessing = false
     @Published private(set) var completed = 0
@@ -23,15 +33,53 @@ final class ImageToolsModel: ObservableObject {
     private var task: Task<Void, Never>?
     private var editTask: Task<Bool, Never>?
     private var editDirectory: URL?
+    private var scopedInputs = Set<URL>()
+    private var shelfInputs = Set<URL>()
+    private var resultShelf: FileShelfStore?
+    var startAccessing: (URL) -> Bool = { $0.startAccessingSecurityScopedResource() }
+    var stopAccessing: (URL) -> Void = { $0.stopAccessingSecurityScopedResource() }
+    var beforeReturningResults: ((ImageProcessingBatch) async -> Void)?
+    private var isClosed = false
 
     isolated deinit {
         task?.cancel()
         if let directory = batch?.directoryURL { try? FileManager.default.removeItem(at: directory) }
         if let editDirectory { try? FileManager.default.removeItem(at: editDirectory) }
+        scopedInputs.forEach(stopAccessing)
+    }
+
+    func receiveShelfInputs(_ urls: [URL], shelf: FileShelfStore) throws {
+        guard !isProcessing, !isClosed else { throw ShelfContextActionError.imageToolsUnavailable }
+        var seen = Set<URL>()
+        let urls = urls.filter { seen.insert($0.standardizedFileURL).inserted }
+        guard !urls.isEmpty else { throw ShelfContextActionError.unsupportedSelection }
+        var acquired: [URL] = []
+        do {
+            for url in urls {
+                guard url.isFileURL else { throw ShelfContextActionError.unavailableFile(url.lastPathComponent) }
+                if !scopedInputs.contains(url), startAccessing(url) { acquired.append(url) }
+                let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                guard values.isRegularFile == true, values.isSymbolicLink != true,
+                      ImageProcessingService.supportedExtensions.contains(url.pathExtension.lowercased()),
+                      FileManager.default.isReadableFile(atPath: url.path) else {
+                    throw ShelfContextActionError.unavailableFile(url.lastPathComponent)
+                }
+            }
+        } catch {
+            acquired.forEach(stopAccessing)
+            throw error
+        }
+        discardResults()
+        discardEdits()
+        scopedInputs.formUnion(acquired)
+        inputs = urls
+        shelfInputs = Set(urls.map(\.standardizedFileURL))
+        resultShelf = shelf
+        message = nil
     }
 
     func addInputs(_ urls: [URL]) {
-        guard !isProcessing else { return }
+        guard !isProcessing, !isClosed else { return }
         isProcessing = true
         total = 0
         task = Task { [weak self] in
@@ -40,7 +88,9 @@ final class ImageToolsModel: ObservableObject {
                 let files = try await withTaskCancellationHandler { try await scan.value } onCancel: { scan.cancel() }
                 try Task.checkCancellation()
                 guard let self else { return }
-                self.inputs = Array(Set(self.inputs + files)).sorted { $0.path < $1.path }
+                var seen = Set<URL>()
+                self.inputs = (self.inputs + files).filter { seen.insert($0.standardizedFileURL).inserted }
+                    .sorted { $0.path < $1.path }
                 self.message = files.isEmpty ? AppLocalization.text("请先选择图片或包含图片的文件夹") : nil
                 self.isProcessing = false
             } catch {
@@ -54,14 +104,21 @@ final class ImageToolsModel: ObservableObject {
     func start(service: ImageProcessingService, options: ImageProcessingOptions,
                rasterTransform: ImageProcessingService.RasterTransform? = nil,
                inputURLs: [URL]? = nil) -> Task<Void, Never>? {
-        guard !isProcessing else { return nil }
+        guard !isProcessing, !isClosed else { return nil }
         discardResults()
         isProcessing = true
         completed = 0
         let inputs = inputURLs ?? self.inputs
+        let shelfInputs = self.shelfInputs
+        let resultShelf = self.resultShelf
         total = inputs.count
         message = nil
         task = Task { [weak self] in
+            var prepared: ImageProcessingBatch?
+            defer {
+                if let prepared { try? FileManager.default.removeItem(at: prepared.directoryURL) }
+                self?.isProcessing = false
+            }
             do {
                 let result = try await service.process(inputs, options: options, rasterTransform: rasterTransform,
                                                        progress: { [weak self] completed, total in
@@ -70,15 +127,37 @@ final class ImageToolsModel: ObservableObject {
                                                                self?.total = total
                                                            }
                                                        })
-                guard let self else {
-                    try? FileManager.default.removeItem(at: result.directoryURL)
-                    return
+                prepared = result
+                await self?.beforeReturningResults?(result)
+                let returningItems = result.items.filter { shelfInputs.contains($0.inputURL.standardizedFileURL) }
+                var outputs: [URL] = []
+                if !returningItems.isEmpty, resultShelf != nil {
+                    let directory = result.directoryURL.appendingPathComponent("shelf", isDirectory: true)
+                    let worker = Task.detached {
+                        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+                                                                attributes: [.posixPermissions: 0o700])
+                        return try ImageProcessingService.export(returningItems, to: directory, smallestOnly: false)
+                    }
+                    outputs = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 }
+                try Task.checkCancellation()
+                guard let self else { return }
                 self.batch = result
-                self.isProcessing = false
                 self.message = AppLocalization.text("完成 %ld 张图片，失败 %ld 项", result.items.count, result.failures.count)
+                if let shelf = resultShelf, !outputs.isEmpty {
+                    var added = 0
+                    var failed = 0
+                    for output in outputs {
+                        if shelf.importPromisedFile(at: output, from: result.directoryURL) == 1 { added += 1 }
+                        else { failed += 1 }
+                    }
+                    self.message = self.message! + " · " + AppLocalization.text("已加入 %ld 个项目", added)
+                    if failed > 0 {
+                        self.message = self.message! + " · " + AppLocalization.text("%ld 个结果未能加入中转站", failed)
+                    }
+                }
+                prepared = nil
             } catch {
-                self?.isProcessing = false
                 self?.message = error is CancellationError ? AppLocalization.text("已取消") : error.localizedDescription
             }
         }
@@ -86,6 +165,23 @@ final class ImageToolsModel: ObservableObject {
     }
 
     func cancel() { task?.cancel(); editTask?.cancel() }
+
+    @discardableResult
+    func cancelAndDiscard(after recognitionTask: Task<Void, Never>? = nil) -> Task<Void, Never> {
+        isClosed = true
+        cancel()
+        let pending = task
+        let pendingEdit = editTask
+        return Task { [self] in
+            await recognitionTask?.value
+            await pending?.value
+            _ = await pendingEdit?.value
+            inputs = []
+            discardResults()
+            discardEdits()
+            message = nil
+        }
+    }
 
     @discardableResult
     func prepareEditor(_ input: URL, service: ImageProcessingService,
@@ -112,7 +208,7 @@ final class ImageToolsModel: ObservableObject {
 
     @discardableResult
     func recordEdit(_ image: CGImage, for input: URL) -> Task<Bool, Never>? {
-        guard !isProcessing else { return nil }
+        guard !isProcessing, !isClosed else { return nil }
         let directory: URL
         do {
             if let editDirectory { directory = editDirectory }
@@ -187,7 +283,7 @@ final class ImageToolsModel: ObservableObject {
     }
 
     func exportImages(_ items: [ImageProcessedItem], to directory: URL, smallestOnly: Bool) {
-        guard !isProcessing else { return }
+        guard !isProcessing, !isClosed else { return }
         isProcessing = true
         total = 0
         task = Task { [weak self] in
@@ -207,7 +303,7 @@ final class ImageToolsModel: ObservableObject {
                    archive: @escaping @Sendable (URL, URL) async -> String? = { source, output in
                        await AppModel.zipArchiveError(source: source, destination: output)
                    }) {
-        guard !isProcessing else { return }
+        guard !isProcessing, !isClosed else { return }
         isProcessing = true
         total = 0
         task = Task { [weak self] in

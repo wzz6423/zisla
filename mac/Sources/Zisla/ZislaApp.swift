@@ -319,6 +319,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var combinedIconReadTask: Task<Void, Never>?
     private var lastMonitorStatusRefreshAt = Date.distantPast
     private var settingsWindowController: NSWindowController?
+    private var settingsInput: SettingsInput?
     private var settingsWindowScreen: NSScreen?
     private var quickNotesEditorController: NSWindowController?
     private var screenshotSelectionController: ScreenshotSelectionController?
@@ -687,9 +688,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         configureMainMenu()
         registerScreenshotHotkeys()
         model.onScreenRecordingRequested = { [weak self] in self?.showScreenRecording() }
-        model.onShelfVideosRequested = { [weak self] urls in
-            guard let self else { return false }
-            return recordingStudio().importShelfVideos(urls)
+        model.onShelfVideosRequested = { [weak self] urls, libraryOnly in
+            guard let self else { throw ShelfContextActionError.studioUnavailable }
+            try await recordingStudio().importShelfVideos(urls, libraryOnly: libraryOnly)
+        }
+        model.onShelfImagesRequested = { [weak self, weak model] urls, operation in
+            guard let self, let model else { throw ShelfContextActionError.imageToolsUnavailable }
+            let input = settingsInput ?? SettingsInput()
+            guard !input.imageRecognition.isProcessing else {
+                throw ShelfContextActionError.imageToolsUnavailable
+            }
+            try input.imageTools.receiveShelfInputs(urls, shelf: model.shelf)
+            input.imageRecognition.clear()
+            input.select(.imageTools, searchTarget: .imageOperation(operation))
+            settingsInput = input
+            showSettings()
         }
         registerRecordingHotkeys()
         startSystemScreenshotMonitoring()
@@ -1030,6 +1043,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         screenRecordingController = nil
         runningModel.onScreenRecordingRequested = nil
         runningModel.onShelfVideosRequested = nil
+        runningModel.onShelfImagesRequested = nil
         setScreenshotSessionActive(false)
         screenshotSelectionController?.cancel()
         screenshotEditorController?.close()
@@ -2048,7 +2062,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let targetScreen = WindowPlacement.screenUnderMouse()
         if settingsWindowController == nil {
-            let rootView = SettingsView(model: AppModel.shared)
+            let input = settingsInput ?? SettingsInput()
+            settingsInput = input
+            let rootView = SettingsView(model: AppModel.shared, input: input)
             let window = SettingsWindow(
                 contentRect: CGRect(x: 0, y: 0, width: 960, height: 680),
                 styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
@@ -2087,6 +2103,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         if notification.object as? SettingsWindow != nil {
+            let input = settingsInput
+            settingsInput = nil
+            if let input {
+                input.imageTools.cancelAndDiscard(after: input.imageRecognition.cancel())
+            }
             settingsWindowController = nil
             settingsWindowScreen = nil
         } else if let window = notification.object as? QuickNotesEditorWindow {

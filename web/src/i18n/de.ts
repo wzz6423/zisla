@@ -81,7 +81,7 @@ export const de: SiteContent = {
       shelf: {
         name: 'Ablage',
         caption:
-          'Ziehen Sie Dateien, Audio, Videos oder Links an den oberen Bildschirmrand. Suchen und filtern Sie Ablagen, wählen Sie mehrere aus und kopieren, teilen oder senden Sie sie an Schnellnotizen. Wandeln Sie Bilder in PDF um, senden Sie erkannten Bildtext an Schnellnotizen oder bearbeiten Sie Videos im Aufnahmestudio. Dateien lassen sich auch im Finder anzeigen.',
+          'Ziehen Sie Dateien, Audio, Videos oder Links an den oberen Bildschirmrand. Suchen und filtern Sie Ablagen, wählen Sie mehrere aus und kopieren, teilen oder senden Sie sie an Schnellnotizen. Wandeln Sie Bilder in PDF um, senden Sie erkannten Bildtext an Schnellnotizen oder bearbeiten Sie Videos im Aufnahmestudio. Dateien lassen sich auch im Finder anzeigen. Komprimiere ausgewählte Dateien und Ordner als ZIP oder öffne ausgewählte Bilder zum Skalieren oder Konvertieren in den Bildwerkzeugen; erfolgreiche Ergebnisse kehren zur Ablage zurück. Importiere Bilder, Video und Audio in die Aufnahme-Mediathek.',
         points: ['Suche und Sammelaktionen', 'Bilder als PDF und Schnellnotizen', 'Videos im Studio bearbeiten'],
       },
       clipboard: {
@@ -193,7 +193,7 @@ export const de: SiteContent = {
       },
       recording: {
         title: 'Aufnehmen und bearbeiten im Studio',
-        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren mit Animationen, Zooms und Untertiteln. Passen Sie Hautglättung, Helligkeit, Gesichts- und Körperform sowie Stimmeffekte an und ergänzen Sie sanfte Cursorspuren in eigener Farbe. Spielen Sie das Ergebnis im Studio ab. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3; exportieren Sie Video, GIF, Live Photo oder Audio. Manche Formate benötigen FFmpeg. Prüfen Sie optionale KI-Vorschläge vor der Anwendung. Der Aufnahmeordner wird unter Einstellungen → Speicherort separat gewählt. Auf unterstützten Geräten sind HDR-Aufnahmen möglich.',
+        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren mit Animationen, Zooms und Untertiteln. Passen Sie Hautglättung, Helligkeit, Gesichts- und Körperform sowie Stimmeffekte an und ergänzen Sie sanfte Cursorspuren in eigener Farbe. Spielen Sie das Ergebnis im Studio ab. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3; exportieren Sie Video, GIF, Live Photo oder Audio. Manche Formate benötigen FFmpeg. Prüfen Sie optionale KI-Vorschläge vor der Anwendung. Der Aufnahmeordner wird unter Einstellungen → Speicherort separat gewählt. Auf unterstützten Geräten sind HDR-Aufnahmen möglich. Importiere Bilder, Video und Audio aus der Ablage in die Mediathek und behalte das aktuelle Projekt und die Zeitleiste bei.',
         detail: 'Porträt- und Stimmeffekte · Farbige Cursorspuren · Mehrspurwiedergabe und Export',
       },
       permissions: {

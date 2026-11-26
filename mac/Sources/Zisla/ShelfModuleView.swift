@@ -320,7 +320,12 @@ struct ShelfModuleView: View {
             model.share(model.shelfTransferItems(items))
         }))
         for action in ShelfContextAction.allCases {
-            let featureEnabled = action != .editVideo || model.settingsStore.settings.screenRecordingEnabled
+            let featureEnabled: Bool
+            switch action {
+            case .editVideo, .importToStudioLibrary: featureEnabled = model.settingsStore.settings.screenRecordingEnabled
+            case .resizeImages, .convertImages: featureEnabled = model.settingsStore.settings.imageToolsEnabled
+            default: featureEnabled = true
+            }
             actions.append(ShelfMenuAction(title: action.title,
                                            isEnabled: canAct && featureEnabled && action.supports(items),
                                            action: { model.performShelfContextAction(action, items: items) }))

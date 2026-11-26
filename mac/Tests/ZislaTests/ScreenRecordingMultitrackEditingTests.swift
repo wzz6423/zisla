@@ -85,6 +85,111 @@ struct ScreenRecordingMultitrackEditingTests {
         #expect(model.project == library && !model.canExport)
     }
 
+    @Test func shelfLibraryImportCompletesOnlyAfterMixedAssetsMergeAndLeavesTimelineAndProjectIdentityIntact() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        _ = try await fixture.createVideo()
+        let image = try fixture.createImage()
+        let audio = try fixture.createTone()
+        let video = try await fixture.createVideo("additional.mp4", colors: [.init(red: 0, green: 1, blue: 0)])
+        let original = fixture.project()
+        model.install(original, directory: fixture.directory)
+        let clips = model.timeline?.clips
+        let tracks = model.timeline?.tracks
+        let selectedClip = model.selectedTimelineClipID
+        var result: Result<Void, Error>?
+        #expect(model.importMedia([image, audio, video], completion: { result = $0 }))
+        #expect(result == nil && model.isBusy)
+        await model.operationTask?.value
+        try #require(result).get()
+        #expect(model.project?.id == original.id && model.directory == fixture.directory)
+        #expect(model.timeline?.clips == clips && model.timeline?.tracks == tracks)
+        #expect(model.selectedTimelineClipID == selectedClip)
+        #expect(model.mediaAssets.map(\.kind) == [.video, .image, .audio, .video])
+        #expect(model.project?.edits == original.edits && model.project?.outputDuration == original.outputDuration)
+        #expect(model.isDirty && model.canUndo)
+        try model.save()
+        #expect(try fixture.store.load(from: fixture.directory) == model.project)
+    }
+
+    @Test(arguments: ["cancel", "shutdown", "replace project"])
+    func shelfLibraryCancellationOrProjectReplacementRejectsPreparedCopiesAndCompletesWithFailure(_ action: String) async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        _ = try await fixture.createVideo()
+        let image = try fixture.createImage()
+        let original = fixture.project()
+        model.install(original, directory: fixture.directory)
+        let files = try fixture.files()
+        let started = AsyncStream<Void>.makeStream()
+        let resume = AsyncStream<Void>.makeStream()
+        defer { started.continuation.finish(); resume.continuation.finish() }
+        model.beforeCommittingMediaImport = { _ in
+            started.continuation.yield()
+            for await _ in resume.stream { break }
+        }
+        var result: Result<Void, Error>?
+        #expect(model.importMedia([image], completion: { result = $0 }))
+        let task = try #require(model.operationTask)
+        for await _ in started.stream { break }
+        #expect(result == nil)
+        var expected = original
+        switch action {
+        case "shutdown": model.shutdown()
+        case "replace project":
+            expected.name = "Replacement"
+            model.install(expected, directory: fixture.directory)
+        default: model.cancelOperation()
+        }
+        resume.continuation.yield()
+        await task.value
+        let completion = try #require(result)
+        #expect(throws: CancellationError.self) { try completion.get() }
+        #expect(model.project == expected && model.directory == fixture.directory)
+        #expect(try fixture.files() == files)
+        #expect(!model.isBusy)
+    }
+
+    @Test func failedShelfLibraryBatchRollsBackTheFirstCopyAndReportsItsActualError() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        _ = try await fixture.createVideo()
+        let image = try fixture.createImage()
+        let corrupt = fixture.directory.appendingPathComponent("corrupt.png")
+        try Data("invalid".utf8).write(to: corrupt)
+        let original = fixture.project()
+        model.install(original, directory: fixture.directory)
+        let files = try fixture.files()
+        var result: Result<Void, Error>?
+        #expect(model.importMedia([image, corrupt], completion: { result = $0 }))
+        await model.operationTask?.value
+        let completion = try #require(result)
+        #expect(throws: (any Error).self) { try completion.get() }
+        #expect(model.errorMessage != nil && model.project == original)
+        #expect(try fixture.files() == files && !model.isBusy)
+    }
+
+    @Test func releasedStudioBeforeImportStartsReportsCancellationWithoutCreatingAProject() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let image = try fixture.createImage()
+        let files = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
+        var model: ScreenRecordingStudioModel? = try fixture.model()
+        var result: Result<Void, Error>?
+        #expect(try #require(model).importMedia([image], completion: { result = $0 }))
+        let task = try #require(model?.operationTask)
+        weak var weakModel = model
+        model = nil
+        #expect(weakModel == nil)
+        await task.value
+        let completion = try #require(result)
+        #expect(throws: CancellationError.self) { try completion.get() }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == files)
+    }
+
     @Test(arguments: [false, true])
     func failedBatchImportRollsBackAllCopiedFilesAndPreservesThePreviousManifest(_ newProject: Bool) async throws {
         let fixture = try RecordingMultitrackTestFixture()

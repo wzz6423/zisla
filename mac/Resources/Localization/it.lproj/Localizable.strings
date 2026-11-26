@@ -3784,3 +3784,11 @@
 "取消图片文字识别" = "Annulla il riconoscimento del testo";
 "等待识别图片文字" = "In attesa di riconoscere il testo";
 "正在识别图片文字" = "Riconoscimento del testo dell’immagine";
+
+"缩放图片" = "Ridimensiona immagini";
+"转换图片格式" = "Converti formato immagine";
+"导入录屏素材库" = "Importa nella libreria dello studio";
+"图片工具当前不可用，请稍后重试" = "Gli strumenti immagine non sono disponibili. Riprova più tardi.";
+"无法压缩同名项目：%@" = "Impossibile comprimere elementi con lo stesso nome: %@";
+"素材库导入完成" = "Importazione nella libreria completata";
+"%ld 个结果未能加入中转站" = "Impossibile aggiungere %ld risultati alla raccolta";

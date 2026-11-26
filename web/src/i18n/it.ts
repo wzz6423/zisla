@@ -83,7 +83,7 @@ export const it = createCatalog({
       shelf: {
         name: 'Scaffale',
         caption:
-          'Trascina file, audio, video o link nella parte alta dello schermo, poi cerca, filtra e seleziona più elementi per copiarli, condividerli o inviarli alle Note rapide. Converti immagini in PDF, invia il testo riconosciuto alle Note rapide o apri i video nello studio di registrazione per modificarli. Puoi anche mostrare i file nel Finder.',
+          'Trascina file, audio, video o link nella parte alta dello schermo, poi cerca, filtra e seleziona più elementi per copiarli, condividerli o inviarli alle Note rapide. Converti immagini in PDF, invia il testo riconosciuto alle Note rapide o apri i video nello studio di registrazione per modificarli. Puoi anche mostrare i file nel Finder. Comprimi i file e le cartelle selezionati in ZIP oppure apri le immagini selezionate negli strumenti immagine per ridimensionarle o convertirle; i risultati riusciti tornano nella raccolta. Importa immagini, video e audio nella libreria dello studio.',
         points: ['Ricerca e azioni in gruppo', 'Immagini in PDF e Note rapide', 'Modifica video nello studio'],
       },
       clipboard: {
@@ -180,7 +180,7 @@ export const it = createCatalog({
       },
       recording: {
         title: 'Registra e monta nello studio',
-        description: 'Registra schermo, finestra o area con audio del sistema, microfono e fotocamera opzionali. Modifica video, audio, immagini e testo su più tracce con animazioni, zoom e sottotitoli. Regola levigatura della pelle, luminosità, snellimento di viso e corpo, effetti vocali e scie fluide del cursore nel colore scelto. Riproduci il montaggio nello studio. Scegli proporzioni originali, 16:9, 9:16, 1:1 o 4:3; esporta video, GIF, Live Photo o audio. Alcuni formati richiedono FFmpeg. Controlla le proposte IA opzionali prima di applicarle. La cartella delle registrazioni si imposta separatamente in Impostazioni → Posizione di salvataggio. Registra in HDR sui dispositivi compatibili.',
+        description: 'Registra schermo, finestra o area con audio del sistema, microfono e fotocamera opzionali. Modifica video, audio, immagini e testo su più tracce con animazioni, zoom e sottotitoli. Regola levigatura della pelle, luminosità, snellimento di viso e corpo, effetti vocali e scie fluide del cursore nel colore scelto. Riproduci il montaggio nello studio. Scegli proporzioni originali, 16:9, 9:16, 1:1 o 4:3; esporta video, GIF, Live Photo o audio. Alcuni formati richiedono FFmpeg. Controlla le proposte IA opzionali prima di applicarle. La cartella delle registrazioni si imposta separatamente in Impostazioni → Posizione di salvataggio. Registra in HDR sui dispositivi compatibili. Importa immagini, video e audio dalla raccolta nella libreria mantenendo il progetto e la timeline attuali.',
         detail: 'Effetti ritratto e voce · Scie colorate del cursore · Riproduzione ed export multitraccia',
       },
       permissions: {

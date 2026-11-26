@@ -26,7 +26,7 @@ Music: “Funkorama” by Kevin MacLeod · [CC BY 4.0](https://creativecommons.o
 | Capability | What it does |
 | --- | --- |
 | Now Playing | Shows artwork, title, progress, lyrics, and playback controls; Core Audio can identify the app actually outputting audio when metadata is unavailable. |
-| Handoff and sharing | Drop files, media, or links on the top trigger area to keep them in a handoff tray, reveal them in Finder, or open the macOS share menu. |
+| Handoff and sharing | Drop files, media, or links on the top trigger area to keep them in a handoff tray, reveal them in Finder, or open the macOS share menu. Compress selected files and folders as ZIP, resize or convert images in Image Tools, and return successful results to the shelf; import supported images, video and audio into the recording media library. |
 | Clipboard and notifications | Optionally records local clipboard history, recognizes new links locally, and surfaces media, AI activity, browser downloads, timers, mail, and updates in the collapsed state. Optional Quick Actions show a small island toast after every copy with a rich preview and smart next actions (open, reveal in Finder, search, translate, calculate, save). After a browser download completes or an AirDrop file arrives, the same shortcut can open its folder. New images are queued for on-device OCR; search recognized text to find the original image, or right-click a history image to recognize or copy its text. |
 | Everyday workspace | Includes weather, calendar, reminders, Mail.app, Markdown notes backed by Apple Notes, lock-screen information, and optional desktop pets. |
 
