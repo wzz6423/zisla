@@ -1,6 +1,6 @@
 # 签名与发布设计
 
-[English](releasing.md) | **简体中文**
+[English](releasing.md) | **简体中文** | [其他语言](../../docs/locales/README.md)
 
 项目的完整发布流程、双更新通道和 GitHub/Gitee 的资产同步由仓库根目录的 [`skills/zisla-release`](../../skills/zisla-release/SKILL.md) 统一维护。本页只说明签名、公证和更新包的设计约束；发布时以该技能为准。
 
@@ -70,7 +70,7 @@ xcrun notarytool submit \
 xcrun stapler staple 'dist/zisla.app'
 xcrun stapler validate 'dist/zisla.app'
 
-# 重新打包已 stapled 的应用，确保 ZIP 和 DMG 都携带最终产物。
+# Repackage the stapled app so both the ZIP and DMG contain the final artifact.
 export SKIP_BUILD=true
 Scripts/package-release.sh
 ```

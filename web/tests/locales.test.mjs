@@ -8,6 +8,7 @@ import {
   isSiteLocale,
   localeDirection,
   localeNativeNames,
+  localeStorageKey,
   matchLocale,
   openGraphLocales,
   resolvePreferredLocale,
@@ -34,7 +35,7 @@ for (const locale of siteLocales) await site.loadSiteContent(locale);
 
 const changedFeatureIds = [
   'floatingIsland', 'dailyBriefing', 'userCare', 'contextNotes', 'recording', 'permissions', 'pdf',
-  'imageTools', 'audioTools',
+  'imageTools', 'audioTools', 'lockScreen',
 ];
 const english = site.getSiteContent('en');
 // Read authored overrides before createCatalog can silently merge missing fields from English.
@@ -52,41 +53,55 @@ const iconNames = mainSource.match(/const siteIcons = \{([\s\S]*?)\};/)[1].match
 const renderSource = stripTypeScriptTypes(mainSource.slice(mainSource.indexOf('const app = ')))
   .replace('void showLocale(currentLocale);', '');
 
-const renderInMemory = (locale, releases = site.changelogEntries, runtimeNodes = {}) => {
+const renderInMemory = (locale, releases = site.changelogEntries, runtimeNodes = {}, options = {}) => {
   const classList = { add() {}, remove() {}, toggle() {} };
-  const node = () => ({ style: {}, dataset: {}, classList, setAttribute() {}, append() {} });
+  const node = () => ({ style: {}, dataset: {}, classList, setAttribute(name, value) { this[name] = value; }, append() {} });
   const app = { ...node(), innerHTML: '' };
   const metadata = [];
   const document = {
-    documentElement: { ...node(), scrollHeight: 800 },
+    documentElement: { ...node(), dataset: { page: options.page }, scrollHeight: 800 },
     body: node(),
     head: { querySelector: () => null, append: (element) => metadata.push(element) },
     querySelector: (selector) => selector === '#app' ? app : runtimeNodes[selector] ?? null,
-    querySelectorAll: () => [],
-    getElementById: () => null,
+    querySelectorAll: (selector) => options.selectors?.[selector] ?? [],
+    getElementById: (id) => options.targets?.[id] ?? null,
     createElement: node,
   };
+  const navigations = [];
+  const location = new URL(options.url ?? `https://example.test/zisla/${options.page === 'help' ? 'help.html' : ''}`);
+  location.replace = (address) => navigations.push(new URL(address, location));
   const window = {
-    localStorage: { getItem: () => null },
+    location,
+    history: {
+      replaceState(_state, _title, address) { window.location = new URL(address, window.location); },
+      pushState(_state, _title, address) { window.location = new URL(address, window.location); },
+    },
+    localStorage: { getItem: () => options.storedLocale ?? null, setItem(key, value) { this[key] = value; } },
     matchMedia: (query) => ({ matches: query.includes('reduced-motion'), addEventListener() {} }),
-    addEventListener() {},
+    addEventListener(event, listener) { options.windowHandlers?.set(event, listener); },
     dispatchEvent() {},
     innerHeight: 800,
     scrollY: 0,
+    pageYOffset: 0,
+    requestAnimationFrame(callback) { callback(); },
+    scrollTo({ top }) { window.scrollY = top; },
   };
   const context = vm.createContext({
     ...site,
-    defaultLocale, isSiteLocale, localeDirection, localeNativeNames,
+    defaultLocale, isSiteLocale, localeDirection, localeNativeNames, localeStorageKey,
     openGraphLocales, resolvePreferredLocale, siteLocales,
     changelogEntries: releases,
-    document, window, navigator: { languages: [] }, Event,
+    document, window, navigator: { languages: [] }, Event, URL, URLSearchParams,
     ...Object.fromEntries(iconNames.map((name) => [name, {}])),
     createIcons() {},
   });
   vm.runInContext(renderSource, context);
   vm.runInContext(`renderSite(${JSON.stringify(locale)})`, context);
-  return { html: app.innerHTML, document, metadata };
+  return { html: app.innerHTML, document, metadata, window, context, navigations };
 };
+
+const renderHelpInMemory = (locale, releases = site.changelogEntries, runtimeNodes = {}, options = {}) =>
+  renderInMemory(locale, releases, runtimeNodes, { ...options, page: 'help' });
 
 const strings = (value, path) => {
   if (typeof value === 'string') return [[path, value]];
@@ -110,8 +125,10 @@ const updatedStrings = (content) => [
   ['meta.description', content.meta.description],
   ['meta.ogDescription', content.meta.ogDescription],
   ['extensions.lede', content.extensions.lede],
-  ['ai.lede', content.ai.lede],
-  ['ai.usageNote', content.ai.usageNote],
+  ...['eyebrow', 'title', 'lede', 'summaryMono', 'summaryLede', 'toolsLede', 'boundariesHeading', 'privacyPoints', 'bridgeLede']
+    .flatMap((field) => strings(content.ai[field], `ai.${field}`)),
+  ['flow.steps.trigger.desc', content.flow.steps.trigger.desc],
+  ...strings(content.developers.performancePoints, 'developers.performancePoints'),
   ['download.copy', content.download.copy],
   ['faq.items.permissions.answer', content.faq.items.permissions.answer],
   ['faq.items.storage.answer', content.faq.items.storage.answer],
@@ -123,6 +140,8 @@ const updatedStrings = (content) => [
   ...strings(content.changelog.releaseNotes['v0.1.24'], 'changelog.releaseNotes.v0.1.24'),
   ...strings(content.changelog.releaseNotes['v0.1.25'], 'changelog.releaseNotes.v0.1.25'),
   ...strings(content.film, 'film'),
+  ...strings(content.help, 'help'),
+  ['header.navItems.help', content.header.navItems.help],
 ];
 
 test('clipboard image text search is authored and rendered in every locale', () => {
@@ -132,10 +151,18 @@ test('clipboard image text search is authored and rendered in every locale', () 
     const content = site.getSiteContent(locale);
     assert.equal(content.showcase.modules.clipboard.caption, authored);
     if (locale !== 'en') assert.notEqual(authored, english.showcase.modules.clipboard.caption);
-    assert.ok(renderInMemory(locale).html.includes(escapedText(authored)), `${locale} must render its clipboard instructions`);
+    assert.ok(renderInMemory(locale).html.includes(escapedText(authored)), `${locale} must render its clipboard overview`);
+    const authoredGuide = authoredCatalogs.get(locale)?.help?.guides?.clipboard;
+    assert.ok(authoredGuide?.steps.length > 0, `${locale} must author its clipboard instructions`);
+    const { html } = renderHelpInMemory(locale);
+    for (const step of authoredGuide.steps) {
+      assert.ok(html.includes(escapedText(step)), `${locale} must render its clipboard instructions`);
+    }
   }
-  assert.match(english.showcase.modules.clipboard.caption, /on-device text recognition/);
-  assert.match(english.showcase.modules.clipboard.caption, /Right-click a history image/);
+  assert.match(english.showcase.modules.clipboard.caption, /search local clipboard history, including text in images/);
+  const instructions = english.help.guides.clipboard.steps.join(' ');
+  assert.match(instructions, /on-device recognition.*search.*original image/);
+  assert.match(instructions, /Right-click.*recognize or copy its text/);
 });
 
 test('launch film sits after the changelog and before the footer with explicit playback', () => {
@@ -299,8 +326,8 @@ test('current feature descriptions keep meeting, power and application-repair co
   assert.match(content.showcase.modules.dashboard.caption, /AI work is grouped by application on Home/);
   assert.match(content.showcase.modules.agenda.caption, /Events with a meeting link.*10 minutes before the start.*one-click join/);
   assert.match(content.showcase.modules.agenda.caption, /Create a meeting note.*link and unlink existing context notes/);
-  assert.match(content.showcase.modules.shelf.caption, /search, filter and select several.*copy, share or send to Quick Notes/);
-  assert.match(content.showcase.modules.shelf.caption, /Convert images to PDF.*send videos to the recording studio/);
+  assert.match(content.showcase.modules.shelf.caption, /Search, select and share.*ZIP or PDF.*resize or convert images/);
+  assert.match(content.showcase.modules.shelf.caption, /Quick Notes or the recording studio/);
   assert.match(content.showcase.modules.mail.caption, /one message or all inbox messages as read/);
   assert.match(content.showcase.modules.toolbox.caption, /Pause, resume or reset.*compact horizontal and vertical/);
   assert.match(content.showcase.modules.system.caption, /automatic power modes for plugged-in and battery use.*20% or below/);
@@ -309,7 +336,12 @@ test('current feature descriptions keep meeting, power and application-repair co
   assert.match(content.extensions.features.capture.description, /slow automatic scrolling.*HDR screenshots on supported devices/);
   assert.match(content.extensions.features.floatingIsland.description, /Reorder.*Settings → Dynamic Island Layout/);
   assert.match(content.extensions.features.dailyBriefing.description, /real account allowances and their sampling times/);
-  assert.match(content.ai.usageNote, /separate data sources.*credits are not converted into tokens or USD cost/);
+  assert.match(content.ai.lede, /tasks by application.*model usage by date.*remaining account allowances/);
+  assert.match(content.ai.privacyPoints[0], /Task status and usage stay on your Mac/);
+  assert.match(content.ai.privacyPoints[1], /Prompts and replies are not read/);
+  assert.match(content.ai.privacyPoints[2], /Conversations are not uploaded/);
+  assert.match(content.help.guides.ai.permissions, /Allowance checks contact the provider/);
+  assert.match(content.help.guides.ai.output, /provider samples, not token estimates.*unavailable data stays unavailable/);
   assert.doesNotMatch(content.showcase.modules.aiMonitor.caption, /remaining allowances hidden/);
   assert.match(content.showcase.modules.aiMonitor.caption, /Remaining-quota rings.*compact island layouts/);
   assert.match(content.showcase.modules.download.caption, /Settings → Dependency Components.*daily updates for installed components/);
@@ -323,13 +355,13 @@ test('current feature descriptions keep meeting, power and application-repair co
 });
 
 test('current release describes source grouping, cleanup, HDR and saved preferences', () => {
-  assert.match(english.showcase.modules.clipboard.caption, /Search and group history by source application/);
+  assert.match(english.showcase.modules.clipboard.caption, /search local clipboard history.*text in images.*type or source app/);
   assert.match(english.showcase.modules.system.caption, /background.*island progress and results/);
   assert.match(english.showcase.modules.system.caption, /duplicate application installations.*leftovers/);
   assert.match(english.showcase.modules.quickNotes.caption, /Command-arrow.*native body typography/);
   assert.match(english.showcase.modules.volumeMixer.caption, /remembered per application.*stale audio sources/);
   assert.match(english.showcase.modules.aiMonitor.caption, /account regions independently.*daily usage records/i);
-  assert.match(english.extensions.features.recording.description, /HDR on supported devices/);
+  assert.match(english.extensions.features.recording.description, /HDR on compatible devices.*media imports from the shelf/);
   assert.match(english.extensions.features.permissions.description, /status refreshes after access is granted/);
   assert.match(english.extensions.features.capture.description, /settings window/);
   assert.match(english.extensions.features.windowPreviews.description, /duplicate windows.*context menus/);
@@ -359,7 +391,9 @@ for (const locale of siteLocales) {
       assert.ok(value.trim().length > 0, path);
       assert.doesNotMatch(value, /\bTODO\b|\bTBD\b/, path);
       assert.deepEqual(value.match(/\{\w+\}/g) ?? [], baseline.get(path).match(/\{\w+\}/g) ?? [], path);
-      if (locale !== 'en' && path !== 'showcase.modules.volumeMixer.points.2') {
+      // "Privacy" is also the native heading in Italian and Dutch; authored-source checks still reject fallback.
+      const sharedPrivacyHeading = path === 'ai.boundariesHeading' && ['it', 'nl'].includes(locale);
+      if (locale !== 'en' && path !== 'showcase.modules.volumeMixer.points.2' && !sharedPrivacyHeading) {
         assert.notEqual(value, baseline.get(path), `${locale}: ${path} must have its own translation`);
       }
     }
@@ -369,10 +403,11 @@ for (const locale of siteLocales) {
     assert.equal(content.changelog.releaseNotes['v0.1.23'].length, 13);
     assert.equal(content.changelog.releaseNotes['v0.1.24'].length, 9);
     const rendered = renderInMemory(locale);
+    const help = renderHelpInMemory(locale);
     for (const [path, value] of updatedStrings(content)) {
       if (path.startsWith('meta.')) continue;
-      const expected = path.startsWith('faq.') ? value : escapedText(value);
-      assert.ok(rendered.html.includes(expected), `${locale}: ${path} is rendered`);
+      const expected = path.startsWith('faq.') || path === 'ai.title' ? value : escapedText(value);
+      assert.ok((path.startsWith('help.') ? help.html : rendered.html).includes(expected), `${locale}: ${path} is rendered on its page`);
     }
     assert.equal((rendered.html.match(/class="workflow-module reveal-step"/g) ?? []).length, 12);
     assert.equal((rendered.html.match(/class="extension-item reveal-step"/g) ?? []).length, site.crossModuleFeatureIds.length);
@@ -437,5 +472,274 @@ test('latest release downloads and README match the newest changelog entry', () 
     for (const url of readme.match(/https:\/\/github\.com\/wzz6423\/zisla\/releases\/(?:tag|download)\/v[^\s]+/g)) {
       assert.ok(url.startsWith(releasePage) || url.startsWith(downloadRoot), `${filename}: ${url}`);
     }
+  }
+});
+
+test('help languages mirror the native AppLanguage values', () => {
+  const source = readFileSync(new URL('../../mac/Sources/ZislaCore/AppLocalization.swift', import.meta.url), 'utf8');
+  const declaration = source.slice(source.indexOf('public enum AppLanguage'), source.indexOf('public var', source.indexOf('public enum AppLanguage')));
+  const values = [...declaration.matchAll(/case \w+ = "([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(values.sort(), [...siteLocales].sort());
+});
+
+test('the homepage stays concise while linked help retains translated guides and demonstrations', () => {
+  for (const locale of siteLocales) {
+    const content = site.getSiteContent(locale);
+    const homepage = renderInMemory(locale);
+    assert.ok(homepage.html.includes(`href="./help.html?lang=${locale}">${escapedText(content.header.navItems.help)}</a>`), locale);
+    assert.doesNotMatch(homepage.html, /class="user-guide|class="workflow-video|id="help"/);
+    const { html, document, metadata } = renderHelpInMemory(locale);
+    assert.doesNotMatch(html, /class="hero"|id="showcase"|id="changelog"/);
+    assert.ok(html.includes(`href="./?lang=${locale}"`), `${locale}: help returns home`);
+    for (const markup of [homepage.html, html]) {
+      const footer = markup.match(/<footer\b[\s\S]*?<\/footer>/)?.[0];
+      assert.ok(footer?.includes(`<a href="./help.html?lang=${locale}">${escapedText(content.header.navItems.help)}</a>`),
+        `${locale}: both footers link to localized user help`);
+    }
+    for (const id of site.guideIds) {
+      const guide = content.help.guides[id];
+      assert.ok(guide.steps.length > 0, `${locale}: ${id} has actionable steps`);
+      assert.ok(html.includes(`id="guide-${id}"`), `${locale}: ${id} has a stable destination`);
+      assert.ok(html.includes(`href="#guide-${id}"`), `${locale}: ${id} is reachable`);
+    }
+    for (const id of site.workflowIds) {
+      const { start, end, guide } = site.workflowExcerpts[id];
+      assert.ok(start >= 0 && end > start && end <= 160, id);
+      assert.ok(html.includes(`id="workflow-${id}"`), `${locale}: workflow destination`);
+      assert.ok(html.includes(`src="${site.launchFilmMedia.video}#t=${start},${end}"`), `${locale}: inline excerpt`);
+      assert.ok(html.includes(`href="#guide-${guide}"`), `${locale}: workflow has instructions`);
+    }
+    assert.equal((html.match(/class="workflow-video" controls playsinline preload="none"/g) ?? []).length, site.workflowIds.length);
+    assert.equal(document.documentElement.lang, locale);
+    assert.equal(document.documentElement.dir, locale === 'ar' ? 'rtl' : 'ltr');
+    assert.ok(metadata.some((entry) => entry.content === openGraphLocales[locale]));
+  }
+});
+
+test('developer resources select complete documents in the chosen locale', () => {
+  for (const locale of siteLocales) {
+    const { html } = renderInMemory(locale);
+    for (const id of site.documentationIds) {
+      const link = site.documentationLink(id, locale);
+      assert.equal(link.language, locale, `${locale}: document language`);
+      const sourcePath = link.url.split('/blob/main/')[1];
+      const original = site.documentationUrls[id].split('/blob/main/')[1];
+      const expected = locale === 'en' ? original : locale === 'zh-Hans' ? original.replace(/\.md$/, '.zh-CN.md') :
+        `docs/locales/${locale}/${original}`;
+      assert.equal(sourcePath, expected, `${locale}: localized resource path`);
+      assert.ok(existsSync(new URL(`../../${sourcePath}`, import.meta.url)), `${locale}: ${sourcePath} exists`);
+      assert.ok(html.includes(`href="${link.url}"`), `${locale}: resource links to ${sourcePath}`);
+    }
+  }
+});
+
+const localizedDocuments = [
+  'README.md', 'mac/README.md', 'mac/Docs/architecture.md',
+  'mac/Docs/cli-reference.md', 'mac/Docs/releasing.md', 'CONTRIBUTING.md',
+];
+const fencedExamples = (markdown) => [...markdown.matchAll(/^[ \t]*```[^\n]*\n[\s\S]*?^[ \t]*```[ \t]*$/gm)].map((match) => match[0]);
+const proseOnly = (markdown) => markdown.replace(/^[ \t]*```[^\n]*\n[\s\S]*?^[ \t]*```[ \t]*$/gm, '');
+const markdownAnchors = (markdown) => {
+  const anchors = new Set();
+  const repeats = new Map();
+  for (const match of proseOnly(markdown).matchAll(/^#{1,6} (.+)$/gm)) {
+    const slug = match[1].replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\p{M}_\-\s]/gu, '')
+      .trim().toLowerCase().replace(/\s/g, '-');
+    const count = repeats.get(slug) ?? 0;
+    repeats.set(slug, count + 1);
+    anchors.add(count ? `${slug}-${count}` : slug);
+  }
+  return anchors;
+};
+
+test('all 17 documentation sets retain executable examples and local navigation', () => {
+  const index = new URL('../../docs/locales/README.md', import.meta.url);
+  const indexText = readFileSync(index, 'utf8');
+  const documents = [index];
+  for (const locale of siteLocales) {
+    for (const path of localizedDocuments) {
+      const source = new URL(`../../${path}`, import.meta.url);
+      const localized = new URL(`../../${locale === 'en' ? path : locale === 'zh-Hans' ? path.replace(/\.md$/, '.zh-CN.md') :
+        `docs/locales/${locale}/${path}`}`, import.meta.url);
+      assert.ok(existsSync(localized), `${locale}: ${path} exists`);
+      const markdown = readFileSync(localized, 'utf8');
+      assert.ok(/^# .+/m.test(markdown) && /^## .+/m.test(markdown), `${locale}: ${path} has full document sections`);
+      assert.equal((markdown.match(/^[ \t]*```/gm) ?? []).length, fencedExamples(markdown).length * 2,
+        `${locale}: ${path} has closed code fences`);
+      const indexedPath = locale === 'en' ? `../../${path}` : locale === 'zh-Hans' ?
+        `../../${path.replace(/\.md$/, '.zh-CN.md')}` : `${locale}/${path}`;
+      assert.ok(indexText.includes(indexedPath), `${locale}: ${path} is indexed`);
+      if (locale !== 'en' && locale !== 'zh-Hans') {
+        const englishMarkdown = readFileSync(source, 'utf8');
+        assert.notEqual(proseOnly(markdown), proseOnly(englishMarkdown), `${locale}: ${path} contains authored translated prose`);
+        assert.deepEqual(fencedExamples(markdown), fencedExamples(englishMarkdown), `${locale}: ${path} preserves executable examples`);
+      }
+      documents.push(localized);
+    }
+  }
+  for (const document of documents) {
+    for (const match of proseOnly(readFileSync(document, 'utf8')).matchAll(/!?\[[^\]]*\]\(([^\s)]+)(?:\s+[^)]*)?\)/g)) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(match[1])) continue;
+      const target = new URL(match[1], document);
+      const hash = decodeURIComponent(target.hash.slice(1));
+      target.hash = '';
+      assert.ok(existsSync(target), `${document.pathname}: ${match[1]} exists`);
+      if (hash && target.pathname.endsWith('.md')) {
+        assert.ok(markdownAnchors(readFileSync(target, 'utf8')).has(hash), `${document.pathname}: ${match[1]} anchor exists`);
+      }
+    }
+  }
+});
+
+test('explicit language links override saved preferences while invalid values leave preferences intact', () => {
+  for (const locale of siteLocales) {
+    const page = renderInMemory(locale, site.changelogEntries, {}, {
+      url: `https://example.test/zisla/?lang=${locale}#guide-clipboard`, storedLocale: 'en',
+    });
+    assert.equal(vm.runInContext('readInitialLocale()', page.context), locale);
+  }
+  for (const value of ['xx', 'en-US', '<script>', 'javascript:alert(1)', '']) {
+    const page = renderInMemory('fr', site.changelogEntries, {}, {
+      url: `https://example.test/zisla/?lang=${encodeURIComponent(value)}#help`, storedLocale: 'fr',
+    });
+    assert.equal(vm.runInContext('readInitialLocale()', page.context), 'fr', value);
+  }
+  const page = renderInMemory('zh-Hans', site.changelogEntries, {}, { storedLocale: 'invalid' });
+  assert.equal(vm.runInContext('readInitialLocale()', page.context), defaultLocale);
+});
+
+test('legacy homepage help links forward with language, query and destination intact', () => {
+  for (const locale of siteLocales) {
+    for (const destination of ['help', ...site.guideIds.map((id) => 'guide-' + id), ...site.workflowIds.map((id) => 'workflow-' + id)]) {
+      const page = renderInMemory('en', site.changelogEntries, {}, {
+        url: `https://example.test/zisla/?campaign=help&lang=${locale}#${destination}`, storedLocale: 'en',
+      });
+      assert.equal(page.navigations.length, 1);
+      const url = page.navigations[0];
+      assert.equal(url.pathname, '/zisla/help.html');
+      assert.equal(url.searchParams.get('lang'), locale);
+      assert.equal(url.searchParams.get('campaign'), 'help');
+      assert.equal(url.hash, '#' + destination);
+    }
+  }
+  for (const destination of ['showcase', 'film', 'guide-unknown', '%3Cimg%20onerror=alert(1)%3E']) {
+    const page = renderInMemory('en', site.changelogEntries, {}, { url: `https://example.test/zisla/#${destination}` });
+    assert.equal(page.navigations.length, 0, destination);
+  }
+  for (const search of ['', '?lang=xx&campaign=help']) {
+    const page = renderInMemory('en', site.changelogEntries, {}, {
+      url: `https://example.test/zisla/${search}#guide-shelf`, storedLocale: 'fr',
+    });
+    assert.equal(page.navigations[0].searchParams.get('lang'), 'fr', 'saved language applies to old links without a supported language');
+    assert.equal(page.navigations[0].searchParams.get('campaign'), search ? 'help' : null);
+  }
+  const handlers = new Map();
+  const page = renderInMemory('en', site.changelogEntries, {}, { windowHandlers: handlers });
+  page.window.location.hash = '#guide-shelf';
+  handlers.get('hashchange')();
+  assert.equal(page.navigations[0].hash, '#guide-shelf');
+});
+
+test('help metadata and cross-page links retain locale and safely encode the query', () => {
+  for (const locale of siteLocales) {
+    const page = renderHelpInMemory(locale);
+    const content = site.getSiteContent(locale);
+    assert.equal(page.document.title, content.help.title + ' · zisla');
+    assert.ok(page.metadata.some((entry) => entry.name === 'description' && entry.content === content.help.lede));
+    assert.ok(page.metadata.some((entry) => entry.property === 'og:title' && entry.content === page.document.title));
+    assert.ok(page.metadata.some((entry) => entry.property === 'og:description' && entry.content === content.help.lede));
+    assert.equal(page.document.documentElement.dir, localeDirection(locale));
+  }
+  const page = renderInMemory('ar', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/?campaign=sample&lang=ar&source=docs',
+  });
+  assert.ok(page.html.includes('href="./help.html?campaign=sample&amp;lang=ar&amp;source=docs"'));
+  const help = renderHelpInMemory('ar', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/help.html?campaign=sample&lang=ar&source=docs#guide-ai',
+  });
+  assert.ok(help.html.includes('href="./?campaign=sample&amp;lang=ar&amp;source=docs#showcase"'));
+  assert.ok(help.html.includes('class="header-cta" href="./?campaign=sample&amp;lang=ar&amp;source=docs#download"'));
+  for (const markup of [page.html, help.html]) {
+    const footer = markup.match(/<footer\b[\s\S]*?<\/footer>/)?.[0];
+    assert.ok(footer?.includes(`<a href="./help.html?campaign=sample&amp;lang=ar&amp;source=docs">${escapedText(site.getSiteContent('ar').header.navItems.help)}</a>`),
+      'footer help keeps the selected language and query on both pages');
+  }
+  assert.equal(help.navigations.length, 0, 'the help page must not redirect itself');
+});
+
+test('initial guide deep links reach the selected section without interpreting arbitrary hash markup', () => {
+  let visits = 0;
+  const target = { scrollIntoView() { visits++; } };
+  const page = renderHelpInMemory('ar', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/help.html?lang=ar#guide-meeting', targets: { 'guide-meeting': target },
+  });
+  assert.equal(visits, 1);
+  assert.equal(page.document.documentElement.dir, 'rtl');
+  assert.doesNotThrow(() => renderInMemory('en', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/#%3Cimg%20onerror=alert(1)%3E',
+  }));
+});
+
+test('language switching preserves the guide and query, and help navigation retains the locale', async () => {
+  const handlers = new Map();
+  const control = { addEventListener(event, handler) { handlers.set(event, handler); } };
+  const anchor = { getAttribute: () => '#guide-ai', addEventListener(event, handler) { handlers.set('anchor-' + event, handler); } };
+  const target = { getBoundingClientRect: () => ({ top: 400 }), scrollIntoView() {} };
+  const page = renderHelpInMemory('en', site.changelogEntries, { '#languageSelect': control }, {
+    url: 'https://example.test/zisla/help.html?campaign=guide&lang=en#guide-clipboard',
+    selectors: { 'a[href^="#"]': [anchor] }, targets: { 'guide-ai': target },
+  });
+  handlers.get('change')({ currentTarget: { value: 'ar' } });
+  await vm.runInContext('showLocale("ar", true)', page.context);
+  assert.equal(page.window.location.searchParams.get('lang'), 'ar');
+  assert.equal(page.window.location.searchParams.get('campaign'), 'guide');
+  assert.equal(page.window.location.hash, '#guide-clipboard');
+  assert.equal(page.document.documentElement.lang, 'ar');
+  const before = page.window.location.href;
+  handlers.get('change')({ currentTarget: { value: 'javascript:alert(1)' } });
+  assert.equal(page.window.location.href, before);
+  let prevented = false;
+  handlers.get('anchor-click')({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(page.window.location.hash, '#guide-ai');
+  assert.equal(page.window.location.searchParams.get('lang'), 'ar');
+  assert.equal(page.window.location.searchParams.get('campaign'), 'guide');
+  assert.equal(page.window.scrollY, 302);
+});
+
+test('browser back restores the language and help destination from its URL', async () => {
+  const handlers = new Map();
+  const visits = [];
+  const targets = Object.fromEntries(['guide-clipboard', 'guide-meeting'].map((id) => [id, {
+    scrollIntoView() { visits.push(id); },
+  }]));
+  const page = renderHelpInMemory('en', site.changelogEntries, {}, {
+    url: 'https://example.test/zisla/help.html?lang=en#guide-clipboard', targets, windowHandlers: handlers,
+  });
+  page.window.location = new URL('https://example.test/zisla/help.html?lang=ja#guide-meeting');
+  await handlers.get('popstate')();
+  assert.equal(page.document.documentElement.lang, 'ja');
+  assert.equal(visits.at(-1), 'guide-meeting');
+  page.window.location = new URL('https://example.test/zisla/help.html?lang=en#guide-clipboard');
+  await handlers.get('popstate')();
+  assert.equal(page.document.documentElement.lang, 'en');
+  assert.equal(visits.at(-1), 'guide-clipboard');
+});
+
+test('guide content is escaped as text and cannot inject markup or URL attributes', () => {
+  const content = site.getSiteContent('en');
+  const original = content.help.guides.clipboard;
+  const payload = '<img src=x onerror="alert(1)"><a href="javascript:alert(1)">unsafe</a>';
+  try {
+    content.help.guides.clipboard = {
+      title: payload, summary: payload, entry: payload, steps: [payload], shortcuts: payload,
+      permissions: payload, output: payload,
+    };
+    const { html: help } = renderHelpInMemory('en');
+    assert.ok(help.includes(escapedText(payload)));
+    assert.doesNotMatch(help, /<img src=x|href="javascript:/);
+    assert.ok(help.includes('id="guide-clipboard"'), 'untrusted copy cannot replace the stable id');
+  } finally {
+    content.help.guides.clipboard = original;
   }
 });

@@ -17,6 +17,7 @@ export const id = createCatalog({
     menuCloseLabel: 'Tutup navigasi',
     menuButtonTitle: 'Buka navigasi',
     navItems: {
+      help: "Bantuan",
       showcase: 'Fitur',
       ai: 'Alur kerja AI',
       download: 'Unduh',
@@ -73,8 +74,8 @@ export const id = createCatalog({
     pointsAriaLabel: 'Sorotan {name}',
     modules: {
       dashboard: { name: 'Beranda', caption: 'Kartu dinamis hanya muncul saat sesi fokus, tugas AI, atau unduhan berlangsung; saat tidak ada aktivitas, tidak ada ruang yang terpakai. Halaman utama mengelompokkan tugas AI yang berjalan menurut aplikasi.', points: ['Muncul sesuai kebutuhan', 'Progres langsung', 'Tata letak menyesuaikan'] },
-      shelf: { name: 'Rak', caption: 'Seret berkas, audio, video, atau tautan ke bagian atas layar, lalu cari, saring, dan pilih beberapa item untuk disalin, dibagikan, atau dikirim ke Catatan cepat. Ubah gambar menjadi PDF, kirim teks yang dikenali ke Catatan cepat, atau buka video di studio rekaman untuk diedit. Berkas juga dapat ditampilkan di Finder. Kompres file dan folder yang dipilih menjadi ZIP, atau buka gambar pilihan di alat gambar untuk mengubah ukuran atau format; hasil yang berhasil kembali ke rak. Impor gambar, video, dan audio ke pustaka media rekaman.', points: ['Pencarian dan tindakan massal', 'Gambar ke PDF dan Catatan cepat', 'Edit video di studio'] },
-      clipboard: { name: 'Clipboard', caption: 'Jelajahi riwayat clipboard di dalam pulau, filter berdasarkan gambar, URL, jalur, atau jenis berkas, dan lihat kapan setiap entri disalin. Kirim item ke Catatan cepat, jadikan favorit, atau hapus. Anda dapat menghapus riwayat yang lebih lama dari 7, 15 atau 30 hari secara otomatis dan mempertahankan favorit. Penghapusan otomatis nonaktif secara default. Cari dan kelompokkan riwayat berdasarkan aplikasi sumber. Gambar baru mencoba mengenali teks secara lokal di latar belakang agar gambar asli dapat ditemukan lewat teksnya. Klik kanan gambar dalam riwayat untuk mengenali atau menyalin teksnya.', points: ['Riwayat di dalam pulau', 'Filter berdasarkan jenis', 'Catatan cepat dan favorit'] },
+      shelf: { name: 'Rak', caption: "Simpan berkas di rak untuk mencari, memilih, dan berbagi. Buat ZIP atau PDF, ubah ukuran atau format gambar, lalu kirim media ke catatan atau studio.", points: ['Pencarian dan tindakan massal', 'Gambar ke PDF dan Catatan cepat', 'Edit video di studio'] },
+      clipboard: { name: 'Clipboard', caption: "Cari riwayat lokal dan teks dalam gambar. Filter menurut jenis atau aplikasi, simpan favorit, dan kirim entri ke Catatan Cepat.", points: ['Riwayat di dalam pulau', 'Filter berdasarkan jenis', 'Catatan cepat dan favorit'] },
       aiMonitor: { name: 'Monitor AI', caption: 'Menggabungkan tugas dan status dari CLI AI, aplikasi desktop, dan IDE. Angka pemakaian yang andal menghasilkan tren token dan peta aktivitas; pilih tanggal untuk melihat token masukan, keluaran, dan total menurut penyedia serta model. Lihat riwayat, ekspor seluruhnya sebagai .xlsx, atau hapus di Pengaturan. Menampilkan sisa kuota akun yang sebenarnya, waktu reset, dan peringatan kuota rendah, termasuk periode 5h/7d serta anggaran Cursor dalam dolar jika tersedia. Tidak membaca teks prompt atau balasan. Tata letak ringkas juga menampilkan sisa kuota dalam bentuk cincin. Pilih wilayah akun secara terpisah; catatan penggunaan harian dan warna sisa kuota tetap konsisten di semua tata letak.', points: ['Tugas dari berbagai alat AI', 'Riwayat model dan ekspor .xlsx', 'Kuota akun dan waktu reset'] },
       keyboardSound: { name: 'Suara keyboard', caption: 'Memutar 20 suara keyboard mekanis bawaan untuk penekanan tombol global, dengan volume dan variasi nada yang dapat diatur. Aktifkan statistik mengetik lokal untuk melihat ringkasan, tren, riwayat, lini masa aplikasi, dan peta tombol F1-F12. Total suara, durasi dikte, kecepatan dan waktu yang dihemat juga ada di dasbor keyboard. Konfigurasi baru mengaktifkan suara dan statistik, yang bisa dimatikan terpisah.', points: ['20 suara bawaan', 'Suara lepas dan variasi nada', 'Statistik bisa diubah terpisah'] },
       download: { name: 'Pengunduh', caption: 'Tempel tautan atau biarkan zisla mengenali tautan dari clipboard setelah diaktifkan. Pilih video atau audio dan unduh ke folder default atau folder pilihan. Tautan yang didukung menampilkan sumber, progres langsung, dan status selesai. Pilih folder unduhan di Pengaturan → Lokasi Penyimpanan, terpisah dari tangkapan layar dan rekaman. Tautan Bilibili mengunduh bagian yang dipilih. Kelola komponen di Pengaturan → Komponen yang diperlukan, dengan pilihan pembaruan harian untuk komponen yang sudah terpasang.', points: ['Mode video / audio', 'Folder default atau khusus', 'Sumber dan progres langsung'] },
@@ -106,7 +107,7 @@ export const id = createCatalog({
       },
       dailyBriefing: {
         title: 'Hari Anda dalam ringkasan harian',
-        description: 'Pilih dari delapan templat, tentukan data penggunaan, pengetikan, sistem dan aktivitas zisla, lalu lihat pratinjau. Ekspor PNG secara manual atau pada waktu harian pilihan. Riwayat Durasi Layar dipakai saat aktif dan tersedia; data yang hilang tidak dianggap nol terukur. Pilih folder ekspor terpisah di Pengaturan → Lokasi Penyimpanan. Anda juga dapat menyertakan sisa kuota akun yang sebenarnya dan waktu pengambilannya.',
+        description: "Pilih dari delapan templat, tentukan data penggunaan, pengetikan, sistem dan aktivitas zisla, lalu lihat pratinjau. Ekspor PNG secara manual atau pada waktu harian pilihan. Riwayat Durasi Layar dipakai saat aktif dan tersedia. Pilih folder ekspor terpisah di Pengaturan → Lokasi Penyimpanan. Anda juga dapat menyertakan sisa kuota akun yang sebenarnya dan waktu pengambilannya.",
         detail: '8 templat · Pilih isi · Pratinjau dan ekspor PNG terjadwal',
       },
       userCare: {
@@ -121,13 +122,13 @@ export const id = createCatalog({
       },
       recording: {
         title: 'Rekam dan edit di studio',
-        description: 'Rekam layar, jendela atau area dengan audio sistem, mikrofon dan kamera opsional. Edit video, audio, gambar dan teks pada banyak trek dengan animasi, zoom dan subtitel. Atur penghalusan kulit, kecerahan, perampingan wajah dan tubuh, efek suara serta jejak kursor halus dengan warna pilihan. Putar hasil edit di studio. Pilih rasio asli, 16:9, 9:16, 1:1 atau 4:3; ekspor video, GIF, Live Photo atau audio. Beberapa format perlu FFmpeg. Pratinjau usulan AI sebelum diterapkan. Folder rekaman dipilih terpisah di Pengaturan → Lokasi Penyimpanan. Rekam HDR pada perangkat yang didukung. Impor gambar, video, dan audio dari rak ke pustaka media dengan tetap mempertahankan proyek dan linimasa saat ini.',
+        description: "Rekam layar, jendela, atau area, edit trek, takarir serta efek potret/suara, lalu ekspor. Mendukung HDR pada perangkat yang sesuai dan impor dari rak.",
         detail: 'Efek potret dan suara · Jejak kursor berwarna · Pemutaran dan ekspor multitrek',
       },
       permissions: {
         title: 'Izin sistem di satu tempat',
-        description: 'Tinjau status di Pengaturan → Izin, mulai permintaan yang didukung atau buka halaman sistem terkait. Sambutan pertama memakai daftar yang sama dan menandai izin yang harus diatur manual. Status izin diperbarui setelah akses diberikan. Bantuan menyeret aplikasi mempermudah izin yang mengharuskan penambahan aplikasi.',
-        detail: 'Status izin · Permintaan dan tautan · Sama dengan sambutan',
+        description: "Tinjau status di Pengaturan → Izin, mulai permintaan yang didukung atau buka halaman sistem terkait. Status izin diperbarui setelah akses diberikan. Bantuan menyeret aplikasi mempermudah izin yang mengharuskan penambahan aplikasi.",
+        detail: "Status izin · Permintaan dan tautan",
       },
       imageTools: {
         title: 'Alat Gambar',
@@ -141,7 +142,7 @@ export const id = createCatalog({
       },
       pdf: {
         title: 'Alat PDF',
-        description: 'Tersedia di Pengaturan, di luar karusel modul pulau. Empat belas operasi di perangkat: gabungkan, pisahkan, putar, pangkas, konversi gambar dan Office, render ke gambar, ekstrak teks, tambahkan watermark dan nomor halaman, enkripsi, hapus kata sandi, dan edit metadata.',
+        description: "Tersedia di Pengaturan. Empat belas operasi di perangkat: gabungkan, pisahkan, putar, pangkas, konversi gambar dan Office, render ke gambar, ekstrak teks, tambahkan watermark dan nomor halaman, enkripsi, hapus kata sandi, dan edit metadata.",
         detail: '14 alat di perangkat · Gabungkan sesuai urutan Anda · Tidak ada yang meninggalkan Mac',
       },
 
@@ -158,7 +159,7 @@ export const id = createCatalog({
       copyAssistant: { title: 'Tindakan Cepat dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi. Buka folder berkas melalui Tindakan Cepat setelah unduhan browser atau transfer AirDrop. Mendukung folder unduhan bawaan dan pilihan di Chrome, dengan sakelar terpisah dari tampilan progres unduhan. Alamat IP memiliki tindakan pencarian dan membuka tautan terpisah. Konversi mengenali satuan mata uang kecil; katalog mencakup Emoji 18.0. Teks dan gambar yang disimpan memakai folder Tindakan Cepat terpisah di Pengaturan → Lokasi Penyimpanan. Jika aplikasi tidak dapat dibuka, Tindakan Cepat memeriksa integritas, tanda tangan, dan kebijakan keamanan macOS, lalu menghapus atribut karantina dan membukanya setelah pemeriksaan berhasil. Atur urutan tindakan per jenis yang dikenali di Pengaturan → Tindakan Cepat. Jumlah uang mendukung simbol regional dan kode mata uang dengan prefiks. Deteksi perintah mendukung here-document.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
       aiManagement: { title: 'Pengelolaan CLI AI dan Skills', description: 'Deteksi, pasang, perbarui, dan hapus CLI AI dari Pengaturan, serta tinjau dan kelola Skills lokal agar lebih jarang berpindah terminal.', detail: 'Deteksi dan pasang · Perbarui dan hapus · Skills lokal' },
       pet: { title: 'Hewan peliharaan pulau', description: 'Pilih dari katalog hewan dan karakter yang diperluas, atau impor gambar, animasi atau video yang didukung dan beri nama. Letakkan di salah satu sisi pulau dan hapus hewan impor di Pengaturan. Animasi maksimal 30 detik, berkas maksimal 100 MB.', detail: 'Katalog diperluas · Impor gambar dan video · Hapus hewan kustom' },
-      lockScreen: { title: 'Informasi layar terkunci', description: 'Tampilkan tanggal, status, dan media yang sedang diputar di layar terkunci macOS secara opsional. Ini adalah overlay terpisah dan tidak muncul di daftar atau karusel modul pulau.', detail: 'Overlay terpisah · Pilihan pengguna · Tidak mengambil fokus' },
+      lockScreen: { title: 'Informasi layar terkunci', description: "Tampilkan tanggal, status, dan media yang sedang diputar di layar terkunci macOS secara opsional.", detail: "Pilihan pengguna · Tidak mengambil fokus" },
       recommendedTools: {
         title: 'Aplikasi rekomendasi',
         description:
@@ -168,20 +169,22 @@ export const id = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'AI TANPA KOTAK HITAM',
-    title: 'Lihat status AI <span>tanpa membaca percakapan.</span>',
-    lede: 'Lihat tugas menurut aplikasi, pemakaian model menurut tanggal, dan kuota akun yang sebenarnya. Status dan catatan angka tetap di Mac; isi percakapan tidak dibaca.',
-    summaryMono: 'STATUS LOKAL / BATAS JELAS',
-    summaryLede: 'Hubungkan alat AI yang Anda gunakan sambil menjaga batas konteks yang diperlukan.',
-    summaryNote: 'Halaman ini hanya menjelaskan cakupan deteksi, batas data, dan cara menghubungkan; sesi langsung tidak disimulasikan.',
+    eyebrow: "ALUR AI",
+    title: "Pantau tugas AI, <span>penggunaan dan kuota.</span>",
+    lede: "Lihat tugas per aplikasi, penggunaan model per tanggal, dan sisa kuota akun.",
+    summaryMono: "TUGAS / PENGGUNAAN / KUOTA",
+    summaryLede: "Tugas AI, penggunaan, dan kuota di satu tempat.",
     toolsHeading: 'Alat AI yang didukung',
-    toolsLede: 'Mendeteksi aktivitas CLI, aplikasi desktop, dan IDE yang didukung, lalu menggabungkan status tugas.',
+    toolsLede: "Mendeteksi tugas dari CLI, aplikasi desktop, dan IDE yang didukung.",
     toolsAriaLabel: 'Alat AI yang didukung',
-    usageNote: 'Deteksi sesi, riwayat token, dan kuota akun memakai sumber berbeda. Delta menggunakan catatan angka lokal; Orca menghapus duplikasi pemakaian CLI yang terhubung dan mengaitkannya ke penyedia asal. WorkBuddy AI dapat mendeteksi sesi dan memeriksa kredit; pemakaian konteks dan kredit tidak diubah menjadi token atau biaya dolar. Kuota yang tersedia bergantung pada penyedia dan metode masuk.',
-    boundariesHeading: 'Hanya batas status yang dicatat',
-    privacyPoints: ['Hanya menganalisis jenis peristiwa, status, waktu, model, dan ID sesi dari peristiwa terstruktur', 'Tidak pernah membaca teks prompt atau balasan', 'Protokol dan status disimpan di Mac'],
+    boundariesHeading: "Privasi",
+    privacyPoints: [
+      "Status tugas dan penggunaan disimpan di Mac",
+      "Teks prompt dan balasan tidak dibaca",
+      "Percakapan tidak diunggah",
+    ],
     bridgeHeading: 'Hubungkan tugas Anda sendiri',
-    bridgeLede: 'Gunakan zislactl untuk mengirim status terstruktur tugas eksternal ke bilah status.',
+    bridgeLede: "Gunakan zislactl untuk menampilkan skrip dan tugas build di bilah status.",
     zislactlTaskTitle: 'Build dan rilis',
     copyZislactlAriaLabel: 'Salin perintah zislactl',
   },
@@ -194,10 +197,182 @@ export const id = createCatalog({
     summaryLede: 'Membuka saat diperlukan dan menutup setelah selesai.',
     summaryNote: 'Dipicu posisi penunjuk, tidak memakan ruang saat kosong, dan tidak mengambil fokus.',
     steps: {
-      trigger: { phase: 'Picu', title: 'Gerakkan penunjuk ke tengah atas', desc: 'Layar ber-notch dan eksternal memakai pemicu yang sama; saat tersembunyi tidak ada loop frame.' },
+      trigger: { phase: 'Picu', title: 'Gerakkan penunjuk ke tengah atas', desc: "Dapat digunakan di layar berponi dan layar eksternal." },
       review: { phase: 'Tinjau', title: 'Lihat status saat ini sekilas', desc: 'Media, berkas, AI, agenda, dan alat sistem berada di tempat yang sama.' },
       dismiss: { phase: 'Tutup', title: 'Kembali ke pekerjaan', desc: 'Jauhkan penunjuk dan panel menutup; membuka tidak mengaktifkan aplikasi atau mengambil fokus.' },
     },
+  },
+  help: {
+    "title": "Mulai memakai zisla",
+    "lede": "Pilih tugas lalu ikuti pintu masuk, langkah, izin, dan tempat penyimpanan.",
+    "labels": {
+      "entry": "Pintu masuk",
+      "shortcuts": "Pintasan",
+      "permissions": "Izin",
+      "output": "Hasil dan penyimpanan"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Gunakan kembali yang disalin",
+        "summary": "Cari riwayat atau pilih tindakan setelah menyalin.",
+        "entry": "Pulau → Papan klip; Pengaturan → Tindakan cepat.",
+        "steps": [
+          "Aktifkan riwayat atau tindakan cepat lalu salin teks atau tautan contoh.",
+          "Buka papan klip, saring atau cari, lalu salin item.",
+          "Salin gambar contoh dengan teks yang jelas, tunggu pengenalan lokal di latar belakang, lalu cari kata dari gambar untuk menemukan gambar asli.",
+          "Klik kanan gambar untuk mengenali atau menyalin teksnya; batalkan saat pengenalan berlangsung jika perlu. Pengenalan di latar belakang tidak menyalin teks otomatis.",
+          "Tempel di aplikasi tujuan; untuk salinan baru, pilih langkah berikutnya di jendela tindakan cepat."
+        ],
+        "shortcuts": "Command+1…9 lalu Command+0 mengikuti urutan tindakan. Konfigurasi baru juga memakai Command+N untuk tindakan pertama; Command+Delete menutup. Pintasan yang disimpan atau dikosongkan tetap dipertahankan.",
+        "permissions": "Riwayat dan pengenalan lokal. Pemicu tombol pengubah/mouse perlu Pemantauan Input; gestur salin opsional perlu Aksesibilitas. Terjemahan memakai layanan pilihan.",
+        "output": "Riwayat dalam data aplikasi lokal. Simpan teks/gambar memakai Pengaturan → Lokasi penyimpanan → Tindakan cepat; default baru ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Tangkap dan edit layar",
+        "summary": "Edit tangkapan atau rekaman lalu ekspor hasilnya.",
+        "entry": "Bilah menu → Tangkapan/Rekaman; Pengaturan → Rekaman → Studio.",
+        "steps": [
+          "Tangkap area atau jendela; edit, salin, simpan, atau taruh di rak.",
+          "Pilih layar, jendela, atau area dan aktifkan hanya sumber audio/kamera yang perlu.",
+          "Hentikan, edit dan pratinjau di studio, lalu ekspor format pilihan."
+        ],
+        "shortcuts": "Control+1 tangkapan; Control+2 tangkapan panjang. Control+Shift+1/2/3 merekam layar/jendela/area; Control+Shift+6 membuka studio. Dapat diubah di pengaturan.",
+        "permissions": "Perlu Perekaman Layar. Mikrofon dan kamera perlu izin masing-masing, termasuk pratinjau kamera.",
+        "output": "Default baru: ~/Downloads/picture untuk gambar, ~/Downloads/video untuk rekaman/proyek. Folder diatur terpisah. Beberapa ekspor perlu FFmpeg."
+      },
+      "shelf": {
+        "title": "Teruskan file lewat rak",
+        "summary": "Siapkan file untuk aplikasi lain tanpa menyalin aslinya.",
+        "entry": "Pulau → Rak; seret ke pemicu atas.",
+        "steps": [
+          "Seret file contoh ke atas atau goyangkan saat menyeret bila gesturnya aktif.",
+          "Buka rak dan pilih kategori atau item yang diperlukan.",
+          "Seret ke tujuan, tampilkan di Finder, atau bagikan; tangkapan yang disimpan dapat diekspor sebagai PNG.",
+          "Pilih berkas atau folder dan pilih kompresi ZIP di menu konteks; arsip kembali ke rak.",
+          "Pilih gambar di rak lalu ubah ukuran atau format; jalankan alat gambar dan hasil yang berhasil kembali ke rak.",
+          "Pilih gambar, video, atau audio lalu impor ke pustaka media studio rekaman; proyek dan linimasa saat ini tetap dipertahankan."
+        ],
+        "shortcuts": "Seret dengan penunjuk. Gestur goyang diatur terpisah; tidak perlu pintasan tetap.",
+        "permissions": "Pemilih file dan bookmark aman memberi akses ke file pilihan. Tangkapan perlu Perekaman Layar.",
+        "output": "File asli tetap di tempatnya. Referensi dan tangkapan disimpan lokal; PNG memakai tujuan pilihan. Arsip ZIP dan hasil gambar yang berhasil kembali ke rak; media impor ditambahkan ke pustaka proyek rekaman."
+      },
+      "meeting": {
+        "title": "Ikuti rapat dan simpan catatan",
+        "summary": "Hubungkan rapat kalender dengan catatan konteks.",
+        "entry": "Pulau → Agenda; aktifkan kalender dan catatan konteks di Pengaturan.",
+        "steps": [
+          "Buat atau buka acara dengan tautan rapat yang didukung dan waktu awal/akhir valid.",
+          "Klik Gabung; hitung mundur muncul 10 menit sebelumnya.",
+          "Buat, simpan, atau tautkan catatan dari acara; buka kembali lewat agenda atau rak."
+        ],
+        "shortcuts": "Gabung dan catatan memakai tombol. Di lokasi lain tahan tombol yang diatur lalu goyangkan; default Command.",
+        "permissions": "Perlu akses kalender. Catatan jendela mungkin perlu Aksesibilitas; tangkapan terlampir perlu Perekaman Layar.",
+        "output": "Catatan rapat ada dalam data rak lokal. Catatan cepat adalah fitur terpisah memakai Apple Notes."
+      },
+      "ai": {
+        "title": "Hubungkan AI dan cek kuota",
+        "summary": "Pantau tugas, pemakaian tercatat, dan kuota akun.",
+        "entry": "Pengaturan → AI; pulau → Monitor AI.",
+        "steps": [
+          "Aktifkan alat lokal yang didukung atau laporkan tugas dengan zislactl sesuai referensi CLI.",
+          "Aktifkan pemantauan kuota penyedia pilihan dan isi kredensial hanya bila diminta.",
+          "Lihat waktu sampel/reset dan peringatan; buka riwayat atau ekspor .xlsx."
+        ],
+        "shortcuts": "Pakai monitor atau Pengaturan, tanpa pintasan global tetap. zislactl memakai argumen yang terdokumentasi.",
+        "permissions": "Deteksi lokal membaca status terstruktur. Kuota menghubungi penyedia; edit AI opsional memakai model atau CLI pilihan.",
+        "output": "Tugas/pemakaian: ~/Library/Application Support/zisla/ai-state.sqlite. Kuota berasal dari penyedia, bukan perkiraan token; data hilang tetap tidak tersedia."
+      },
+      "media-tools": {
+        "title": "Proses gambar, audio, dan PDF",
+        "summary": "Gunakan alat lokal mandiri pada file contoh.",
+        "entry": "Pengaturan → Alat Gambar / Audio / PDF.",
+        "steps": [
+          "Tambahkan gambar, pilih operasi dan opsi, jalankan lalu ekspor hasil atau ZIP.",
+          "Pilih gambar di rak lalu ubah ukuran atau format; jalankan alat gambar dan hasil yang berhasil kembali ke rak.",
+          "Pasang FFmpeg dan ffprobe di komponen, tambahkan audio, pilih potong atau campur lalu file atau folder keluaran.",
+          "Tambahkan PDF sesuai urutan, jalankan dan simpan. Konversi Office perlu LibreOffice atau OpenOffice lokal."
+        ],
+        "shortcuts": "Tombol alat; tanpa pintasan global tetap.",
+        "permissions": "Pemilih file memberi akses ke file dan folder pilihan. Proses lokal; memasang komponen mengunduhnya.",
+        "output": "Default baru: gambar ~/Downloads/picture, PDF ~/Downloads/pdf, diatur terpisah. Audio memakai dialog ekspor."
+      },
+      "daily-briefing": {
+        "title": "Buat ringkasan harian",
+        "summary": "Pratinjau statistik sebelum ekspor PNG.",
+        "entry": "Pengaturan → Ringkasan harian.",
+        "steps": [
+          "Pilih templat dan statistik.",
+          "Buka pratinjau, periksa data tersedia dan folder keluaran.",
+          "Ekspor hari ini atau aktifkan ekspor harian dan waktunya."
+        ],
+        "shortcuts": "Tombol Pratinjau dan Ekspor; tanpa pintasan tetap.",
+        "permissions": "Aktifkan fitur statistik terkait. Riwayat Durasi Layar mungkin perlu Akses Disk Penuh; kuota menghubungi penyedia.",
+        "output": "PNG di folder ringkasan; default baru ~/Downloads/daily. Data hilang bukan nol terukur."
+      },
+      "desktop": {
+        "title": "Pratinjau jendela dan buat catatan konteks",
+        "summary": "Pindah ke jendela lalu tinggalkan catatan lokasinya.",
+        "entry": "Pengaturan → Pratinjau jendela / Catatan konteks; Dock, Command+Tab dan rak.",
+        "steps": [
+          "Aktifkan pratinjau dan izin, arahkan ke aplikasi Dock atau pakai Command+Tab lalu klik kartu.",
+          "Di halaman, jendela atau desktop contoh, tahan tombol pilihan dan goyangkan; tulis lalu simpan.",
+          "Kembali ke lokasi atau buka dari rak; tambah pengingat berkala atau tangkapan jendela bila perlu."
+        ],
+        "shortcuts": "Command+Tab beralih aplikasi. Catatan default menahan Command, bisa diubah.",
+        "permissions": "Pratinjau perlu Aksesibilitas dan Perekaman Layar. Deteksi jendela memakai Aksesibilitas; tangkapan lampiran Perekaman Layar.",
+        "output": "Catatan dan gambar dalam data rak lokal di ~/Library/Application Support/zisla."
+      },
+      "playback": {
+        "title": "Pilih pemutaran dan campur volume aplikasi",
+        "summary": "Pilih keluaran dan atur aplikasi yang berbunyi.",
+        "entry": "Area media → Perangkat keluaran; Pengaturan → Sumber media; pulau → Mixer.",
+        "steps": [
+          "Putar audio contoh dan pilih keluaran tersedia.",
+          "Pilih sumber otomatis atau pemutar favorit lalu uji kontrol.",
+          "Di macOS 14.4+, buka mixer, izinkan Perekaman Audio Sistem lalu atur atau bisukan aplikasi."
+        ],
+        "shortcuts": "Tombol dan penggeser; tanpa pintasan tetap.",
+        "permissions": "Mixer perlu macOS 14.4+ dan Perekaman Audio Sistem. Perangkat tergantung koneksi; Bluetooth mungkin perlu izin.",
+        "output": "Keluaran adalah pilihan sistem. Volume aplikasi diingat lokal; tidak mengekspor file."
+      }
+    },
+    "workflowsTitle": "Demo alur singkat",
+    "workflows": {
+      "copy-next": {
+        "title": "Cari, salin, dan gunakan lagi",
+        "steps": [
+          "Cari kata contoh “brew” dalam riwayat.",
+          "Salin item yang cocok.",
+          "Tempel di aplikasi tujuan. Cuplikan memperlihatkan pencarian dan penyalinan; salinan baru punya tindakan cepat terpisah."
+        ]
+      },
+      "drop-output": {
+        "title": "Taruh file dan siapkan keluaran",
+        "steps": [
+          "Seret gambar contoh dari Finder ke rak atas.",
+          "Buka rak dan pilih gambar.",
+          "Seret ke tujuan atau simpan tangkapan sebagai PNG. Cuplikan memperlihatkan penempatan ke rak."
+        ]
+      },
+      "meeting-note": {
+        "title": "Dari rapat ke catatan",
+        "steps": [
+          "Buka rapat dengan tautan gabungnya.",
+          "Pilih Catatan rapat baru atau Tautkan catatan lama.",
+          "Simpan dan buka kembali dari acara atau rak. Cuplikan memperlihatkan pembuatan dan penautan."
+        ]
+      }
+    },
+    "excerptLabel": "Putar cuplikan",
+    "guideLinkLabel": "Baca panduan",
+    "videoNotice": "Cuplikan dari tur fitur yang sudah ada dengan data demo. Teks dalam video berbahasa Inggris; langkah di sini memakai bahasa pilihan. Tur lengkap 2:40 dan kredit musik ada di bawah.",
+    "preferencesTitle": "Preferensi berguna",
+    "preferences": [
+      "Aktifkan goyang saat menyeret untuk menampilkan rak. Catatan konteks memakai tombol tahan tersendiri.",
+      "Pilih keluaran audio di area media dan sumber otomatis atau pemutar favorit di Pengaturan. Ini tidak membagi perangkat berbeda per aplikasi.",
+      "Suara tombol dan statistik ketikan berdiri sendiri dan memakai Pemantauan Input. Mixer aplikasi perlu macOS 14.4+ dan Perekaman Audio Sistem.",
+      "Ringkasan harian menawarkan 8 templat, pratinjau, serta ekspor PNG manual atau harian dengan folder terpisah."
+    ]
   },
   download: {
     eyebrow: 'SIAP SAAT ANDA SIAP',
@@ -345,10 +520,8 @@ export const id = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Mendukung banyak layar, Spaces, dan aplikasi layar penuh biasa; membuka tidak mengaktifkan aplikasi atau mengambil fokus',
-      'Saat tersembunyi tidak membuat jendela hotspot transparan permanen dan tidak menjalankan loop frame; ekspansi memakai event global dan geometri',
-      'Menggunakan satu lapisan material sistem dan beralih ke latar buram saat Kurangi Transparansi aktif',
+      "Menggunakan latar buram saat Kurangi Transparansi aktif",
       'Liquid Glass di macOS 26+, dengan fallback otomatis ke material native di macOS 14 dan 15',
-      'Notch fisik disimpulkan dari area aman sistem; layar eksternal tanpa notch mendapat bilah status simulasi dalam overlay khusus',
     ],
   },
   film: {

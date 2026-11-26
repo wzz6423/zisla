@@ -1,14 +1,20 @@
 # `zislactl` 接入设计与协议
 
-[English](cli-reference.md) | **简体中文**
+[English](cli-reference.md) | **简体中文** | [其他语言](../../docs/locales/README.md)
 
-`zislactl` 是本地 AI 工具、脚本和 CI 任务接入 zisla 的统一状态协议。设计目标是让任务状态、用量和通知都通过结构化数据写入，并以原子替换避免半写入状态；本文件定义稳定的 Provider、命令和字段约束。
+`zislactl` 是本地 AI 工具、脚本和 CI 任务接入 zisla 的统一状态协议。设计目标是让任务状态、用量和通知都通过结构化数据写入，并以 SQLite 事务避免半写入状态；本文件定义稳定的 Provider、命令和字段约束。
 
 ## 设计原则
 
 - 状态写入只发生在本机，不上传提示词、回答正文或凭据。
-- 同一任务 ID 的更新保持幂等，读取方始终看到完整 JSON 状态。
+- 同一任务 ID 的更新保持幂等，读取方看到完整提交的数据库状态。
 - Provider 名称允许兼容别名，但持久化时使用规范值。
+
+## 本地持久化与 JSON 边界
+
+任务、用量与通知保存在 `~/Library/Application Support/zisla/ai-state.sqlite`。写入使用 SQLite 事务，当前协议不写入 `ai-state.json`。清空任务不删除用量历史。
+
+`zislactl` 接受上述命令行参数，`list` 输出逐行文本。集成和配置仍使用真实的结构化 JSON，例如外部工具的 JSON/JSONL 会话输入与设置的 JSON 编解码；这些数据按各自的解析规则处理。CLI 本身使用命令行参数输入和文本输出，持久化使用 SQLite。
 
 ## Provider
 
@@ -155,7 +161,7 @@ zislactl message \
 
 - `--app`、`--sender`、`--content` 必填；`--app-bundle-id` 可选，用于解析已安装 App 图标。
 - 正文会折叠换行与多余空白，并截断到约 48 个字符后加省略号。
-- 一次写入会原子落盘左右两条 `IslandNotice`，不影响既有 `notify` 行为。
+- 一次 SQLite 事务会同时提交左右两条 `IslandNotice`，不影响既有 `notify` 行为。
 
 ## 退出码
 
@@ -163,5 +169,5 @@ zislactl message \
 | --- | --- |
 | `0` | 成功 |
 | `64` | 参数或子命令错误 |
-| `65` | 数据错误、任务不存在或状态文件损坏 |
+| `65` | 数据错误、任务不存在或数据库损坏 |
 | `70` | 文件系统等运行时错误 |

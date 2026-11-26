@@ -2910,15 +2910,15 @@ struct FeatureSettingsTests {
     @Test
     func clipboardAssistantTriggerRoundTripsAndDefaultsOnLegacyJSON() throws {
         let defaults = FeatureSettings.default
-        // Assistant is on by default; its conventional trigger is ⌘1.
+        // The additional trigger must not reserve a numbered action shortcut.
         #expect(defaults.clipboardAssistantEnabled)
         let defaultHotkey = try #require(defaults.clipboardAssistantTriggerConfiguration.hotkey)
         #expect(!defaultHotkey.isModifierOnly)
-        #expect(defaultHotkey.keyCode == 18)
+        #expect(defaultHotkey.keyCode == 45)
         #expect(defaultHotkey.carbonModifiers == 0x0100)
-        #expect(defaultHotkey.keyDisplayName == "1")
+        #expect(defaultHotkey.keyDisplayName == "N")
         #expect(defaultHotkey.modifierSides == nil)
-        #expect(defaultHotkey.displayName == "⌘ 1")
+        #expect(defaultHotkey.displayName == "⌘ N")
         #expect(defaults.clipboardAssistantMouseButton == nil)
 
         let encoder = JSONEncoder()
@@ -2956,7 +2956,7 @@ struct FeatureSettingsTests {
         #expect(legacy.clipboardAssistantMouseButton == nil)
 
         let previousHotkey = VoiceInputHotkeyPreset(
-            keyCode: 45, carbonModifiers: 0x0100, keyDisplayName: "N"
+            keyCode: 18, carbonModifiers: 0x0100, keyDisplayName: "1"
         )
         settings.clipboardAssistantTriggerConfiguration = .hotkey(previousHotkey)
         let savedPreviousHotkey = try decoder.decode(FeatureSettings.self, from: encoder.encode(settings))

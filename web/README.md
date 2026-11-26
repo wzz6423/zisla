@@ -2,7 +2,13 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-This directory contains the repository's TypeScript website, built with Vite. Page copy and download links match the current macOS Release. The site presents 12 island modules and 19 standalone capabilities, including nine image tools, 27 audio operations, PDF tools, AI quota rings and model usage history, meeting countdowns and linked notes, shelf batch actions, automatic power modes, compact Pomodoro controls, HDR and scrolling screenshots, application-opening repair, and daily briefings. It also covers recording portrait and voice effects, independent save folders, scheduled cleanup, reorganized settings, daily dependency updates, actual browser download filenames, and the Zshell recommendation. Recent additions cover clipboard grouping by source application, background cleanup with island feedback, duplicate installation and update-leftover detection, HDR recordings, Command-arrow note navigation, independent AI quota regions, permission status refresh, persistent application volumes, and restoring all save folders to their defaults. The 0.1.25 update adds the Utilities junk-cleanup shortcut and fixes pinned screenshot scaling, duplicate weather labels, typing-statistics scrolling, audio-tool viewport layout, and idle application-volume sources. A 160-second feature tour plays on request. Copy covers all 17 languages, and the changelog matches v0.1.25 (2026-11-24). System history is retained until manually cleared by default.
+This directory contains the repository's TypeScript website, built with Vite. The homepage keeps concise feature introductions, downloads and the full feature tour; detailed instructions and limits are in Help. Copy supports 17 languages; download links and the changelog match v0.1.25 (2026-11-24).
+
+## User help
+
+The header and footer Help links open `help.html`. Its nine guides cover clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/previews, and playback/mixing. Each includes steps, shortcuts, permissions and save locations. Three video excerpts reuse the existing tour with demonstration data and English captions.
+
+Links use `help.html?lang=<siteLocale>#guide-<id>`. Language switching retains the selected guide; old homepage `#help`, `#guide-*` and `#workflow-*` links forward to the help page. Developer links select complete documents in the chosen language. English and Simplified Chinese keep their original paths; the other 15 locales share `docs/locales/<siteLocale>/`. The [language index](../docs/locales/README.md) lists all six documents.
 
 ## Run locally
 

@@ -17,6 +17,7 @@ export const en: SiteContent = {
     menuCloseLabel: 'Close navigation',
     menuButtonTitle: 'Open navigation',
     navItems: {
+      help: "Help",
       showcase: 'Features',
       ai: 'AI workflow',
       download: 'Download',
@@ -82,13 +83,13 @@ export const en: SiteContent = {
       shelf: {
         name: 'Shelf',
         caption:
-          'Drag files, audio, video or links to the top of the screen, then search, filter and select several shelf items to copy, share or send to Quick Notes. Convert images to PDF, recognise image text into Quick Notes, or send videos to the recording studio for editing. Reveal files in Finder whenever needed. Compress selected files and folders to ZIP, or open selected images in Image Tools for resizing or conversion; successful results return to the shelf. Import images, video and audio into the recording media library.',
+          "Keep files and media on the shelf. Search, select and share items, create ZIP or PDF, resize or convert images, and send media to Quick Notes or the recording studio.",
         points: ['Search and batch actions', 'Images to PDF and Quick Notes', 'Edit videos in the studio'],
       },
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it. Optionally delete history older than 7, 15 or 30 days while keeping favourites; automatic deletion is off by default. Search and group history by source application. New images are queued for on-device text recognition, so you can search their text to find the original image. Right-click a history image to recognize or copy its text.',
+          "Browse and search local clipboard history, including text in images. Filter by type or source app, keep favourites, and send entries to Quick Notes.",
         points: ['History inside the island', 'Filter by type', 'Quick Notes and favourites'],
       },
       aiMonitor: {
@@ -163,7 +164,7 @@ export const en: SiteContent = {
       },
       dailyBriefing: {
         title: 'Your day, in a daily briefing',
-        description: 'Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available; unavailable data is not presented as measured zero. Choose a separate export folder in Settings → Save Location. Optionally include real account allowances and their sampling times.',
+        description: "Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available. Choose a separate export folder in Settings → Save Location. Optionally include real account allowances and their sampling times.",
         detail: '8 templates · Select content · Preview and scheduled PNG export',
       },
       userCare: {
@@ -178,13 +179,13 @@ export const en: SiteContent = {
       },
       recording: {
         title: 'Record and edit in the recording studio',
-        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks with animations, zooms and captions. Adjust portrait smoothing, brightness, face and body slimming, choose voice effects, and add smooth cursor trails in your colour. Play the edited result in the studio. Choose original, 16:9, 9:16, 1:1 or 4:3; export video, GIF, Live Photo or audio, with FFmpeg needed for some formats. Preview optional AI edits before applying them. Recording has its own folder in Settings → Save Location. Record HDR on supported devices. Import images, video and audio from the shelf into the media library while keeping the current project and timeline.',
+        description: "Record a display, window or region, edit tracks, captions and portrait/voice effects, then preview and export. Supports HDR on compatible devices and media imports from the shelf.",
         detail: 'Portrait and voice effects · Coloured cursor trails · Multitrack playback and export',
       },
       permissions: {
         title: 'System permissions in one place',
-        description: 'Review permission status in Settings → Permissions, start supported requests or open the relevant System Settings page. The same permission list is available during first-launch onboarding; manual permissions are labelled accordingly. Permission status refreshes after access is granted. An application drag helper assists permissions that require adding the app.',
-        detail: 'Permission status · Requests and settings links · Shared with onboarding',
+        description: "Review permission status in Settings → Permissions, start supported requests or open the relevant System Settings page. Permission status refreshes after access is granted. An application drag helper assists permissions that require adding the app.",
+        detail: "Permission status · Requests and settings links",
       },
       imageTools: {
         title: 'Image tools',
@@ -198,7 +199,7 @@ export const en: SiteContent = {
       },
       pdf: {
         title: 'PDF tools',
-        description: 'Available in Settings rather than the island module carousel. Fourteen operations that all run on your Mac: merge, split, rotate, crop, convert images and Office files, render to images, extract text, add text or image watermarks, add page numbers, encrypt, remove a password and edit metadata.',
+        description: "Available in Settings. Fourteen operations that all run on your Mac: merge, split, rotate, crop, convert images and Office files, render to images, extract text, add text or image watermarks, add page numbers, encrypt, remove a password and edit metadata.",
         detail: '14 on-device tools · Merge in your own order · Nothing leaves your Mac',
       },
 
@@ -253,8 +254,8 @@ export const en: SiteContent = {
       lockScreen: {
         title: 'Lock screen information',
         description:
-          'Optionally show the date, status and now playing on the macOS lock screen. It is a separate lock screen overlay and never appears in the island module list or carousel.',
-        detail: 'Separate lock screen overlay · Opt in · Never takes focus',
+          "Optionally show the date, status and now playing on the macOS lock screen.",
+        detail: "Opt in · Never takes focus",
       },
       recommendedTools: {
         title: 'Recommended apps',
@@ -265,27 +266,23 @@ export const en: SiteContent = {
     },
   },
   ai: {
-    eyebrow: 'AI WITHOUT A BLACK BOX',
-    title: 'See AI status <span>without reading the conversation.</span>',
-    lede: 'Follow tasks by application, inspect model usage by date and check real account allowances. Status and numeric records stay on your Mac; conversations are not read.',
-    summaryMono: 'ON-DEVICE STATUS / CLEAR BOUNDARIES',
-    summaryLede: 'Different harnesses. One place for status.',
-    summaryNote:
-      'WorkBuddy and WorkBuddy AI are detected independently, with separate sessions, branding and open actions — not one interchangeable product.',
+    eyebrow: "AI WORKFLOW",
+    title: "Follow AI tasks, <span>usage and allowances.</span>",
+    lede: "Follow tasks by application, view model usage by date and check remaining account allowances.",
+    summaryMono: "TASKS / USAGE / ALLOWANCES",
+    summaryLede: "AI tasks, usage and allowances in one place.",
     toolsHeading: '{tools} AI tools and harnesses',
     toolsLede:
-      'Detects supported CLI, desktop and IDE activity. Delta, Orca, WorkBuddy and WorkBuddy AI each retain their own name.',
+      "Detects tasks from supported CLIs, desktop apps and IDEs.",
     toolsAriaLabel: 'Supported AI tools and harnesses',
-    usageNote:
-      'Session detection, token history and account allowances have separate data sources. Delta uses its local numeric ledger; Orca deduplicates bound CLI usage under the underlying provider. WorkBuddy AI can detect sessions and query credits; context occupancy and credits are not converted into tokens or USD cost. Quota availability follows the provider and login method.',
-    boundariesHeading: 'Only status boundaries are recorded',
+    boundariesHeading: "Privacy",
     privacyPoints: [
-      'Parses status metadata (including session titles, timestamps, models and session identifiers) and reliable numeric usage only',
-      'Does not parse prompt or reply text, or upload conversations',
-      'Third-party session stores are read-only; protocol, status and usage records stay on your Mac',
+      "Task status and usage stay on your Mac",
+      "Prompts and replies are not read",
+      "Conversations are not uploaded",
     ],
     bridgeHeading: 'Bring in your own tasks',
-    bridgeLede: 'Use zislactl to push structured status from external tasks into the status bar.',
+    bridgeLede: "Use zislactl to show your scripts and build tasks in the status bar.",
     zislactlTaskTitle: 'Build and release',
     copyZislactlAriaLabel: 'Copy the zislactl command',
   },
@@ -302,7 +299,7 @@ export const en: SiteContent = {
       trigger: {
         phase: 'Trigger',
         title: 'Move to the top centre of the screen',
-        desc: 'Notched and external displays use the same trigger, and no frame loop runs while it is hidden.',
+        desc: "Works on notched and external displays.",
       },
       review: {
         phase: 'Review',
@@ -315,6 +312,178 @@ export const en: SiteContent = {
         desc: 'Move the pointer away and it collapses; expanding never activates the app or takes focus.',
       },
     },
+  },
+  help: {
+    "title": "Start using zisla",
+    "lede": "Choose a task. Follow its entry point, steps, permissions and save location.",
+    "labels": {
+      "entry": "Entry point",
+      "shortcuts": "Shortcuts",
+      "permissions": "Permissions",
+      "output": "Result and storage"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Reuse something you copied",
+        "summary": "Find a saved item or choose the next action after copying.",
+        "entry": "Island → Clipboard; Settings → Quick Actions.",
+        "steps": [
+          "Enable clipboard history or Quick Actions in Settings, then copy a sample link or text.",
+          "Open Clipboard, filter or search, and click Copy on an item.",
+          "Copy a sample image with visible text, wait for background on-device recognition, then search a word from it to find the original image.",
+          "Right-click the image to recognize or copy its text; cancel while recognition is running if needed. Background recognition does not copy text automatically.",
+          "Paste into the destination app; for a new copy, choose an action in the Quick Actions popup."
+        ],
+        "shortcuts": "Command+1…9, then Command+0 follow popup action order. New configurations also use Command+N for the first action; Command+Delete closes it. Saved custom or cleared triggers are retained.",
+        "permissions": "History and recognition run locally. Modifier-only/mouse triggers need Input Monitoring; the optional copy gesture needs Accessibility. Translation uses the selected service.",
+        "output": "History stays in local application data. Save Text/Image uses Settings → Save Location → Quick Actions; new defaults use ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Capture and edit your screen",
+        "summary": "Make a screenshot or a recording, then export the result.",
+        "entry": "Menu bar → Screenshot/Recording; Settings → Screenshot/Recording → Recording studio.",
+        "steps": [
+          "Take a screenshot and select a region or window; edit, copy, save or stash it.",
+          "For recording, select display, window or region and enable only the audio/camera sources you need.",
+          "Stop recording, edit and preview in the studio, then export the chosen format."
+        ],
+        "shortcuts": "Control+1 screenshot; Control+2 scrolling screenshot. Control+Shift+1/2/3 record display/window/region; Control+Shift+6 opens the studio. Settings can change them.",
+        "permissions": "Screen Recording is needed. Enable microphone/camera access for those sources; the studio camera preview also uses camera access.",
+        "output": "New defaults: screenshots ~/Downloads/picture, recordings/projects ~/Downloads/video. Change each in Save Location. Stashed screenshots stay on the shelf; some exports need FFmpeg."
+      },
+      "shelf": {
+        "title": "Carry files through the shelf",
+        "summary": "Keep files ready for another app without copying the originals.",
+        "entry": "Island → Handoff; drag to the top trigger area.",
+        "steps": [
+          "Drag a sample file into the top target, or shake while dragging if the gesture is enabled.",
+          "Open Handoff and choose a category or select the required items.",
+          "Drag to the destination, reveal in Finder or choose Share; for stashed screenshots, copy or save the PNG.",
+          "Select files or folders and choose Compress to ZIP in the context menu; the archive returns to the shelf.",
+          "Select shelf images and choose Resize Images or Convert Image Format; run Image Tools and successful outputs return to the shelf.",
+          "Select images, video or audio and choose Import into Recording Media Library; the current project and timeline stay in place."
+        ],
+        "shortcuts": "Drag with the pointer. Configure Shake to Drop in Settings; no fixed keyboard shortcut is required.",
+        "permissions": "The file picker and security-scoped bookmarks grant access to selected files. Screen capture needs Screen Recording permission.",
+        "output": "Original files stay where they are. Shelf references and stashed screenshots persist locally; an exported PNG uses the chosen destination. ZIP archives and successful image outputs return to the shelf; imported media is added to the recording project library."
+      },
+      "meeting": {
+        "title": "Join a meeting and keep its notes",
+        "summary": "Connect a calendar meeting to a note you can find again.",
+        "entry": "Island → Agenda; enable calendar and context notes in Settings.",
+        "steps": [
+          "Add or open a calendar event with a supported meeting link and a valid start/end time.",
+          "Use its Join action; the countdown appears from 10 minutes before the start.",
+          "Open its note action to create, save or link a context note. Reopen the note from the event or shelf."
+        ],
+        "shortcuts": "Join and note actions are buttons. For notes at other locations, hold the configured note key and shake; the default hold key is Command.",
+        "permissions": "Calendar access is required. Location-bound window notes may need Accessibility; attached screenshots need Screen Recording.",
+        "output": "Meeting context notes stay in local shelf data. Quick Notes is a separate entry backed by Apple Notes."
+      },
+      "ai": {
+        "title": "Connect AI tools and check allowances",
+        "summary": "Monitor tasks, recorded usage and available account quotas.",
+        "entry": "Settings → AI; island → AI monitor.",
+        "steps": [
+          "Enable a supported local tool, or send a task with zislactl using the CLI reference.",
+          "In AI settings, enable allowance monitoring for the desired provider and supply credentials only where requested.",
+          "Read the sampling/reset time and low-quota notice; view usage history or export it as .xlsx."
+        ],
+        "shortcuts": "Use the AI monitor or Settings; no fixed global shortcut is required. zislactl accepts the documented command-line options.",
+        "permissions": "Local activity detection reads structured state. Allowance checks contact the provider; optional AI text/recording edits use the model or CLI you select.",
+        "output": "Task/usage state uses ~/Library/Application Support/zisla/ai-state.sqlite. Quotas are provider samples, not token estimates; unavailable data stays unavailable."
+      },
+      "media-tools": {
+        "title": "Process images, audio and PDF",
+        "summary": "Use the independent local tools for a sample file.",
+        "entry": "Settings → Image Tools / Audio Tools / PDF Tools.",
+        "steps": [
+          "Images: add a sample, choose an operation and options, run it, then export the result or ZIP.",
+          "Select shelf images and choose Resize Images or Convert Image Format; run Image Tools and successful outputs return to the shelf.",
+          "Audio: install FFmpeg and ffprobe in Dependency Components, add sample audio, choose trimming or mixing, adjust options, and select an export file or folder.",
+          "PDF: add sample files in the required order, choose an operation, run it and save the result. Office conversion needs local LibreOffice or OpenOffice."
+        ],
+        "shortcuts": "Use the tool controls; no fixed global shortcut.",
+        "permissions": "The file picker grants access to selected inputs and output folders. Processing is local; installing dependency components downloads them.",
+        "output": "New defaults: images ~/Downloads/picture, PDF ~/Downloads/pdf; each is configurable in Save Location. Audio uses the export dialog."
+      },
+      "daily-briefing": {
+        "title": "Create a daily briefing",
+        "summary": "Preview selected metrics before exporting a PNG.",
+        "entry": "Settings → Daily Briefing.",
+        "steps": [
+          "Choose a template and the metrics to include.",
+          "Open the preview and inspect available data; choose the export folder in Save Location.",
+          "Export today manually or enable daily export and set the time."
+        ],
+        "shortcuts": "Use Preview and Export buttons; no fixed global shortcut.",
+        "permissions": "Local metrics need their related features enabled. Optional Screen Time history may need Full Disk Access; account quotas contact the provider when monitoring is enabled.",
+        "output": "PNG uses the Daily Briefing folder; the new default is ~/Downloads/daily. Missing data is not measured zero."
+      },
+      "desktop": {
+        "title": "Preview windows and record a location note",
+        "summary": "Switch to a window, then leave a reminder for its context.",
+        "entry": "Settings → Window Previews / Context Notes; Dock, Command+Tab and shelf.",
+        "steps": [
+          "Enable Window Previews, grant its permissions, then hover a Dock app or use Command+Tab and click a preview.",
+          "At a sample webpage, window or desktop, hold the configured note key and shake the pointer; enter a note and save it.",
+          "Revisit the location to see the note, or open it from the shelf; optionally set a recurring reminder or attach a window screenshot."
+        ],
+        "shortcuts": "Command+Tab switches apps; context notes default to holding Command while shaking. Configure the hold key in Settings.",
+        "permissions": "Window previews need Accessibility and Screen Recording. Window context detection may need Accessibility; attached screenshots need Screen Recording.",
+        "output": "Notes and attached screenshots stay in local shelf data under ~/Library/Application Support/zisla."
+      },
+      "playback": {
+        "title": "Choose playback and mix application volume",
+        "summary": "Select audio output and adjust currently playing apps.",
+        "entry": "Island media area → Output Device; Settings → Media source; island → Application Volume Mixer.",
+        "steps": [
+          "Play sample audio and choose the available output device in the media area.",
+          "Choose automatic media source or a preferred player in Settings; test the displayed playback controls.",
+          "On macOS 14.4+, open the application mixer, grant System Audio Recording, then adjust or mute one playing app."
+        ],
+        "shortcuts": "Use playback controls and sliders; no fixed global shortcut.",
+        "permissions": "The mixer needs macOS 14.4+ and System Audio Recording. Device choices depend on connected hardware; Bluetooth connections may need Bluetooth permission.",
+        "output": "Output device is the system choice. Per-app volume is remembered locally. This workflow does not export files."
+      }
+    },
+    "workflowsTitle": "Short workflow demonstrations",
+    "workflows": {
+      "copy-next": {
+        "title": "Find, copy and use it again",
+        "steps": [
+          "Search clipboard history for the sample word “brew”.",
+          "Copy the matched item.",
+          "Paste into your destination app. The excerpt demonstrates finding and copying; Quick Actions offers a separate next step for new copies."
+        ]
+      },
+      "drop-output": {
+        "title": "Drop a file and prepare its output",
+        "steps": [
+          "Drag a sample image from Finder to the top shelf target.",
+          "Open the shelf and select the image.",
+          "Drag it to your destination or save a stashed screenshot as PNG. The excerpt demonstrates the drag and shelf entry."
+        ]
+      },
+      "meeting-note": {
+        "title": "Turn a meeting into a note",
+        "steps": [
+          "Open the meeting with its join link.",
+          "Choose New Meeting Note or Link Existing Note.",
+          "Save and reopen from the event or shelf. The excerpt shows creation and linking."
+        ]
+      }
+    },
+    "excerptLabel": "Play the excerpt",
+    "guideLinkLabel": "Read the guide",
+    "videoNotice": "These are excerpts from the existing feature tour, built with demonstration data. Its embedded captions are English; the steps here follow your language. The complete 2:40 tour and music credits remain below.",
+    "preferencesTitle": "Useful preferences",
+    "preferences": [
+      "Enable Shake to Drop in Settings to reveal a shelf target while dragging files. Context-note shaking uses its own configured hold key.",
+      "Choose an audio output device from the media area. In Settings, choose automatic media source or a preferred player; this does not route each app to a different device.",
+      "Keyboard sounds and typing statistics have independent switches and use Input Monitoring. The application volume mixer needs macOS 14.4+ and System Audio Recording permission.",
+      "Use Daily Briefing in Settings to preview one of 8 templates and export PNG manually or daily; its folder is independent in Save Location."
+    ]
   },
   download: {
     eyebrow: 'READY WHEN YOU ARE',
@@ -505,10 +674,8 @@ export const en: SiteContent = {
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Supports multiple displays, Spaces and ordinary full-screen apps; expanding never activates the app or takes focus',
-      'While hidden it creates no persistent transparent hot-zone window and runs no frame loop; expansion is triggered by global event monitoring and geometry checks',
-      'Uses a single layer of system material, and switches to an opaque background when Reduce Transparency is on',
+      "Uses an opaque background when Reduce Transparency is enabled",
       'Liquid Glass on macOS 26+, with an automatic fallback to native system materials on macOS 14 and 15',
-      'A physical notch is inferred from the system safe area; external displays without one get a simulated status bar in a dedicated overlay',
     ],
   },
   film: {

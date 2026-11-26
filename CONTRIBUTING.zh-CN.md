@@ -1,6 +1,6 @@
 # 贡献指南
 
-[English](CONTRIBUTING.md) | **简体中文**
+[English](CONTRIBUTING.md) | **简体中文** | [其他语言](docs/locales/README.md)
 
 感谢你为 zisla 做出贡献。
 
@@ -25,6 +25,8 @@ swift test
 ```
 
 提交前请删除测试、构建和打包产生的二进制产物。
+
+每次提交或 amend 前，在仓库根目录使用与 CI 一致的 SwiftFormat 0.64.7 执行 `make format`。检查差异，只保留当前任务需要的格式化。
 
 ## 分支和提交
 
@@ -116,7 +118,7 @@ swift test
 - `PR Quality` 检查会自动验证上述格式；状态检查未通过时不能合并。随后 `PR Automation` 负责打标签与指派。
 - macOS 代码变更必须运行 `cd mac && swift test`；涉及界面时请用文字说明实际验证结果。
 - PR 正文和发版说明均可只使用文字，不需要图片、截图或封面。
-- 更新用户可见行为、构建方式或发布流程时，同步更新相应文档。
+- 修改功能、行为、默认值、构建方式或发布流程时，同一补丁同步正式文档与官网帮助。官网用户文案覆盖 17 种语言，复用现有帮助结构和集中本地化文档目录。
 - 不要提交 `.build`、`dist`、下载文件、日志、令牌、签名材料或其他个人数据。
 - `main` 和 `publish-v*` 受保护，只能通过检查并完成评审的 PR 合并。
 
@@ -132,26 +134,24 @@ swift test
 | `unskip-<workflow>` | 恢复单个工作流。 |
 
 - 指令后面可以接自由文本，例如 `skip-all: documentation only change`。
-- 工作流可以直接写 GitHub 上显示的名字（含空格），因此 `skip-Repository Hygiene` 与 `skip-hygiene` 等价；匹配时取最长的已知名称，剩下的词作为备注。
+- 工作流可以直接写 GitHub 上显示的名字（含空格），因此 `skip-CI Lint` 与 `skip-lint` 等价；匹配时取最长的已知名称，剩下的词作为备注。
 - 只有仓库 owner、组织成员、协作者或被请求的 reviewer 的指令才生效，机器人评论一律忽略。
 - `CI Skip` 会取消正在运行的任务，把被跳过的检查标记为成功以满足必需检查，打上 `skip-ci` 标签，并复用同一条评论汇总当前决策。
 - 每次评论都会重放整个评论区，因此最新的指令始终生效。
 - 一旦推送了新 commit，此前的指令随即失效：指令只能针对作者当时看到的代码，否则被标记为成功的检查会让未经构建的新 commit 直接合并。每次推送都会重新运行 `CI Skip`，摘掉 `skip-ci` 标签并恢复检查，摘要评论里会列出失效的指令。若新 commit 同样需要跳过，请再评论一次。
 - 维护者也可以不用新增评论，在 **Actions -> CI Skip -> Run workflow** 里填入 PR 编号重新应用当前决策。
-- `.github/ci-skip.json` 记录了每个工作流发布的检查名；清单与工作流不一致时 `Test CI Scripts` 会失败。
+- `.github/ci-skip.json` 记录了每个工作流发布的检查名；清单与工作流不一致时 `CI Checks` 会失败。
 
 ## 按路径裁剪检查
 
-平台相关的工作流只在 PR 改动了它构建的文件时才运行，所以纯文档改动不会再启动 Windows 或 macOS runner：
+平台相关的工作流只在 PR 改动了它构建的文件时才运行，所以文档改动按所属路径决定是否运行平台检查：
 
 | 工作流 | 触发它的改动路径 |
 | --- | --- |
-| `Swift Tests` | `mac/**`、`Makefile`、`.github/**` |
-| `Core Tests` | `windows/**`、`.github/**` |
-| `Web CI` | `web/**`、`.github/**` |
-| `Skill CI` | `skills/**`、`.github/**` |
+| `Swift Tests` | `mac/**`、`Makefile`、`.swiftformat`、`.github/**` |
+| `Web CI` | `web/**`、`promo/**`、`docs/**`、`.github/**` |
 
-- 范围由 `.github/ci-skip.json` 的 `paths` 字段决定；没有声明 `paths` 的工作流始终运行，因此 `CI Lint`、`Repository Hygiene`、`PR Quality Gates`、`CodeQL`、`Dependency Review` 每个 PR 都会跑。
+- 范围由 `.github/ci-skip.json` 的 `paths` 字段决定；没有声明 `paths` 的工作流始终运行，因此 `CI Lint`、`PR Quality Gates`、`CodeQL`、`Dependency Review` 每个 PR 都会跑。仓库卫生与技能验证属于 `CI Checks`；旧 `hygiene` 和 `skills` 别名不再使用。
 - 只要改动了 `.github/` 下的文件就全部运行，因为改 CI 必须在所有平台上验证。
 - 裁剪用的是 job 级条件而不是工作流的 `paths:` 过滤器，这样必需检查会报告成功，而不是一直挂在 pending。
 - 文件重命名会同时按旧路径和新路径匹配，且比较时忽略大小写。

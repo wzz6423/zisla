@@ -17,6 +17,7 @@ export const ptBR = createCatalog({
     menuCloseLabel: 'Fechar navegação',
     menuButtonTitle: 'Abrir navegação',
     navItems: {
+      help: "Ajuda",
       showcase: 'Recursos',
       ai: 'Fluxo de IA',
       download: 'Baixar',
@@ -83,13 +84,13 @@ export const ptBR = createCatalog({
       shelf: {
         name: 'Prateleira',
         caption:
-          'Arraste arquivos, áudios, vídeos ou links para o topo da tela. Pesquise, filtre e selecione vários itens para copiar, compartilhar ou enviar às Notas rápidas. Converta imagens em PDF, envie o texto reconhecido às Notas rápidas ou abra vídeos no estúdio de gravação para editar. Você também pode localizar os arquivos no Finder. Compacte os arquivos e pastas selecionados em ZIP ou abra as imagens selecionadas nas ferramentas de imagem para redimensionar ou converter; os resultados concluídos voltam à bandeja. Importe imagens, vídeo e áudio para a biblioteca do estúdio.',
+          "Guarde arquivos na prateleira para pesquisar, selecionar e compartilhar. Crie ZIP ou PDF, redimensione ou converta imagens e envie mídia para notas ou estúdio.",
         points: ['Busca e ações em lote', 'Imagens para PDF e Notas rápidas', 'Editar vídeos no estúdio'],
       },
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Consulte o histórico do clipboard dentro da ilha e filtre por imagem, URL, caminho ou tipo de arquivo e veja quando cada item foi copiado. Envie um item para Notas rápidas, fixe-o como favorito ou exclua-o. Você pode excluir automaticamente o histórico com mais de 7, 15 ou 30 dias e manter os favoritos. A exclusão automática vem desativada. Pesquise e agrupe o histórico pelo aplicativo de origem. Novas imagens tentam reconhecer texto no dispositivo em segundo plano para encontrar o original pelo texto. Clique com o botão direito em uma imagem do histórico para reconhecer ou copiar seu texto.',
+          "Pesquise o histórico local e texto em imagens. Filtre por tipo ou aplicativo, salve favoritos e envie itens para Notas rápidas.",
         points: ['Histórico dentro da ilha', 'Filtro por tipo', 'Notas rápidas e favoritos'],
       },
       aiMonitor: {
@@ -165,7 +166,7 @@ export const ptBR = createCatalog({
       },
       dailyBriefing: {
         title: 'Seu dia em um relatório diário',
-        description: 'Escolha entre oito modelos, selecione dados de uso, digitação, sistema e atividade zisla e confira a prévia. Exporte um PNG manualmente ou em um horário diário. O histórico de Tempo de Uso entra quando ativado e disponível; dados ausentes não são apresentados como zero medido. Escolha uma pasta de exportação independente em Ajustes → Local de salvamento. Também é possível incluir as cotas reais das contas e o horário da consulta.',
+        description: "Escolha entre oito modelos, selecione dados de uso, digitação, sistema e atividade zisla e confira a prévia. Exporte um PNG manualmente ou em um horário diário. O histórico de Tempo de Uso entra quando ativado e disponível. Escolha uma pasta de exportação independente em Ajustes → Local de salvamento. Também é possível incluir as cotas reais das contas e o horário da consulta.",
         detail: '8 modelos · Conteúdo à escolha · Prévia e exportação PNG agendada',
       },
       userCare: {
@@ -180,13 +181,13 @@ export const ptBR = createCatalog({
       },
       recording: {
         title: 'Grave e edite no estúdio',
-        description: 'Grave tela, janela ou região com áudio do sistema, microfone e câmera opcionais. Edite vídeo, áudio, imagens e texto em várias faixas com animações, zooms e legendas. Ajuste suavização da pele, brilho, afinamento de rosto e corpo, efeitos de voz e rastros suaves do cursor na cor escolhida. Reproduza a edição no estúdio. Escolha proporção original, 16:9, 9:16, 1:1 ou 4:3; exporte vídeo, GIF, Live Photo ou áudio. Alguns formatos exigem FFmpeg. Revise propostas opcionais de IA antes de aplicar. A pasta de gravação é definida separadamente em Ajustes → Local de salvamento. Grave em HDR nos dispositivos compatíveis. Importe imagens, vídeo e áudio da bandeja para a biblioteca, mantendo o projeto e a linha do tempo atuais.',
+        description: "Grave tela, janela ou região, edite faixas, legendas e efeitos de retrato/voz e exporte. HDR em aparelhos compatíveis e importação da prateleira.",
         detail: 'Efeitos de retrato e voz · Rastros coloridos do cursor · Reprodução e exportação multifaixa',
       },
       permissions: {
         title: 'Permissões do sistema em um lugar',
-        description: 'Veja os estados em Ajustes → Permissões, inicie pedidos compatíveis ou abra a página correspondente do sistema. As boas-vindas iniciais usam a mesma lista e identificam permissões com configuração manual. O estado das permissões é atualizado após a concessão do acesso. Uma ajuda para arrastar o aplicativo facilita as permissões que exigem adicioná-lo.',
-        detail: 'Estado das permissões · Pedidos e links · Compartilhado com as boas-vindas',
+        description: "Veja os estados em Ajustes → Permissões, inicie pedidos compatíveis ou abra a página correspondente do sistema. O estado das permissões é atualizado após a concessão do acesso. Uma ajuda para arrastar o aplicativo facilita as permissões que exigem adicioná-lo.",
+        detail: "Estado das permissões · Pedidos e links",
       },
       imageTools: {
         title: 'Ferramentas de imagem',
@@ -200,7 +201,7 @@ export const ptBR = createCatalog({
       },
       pdf: {
         title: 'Ferramentas de PDF',
-        description: 'Disponível nos Ajustes, fora do carrossel de módulos da ilha. Quatorze operações no próprio Mac: unir, dividir, girar, recortar, converter imagens e arquivos Office, renderizar imagens, extrair texto, adicionar marcas d’água e números de página, criptografar, remover senha e editar metadados.',
+        description: "Disponível nos Ajustes. Quatorze operações no próprio Mac: unir, dividir, girar, recortar, converter imagens e arquivos Office, renderizar imagens, extrair texto, adicionar marcas d’água e números de página, criptografar, remover senha e editar metadados.",
         detail: '14 ferramentas no dispositivo · Una na ordem que quiser · Nada sai do seu Mac',
       },
 
@@ -254,8 +255,8 @@ export const ptBR = createCatalog({
       lockScreen: {
         title: 'Informações da tela bloqueada',
         description:
-          'Mostre opcionalmente data, estado e reprodução na tela bloqueada do macOS. É uma sobreposição independente e nunca aparece na lista ou no carrossel de módulos da ilha.',
-        detail: 'Sobreposição independente · Ativação opcional · Não rouba o foco',
+          "Mostre opcionalmente data, estado e reprodução na tela bloqueada do macOS.",
+        detail: "Ativação opcional · Não rouba o foco",
       },
       recommendedTools: {
         title: 'Apps recomendados',
@@ -266,25 +267,23 @@ export const ptBR = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'IA SEM CAIXA-PRETA',
-    title: 'Veja o estado da IA <span>sem ler a conversa.</span>',
+    eyebrow: "FLUXO DE IA",
+    title: "Acompanhe tarefas de IA, <span>uso e cotas.</span>",
     lede:
-      'Acompanhe tarefas por aplicativo, uso de modelos por data e cotas reais das contas. Os estados e dados numéricos ficam no Mac; o texto das conversas não é lido.',
-    summaryMono: 'ESTADO LOCAL / LIMITES CLAROS',
-    summaryLede: 'Conecte as ferramentas de IA que você já usa, mantendo os limites de contexto necessários.',
-    summaryNote: 'A página explica apenas escopo de detecção, dados e conexão; não simula uma sessão ao vivo.',
+      "Veja tarefas por aplicativo, uso de modelos por data e cotas restantes das suas contas.",
+    summaryMono: "TAREFAS / USO / COTAS",
+    summaryLede: "Tarefas de IA, uso e cotas em um só lugar.",
     toolsHeading: 'Ferramentas de IA compatíveis',
-    toolsLede: 'Detecta atividade de CLIs, apps e IDEs compatíveis e agrega o estado das tarefas.',
+    toolsLede: "Detecta tarefas de CLIs, aplicativos de desktop e IDEs compatíveis.",
     toolsAriaLabel: 'Ferramentas de IA compatíveis',
-    usageNote: 'Detecção de sessões, histórico de tokens e cotas usam fontes diferentes. Delta utiliza seu registro numérico local; Orca elimina duplicatas do uso do CLI vinculado e o atribui ao provedor original. WorkBuddy AI pode detectar sessões e consultar créditos; ocupação de contexto e créditos não são convertidos em tokens nem custos em dólares. A disponibilidade das cotas depende do provedor e da forma de login.',
-    boundariesHeading: 'Somente o estado é registrado',
+    boundariesHeading: "Privacidade",
     privacyPoints: [
-      'Analisa apenas tipo de evento, estado, horário, modelo e ID da sessão em eventos estruturados',
-      'Nunca lê o texto de prompts ou respostas',
-      'Protocolo e estado ficam armazenados no seu Mac',
+      "O estado das tarefas e o uso ficam no seu Mac",
+      "Prompts e respostas não são lidos",
+      "Conversas não são enviadas",
     ],
     bridgeHeading: 'Conecte suas próprias tarefas',
-    bridgeLede: 'Use zislactl para enviar o estado estruturado de tarefas externas à barra superior.',
+    bridgeLede: "Use zislactl para mostrar scripts e tarefas de compilação na barra de status.",
     zislactlTaskTitle: 'Build e publicação',
     copyZislactlAriaLabel: 'Copiar o comando zislactl',
   },
@@ -300,7 +299,7 @@ export const ptBR = createCatalog({
       trigger: {
         phase: 'Acionar',
         title: 'Mova o cursor para o centro superior',
-        desc: 'Telas com notch e externas usam o mesmo acionador; oculta, nenhum loop de quadros é executado.',
+        desc: "Funciona em telas com notch e monitores externos.",
       },
       review: {
         phase: 'Revisar',
@@ -313,6 +312,178 @@ export const ptBR = createCatalog({
         desc: 'Afaste o cursor e ela se recolhe; expandir nunca ativa o app nem toma o foco.',
       },
     },
+  },
+  help: {
+    "title": "Comece a usar o zisla",
+    "lede": "Escolha uma tarefa e siga o acesso, as etapas, as permissões e o destino.",
+    "labels": {
+      "entry": "Acesso",
+      "shortcuts": "Atalhos",
+      "permissions": "Permissões",
+      "output": "Resultado e armazenamento"
+    },
+    "guides": {
+      "clipboard": {
+        "title": "Reutilize o que copiou",
+        "summary": "Encontre um item ou escolha uma ação após copiar.",
+        "entry": "Ilha → Área de transferência; Ajustes → Ações rápidas.",
+        "steps": [
+          "Ative o histórico ou as ações rápidas e copie um texto ou link de exemplo.",
+          "Abra a área de transferência, filtre ou pesquise e copie um item.",
+          "Copie uma imagem de exemplo com texto legível, aguarde o reconhecimento local em segundo plano e pesquise uma palavra da imagem para encontrar o original.",
+          "Clique com o botão direito na imagem para reconhecer ou copiar seu texto; cancele durante o reconhecimento se necessário. O reconhecimento em segundo plano não copia o texto automaticamente.",
+          "Cole no aplicativo de destino; para uma nova cópia, escolha a próxima ação na janela rápida."
+        ],
+        "shortcuts": "Command+1…9 e Command+0 seguem a ordem das ações. Novas configurações também usam Command+N para a primeira; Command+Delete fecha. Atalhos salvos ou apagados são mantidos.",
+        "permissions": "Histórico e reconhecimento são locais. Modificadores/botões do mouse usam Monitoramento de Entrada; o gesto opcional de cópia usa Acessibilidade. Tradução usa o serviço escolhido.",
+        "output": "Histórico nos dados locais. Salvar texto/imagem usa Ajustes → Local de salvamento → Ações rápidas; novo padrão: ~/Downloads/quick."
+      },
+      "capture": {
+        "title": "Capture e edite a tela",
+        "summary": "Edite uma captura ou gravação e exporte o resultado.",
+        "entry": "Barra de menus → Captura/Gravação; Ajustes → Gravação → Estúdio.",
+        "steps": [
+          "Capture uma região ou janela e edite, copie, salve ou guarde na prateleira.",
+          "Escolha tela, janela ou região e ative só as fontes de áudio/câmera necessárias.",
+          "Pare, edite e visualize no estúdio, depois exporte o formato escolhido."
+        ],
+        "shortcuts": "Control+1 captura; Control+2 captura longa. Control+Shift+1/2/3 gravam tela/janela/região; Control+Shift+6 abre o estúdio. Ajustáveis nas configurações.",
+        "permissions": "Gravação de Tela necessária. Microfone e câmera precisam de suas permissões, inclusive a prévia da câmera.",
+        "output": "Novos padrões: ~/Downloads/picture para capturas e ~/Downloads/video para gravações/projetos. Pastas independentes. Alguns formatos precisam de FFmpeg."
+      },
+      "shelf": {
+        "title": "Passe arquivos pela prateleira",
+        "summary": "Deixe arquivos prontos sem copiar os originais.",
+        "entry": "Ilha → Prateleira; arraste até o alvo superior.",
+        "steps": [
+          "Arraste um arquivo de exemplo para cima ou agite ao arrastar se o gesto estiver ativo.",
+          "Abra a prateleira e escolha uma categoria ou os itens necessários.",
+          "Arraste ao destino, mostre no Finder ou compartilhe; capturas guardadas podem ser salvas como PNG.",
+          "Selecione arquivos ou pastas e escolha a compactação ZIP no menu de contexto; o arquivo volta à prateleira.",
+          "Selecione imagens da prateleira e escolha redimensionar ou converter o formato; execute as ferramentas de imagem e os resultados concluídos voltam à prateleira.",
+          "Selecione imagens, vídeo ou áudio e importe para a biblioteca do estúdio de gravação; o projeto e a linha do tempo atuais são mantidos."
+        ],
+        "shortcuts": "Arraste com o ponteiro. Agitar para soltar é configurável separadamente; não exige atalho fixo.",
+        "permissions": "O seletor e os marcadores seguros permitem acesso aos arquivos escolhidos. Capturas exigem Gravação de Tela.",
+        "output": "Os originais ficam no lugar. Referências e capturas persistem localmente; o PNG vai ao destino escolhido. Os ZIP e os resultados de imagem concluídos voltam à prateleira; a mídia importada entra na biblioteca do projeto de gravação."
+      },
+      "meeting": {
+        "title": "Entre em uma reunião e guarde notas",
+        "summary": "Vincule a reunião do calendário a uma nota de contexto.",
+        "entry": "Ilha → Agenda; ative calendário e notas de contexto nos Ajustes.",
+        "steps": [
+          "Crie ou abra um evento com link de reunião compatível e horários válidos de início/fim.",
+          "Clique em Entrar; a contagem aparece 10 minutos antes.",
+          "Crie, salve ou vincule uma nota pelo evento e reabra na agenda ou prateleira."
+        ],
+        "shortcuts": "Entrar e notas são botões. Em outros locais, segure a tecla configurada e agite; o padrão é Command.",
+        "permissions": "Acesso ao calendário necessário. Notas de janela podem precisar de Acessibilidade; capturas anexas exigem Gravação de Tela.",
+        "output": "Notas de reunião ficam na prateleira local. Notas rápidas é um recurso separado que usa Notas da Apple."
+      },
+      "ai": {
+        "title": "Conecte IA e consulte cotas",
+        "summary": "Acompanhe tarefas, uso registrado e cotas da conta.",
+        "entry": "Ajustes → IA; ilha → Monitor de IA.",
+        "steps": [
+          "Ative uma ferramenta local compatível ou informe a tarefa com zislactl conforme a referência CLI.",
+          "Ative o monitoramento de cota do provedor desejado e forneça credenciais só quando solicitadas.",
+          "Confira coleta, redefinição e aviso de cota; veja o histórico ou exporte .xlsx."
+        ],
+        "shortcuts": "Use o monitor ou Ajustes; não há atalho global fixo. zislactl aceita os argumentos documentados.",
+        "permissions": "A detecção local lê estado estruturado. Cotas consultam o provedor; edições IA opcionais usam o modelo ou CLI escolhido.",
+        "output": "Tarefas/uso: ~/Library/Application Support/zisla/ai-state.sqlite. Cotas vêm do provedor, sem estimativas por token; dados ausentes continuam indisponíveis."
+      },
+      "media-tools": {
+        "title": "Processe imagens, áudio e PDF",
+        "summary": "Use as ferramentas locais independentes com exemplos.",
+        "entry": "Ajustes → Ferramentas de imagem / Áudio / PDF.",
+        "steps": [
+          "Adicione uma imagem, escolha operação e opções, execute e exporte o resultado ou ZIP.",
+          "Selecione imagens da prateleira e escolha redimensionar ou converter o formato; execute as ferramentas de imagem e os resultados concluídos voltam à prateleira.",
+          "Instale FFmpeg e ffprobe nos componentes, adicione áudio, escolha corte ou mixagem e selecione arquivo ou pasta de saída.",
+          "Adicione PDF na ordem necessária, execute e salve. Conversão de Office exige LibreOffice ou OpenOffice."
+        ],
+        "shortcuts": "Botões das ferramentas; sem atalho global fixo.",
+        "permissions": "O seletor dá acesso aos arquivos e pastas escolhidos. Processamento local; instalar componentes faz downloads.",
+        "output": "Novos padrões: imagens ~/Downloads/picture, PDF ~/Downloads/pdf, configuráveis separadamente. Áudio usa o diálogo de exportação."
+      },
+      "daily-briefing": {
+        "title": "Crie um resumo diário",
+        "summary": "Confira estatísticas antes de exportar PNG.",
+        "entry": "Ajustes → Resumo diário.",
+        "steps": [
+          "Escolha modelo e estatísticas.",
+          "Abra a prévia, confira dados disponíveis e escolha a pasta.",
+          "Exporte hoje ou ative a exportação diária com horário."
+        ],
+        "shortcuts": "Botões de prévia e exportação; sem atalho fixo.",
+        "permissions": "Ative os recursos de estatística correspondentes. Tempo de Uso pode precisar de Acesso Total ao Disco; cotas consultam o provedor.",
+        "output": "PNG na pasta do resumo; novo padrão ~/Downloads/daily. Dados ausentes não viram zero medido."
+      },
+      "desktop": {
+        "title": "Pré-visualize janelas e anote seu contexto",
+        "summary": "Mude de janela e deixe uma nota para esse local.",
+        "entry": "Ajustes → Prévia de janelas / Notas de contexto; Dock, Command+Tab e prateleira.",
+        "steps": [
+          "Ative prévias e permissões, passe sobre o app do Dock ou use Command+Tab e clique no cartão.",
+          "Em uma página, janela ou mesa de exemplo, segure a tecla configurada e agite; escreva e salve a nota.",
+          "Retorne ao local ou abra pela prateleira; adicione lembrete recorrente ou captura de janela se quiser."
+        ],
+        "shortcuts": "Command+Tab muda apps. Notas usam Command segurado por padrão, alterável nos Ajustes.",
+        "permissions": "Prévias precisam de Acessibilidade e Gravação de Tela. Detectar janela usa Acessibilidade; capturas anexas Gravação de Tela.",
+        "output": "Notas e capturas nos dados locais da prateleira em ~/Library/Application Support/zisla."
+      },
+      "playback": {
+        "title": "Escolha reprodução e misture volumes",
+        "summary": "Selecione saída e ajuste apps reproduzindo áudio.",
+        "entry": "Área de mídia → Saída; Ajustes → Fonte de mídia; ilha → Mixer.",
+        "steps": [
+          "Reproduza áudio de exemplo e escolha uma saída disponível.",
+          "Escolha fonte automática ou player preferido e teste os controles.",
+          "No macOS 14.4+, abra o mixer, permita Gravação de Áudio do Sistema e ajuste ou silencie uma app."
+        ],
+        "shortcuts": "Botões e controles deslizantes; sem atalho fixo.",
+        "permissions": "Mixer exige macOS 14.4+ e Gravação de Áudio do Sistema. Dispositivos dependem das conexões; Bluetooth pode precisar de permissão.",
+        "output": "A saída é a escolha do sistema. Volumes por app são lembrados localmente; nenhum arquivo é exportado."
+      }
+    },
+    "workflowsTitle": "Demonstrações curtas",
+    "workflows": {
+      "copy-next": {
+        "title": "Encontre, copie e reutilize",
+        "steps": [
+          "Pesquise a palavra de exemplo “brew” no histórico.",
+          "Copie o item correspondente.",
+          "Cole no app de destino. O trecho mostra busca e cópia; uma nova cópia tem ações rápidas separadas."
+        ]
+      },
+      "drop-output": {
+        "title": "Solte um arquivo e prepare a saída",
+        "steps": [
+          "Arraste uma imagem de exemplo do Finder até a prateleira superior.",
+          "Abra a prateleira e selecione a imagem.",
+          "Arraste ao destino ou salve uma captura como PNG. O trecho mostra a entrada na prateleira."
+        ]
+      },
+      "meeting-note": {
+        "title": "Da reunião à nota",
+        "steps": [
+          "Abra a reunião com seu link de entrada.",
+          "Escolha Nova nota ou Vincular nota existente.",
+          "Salve e reabra pelo evento ou prateleira. O trecho mostra criação e vínculo."
+        ]
+      }
+    },
+    "excerptLabel": "Reproduzir trecho",
+    "guideLinkLabel": "Ler guia",
+    "videoNotice": "Trechos da apresentação existente com dados de demonstração. As legendas do vídeo estão em inglês; as etapas usam seu idioma. O vídeo completo de 2:40 e os créditos musicais estão abaixo.",
+    "preferencesTitle": "Preferências úteis",
+    "preferences": [
+      "Ative agitar ao arrastar para revelar a prateleira. Notas de contexto usam sua própria tecla mantida.",
+      "Escolha a saída de áudio na área de mídia e fonte automática ou player preferido nos Ajustes. Isso não atribui um dispositivo diferente a cada app.",
+      "Sons e estatísticas do teclado são independentes e usam Monitoramento de Entrada. O mixer exige macOS 14.4+ e Gravação de Áudio do Sistema.",
+      "O resumo diário oferece 8 modelos, prévia e exportação PNG manual ou diária, com pasta própria."
+    ]
   },
   download: {
     eyebrow: 'PRONTO QUANDO VOCÊ ESTIVER',
@@ -482,10 +653,8 @@ export const ptBR = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Compatível com vários monitores, Spaces e apps normais em tela cheia; expandir nunca ativa o app nem rouba o foco',
-      'Oculto, não cria janela transparente persistente nem executa loop de quadros; a expansão usa eventos globais e geometria',
-      'Usa uma única camada de material do sistema e troca para fundo opaco quando Reduzir transparência está ativo',
+      "Usa um fundo opaco quando Reduzir Transparência está ativado",
       'Liquid Glass no macOS 26+, com fallback automático para materiais nativos no macOS 14 e 15',
-      'O notch físico é inferido pela área segura; telas externas sem notch recebem uma barra simulada em uma sobreposição dedicada',
     ],
   },
   film: {
