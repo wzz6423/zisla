@@ -328,9 +328,15 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         containing point: CGPoint,
         in layouts: [ScreenOverlayLayout]
     ) -> ScreenOverlayLayout? {
+        // Check half-open bounds first so shared borders between adjacent or stacked displays
+        // resolve deterministically, then fall back to closed bounds for outer top/right edges
+        // (Quartz y == 0 maps to AppKit y == frame.maxY).
         layouts.first {
             point.x >= $0.screenFrame.minX && point.x < $0.screenFrame.maxX
                 && point.y >= $0.screenFrame.minY && point.y < $0.screenFrame.maxY
+        } ?? layouts.first {
+            point.x >= $0.screenFrame.minX && point.x <= $0.screenFrame.maxX
+                && point.y >= $0.screenFrame.minY && point.y <= $0.screenFrame.maxY
         }
     }
 
