@@ -28,7 +28,7 @@ struct ToolboxModuleView: View {
 
     private var timerPanel: some View {
         ToolboxTimerPanel(service: pomodoro)
-            .frame(width: pomodoro.countdowns.isEmpty ? 236 : 320, height: Metrics.toolContentHeight)
+            .frame(height: Metrics.toolContentHeight)
     }
 
     private var toolActions: some View {
@@ -258,6 +258,7 @@ struct ToolboxTimerPanel: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .accessibilityIdentifier("toolbox.timers")
+        .frame(width: 236)
         .overlay(alignment: .topTrailing) {
             IconButton(symbol: "plus", help: AppLocalization.text("添加计时器"), size: .compact) {
                 service.addCountdown()
@@ -292,20 +293,17 @@ struct ToolboxTimerCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 6 : 0) {
+        VStack(alignment: .leading, spacing: 0) {
             nameField
                 .padding(.trailing, 24)
-            if !compact { Spacer(minLength: 0) }
-            HStack(spacing: 4) {
-                durationDisplay
-                if compact {
-                    Spacer(minLength: 0)
-                    controls
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-            if !compact {
-                Spacer(minLength: 0)
+            Spacer(minLength: 0)
+            durationDisplay
+                .frame(maxWidth: .infinity, alignment: .center)
+            Spacer(minLength: 0)
+            if compact {
+                controls
+                    .frame(maxWidth: .infinity, minHeight: 40)
+            } else {
                 HStack(spacing: 8) {
                     Button(action: toggle) {
                         Text(toggleTitle)
@@ -338,7 +336,7 @@ struct ToolboxTimerCard: View {
         }
         .padding(compact ? 8 : 10)
         .frame(maxWidth: .infinity)
-        .frame(height: compact ? 65 : 136)
+        .frame(height: 136)
         .background(Color.fillCard)
         .clipShape(shape)
         .overlay { shape.strokeBorder(Color.strokeCard, lineWidth: 1) }
@@ -449,7 +447,7 @@ struct ToolboxTimerCard: View {
 
     private var timeText: some View {
         Text(clock)
-            .font(.system(size: compact ? 20 : 26, weight: .bold, design: .rounded))
+            .font(.system(size: 26, weight: .bold, design: .rounded))
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.5)

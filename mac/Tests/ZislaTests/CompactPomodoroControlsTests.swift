@@ -62,7 +62,7 @@ struct CompactPomodoroControlsTests {
                     "Measuring a button must not intercept its mouse events")
             let pill = try #require(coordinator.activeLayout).collapsedFrame
             #expect(try #require(coordinator.activeLayout).containsTrigger(point))
-            let entry = edge.isVertical ? CGPoint(x: pill.minX + 0.5, y: point.y)
+            let entry = edge.isVertical && iconCount == 0 ? CGPoint(x: pill.minX + 0.5, y: point.y)
                 : CGPoint(x: point.x, y: pill.minY + 0.5)
             coordinator.handlePointer(at: entry)
             #expect(!expanded, "The pointer must be able to reach a button across the pill's padding")

@@ -96,4 +96,8 @@ struct CompactPomodoroControlRegion: NSViewRepresentable {
 
 final class CompactPomodoroControlRegionView: NSView {
     var pixelAlignmentInset: CGFloat = 0
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
 }

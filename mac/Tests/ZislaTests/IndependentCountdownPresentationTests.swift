@@ -7,6 +7,43 @@ import ZislaCore
 
 @MainActor
 struct IndependentCountdownPresentationTests {
+    @Test(arguments: IslandEdge.allCases)
+    func countdownRowsStartAfterTheMonitoringRowAndUseTheEntireIsland(edge: IslandEdge) async throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        let first = fixture.service.addCountdown(name: "Tea", duration: 60)
+        let second = fixture.service.addCountdown(name: "Meeting", duration: 120)
+        fixture.service.toggleCountdown(id: first)
+        fixture.service.toggleCountdown(id: second)
+        let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%", image: nil, style: .detailed), tooltip: "CPU")]
+        let notices = fixture.service.countdownNotices(for: .right, limit: 2)
+            + [IslandNotice(id: "ai-active-openai-layout", title: "AI")]
+        let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
+                                                                  settings: fixture.base.settings.settings, item: nil, at: fixture.date))
+        #expect(layout.rowCount == 3)
+        let host = fixture.host(FloatingIslandInformationView(layout: layout, visualizationStyle: .waveform, item: nil, date: fixture.date)
+            .environmentObject(fixture.service), size: layout.size)
+        await fixture.layout()
+        let monitor = try #require(Self.element("cpu", in: host) as? any NSAccessibilityElementProtocol).accessibilityFrame()
+        let frames = try [first, second].map { id in
+            try #require(Self.element("countdown.row.\(id)", in: host) as? any NSAccessibilityElementProtocol).accessibilityFrame()
+        }
+        let window = try #require(fixture.window).frame
+        #expect(!monitor.intersects(frames[0]) && !monitor.intersects(frames[1]))
+        #expect(!frames[0].intersects(frames[1]))
+        for frame in frames {
+            if edge.isVertical {
+                #expect(abs(frame.height - window.height) < 1)
+                #expect(abs(frame.minY - window.minY) < 1)
+            } else {
+                #expect(abs(frame.width - window.width) < 1)
+                #expect(abs(frame.minX - window.minX) < 1)
+            }
+        }
+        fixture.base.presenter.setStatusIcons(icons)
+        #expect(layout.size == fixture.base.presenter.compactConfiguration(for: notices, at: fixture.date).statusIconSize)
+    }
+
     @Test(arguments: IslandEdge.allCases, [false, true])
     func longNamesKeepTheFullClockOnEveryFloatingEdge(edge: IslandEdge, moreInformation: Bool) async throws {
         let fixture = try Fixture(edge: edge)
@@ -71,7 +108,7 @@ struct IndependentCountdownPresentationTests {
         defer { fixture.close() }
         let service = fixture.service
         let host = fixture.host(ToolboxTimerPanel(service: service).environment(\.locale, AppLanguage.english.locale),
-                                size: CGSize(width: 320, height: 136))
+                                size: CGSize(width: 236, height: 136))
         await fixture.layout()
         let add = try #require(Self.element("toolbox.addTimer", in: host))
         _ = add.perform(NSSelectorFromString("accessibilityPerformPress"))
@@ -104,7 +141,7 @@ struct IndependentCountdownPresentationTests {
         let id = service.addCountdown(name: "Tea", duration: 60)
         service.toggleCountdown(id: id)
         let deadline = service.countdowns.first?.engine.deadline
-        let host = fixture.host(ToolboxTimerCard(service: service, timerID: id, compact: true), size: CGSize(width: 157, height: 65))
+        let host = fixture.host(ToolboxTimerCard(service: service, timerID: id, compact: true), size: CGSize(width: 115, height: 136))
         await fixture.layout()
         let rename = try #require(Self.element("toolbox.renameTimer.\(id)", in: host))
         _ = rename.perform(NSSelectorFromString("accessibilityPerformPress"))
@@ -143,15 +180,19 @@ struct IndependentCountdownPresentationTests {
         #expect(layout.countdowns.count == 2)
         #expect(layout.countdowns.map(\.text) == ["Tea 00:00:10", "Meeting 00:00:20"])
         #expect(layout.icons.map(\.id) == ["cpu"])
-        #expect(layout.primaryThickness == 64)
-        #expect((edge.isVertical ? layout.size.width : layout.size.height) == 64)
+        #expect(layout.primaryThickness == (edge.isVertical ? layout.iconSize?.width : layout.iconSize?.height))
+        #expect((edge.isVertical ? layout.size.width : layout.size.height) == layout.primaryThickness + 64)
+        #expect((edge.isVertical ? layout.size.height : layout.size.width)
+            == max(layout.primaryLength, layout.countdownLength))
         #expect(!SideNoticePresenter.compactPanelIgnoresMouseEvents(statusIcons: icons, information: layout))
         service.cancelCountdown(id: tea)
         service.cancelCountdown(id: meeting)
         let unnamed = try #require(FloatingIslandInformationLayout(notices: service.countdownNotices(for: .right), icons: [],
                                                                    settings: fixture.base.settings.settings, item: nil, at: fixture.date))
         #expect(unnamed.countdowns.first?.text == "00:00:30")
-        #expect(unnamed.primaryThickness == 32)
+        #expect(unnamed.primaryThickness == 0)
+        #expect(unnamed.rowCount == 1)
+        #expect((edge.isVertical ? unnamed.size.width : unnamed.size.height) == 32)
     }
 
     @Test(arguments: [AppLanguage.english, .arabic])
@@ -204,7 +245,7 @@ struct IndependentCountdownPresentationTests {
         #expect(fixture.service.phase == .idle)
         let id = fixture.service.addCountdown(name: "Tea", duration: 3723)
         let compact = ToolboxTimerCard(service: fixture.service, timerID: id, compact: true)
-        let host = fixture.host(compact.environment(\.locale, AppLanguage.english.locale), size: CGSize(width: 115, height: 65))
+        let host = fixture.host(compact.environment(\.locale, AppLanguage.english.locale), size: CGSize(width: 115, height: 136))
         await fixture.layout()
         let toggle = try #require(Self.element("toolbox.toggleTimer.\(id)", in: host))
         let cancel = try #require(Self.element("toolbox.cancelTimer.\(id)", in: host))

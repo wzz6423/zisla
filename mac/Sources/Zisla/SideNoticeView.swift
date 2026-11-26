@@ -261,8 +261,8 @@ struct CompactStatusBarView: View {
     private func compactSurfaceContent(size: CGSize, at date: Date, animatesLogo: Bool) -> some View {
         let information = compactInformation(at: date)
         let progressPriority = compactProgressPriority(for: information)
-        let pillCornerRadius: CGFloat? = information?.secondary == nil
-            ? nil : VoiceRecordingIslandGeometry.bottomCornerRadius
+        let pillCornerRadius: CGFloat? = information.map { $0.rowCount > 1 } == true
+            ? VoiceRecordingIslandGeometry.bottomCornerRadius : nil
         let shape = CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle,
                                        pillCornerRadius: pillCornerRadius)
         return ZStack {
