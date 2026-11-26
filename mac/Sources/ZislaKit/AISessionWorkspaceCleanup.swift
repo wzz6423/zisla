@@ -395,7 +395,7 @@ struct AISessionWorkspaceCleanup: Sendable {
                     complete = false
                 }
             }
-        case .harness, .trae, .orca, .gpt, .doubao, .grokBot, .muse:
+        case .harness, .trae, .orca, .gpt, .doubao, .grokBot, .muse, .antigravity:
             // Activity logs and opaque or remote stores cannot establish permanent deletion.
             break
         }

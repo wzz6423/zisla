@@ -81,6 +81,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case codex
     case gemini
     case geminiDesktop
+    case antigravity
     case grok
     case gpt
     case copilot
@@ -135,6 +136,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .claude: self = .claude
         case .codex: self = .codex
         case .gemini: self = .gemini
+        case .antigravity: self = .antigravity
         case .grok: self = .grok
         case .gpt: self = .gpt
         case .copilot: self = .copilot
@@ -168,6 +170,8 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
             self = .claude
         } else if id.contains("codex") {
             self = .codex
+        } else if id.contains("antigravity") {
+            self = .antigravity
         } else if id.contains("gemini") {
             self = .gemini
         } else if id.contains("grok") {
@@ -212,6 +216,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .codex: .codex
         case .gemini: .gemini
         case .geminiDesktop: .gemini
+        case .antigravity: .antigravity
         case .grok: .grok
         case .gpt: .gpt
         case .copilot: .copilot
@@ -355,7 +360,7 @@ struct AIMascotView: View {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }
-        case .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
+        case .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot, .antigravity:
             guard let provider = identity.provider else { return nil }
             return imageCache.image(for: "installed|desktop-\(provider.rawValue)") {
                 AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider).map {

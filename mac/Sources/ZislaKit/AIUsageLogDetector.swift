@@ -324,7 +324,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return url.lastPathComponent.hasSuffix(".jsonl")
         case .muse:
             return url.lastPathComponent == "session.jsonl"
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot, .antigravity:
             return false
         case .codex, .claude, .qwen, .gpt:
             return true
@@ -417,7 +417,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             if parserState.copilotHasDetailedUsage {
                 samples.removeAll(where: isCopilotShutdownSummary)
             }
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot, .antigravity:
             return []
         }
         return Array(samples.suffix(maxSamplesPerFile))
@@ -551,7 +551,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return parsePi(root, candidate: candidate).map { [$0] } ?? []
         case .muse:
             return MuseUsageParser.sample(from: root).map { [$0] } ?? []
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot, .antigravity:
             return []
         }
     }

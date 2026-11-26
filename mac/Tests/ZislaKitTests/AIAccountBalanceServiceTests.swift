@@ -31,7 +31,7 @@ struct AIAccountBalanceServiceTests {
         let rows = try await makeService(openAIProvider: { .gpt }).accountBalances(for: [.cursor, .grokBot])
         #expect(rows.count == 1 && rows.first?.providers == [.cursor, .grokBot])
         #expect(rows.first?.providerTitle(language: .english) == "Cursor / Grok Bot")
-        #expect(BalanceURLProtocol.requests.count == 1)
+        #expect(BalanceURLProtocol.requests.filter { $0.url?.path == "/api/usage-summary" }.count == 1)
     }
 
     #if DEBUG
@@ -111,12 +111,13 @@ struct AIAccountBalanceServiceTests {
         let rows = try await service.accountBalances(for: [.gpt, .grokBot])
         #expect(rows.map(\.providers) == [[.gpt], [.grokBot]])
         #expect(rows.allSatisfy { $0.status == .available && $0.updatedAt == now })
-        #expect(BalanceURLProtocol.requests.count == 2)
+        #expect(BalanceURLProtocol.requests.filter { $0.url?.path == "/backend-api/wham/usage" }.count == 1)
+        #expect(BalanceURLProtocol.requests.filter { $0.url?.path == "/api/usage-summary" }.count == 1)
         #expect(BalanceURLProtocol.requests.first { $0.url?.host == "chatgpt.com" }?.value(forHTTPHeaderField: "ChatGPT-Account-Id") == "fixture-account")
         #expect(!String(describing: rows).contains("fixture-secret"))
         let both = try await service.accountBalances(for: [.codex, .gpt])
         #expect(both.count == 1 && both[0].providers == [.codex, .gpt])
-        #expect(BalanceURLProtocol.requests.count == 3)
+        #expect(BalanceURLProtocol.requests.filter { $0.url?.path == "/backend-api/wham/usage" }.count == 2)
     }
 
     /// Forbidden-read seams prove disabled and debug paths stay isolated even when a fixture is invalid.
@@ -182,7 +183,7 @@ struct AIAccountBalanceServiceTests {
         })
         #expect(try await service.accountBalances(for: [.coder], qoderRegions: [.china]).first?.status == .available)
         #expect(try await service.accountBalances(for: [.coder], qoderRegions: [.global]).first?.status == .available)
-        #expect(BalanceURLProtocol.requests.prefix(2).map { $0.url?.host } == ["qoder.com.cn", "qoder.com"])
+        #expect(BalanceURLProtocol.requests.filter { $0.url?.path == "/api/v2/me/usages/big_model_credits" }.map { $0.url?.host } == ["qoder.com.cn", "qoder.com"])
         #expect(try await service.accountBalances(for: [.trae]).first?.status == .available)
         let entitlement = try #require(BalanceURLProtocol.requests.first { $0.url?.path.hasSuffix("user_current_entitlement_list") == true })
         #expect(entitlement.value(forHTTPHeaderField: "Authorization") == "Cloud-IDE-JWT fixture-exchanged-token")
@@ -280,20 +281,137 @@ struct AIAccountBalanceServiceTests {
         #expect(BalanceURLProtocol.requests.isEmpty)
     }
 
-    /// Unified Cursor must use current endpoints; WorkBuddy's version fallback must not retry authentication failure.
+    /// Unified Cursor uses current dashboard/Connect endpoints; WorkBuddy's version fallback must not retry authentication failure.
     @Test func cursorUnifiedRequestsUseCurrentWindowsAndWorkBuddyFallbackRequires404() async throws {
-        BalanceURLProtocol.configure(["/api/usage-summary": [.json(#"{"membershipType":"unified_pro","limitType":"user","individualUsage":{"plan":{"used":0,"limit":1000}}}"#)],
-                                      "/api/dashboard/get-sand-usage-status": [.json(#"{"usagePercent":90,"hasNonZeroIncludedLimit":true}"#)],
-                                      "/api/dashboard/v2/usage-status": [.json(#"{"availability":"available","monthlyUsage":{"usedCents":800,"limitCents":1000,"periodStart":"2030-01-01T00:00:00Z","resetsAt":"2031-01-01T00:00:00Z"}}"#)],
-                                      "/billing/meter/get-user-resource": [.init(status: 404)],
-                                      "/v2/billing/meter/get-user-resource": [.json(#"{"data":{"Accounts":[{"Status":0,"CycleCapacitySizePrecise":100,"CycleCapacityRemainPrecise":20}]}}"#)]])
-        let rows = try await makeService().accountBalances(for: [.cursor, .workbuddyAI])
+        BalanceURLProtocol.configure([
+            "/api/usage-summary": [.json(#"{"membershipType":"plus","individualUsage":{"plan":{"used":0,"limit":1000}}}"#)],
+            "/api/dashboard/get-plan-info": [.json(#"{"isMerged":true,"planInfo":{"includedUsagePeriod":"INCLUDED_USAGE_PERIOD_WEEKLY","includedUsageResetsAt":"1910500000000"}}"#)],
+            "/api/dashboard/get-sand-usage-status": [.json(#"{"usagePercent":90,"isUnified":true,"hasNonZeroIncludedLimit":true}"#)],
+            "/aiserver.v1.DashboardService/GetCurrentPeriodUsage": [.json(#"{"planUsage":{"totalPercentUsed":80}}"#)],
+            "/api/dashboard/get-user-prepaid-billing": [.json(#"{"availableCents":"1500"}"#)],
+            "/billing/meter/get-user-resource": [.init(status: 404)],
+            "/v2/billing/meter/get-user-resource": [.json(#"{"data":{"Accounts":[{"Status":0,"CycleCapacitySizePrecise":100,"CycleCapacityRemainPrecise":20}]}}"#)],
+        ])
+        let service = makeService(credentials: { provider, _, _ in
+            if provider == .cursor {
+                return AIAccountBalanceCredential(token: "WorkosCursorSessionToken=user_1%3A%3Aaaa.bbb.ccc", accountID: "user_1")
+            }
+            return AIAccountBalanceCredential(token: "fixture-secret", accountID: "fixture-account")
+        })
+        let rows = try await service.accountBalances(for: [.cursor, .workbuddyAI])
         #expect(rows.allSatisfy { $0.status == .available })
-        #expect(rows.first { $0.providers == [.cursor] }?.windows.map(\.remainingPercent) == [10, 20])
-        #expect(BalanceURLProtocol.requests.count == 5)
+        let cursor = try #require(rows.first { $0.providers == [.cursor] })
+        #expect(cursor.windows.map(\.id) == ["included", "prepaid"])
+        #expect(cursor.windows[0].remainingPercent == 20 && cursor.windows[1].remaining == 15)
+        let periodReq = try #require(BalanceURLProtocol.requests.first { $0.url?.host == "api2.cursor.sh" })
+        #expect(periodReq.value(forHTTPHeaderField: "Authorization") == "Bearer aaa.bbb.ccc")
+        #expect(periodReq.value(forHTTPHeaderField: "Connect-Protocol-Version") == "1")
         BalanceURLProtocol.configure(["/billing/meter/get-user-resource": [.init(status: 401)]])
         #expect(try await makeService().accountBalances(for: [.workbuddyAI]).first?.status == .credentialsExpired)
         #expect(BalanceURLProtocol.requests.count == 1)
+    }
+
+    @Test func antigravityAndGeminiDesktopFallbackRespectAccountIsolation() async throws {
+        BalanceURLProtocol.configure([:])
+        let snapshot = AIAccountAntigravitySnapshot(
+            windows: [
+                .init(id: "additional:gemini:five_hour", kind: .fiveHours, remainingPercent: 80, durationSeconds: 18_000, name: "Gemini"),
+                .init(id: "additional:claude-gpt:weekly", kind: .weekly, remainingPercent: 60, durationSeconds: 604_800, name: "Claude/GPT"),
+            ],
+            accountID: "dev@example.test",
+            accountName: "dev@example.test",
+            sourceDetail: .app
+        )
+        let service = makeService(credentials: { _, _, _ in nil }, antigravity: { snapshot })
+        let rows = try await service.accountBalances(for: [.antigravity, .gemini])
+        let ag = try #require(rows.first { $0.providers == [.antigravity] })
+        let gem = try #require(rows.first { $0.providers == [.gemini] })
+        #expect(ag.status == .available && ag.windows.count == 2)
+        #expect(gem.status == .available && gem.windows.map(\.name) == ["Gemini"])
+
+        // Expired Gemini CLI credentials must fail without falling back to the local Antigravity daemon.
+        let expiredCLI = makeService(credentials: { _, _, _ in throw AIAccountBalanceError.credentialsExpired }, antigravity: {
+            Issue.record("Expired Gemini CLI credentials must not fall back to Antigravity probe")
+            return snapshot
+        })
+        let expiredRow = try #require(try await expiredCLI.accountBalances(for: [.gemini]).first)
+        #expect(expiredRow.status == .credentialsExpired && expiredRow.windows.isEmpty)
+
+        // A snapshot without Gemini windows must not leak non-Gemini quota onto the Gemini row.
+        let nonGeminiOnly = AIAccountAntigravitySnapshot(
+            windows: [.init(id: "additional:claude-gpt:weekly", kind: .weekly, remainingPercent: 60, durationSeconds: 604_800, name: "Claude/GPT")],
+            accountID: "dev@example.test",
+            accountName: "dev@example.test",
+            sourceDetail: .app
+        )
+        let missingGemini = try #require(try await makeService(credentials: { _, _, _ in nil }, antigravity: { nonGeminiOnly })
+            .accountBalances(for: [.gemini]).first)
+        #expect(missingGemini.status == .unavailable && missingGemini.windows.isEmpty)
+    }
+
+    @Test func qoderSharedCreditsZcodeStartPlanZedSubscriptionAndGeminiObjectProjectAreFetched() async throws {
+        BalanceURLProtocol.configure([
+            "/api/v2/me/usages/big_model_credits": [.json(#"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":25}}}}"#)],
+            "/api/v1/me/organization-shared-usages/big_model_credits": [.json(#"{"data":{"sharedQuota":{"quotaSummary":{"limitValue":200,"usedValue":50}}}}"#)],
+            "/api/v1/zcode-plan/billing/balance": [.json(#"{"code":200,"data":{"balances":[{"show_name":"Start Credits","total_units":100,"remaining_units":25,"period":"daily"}]}}"#)],
+            "/frontend/billing/usage": [.json(#"{"current_usage":{"token_spend":{"limit_in_cents":2000,"spend_in_cents":500}}}"#)],
+            "/frontend/billing/subscriptions/current": [.json(#"{"subscription":{"period":{"end_at":"2026-06-01T00:00:00Z"}}}"#)],
+            "/v1internal:loadCodeAssist": [.json(#"{"response":{"cloudaicompanionProject":{"id":"proj-obj-9"}}}"#)],
+            "/v1internal:retrieveUserQuota": [.json(#"{"buckets":[{"modelId":"gemini-2.5-pro","remainingFraction":0.7}]}"#)],
+        ])
+        let service = makeService(credentials: { provider, _, _ in
+            switch provider {
+            case .coder:
+                var cred = AIAccountBalanceCredential(token: "session=qoder", region: "global")
+                cred.isWebsiteCookie = true
+                return cred
+            case .zcode:
+                return AIAccountBalanceCredential(token: "start-jwt", region: "start-plan", headers: ["X-Device-Mid": "mid-1"])
+            case .zed:
+                var cred = AIAccountBalanceCredential(token: "zed=cookie")
+                cred.isWebsiteCookie = true
+                return cred
+            default:
+                return AIAccountBalanceCredential(token: "fixture-secret", accountID: "fixture-account")
+            }
+        })
+        let rows = try await service.accountBalances(for: [.coder, .zcode, .zed, .gemini])
+        let qoder = try #require(rows.first { $0.providers == [.coder] })
+        let zcode = try #require(rows.first { $0.providers == [.zcode] })
+        let zed = try #require(rows.first { $0.providers == [.zed] })
+        let gemini = try #require(rows.first { $0.providers == [.gemini] })
+        #expect(qoder.windows.map(\.id) == ["credits", "team_credits"])
+        #expect(zcode.windows.first?.remainingPercent == 25)
+        #expect(zed.windows.first?.resetsAt != nil)
+        #expect(gemini.windows.first?.remainingPercent == 70)
+        let retrieveReq = try #require(BalanceURLProtocol.requests.first { $0.url?.path == "/v1internal:retrieveUserQuota" })
+        let retrieveBody = try #require(retrieveReq.httpBody.flatMap { String(data: $0, encoding: .utf8) })
+        #expect(retrieveBody.contains("proj-obj-9"))
+        let zcodeReq = try #require(BalanceURLProtocol.requests.first { $0.url?.host == "zcode.z.ai" })
+        #expect(zcodeReq.value(forHTTPHeaderField: "X-Device-Mid") == "mid-1")
+    }
+
+    @Test func grokHeadersAndStatusAndOpenCodeEntitlementAreClassifiedAccurately() async throws {
+        BalanceURLProtocol.configure([
+            "/grok_api_v2.GrokBuildBilling/GetGrokCreditsConfig": [
+                .init(status: 200, data: Data(), headers: ["grpc-status": "16", "grpc-message": "unauthenticated"]),
+            ],
+            "/zen/go/v1/usage": [
+                .init(status: 403, data: Data(#"{"error":{"type":"EntitlementError","message":"No Go subscription"}}"#.utf8)),
+            ],
+        ])
+        let rows = try await makeService().accountBalances(for: [.grok, .opencode])
+        let grok = try #require(rows.first { $0.providers == [.grok] })
+        let opencode = try #require(rows.first { $0.providers == [.opencode] })
+        #expect(grok.status == .credentialsExpired)
+        #expect(opencode.status == .unavailable, "OpenCode EntitlementError must not be classified as expired credentials")
+        let grokReq = try #require(BalanceURLProtocol.requests.first { $0.url?.host == "grok.com" })
+        #expect(grokReq.value(forHTTPHeaderField: "X-XAI-Token-Auth") == "xai-grok-cli")
+        #expect(grokReq.value(forHTTPHeaderField: "User-Agent") == "Grok Build")
+        #expect(grokReq.value(forHTTPHeaderField: "Referer") == "https://grok.com/?_s=usage")
+        #expect(grokReq.value(forHTTPHeaderField: "x-user-agent") == "connect-es/2.1.1")
+        #expect(grokReq.value(forHTTPHeaderField: "Accept") == "*/*")
+        #expect(grokReq.httpBody == Data([0, 0, 0, 0, 0]))
     }
 
     /// Held request events expose the concurrency bound and make in-flight versus pre-start cancellation observable.
@@ -343,11 +461,12 @@ struct AIAccountBalanceServiceTests {
         AIAccountBalanceCredential(token: "fixture-secret", accountID: "fixture-account")
     }, debug: @escaping @Sendable () -> [AIAccountBalance]? = { nil },
     muse: @escaping @Sendable () async throws -> Data? = { nil },
+    antigravity: @escaping @Sendable () async throws -> AIAccountAntigravitySnapshot? = { nil },
     openAIProvider: @escaping @Sendable () -> AIProvider? = { nil }) -> AIAccountBalanceService {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BalanceURLProtocol.self]
         return .init(credentials: credentials, configuration: configuration, now: { now }, museUsage: muse,
-                     debugBalances: debug, preferredOpenAIProvider: openAIProvider)
+                     antigravityProbe: antigravity, debugBalances: debug, preferredOpenAIProvider: openAIProvider)
     }
 }
 
@@ -358,6 +477,7 @@ private final class BalanceURLProtocol: URLProtocol, @unchecked Sendable {
         var error: URLError.Code?
         var url: String?
         var contentLength: Int?
+        var headers: [String: String] = [:]
         static func json(_ value: String) -> Self { .init(data: Data(value.utf8)) }
     }
     private static let lock = NSLock()
@@ -413,7 +533,7 @@ private final class BalanceURLProtocol: URLProtocol, @unchecked Sendable {
     private func finish() {
         guard Self.lock.withLock({ if finished { return false }; finished = true; Self.active -= 1; return true }) else { return }
         if let error = response.error { client?.urlProtocol(self, didFailWithError: URLError(error)); return }
-        var headers = ["Content-Type": "application/json"]
+        var headers = ["Content-Type": "application/json"].merging(response.headers, uniquingKeysWith: { _, new in new })
         if let length = response.contentLength { headers["Content-Length"] = String(length) }
         let http = HTTPURLResponse(url: response.url.flatMap(URL.init(string:)) ?? request.url!, statusCode: response.status, httpVersion: nil, headerFields: headers)!
         client?.urlProtocol(self, didReceive: http, cacheStoragePolicy: .notAllowed)
