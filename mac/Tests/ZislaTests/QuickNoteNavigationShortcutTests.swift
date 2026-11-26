@@ -10,7 +10,7 @@ import WebKit
 @MainActor
 struct QuickNoteNavigationShortcutTests {
     @Test
-    func commandArrowsNavigateWithoutWrappingWhileAnEditorHasFocus() async throws {
+    func commandArrowsWrapWhileAnEditorHasFocus() async throws {
         let suiteName = "Zisla.QuickNoteNavigationShortcutTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -36,9 +36,9 @@ struct QuickNoteNavigationShortcutTests {
 
         for (key, keyCode, expectedID) in [
             ("\u{F700}", UInt16(126), welcomeID),
-            ("\u{F700}", UInt16(126), welcomeID),
+            ("\u{F700}", UInt16(126), lastID),
+            ("\u{F701}", UInt16(125), welcomeID),
             ("\u{F701}", UInt16(125), firstID),
-            ("\u{F701}", UInt16(125), lastID),
             ("\u{F701}", UInt16(125), lastID),
             ("\u{F700}", UInt16(126), firstID)
         ] {
@@ -57,7 +57,7 @@ struct QuickNoteNavigationShortcutTests {
         #expect(panel.performKeyEquivalent(with: repeated))
         #expect(service.selectedID == lastID)
         #expect(panel.performKeyEquivalent(with: repeated))
-        #expect(service.selectedID == lastID)
+        #expect(service.selectedID == welcomeID)
 
         for modifiers: NSEvent.ModifierFlags in [[], .shift, .option, .control,
                                                  [.command, .shift], [.command, .option], [.command, .control]] {
@@ -114,7 +114,7 @@ struct QuickNoteNavigationShortcutTests {
     }
 
     @Test
-    func navigationScrollsOffscreenSelectionsIntoViewAndKeepsNumberShortcuts() async throws {
+    func wrappingScrollsOffscreenSelectionsIntoViewAndKeepsNumberShortcuts() async throws {
         let suiteName = "Zisla.QuickNoteNavigationShortcutTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -145,11 +145,22 @@ struct QuickNoteNavigationShortcutTests {
         let bottomOrigin = scrollView.contentView.bounds.origin.y
         #expect(bottomOrigin > initialOrigin, "Navigating past the viewport must reveal the selected row")
         #expect(panel.performKeyEquivalent(with: down))
-        #expect(service.selectedID == notes.last?.id)
+        #expect(service.selectedID == welcomeID, "Command-down must wrap the last note to the welcome row")
 
-        service.select(id: welcomeID)
         await layout(host)
-        #expect(scrollView.contentView.bounds.origin.y < bottomOrigin, "Returning to the welcome row must scroll toward the top")
+        let wrappedTopOrigin = scrollView.contentView.bounds.origin.y
+        #expect(wrappedTopOrigin < bottomOrigin, "Wrapping to the welcome row must scroll toward the top")
+        let up = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+                                               modifierFlags: [.command, .numericPad, .function], timestamp: 0,
+                                               windowNumber: panel.windowNumber, context: nil, characters: "\u{F700}",
+                                               charactersIgnoringModifiers: "\u{F700}", isARepeat: false, keyCode: 126))
+        #expect(panel.performKeyEquivalent(with: up))
+        #expect(service.selectedID == notes.last?.id, "Command-up must wrap the welcome row to the last note")
+        await layout(host)
+        #expect(scrollView.contentView.bounds.origin.y > wrappedTopOrigin, "Wrapping to the last note must reveal its row")
+        #expect(panel.performKeyEquivalent(with: down))
+        #expect(service.selectedID == welcomeID)
+        await layout(host)
         let number = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
                                                    modifierFlags: .command, timestamp: 0, windowNumber: panel.windowNumber,
                                                    context: nil, characters: "2", charactersIgnoringModifiers: "2", isARepeat: false, keyCode: 19))
