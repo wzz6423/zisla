@@ -1,3 +1,4 @@
+import AppKit
 import ZislaCore
 import ZislaKit
 import SwiftUI
@@ -246,12 +247,46 @@ struct ToolboxModuleView: View {
 
 struct ToolboxTimerPanel: View {
     @ObservedObject var service: PomodoroService
-    private var timerIDs: [UUID?] { [nil] + service.countdowns.map { $0.id } }
 
     var body: some View {
-        let timerIDs = self.timerIDs
-        ScrollView(.vertical) {
-            LazyVStack(spacing: 6) {
+        TimerList(service: service)
+            .thinScrollChrome()
+            .accessibilityIdentifier("toolbox.timers")
+            .frame(width: 236)
+            .overlay(alignment: .topTrailing) {
+                IconButton(symbol: "plus", help: AppLocalization.text("添加计时器"), size: .compact) {
+                    service.addCountdown()
+                }
+                .accessibilityLabel(AppLocalization.text("添加计时器"))
+                .accessibilityIdentifier("toolbox.addTimer")
+                .padding(6)
+            }
+    }
+
+    private struct TimerList: NSViewRepresentable {
+        @ObservedObject var service: PomodoroService
+
+        func makeNSView(context: Context) -> NSScrollView {
+            let scroll = NSScrollView()
+            scroll.contentView = TimerClipView()
+            scroll.drawsBackground = false
+            scroll.horizontalScrollElasticity = .none
+            ThinScrollChrome.apply(to: scroll)
+            let hosting = NSHostingView(rootView: rows(environment: context.environment))
+            hosting.translatesAutoresizingMaskIntoConstraints = false
+            scroll.documentView = hosting
+            hosting.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
+            return scroll
+        }
+
+        func updateNSView(_ scroll: NSScrollView, context: Context) {
+            let hosting = scroll.documentView as! NSHostingView<AnyView>
+            hosting.rootView = rows(environment: context.environment)
+        }
+
+        private func rows(environment: EnvironmentValues) -> AnyView {
+            let timerIDs: [UUID?] = [nil] + service.countdowns.map { $0.id }
+            return AnyView(VStack(spacing: 6) {
                 ForEach(Array(stride(from: 0, to: timerIDs.count, by: 2)), id: \.self) { index in
                     HStack(spacing: 6) {
                         ForEach(timerIDs[index..<min(index + 2, timerIDs.count)], id: \.self) { timerID in
@@ -260,18 +295,24 @@ struct ToolboxTimerPanel: View {
                     }
                 }
             }
+            .environment(\.colorScheme, environment.colorScheme)
+            .environment(\.locale, environment.locale)
+            .environment(\.layoutDirection, environment.layoutDirection))
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .thinScrollChrome(scrollerStyle: .overlay)
-        .accessibilityIdentifier("toolbox.timers")
-        .frame(width: 236)
-        .overlay(alignment: .topTrailing) {
-            IconButton(symbol: "plus", help: AppLocalization.text("添加计时器"), size: .compact) {
-                service.addCountdown()
+    }
+
+    private final class TimerClipView: NSClipView {
+        override var frame: NSRect {
+            didSet {
+                synchronizeDocumentWidth()
             }
-            .accessibilityLabel(AppLocalization.text("添加计时器"))
-            .accessibilityIdentifier("toolbox.addTimer")
-            .padding(6)
+        }
+
+        private func synchronizeDocumentWidth() {
+            // Autohiding changes the clip width after SwiftUI has laid out the timer cards.
+            if let documentView, documentView.frame.width != bounds.width {
+                documentView.setFrameSize(NSSize(width: bounds.width, height: documentView.frame.height))
+            }
         }
     }
 }

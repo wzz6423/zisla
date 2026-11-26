@@ -86,6 +86,68 @@ struct ToolboxTimerLayoutTests {
         #expect(second.insetBy(dx: -0.5, dy: -0.5).contains(cancel))
     }
 
+    @Test(arguments: [NSAppearance.Name.aqua, .darkAqua], [LayoutDirection.leftToRight, .rightToLeft])
+    func overflowingTimersRenderAThreePointScrollbarAfterNativeStyleChanges(
+        appearanceName: NSAppearance.Name, direction: LayoutDirection
+    ) async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let host = fixture.host(ToolboxTimerPanel(service: fixture.service)
+            .background(appearanceName == .darkAqua ? Color.black : Color.white)
+            .environment(\.colorScheme, appearanceName == .darkAqua ? .dark : .light)
+            .environment(\.layoutDirection, direction),
+            size: CGSize(width: 236, height: 136))
+        fixture.window?.appearance = NSAppearance(named: appearanceName)
+        await fixture.layout()
+        let scroll = try #require(Self.scrollView(in: host))
+        #expect(scroll.verticalScroller?.isHidden == true)
+        for _ in 0..<4 { fixture.service.addCountdown() }
+        await fixture.layout()
+
+        for height in [CGFloat(136), 180] {
+            scroll.scrollerStyle = .overlay
+            fixture.window?.setContentSize(CGSize(width: 236, height: height))
+            await fixture.layout()
+            scroll.tile()
+            scroll.reflectScrolledClipView(scroll.contentView)
+            let scroller = try #require(scroll.verticalScroller)
+            #expect(scroller.knobProportion > 0 && scroller.knobProportion < 1)
+            host.displayIfNeeded()
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let track = scroller.convert(scroller.bounds, to: host)
+            let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+            scroller.isHidden = true
+            let baseline = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: baseline)
+            scroller.isHidden = false
+
+            var visibleColumns = Set<Int>()
+            for y in 0..<bitmap.pixelsHigh {
+                for x in Int(track.minX * scale)..<Int(track.maxX * scale) {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    let background = try #require(baseline.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if abs(color.redComponent - background.redComponent) > 0.1 { visibleColumns.insert(x) }
+                }
+            }
+            #expect(visibleColumns.count == Int(3 * scale),
+                    "Overflowing timer cards must actually paint a 3pt scrollbar after resizing and native style changes")
+            let document = try #require(scroll.documentView)
+            #expect(abs(scroll.frame.width - 236) < 0.5)
+            #expect(abs(document.frame.width - scroll.contentView.bounds.width) < 0.5)
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: document.frame.height - scroll.contentView.bounds.height))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            #expect(scroll.contentView.bounds.minY > 0)
+        }
+        for id in fixture.service.countdowns.map(\.id) { fixture.service.cancelCountdown(id: id) }
+        await fixture.layout()
+        #expect(scroll.verticalScroller?.isHidden == true)
+        let finalDocument = try #require(scroll.documentView)
+        #expect(abs(finalDocument.frame.width - 236) < 0.5,
+                "Returning to a single timer must restore the full card width without a scrollbar gutter")
+        #expect(fixture.window?.isVisible == false)
+    }
+
     private static func scrollView(in view: NSView) -> NSScrollView? {
         (view as? NSScrollView) ?? view.subviews.compactMap { scrollView(in: $0) }.first
     }
