@@ -913,6 +913,39 @@ struct AIAccountBalanceViewTests {
         #expect(try changes(restarted, beginning) == 0, "A new account with identical lines must start from its first quota viewport")
         #expect(try changes(tail, restarted) > 30, "The fixture must have an overflowing weekly line to distinguish the tail")
     }
+
+    @Test func cardPairsSameNamedFiveHourAndWeeklyWindowsIntoOneConcentricRing() throws {
+        let gemini5h = AIAccountQuotaWindow(id: "additional:gemini:five_hour", kind: .fiveHours,
+                                            remainingPercent: 10, durationSeconds: 18_000, name: "Gemini")
+        let gemini7d = AIAccountQuotaWindow(id: "additional:gemini:weekly", kind: .weekly,
+                                            remainingPercent: 51, durationSeconds: 604_800, name: "Gemini")
+        let argon5h = AIAccountQuotaWindow(id: "additional:gemini-4-argon:five_hour", kind: .fiveHours,
+                                           remainingPercent: 80, durationSeconds: 18_000, name: "Gemini 4 Argon")
+        let claude7d = AIAccountQuotaWindow(id: "additional:claude-gpt:weekly", kind: .weekly,
+                                            remainingPercent: 75, durationSeconds: 604_800, name: "Claude/GPT")
+        let claude5h = AIAccountQuotaWindow(id: "additional:claude-gpt:five_hour", kind: .fiveHours,
+                                            remainingPercent: 30, durationSeconds: 18_000, name: "Claude/GPT")
+        let balance = AIAccountBalance(id: "antigravity", providers: [.antigravity], status: .available,
+                                       windows: [gemini5h, gemini7d, argon5h, claude7d, claude5h])
+        let rows = AIAccountBalanceCard.extraRows(for: balance)
+        #expect(rows == [
+            .paired(name: "Gemini", fiveHour: gemini5h, weekly: gemini7d),
+            .single(argon5h),
+            .paired(name: "Claude/GPT", fiveHour: claude5h, weekly: claude7d),
+        ])
+
+        // Paired named 5h/7d renders one concentric ring (inner red 5h, outer green 7d) instead of two stacked rings.
+        let pairedCard = AIAccountBalanceCard(
+            balance: AIAccountBalance(id: "ag-one", providers: [.antigravity], status: .available,
+                                      windows: [gemini5h, gemini7d]),
+            language: .english
+        )
+        .foregroundStyle(.white).environment(\.colorScheme, .dark)
+        let host = NSHostingView(rootView: pairedCard.frame(width: 244).fixedSize(horizontal: false, vertical: true))
+        host.layoutSubtreeIfNeeded()
+        #expect(host.fittingSize.height <= 116, "Paired 5h/7d group must occupy one concentric ring row, not two stacked rings")
+    }
+
     private func renderOffscreen(_ content: some View, size: CGSize, reduceMotion: Bool = false,
                                  progress: Double = 0) async throws -> NSBitmapImageRep {
         let host = NSHostingView(rootView: content.frame(width: size.width, height: size.height).background(.black)

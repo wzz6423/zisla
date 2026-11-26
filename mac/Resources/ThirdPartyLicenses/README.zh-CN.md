@@ -99,7 +99,7 @@ https://github.com/dimpurr/chat-stasher
 
 https://github.com/Javis603/token-monitor
 
-固定 revision：`235a77c3fd3f63926a8fc50e879ada5a80029275`。
-相关源文件为 `src/shared/providers/{codex,copilot,grok,kimi,cursor,qoder,trae,zcode,zed,workbuddy,opencode,muse}`。
+固定 revision：`59154147a7ba9acd4eddeea5f166444bf12090a0`。
+相关源文件为 `src/shared/providers/{antigravity,claude,codex,copilot,grok,kimi,cursor,qoder,trae,zai,zed,workbuddy,opencode,muse}`。
 采用 MIT 许可证，详见本目录的 `TokenMonitor-LICENSE.txt`。
 zisla 原生实现这些映射，不包含浏览器凭据扫描、上游界面、自动登录或远端构建依赖。

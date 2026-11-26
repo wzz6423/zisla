@@ -10,52 +10,112 @@ enum AIAccountGrokQuotaParser {
         var message: Data?
     }
 
-    /// Reads only descriptor-defined quota fields from one bounded, uncompressed gRPC-web payload.
+    /// Maps gRPC-web authentication errors to expired credentials and other non-zero RPC statuses to unavailable.
+    static func validateGRPCStatus(status: String?, message: String?) throws {
+        guard let rawStatus = status?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawStatus.isEmpty, rawStatus != "0" else { return }
+        let code = Int(rawStatus)
+        let decoded = message?.removingPercentEncoding ?? message ?? ""
+        let lower = decoded.lowercased()
+        let isAuthFailure = code == 16
+            || (code == 7 && (
+                lower.contains("bad-credentials")
+                    || lower.contains("unauthenticated")
+                    || (lower.contains("oauth2") && lower.contains("could not be validated"))
+                    || (lower.contains("access token") && (
+                        lower.contains("invalid")
+                            || lower.contains("expired")
+                            || lower.contains("could not be validated")
+                    ))
+            ))
+        if isAuthFailure { throw AIAccountBalanceError.credentialsExpired }
+        throw AIAccountBalanceError.noQuota
+    }
+
+    /// Reads only descriptor-defined quota fields from one bounded, uncompressed gRPC-web or raw protobuf payload.
     /// Protobuf's omitted scalar zero is accepted only for a confirmed active period with a future reset.
     static func parse(_ data: Data, now: Date) throws -> [AIAccountQuotaWindow] {
         guard !data.isEmpty, data.count <= 1_024 * 1_024 else { throw AIAccountBalanceError.invalidResponse }
-        let bytes = [UInt8](data)
-        var index = 0, payloads: [Data] = []
-        while index < bytes.count {
-            guard index + 5 <= bytes.count else { throw AIAccountBalanceError.invalidResponse }
-            let flags = bytes[index]
-            let size = bytes[(index + 1)...(index + 4)].reduce(0) { $0 * 256 + Int($1) }
-            index += 5
-            guard size <= bytes.count - index else { throw AIAccountBalanceError.invalidResponse }
-            let body = Data(bytes[index..<(index + size)])
-            if flags == 0 { payloads.append(body) }
-            else if flags == 0x80 {
-                guard let text = String(data: body, encoding: .utf8),
-                      text.components(separatedBy: .newlines).filter({ $0.lowercased().hasPrefix("grpc-status:") })
-                          .allSatisfy({ $0.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) == "0" }) else {
-                    throw AIAccountBalanceError.invalidResponse
-                }
-            } else { throw AIAccountBalanceError.invalidResponse }
-            index += size
+        let payload: Data
+        if let framed = try extractFramedPayload(data) {
+            payload = framed
+        } else if looksLikeProtobuf(data) {
+            payload = data
+        } else {
+            throw AIAccountBalanceError.invalidResponse
         }
-        guard payloads.count == 1 else { throw AIAccountBalanceError.invalidResponse }
-        let root = try fields(payloads[0])
+        let root = try fields(payload)
         let config = try message(root, number: 1)
         let percentage = try unique(config, number: 1)
+        let directStart = try timestamp(config, number: 4)
         let reset = try timestamp(config, number: 5)
+        let hasPeriodBlock = config.contains { $0.number == 6 }
         let period = try optionalMessage(config, number: 8)
-        let start = try period.flatMap { try timestamp($0, number: 2) }
-        let end = try period.flatMap { try timestamp($0, number: 3) }
+        let legacyStart = try period.flatMap { try timestamp($0, number: 2) }
+        let legacyEnd = try period.flatMap { try timestamp($0, number: 3) }
         let active = try period.flatMap { try unique($0, number: 1)?.integer }
+        let start = directStart ?? legacyStart
+        let end = reset ?? legacyEnd
         let used: Double
         if let percentage {
             guard let value = percentage.float, value.isFinite, (0...100).contains(value) else { throw AIAccountBalanceError.invalidResponse }
             used = Double(value)
         } else {
-            guard active == 1 || active == 2, let start, let end, start <= now, now < end,
-                  reset.map({ $0 > now }) == true else { throw AIAccountBalanceError.noQuota }
+            let confirmedPeriod = hasPeriodBlock || active == 1 || active == 2
+            guard confirmedPeriod, let end, end > now else { throw AIAccountBalanceError.noQuota }
+            if let start, !(start <= now && now < end) { throw AIAccountBalanceError.noQuota }
             used = 0
         }
         let duration = start.flatMap { begin in end.map { $0.timeIntervalSince(begin) } }.flatMap { $0 > 0 ? $0 : nil }
         let window = AIAccountQuotaWindow(id: "credits", kind: AIAccountBalanceParser.kind(duration: duration),
-                                          remainingPercent: 100 - used, resetsAt: reset, durationSeconds: duration)
+                                          remainingPercent: 100 - used, resetsAt: end, durationSeconds: duration)
         guard window.isValid else { throw AIAccountBalanceError.invalidResponse }
         return [window]
+    }
+
+    private static func extractFramedPayload(_ data: Data) throws -> Data? {
+        let bytes = [UInt8](data)
+        var index = 0
+        var payloads: [Data] = []
+        var sawTrailer = false
+        while index < bytes.count {
+            guard index + 5 <= bytes.count else { return nil }
+            let flags = bytes[index]
+            guard flags == 0 || flags == 0x80 else { return nil }
+            let size = bytes[(index + 1)...(index + 4)].reduce(0) { $0 * 256 + Int($1) }
+            index += 5
+            guard size <= bytes.count - index else { return nil }
+            let body = Data(bytes[index..<(index + size)])
+            if flags == 0 {
+                payloads.append(body)
+            } else {
+                sawTrailer = true
+                guard let text = String(data: body, encoding: .utf8) else {
+                    throw AIAccountBalanceError.invalidResponse
+                }
+                var status: String?
+                var message: String?
+                for line in text.components(separatedBy: .newlines) {
+                    guard let colon = line.firstIndex(of: ":") else { continue }
+                    let key = line[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+                    let value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+                    if key == "grpc-status" { status = value }
+                    else if key == "grpc-message" { message = value }
+                }
+                try validateGRPCStatus(status: status, message: message)
+            }
+            index += size
+        }
+        if payloads.count == 1 { return payloads[0] }
+        if sawTrailer && payloads.isEmpty { throw AIAccountBalanceError.noQuota }
+        return nil
+    }
+
+    private static func looksLikeProtobuf(_ data: Data) -> Bool {
+        guard let first = data.first else { return false }
+        let number = first >> 3
+        let wire = first & 0x07
+        return number == 1 && wire == 2
     }
 
     /// An absent timestamp is optional; a present timestamp without its seconds field is malformed.

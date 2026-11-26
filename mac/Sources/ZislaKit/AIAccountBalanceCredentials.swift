@@ -1,4 +1,5 @@
 import CoreFoundation
+import CryptoKit
 import Darwin
 import Foundation
 import Security
@@ -23,10 +24,11 @@ enum AIAccountBalanceError: Error, Equatable {
     case httpStatus(Int), unsupportedLogin, noQuota
 }
 
-// Native read-only adaptation of CodexBar 7447bc77 and token-monitor 235a77c3 (MIT).
+// Native read-only adaptation of CodexBar 7447bc77 and token-monitor 5915414 (MIT).
 struct AIAccountBalanceCredentials: Sendable {
     let home: URL
     var environment: [String: String] = ProcessInfo.processInfo.environment
+    var username: String = NSUserName()
     var fileRead: @Sendable (URL) throws -> Data? = Self.readRegularFile
     var cursorCookie: @Sendable (Date) throws -> String?
     var keychainRead: @Sendable (String, Bool) throws -> AISubscriptionCredentials.KeychainCredential? = {
@@ -48,6 +50,9 @@ struct AIAccountBalanceCredentials: Sendable {
     func load(for provider: AIProvider, at now: Date, qoderRegion: AIAccountBalanceQoderRegion = .global) throws -> AIAccountBalanceCredential? {
         switch provider {
         case .copilot:
+            if let token = envToken(["COPILOT_API_TOKEN", "GITHUB_COPILOT_TOKEN"]) {
+                return try Self.credential(token: token)
+            }
             let config = environment["XDG_CONFIG_HOME"].flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0) : nil }
                 ?? home.appendingPathComponent(".config")
             let base = config.appendingPathComponent("github-copilot")
@@ -60,11 +65,12 @@ struct AIAccountBalanceCredentials: Sendable {
                     }
                     return try Self.credential(token: token, accountID: auth["login"] as? String ?? auth["user"] as? String)
                 }
-                guard let first = values.first else { return nil }
-                guard values.allSatisfy({ $0.accountID != nil && $0.accountID == first.accountID }) || values.count == 1 else {
-                    throw AIAccountBalanceError.credentialsUnavailable
+                if let first = values.first {
+                    guard values.allSatisfy({ $0.accountID != nil && $0.accountID == first.accountID }) || values.count == 1 else {
+                        throw AIAccountBalanceError.credentialsUnavailable
+                    }
+                    return first
                 }
-                return first
             }
             guard let hosts = try json(base.appendingPathComponent("hosts.json")),
                   let auth = hosts["github.com"] as? [String: Any], let token = auth["oauth_token"] as? String ?? auth["access_token"] as? String else { return nil }
@@ -88,55 +94,79 @@ struct AIAccountBalanceCredentials: Sendable {
             return try Self.credential(token: token, accountID: accountID,
                                        name: idClaims?["email"] as? String ?? claims["email"] as? String)
         case .claude:
+            if let token = envToken(["CLAUDE_CODE_OAUTH_TOKEN"]) {
+                let claims = try? Self.claims(token, at: now, checkExpiration: false)
+                return try Self.credential(token: token, accountID: claims?["sub"] as? String)
+            }
             let path = directory("CLAUDE_CONFIG_DIR", fallback: ".claude").appendingPathComponent(".credentials.json")
             let file = try fileRead(path)
             let data = try file ?? keychainRead("Claude Code-credentials", false)?.data
             guard let data else { return nil }
             let root = try Self.object(data)
-            guard let oauth = root["claudeAiOauth"] as? [String: Any], let token = oauth["accessToken"] as? String else {
+            let oauth = root["claudeAiOauth"] as? [String: Any] ?? root["oauth"] as? [String: Any] ?? root
+            guard let token = oauth["accessToken"] as? String ?? oauth["access_token"] as? String else {
                 throw AIAccountBalanceError.invalidCredentials
             }
-            if let expiration = Self.number(oauth["expiresAt"]), expiration <= (now.timeIntervalSince1970 + 60) * 1_000 {
-                throw AIAccountBalanceError.credentialsExpired
+            if let rawExpiry = oauth["expiresAt"] ?? oauth["expires_at"], !(rawExpiry is NSNull) {
+                guard let expiration = Self.expirationSeconds(rawExpiry), expiration > now.timeIntervalSince1970 + 60 else {
+                    throw AIAccountBalanceError.credentialsExpired
+                }
             }
-            let claims = try? Self.claims(token, at: now)
+            let claims = try? Self.claims(token, at: now, checkExpiration: false)
             return try Self.credential(token: token, accountID: claims?["sub"] as? String)
         case .gemini:
-            guard let root = try json(home.appendingPathComponent(".gemini/oauth_creds.json")) else { return nil }
+            guard let root = try geminiOAuthDocument() else { return nil }
             guard let token = root["access_token"] as? String else { throw AIAccountBalanceError.invalidCredentials }
-            guard let expiration = Self.number(root["expiry_date"]), expiration > (now.timeIntervalSince1970 + 60) * 1_000 else {
-                throw AIAccountBalanceError.credentialsExpired
+            if let rawExpiry = root["expiry_date"], !(rawExpiry is NSNull) {
+                guard let expiration = Self.expirationSeconds(rawExpiry), expiration > now.timeIntervalSince1970 + 60 else {
+                    throw AIAccountBalanceError.credentialsExpired
+                }
             }
             let claims = (root["id_token"] as? String).flatMap { try? Self.claims($0, at: now, checkExpiration: false) }
             return try Self.credential(token: token, accountID: claims?["sub"] as? String, name: claims?["email"] as? String)
         case .grok:
+            if let token = envToken(["GROK_BEARER_TOKEN"]) {
+                return try grokCredential(token: token, accountID: nil, email: nil, at: now)
+            }
             guard let root = try json(directory("GROK_HOME", fallback: ".grok").appendingPathComponent("auth.json")) else { return nil }
             let entries = root.sorted { $0.key < $1.key }.compactMap { key, value -> (String, [String: Any])? in
-                guard let value = value as? [String: Any], let token = value["key"] as? String, !token.isEmpty else { return nil }
+                guard let value = value as? [String: Any], let token = value["key"] as? String, !token.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
                 return (key, value)
             }
             guard let entry = (entries.first { $0.0.hasPrefix("https://auth.x.ai::") }
-                ?? entries.first { $0.0 == "https://accounts.x.ai/sign-in" })?.1,
-                let token = entry["key"] as? String else { throw AIAccountBalanceError.invalidCredentials }
-            let claims = try Self.claims(token, at: now)
-            return try Self.credential(token: token, accountID: entry["user_id"] as? String ?? claims["sub"] as? String,
-                                       name: entry["email"] as? String)
+                ?? entries.first { $0.0 == "https://accounts.x.ai/sign-in" || $0.0.contains("/sign-in") }
+                ?? entries.first)?.1,
+                let rawToken = entry["key"] as? String else { throw AIAccountBalanceError.invalidCredentials }
+            return try grokCredential(
+                token: rawToken.trimmingCharacters(in: .whitespaces),
+                accountID: entry["user_id"] as? String,
+                email: entry["email"] as? String,
+                at: now
+            )
         case .kimi:
             guard environment["KIMI_CODE_BASE_URL"] == nil, environment["KIMI_CODE_OAUTH_HOST"] == nil,
                   environment["KIMI_OAUTH_HOST"] == nil else { throw AIAccountBalanceError.unsupportedLogin }
             let base = directory("KIMI_CODE_HOME", fallback: ".kimi-code")
-            guard let root = try json(base.appendingPathComponent("credentials/kimi-code.json")) else { return nil }
+            if let token = envToken(["KIMI_CODE_API_KEY"]) {
+                var credential = try Self.credential(token: token, region: "cn")
+                try attachKimiHeaders(&credential, base: base)
+                return credential
+            }
+            let primaryPath = base.appendingPathComponent("credentials/kimi-code.json")
+            let fallbackPath = environment["KIMI_CODE_HOME"] == nil
+                ? home.appendingPathComponent(".kimi/credentials/kimi-code.json")
+                : nil
+            let document = try json(primaryPath) ?? fallbackPath.flatMap { try json($0) }
+            guard let root = document else { return nil }
             guard let token = root["access_token"] as? String else { throw AIAccountBalanceError.invalidCredentials }
-            guard let expiration = Self.number(root["expires_at"]), expiration > now.timeIntervalSince1970 + 60 else {
-                throw AIAccountBalanceError.credentialsExpired
+            if let rawExpiry = root["expires_at"], !(rawExpiry is NSNull) {
+                guard let expiration = Self.expirationSeconds(rawExpiry), expiration > now.timeIntervalSince1970 + 60 else {
+                    throw AIAccountBalanceError.credentialsExpired
+                }
             }
-            let claims = try? Self.claims(token, at: now)
+            let claims = try? Self.claims(token, at: now, checkExpiration: false)
             var credential = try Self.credential(token: token, accountID: claims?["sub"] as? String, region: "cn")
-            credential.headers = ["X-Msh-Platform": "kimi_code_cli", "X-Msh-Version": "1.0.0"]
-            if let data = try fileRead(base.appendingPathComponent("device_id")),
-               let value = String(data: data, encoding: .utf8) {
-                credential.headers["X-Msh-Device-Id"] = try Self.header(value.trimmingCharacters(in: .whitespacesAndNewlines))
-            }
+            try attachKimiHeaders(&credential, base: base)
             return credential
         case .cursor, .grokBot:
             guard let cookie = try cursorCookie(now) else { return nil }
@@ -155,8 +185,10 @@ struct AIAccountBalanceCredentials: Sendable {
             guard let token = auth["accessToken"] as? String, let uid = account["uid"] as? String else {
                 throw AIAccountBalanceError.invalidCredentials
             }
-            if let expiration = Self.number(auth["expiresAt"]), expiration <= (now.timeIntervalSince1970 + 30) * 1_000 {
-                throw AIAccountBalanceError.credentialsExpired
+            if let rawExpiry = auth["expiresAt"], !(rawExpiry is NSNull) {
+                guard let expiration = Self.expirationSeconds(rawExpiry), expiration > now.timeIntervalSince1970 + 30 else {
+                    throw AIAccountBalanceError.credentialsExpired
+                }
             }
             let domain = auth["domain"] as? String ?? ""
             let isInternational = domain == "workbuddy.ai" || domain.hasSuffix(".workbuddy.ai") || domain.hasSuffix("codebuddy.ai")
@@ -172,6 +204,11 @@ struct AIAccountBalanceCredentials: Sendable {
                 credential.headers["X-Tenant-Id"] = try Self.header(enterprise)
             }
             if !domain.isEmpty { credential.headers["X-Domain"] = try Self.header(domain) }
+            if let department = (account["departmentFullName"] as? String ?? account["departmentInfo"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               let safeDepartment = try? Self.header(department) {
+                credential.headers["X-Department-Info"] = safeDepartment
+            }
             return credential
         case .opencode:
             let dataRoot = environment["XDG_DATA_HOME"].flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0) : nil }
@@ -216,40 +253,182 @@ struct AIAccountBalanceCredentials: Sendable {
         }
     }
 
-    /// Honors the selected coding-plan registry; a credentials store supersedes stale plaintext mirrors.
-    /// Sealed entries require the owning app's access and must not fall back to an older API key.
+    private func geminiOAuthDocument() throws -> [String: Any]? {
+        if let override = environment["GEMINI_CLI_HOME"], override.hasPrefix("/") {
+            let root = URL(fileURLWithPath: override)
+            if let nested = try json(root.appendingPathComponent(".gemini/oauth_creds.json")) {
+                return nested
+            }
+            return try json(root.appendingPathComponent("oauth_creds.json"))
+        }
+        return try json(home.appendingPathComponent(".gemini/oauth_creds.json"))
+    }
+
+    private func grokCredential(token: String, accountID: String?, email: String?, at now: Date) throws -> AIAccountBalanceCredential {
+        let resolvedID: String?
+        if token.split(separator: ".", omittingEmptySubsequences: false).count == 3 {
+            let claims = try Self.claims(token, at: now)
+            resolvedID = accountID ?? claims["sub"] as? String
+        } else {
+            resolvedID = accountID
+        }
+        return try Self.credential(token: token, accountID: resolvedID, name: email)
+    }
+
+    private func attachKimiHeaders(_ credential: inout AIAccountBalanceCredential, base: URL) throws {
+        credential.headers = ["X-Msh-Platform": "kimi_code_cli", "X-Msh-Version": "1.0.0"]
+        if let data = try fileRead(base.appendingPathComponent("device_id")),
+           let value = String(data: data, encoding: .utf8) {
+            credential.headers["X-Msh-Device-Id"] = try Self.header(value.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+    }
+
+    /// Reads ZCode's `setting.json`, `config.json`, and in-memory AES-256-GCM `credentials.json`.
+    /// A present credential store supersedes plaintext mirrors; undecryptable or missing entries fail closed.
     private func zcodeCredential() throws -> AIAccountBalanceCredential? {
-        let base = home.appendingPathComponent(".zcode/v2")
+        let baseRoot = environment["ZCODE_DATA_BASE_DIR"].flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0) : nil } ?? home
+        let base = baseRoot.appendingPathComponent(".zcode/v2")
         guard let config = try json(base.appendingPathComponent("config.json")),
               let providers = config["provider"] as? [String: Any],
-              let settings = try json(base.appendingPathComponent("settings.json")) else { return nil }
-        for family in ["zai", "bigmodel"] {
+              let settings = try json(base.appendingPathComponent("setting.json")) else { return nil }
+        let families: [String]
+        if let rawDomain = settings["providerFamilyDomain"] as? String {
+            let domain = rawDomain.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard domain == "zai" || domain == "bigmodel" else { return nil }
+            families = [domain]
+        } else {
+            families = ["zai", "bigmodel"]
+        }
+        for family in families {
             let selection = settings["providerFamilyConnectionSelections"] as? [String: [String: Any]]
-            let kind = selection?[family]?["kind"] as? String
+            let kind = (selection?[family]?["kind"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             let providerID: String?
-            if let kind {
-                if kind == "start-plan" { throw AIAccountBalanceError.credentialsUnavailable }
-                guard kind == "individual-coding-plan" || kind == "team-coding-plan" else { continue }
-                providerID = "builtin:\(family)-coding-plan"
+            if let kind, !kind.isEmpty {
+                switch kind {
+                case "start-plan":
+                    providerID = "builtin:\(family)-start-plan"
+                case "individual-coding-plan", "team-coding-plan":
+                    providerID = "builtin:\(family)-coding-plan"
+                default:
+                    continue
+                }
             } else {
-                let selected = (settings["modelProviderFamilySelectedKeys"] as? [String: String])?[family]
-                providerID = selected?.components(separatedBy: ":").dropFirst().joined(separator: ":")
+                let selected = (settings["modelProviderFamilySelectedKeys"] as? [String: String])?[family]?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let selected, let prefix = ["coding-plan:", "preset:"].first(where: { selected.hasPrefix($0) }) {
+                    providerID = String(selected.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                } else {
+                    providerID = nil
+                }
             }
-            guard let providerID, providerID == "builtin:\(family)-coding-plan",
+            let isStartPlan = providerID == "builtin:\(family)-start-plan"
+            let isCodingPlan = providerID == "builtin:\(family)-coding-plan"
+            guard let providerID, isStartPlan || isCodingPlan,
                   let provider = providers[providerID] as? [String: Any] else { continue }
-            if provider["enabled"] as? Bool == false,
-               (provider["systemDisabledReason"] == nil || provider["systemDisabledReason"] as? String == "oauth_provider_inactive") {
-                return nil
+            if provider["enabled"] as? Bool == false {
+                let reason = (provider["systemDisabledReason"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if reason.isEmpty || reason == "oauth_provider_inactive" { return nil }
             }
             let store = try json(base.appendingPathComponent("credentials.json"))
-            // A store supersedes plaintext mirrors; sealed entries require the owning app's access.
-            if store != nil { throw AIAccountBalanceError.credentialsUnavailable }
-            guard let token = (provider["options"] as? [String: Any])?["apiKey"] as? String else {
-                throw AIAccountBalanceError.invalidCredentials
+            let secret = zcodeCredentialSecret()
+            if isStartPlan {
+                let token: String
+                if let store {
+                    guard let encrypted = store["zcodejwttoken"] as? String,
+                          let decrypted = Self.decryptZcodeCredential(encrypted, secret: secret) else {
+                        throw AIAccountBalanceError.credentialsUnavailable
+                    }
+                    token = decrypted
+                } else if let mirror = (provider["options"] as? [String: Any])?["apiKey"] as? String, !mirror.isEmpty {
+                    token = mirror
+                } else {
+                    throw AIAccountBalanceError.invalidCredentials
+                }
+                var credential = try Self.credential(token: token, region: "start-plan")
+                if let telemetry = try? json(base.appendingPathComponent("telemetry-state.json")),
+                   let deviceMid = (telemetry["deviceMid"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   let safeMid = try? Self.header(deviceMid) {
+                    credential.headers["X-Device-Mid"] = safeMid
+                }
+                return credential
+            }
+            let token: String
+            if let store {
+                guard let selectionKind = kind, !selectionKind.isEmpty,
+                      let identity = Self.zcodeStoredProfileIdentity(store: store, family: family, secret: secret) else {
+                    throw AIAccountBalanceError.credentialsUnavailable
+                }
+                let keyName = "account-provider:coding-plan:account:\(family)-\(selectionKind):account:\(Self.encodeURIComponent(identity)):api-key"
+                guard let encrypted = store[keyName] as? String,
+                      let decrypted = Self.decryptZcodeCredential(encrypted, secret: secret) else {
+                    throw AIAccountBalanceError.credentialsUnavailable
+                }
+                token = decrypted
+            } else {
+                guard let mirror = (provider["options"] as? [String: Any])?["apiKey"] as? String else {
+                    throw AIAccountBalanceError.invalidCredentials
+                }
+                token = mirror
             }
             return try Self.credential(token: token, region: family)
         }
         throw AIAccountBalanceError.unsupportedLogin
+    }
+
+    private func zcodeCredentialSecret() -> String {
+        if let explicit = environment["ZCODE_CREDENTIAL_SECRET"]?.trimmingCharacters(in: .whitespacesAndNewlines), !explicit.isEmpty {
+            return explicit
+        }
+        let user = username.isEmpty ? "unknown" : username
+        return "zcode-credential-fallback:darwin:\(home.path):\(user)"
+    }
+
+    /// Reproduces ZCode's `enc:v1:<iv>.<tag>.<cipher>` AES-256-GCM decryption in memory without touching Keychain.
+    static func decryptZcodeCredential(_ value: String, secret: String) -> String? {
+        let prefix = "enc:v1:"
+        guard value.hasPrefix(prefix) else { return nil }
+        let parts = value.dropFirst(prefix.count).split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              let iv = decodeBase64URL(String(parts[0])), iv.count == 12,
+              let tag = decodeBase64URL(String(parts[1])), tag.count == 16,
+              let cipher = decodeBase64URL(String(parts[2])) else { return nil }
+        let digest = SHA256.hash(data: Data(secret.utf8))
+        let key = SymmetricKey(data: digest)
+        guard let nonce = try? AES.GCM.Nonce(data: iv),
+              let sealed = try? AES.GCM.SealedBox(nonce: nonce, ciphertext: cipher, tag: tag),
+              let plainData = try? AES.GCM.open(sealed, using: key),
+              let plain = String(data: plainData, encoding: .utf8), !plain.isEmpty else { return nil }
+        return plain
+    }
+
+    private static func zcodeStoredProfileIdentity(store: [String: Any], family: String, secret: String) -> String? {
+        guard let encrypted = store["oauth:\(family):user_info"] as? String,
+              let profileText = decryptZcodeCredential(encrypted, secret: secret),
+              let profile = try? object(Data(profileText.utf8)) else { return nil }
+        let normalizedProfile = profile["id"] is String && profile["username"] is String && profile["displayName"] is String
+        let rawIdentity = normalizedProfile ? (profile["id"] as? String) : (family == "zai" ? profile["user_id"] as? String : nil)
+        let identity = rawIdentity?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return identity.isEmpty ? nil : identity
+    }
+
+    private static func encodeURIComponent(_ value: String) -> String {
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+
+    private static func decodeBase64URL(_ value: String) -> Data? {
+        guard !value.isEmpty else { return nil }
+        var base64 = value.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
+        return Data(base64Encoded: base64)
+    }
+
+    private func envToken(_ keys: [String]) -> String? {
+        for key in keys {
+            guard let raw = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { continue }
+            return raw
+        }
+        return nil
     }
 
     /// Accepts only absolute home overrides so relative environment values cannot redirect credential reads.
@@ -260,6 +439,21 @@ struct AIAccountBalanceCredentials: Sendable {
 
     private func json(_ path: URL) throws -> [String: Any]? {
         try fileRead(path).map(Self.object)
+    }
+
+    /// Normalizes Unix seconds, Unix milliseconds (> 20e9), or ISO-8601 expiry timestamps to Unix seconds.
+    static func expirationSeconds(_ value: Any?) -> Double? {
+        if let numeric = number(value) {
+            return numeric > 20_000_000_000 ? numeric / 1_000 : numeric
+        }
+        if let text = value as? String {
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text) {
+                return date.timeIntervalSince1970
+            }
+        }
+        return nil
     }
 
     /// Bounds credential headers to printable ASCII, rejecting control bytes before URLSession receives them.
