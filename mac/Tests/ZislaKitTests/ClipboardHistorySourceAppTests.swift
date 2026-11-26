@@ -332,7 +332,7 @@ struct ClipboardHistorySourceAppTests {
         try database.flush([.upsert(new, capacity: nil)])
         let reopened = ClipboardHistoryDatabase(storageURL: storage)
         #expect(try await reopened.loadPage(scope: .all, searchText: Self.firstApp.name, category: .all, offset: 0, limit: 20).items == [new])
-        #expect(try scalar("PRAGMA user_version", at: storage) == 6)
+        #expect(try scalar("PRAGMA user_version", at: storage) == 7)
     }
 
     @Test

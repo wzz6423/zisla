@@ -89,7 +89,7 @@ export const ptBR = createCatalog({
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Consulte o histórico do clipboard dentro da ilha e filtre por imagem, URL, caminho ou tipo de arquivo e veja quando cada item foi copiado. Envie um item para Notas rápidas, fixe-o como favorito ou exclua-o. Você pode excluir automaticamente o histórico com mais de 7, 15 ou 30 dias e manter os favoritos. A exclusão automática vem desativada. Pesquise e agrupe o histórico pelo aplicativo de origem.',
+          'Consulte o histórico do clipboard dentro da ilha e filtre por imagem, URL, caminho ou tipo de arquivo e veja quando cada item foi copiado. Envie um item para Notas rápidas, fixe-o como favorito ou exclua-o. Você pode excluir automaticamente o histórico com mais de 7, 15 ou 30 dias e manter os favoritos. A exclusão automática vem desativada. Pesquise e agrupe o histórico pelo aplicativo de origem. Novas imagens tentam reconhecer texto no dispositivo em segundo plano para encontrar o original pelo texto. Clique com o botão direito em uma imagem do histórico para reconhecer ou copiar seu texto.',
         points: ['Histórico dentro da ilha', 'Filtro por tipo', 'Notas rápidas e favoritos'],
       },
       aiMonitor: {

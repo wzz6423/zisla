@@ -88,7 +88,7 @@ export const en: SiteContent = {
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it. Optionally delete history older than 7, 15 or 30 days while keeping favourites; automatic deletion is off by default. Search and group history by source application.',
+          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it. Optionally delete history older than 7, 15 or 30 days while keeping favourites; automatic deletion is off by default. Search and group history by source application. New images are queued for on-device text recognition, so you can search their text to find the original image. Right-click a history image to recognize or copy its text.',
         points: ['History inside the island', 'Filter by type', 'Quick Notes and favourites'],
       },
       aiMonitor: {

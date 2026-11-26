@@ -89,7 +89,7 @@ export const it = createCatalog({
       clipboard: {
         name: 'Appunti',
         caption:
-          'Sfoglia la cronologia degli appunti nell’isola e filtra per immagine, URL, percorso o tipo di file e guarda quando ogni elemento è stato copiato. Invia un elemento a Note rapide, fissalo tra i preferiti o eliminalo. Puoi eliminare automaticamente la cronologia più vecchia di 7, 15 o 30 giorni mantenendo i preferiti. L’eliminazione automatica è disattivata inizialmente. Cerca e raggruppa la cronologia per applicazione di origine.',
+          'Sfoglia la cronologia degli appunti nell’isola e filtra per immagine, URL, percorso o tipo di file e guarda quando ogni elemento è stato copiato. Invia un elemento a Note rapide, fissalo tra i preferiti o eliminalo. Puoi eliminare automaticamente la cronologia più vecchia di 7, 15 o 30 giorni mantenendo i preferiti. L’eliminazione automatica è disattivata inizialmente. Cerca e raggruppa la cronologia per applicazione di origine. Le nuove immagini tentano il riconoscimento del testo sul dispositivo in background, così puoi ritrovare l’originale cercandone il testo. Fai clic destro su un’immagine nella cronologia per riconoscere o copiarne il testo.',
         points: ['Cronologia nell’isola', 'Filtro per tipo', 'Note rapide e preferiti'],
       },
       aiMonitor: {

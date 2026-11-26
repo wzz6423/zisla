@@ -89,7 +89,7 @@ export const es = createCatalog({
       clipboard: {
         name: 'Portapapeles',
         caption:
-          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo y mira cuándo se copió cada entrada. Envía una entrada a Notas rápidas, márcala como favorita o elimínala. Puedes borrar automáticamente el historial de más de 7, 15 o 30 días conservando los favoritos. El borrado automático está desactivado de forma predeterminada. Busca y agrupa el historial por aplicación de origen.',
+          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo y mira cuándo se copió cada entrada. Envía una entrada a Notas rápidas, márcala como favorita o elimínala. Puedes borrar automáticamente el historial de más de 7, 15 o 30 días conservando los favoritos. El borrado automático está desactivado de forma predeterminada. Busca y agrupa el historial por aplicación de origen. Las imágenes nuevas intentan reconocer el texto en el dispositivo en segundo plano para encontrar el original por su texto. Haz clic derecho en una imagen del historial para reconocer o copiar su texto.',
         points: ['Historial dentro de la isla', 'Filtrado por tipo', 'Notas rápidas y favoritos'],
       },
       aiMonitor: {

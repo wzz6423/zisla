@@ -87,7 +87,7 @@ export const de: SiteContent = {
       clipboard: {
         name: 'Zwischenablage',
         caption:
-          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp und sieh, wann jeder Eintrag kopiert wurde. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen. Optional wird Verlauf gelöscht, der älter als 7, 15 oder 30 Tage ist; Favoriten bleiben erhalten. Automatisches Löschen ist standardmäßig aus. Suchen und gruppieren Sie den Verlauf nach der Quellanwendung.',
+          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp und sieh, wann jeder Eintrag kopiert wurde. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen. Optional wird Verlauf gelöscht, der älter als 7, 15 oder 30 Tage ist; Favoriten bleiben erhalten. Automatisches Löschen ist standardmäßig aus. Suchen und gruppieren Sie den Verlauf nach der Quellanwendung. Neue Bilder werden im Hintergrund lokal auf Text geprüft, damit sich das Original über seinen Text finden lässt. Per Rechtsklick auf ein Bild im Verlauf lässt sich sein Text erkennen oder kopieren.',
         points: ['Verlauf in der Island', 'Filter nach Typ', 'Kurznotizen und Favoriten'],
       },
       aiMonitor: {

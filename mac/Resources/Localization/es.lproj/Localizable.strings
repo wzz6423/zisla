@@ -3778,3 +3778,9 @@
 "重复安装 · 版本 %@ · %@ · 保留：%@" = "Instalación duplicada · Versión %@ · %@ · Conservar: %@";
 "更新残留 · 旧版本 %@ · %@ · 当前版本：%@" = "Restos de actualización · Versión antigua %@ · %@ · Versión actual: %@";
 "应用副本或当前版本状态已变化，已保留目标" = "La copia de la aplicación o la versión actual ha cambiado. Se ha conservado el elemento.";
+
+"识别图片文字" = "Reconocer texto de la imagen";
+"复制图片文字" = "Copiar texto de la imagen";
+"取消图片文字识别" = "Cancelar reconocimiento de texto";
+"等待识别图片文字" = "Esperando reconocer el texto";
+"正在识别图片文字" = "Reconociendo texto de la imagen";

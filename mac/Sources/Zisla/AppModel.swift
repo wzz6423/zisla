@@ -587,7 +587,7 @@ final class AppModel: ObservableObject {
     var onContextNoteSaved: ((FileShelfItem) -> Void)?
     let weatherLocations = WeatherLocationStore()
     let clipboardMonitor = ClipboardLinkMonitor()
-    let clipboardHistory = ClipboardHistoryStore()
+    let clipboardHistory = ClipboardHistoryStore(imageTextRecognizer: { try await ClipboardImageTextRecognition.recognize($0) })
     let clipboardHistoryMonitor = ClipboardHistoryMonitor()
     /// Copy assistant: recognizes copied content and shows a toast with a next-step action.
     let clipboardAssistant = ClipboardAssistantController()
@@ -1327,6 +1327,7 @@ final class AppModel: ObservableObject {
         islandClipboardHandoff.cancel()
         managedTools.setAutomaticUpdatesEnabled(recommendedTools: false, dependencyTools: false)
         keyboardSound.stop()
+        clipboardHistory.setImageRecognitionEnabled(false)
         clipboardHistory.flushPendingChanges()
         clipboardHistory.stopCleanup()
         aiAgent.store.flushPendingChanges()
@@ -2038,6 +2039,35 @@ final class AppModel: ObservableObject {
         }
         dailyBriefing.recordActivity(.clipboardReused)
         transientMessage = AppLocalization.text("已复制到剪贴板")
+    }
+
+    func recognizeClipboardHistoryImageText(_ item: ClipboardHistoryItem, copyText: Bool) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let text = try await clipboardHistory.recognizeImageText(id: item.id)
+                try Task.checkCancellation()
+                guard settingsStore.settings.clipboardHistoryEnabled else { return }
+                guard !text.isEmpty else {
+                    transientMessage = AppLocalization.text("未识别到文字")
+                    return
+                }
+                if !copyText {
+                    transientMessage = AppLocalization.text("识图完成")
+                    return
+                }
+                guard ClipboardHistoryPasteboard.write(.text(text)) else {
+                    transientMessage = AppLocalization.text("无法写入剪贴板")
+                    return
+                }
+                dailyBriefing.recordActivity(.clipboardReused)
+                transientMessage = AppLocalization.text("已复制到剪贴板")
+            } catch {
+                if !(error is CancellationError) {
+                    transientMessage = AppLocalization.text("识别失败：%@", error.localizedDescription)
+                }
+            }
+        }
     }
 
     // MARK: - Clipboard Assistant
@@ -3561,6 +3591,7 @@ final class AppModel: ObservableObject {
         clipboardMonitor.setEnabled(
             settings.clipboardDetectionEnabled
         )
+        clipboardHistory.setImageRecognitionEnabled(settings.clipboardHistoryEnabled)
         // The shared pasteboard monitor feeds both history recording and the copy assistant.
         clipboardHistoryMonitor.setEnabled(
             settings.clipboardHistoryEnabled || settings.clipboardAssistantEnabled
