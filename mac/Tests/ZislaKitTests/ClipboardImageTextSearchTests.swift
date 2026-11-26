@@ -165,7 +165,7 @@ struct ClipboardImageTextSearchTests {
         try await recognizer.waitForCalls(1)
         let first = Task { try await store.recognizeImageText(id: id) }
         let second = Task { try await store.recognizeImageText(id: id) }
-        try await waitUntil { store.imageRecognitionWaiterCounts[id] == 2 }
+        try await waitUntil("two image recognition requests are registered") { store.imageRecognitionWaiterCounts[id] == 2 }
         first.cancel()
         await #expect(throws: CancellationError.self) { try await first.value }
         #expect(store.imageRecognitionStates[id] == .processing)
@@ -453,7 +453,7 @@ struct ClipboardImageTextSearchTests {
         store.updateQuery(scope: .all, searchText: "missing")
         await store.waitUntilLoaded()
         let request = Task { try await store.recognizeImageText(id: id) }
-        try await waitUntil { store.imageRecognitionWaiterCounts[id] == 1 }
+        try await waitUntil("the image recognition request is registered") { store.imageRecognitionWaiterCounts[id] == 1 }
         store.removeAllHistory()
         await recognizer.complete(.success("cleared OCR"))
         await #expect(throws: CancellationError.self) { try await request.value }
@@ -625,7 +625,7 @@ struct ClipboardImageTextSearchTests {
         await store.waitUntilLoaded()
         store.imagePinnedLookup = { _ in await metadata.load() }
         let request = Task { try await store.recognizeImageText(id: item.id) }
-        try await waitUntil { await metadata.isLoading }
+        try await waitUntil("the image pin metadata lookup has started") { await metadata.isLoading }
         store.setImageRecognitionEnabled(false)
         await metadata.complete(true)
         await #expect(throws: CancellationError.self) { try await request.value }
@@ -648,7 +648,7 @@ struct ClipboardImageTextSearchTests {
         await store.waitUntilLoaded()
         store.imagePinnedLookup = { _ in await metadata.load() }
         let request = Task { try await store.recognizeImageText(id: item.id) }
-        try await waitUntil { await metadata.isLoading }
+        try await waitUntil("the image pin metadata lookup has started") { await metadata.isLoading }
         if action == "disable" { store.setImageRecognitionEnabled(false) }
         else { store.removeAllHistory() }
         await metadata.complete(false)
@@ -702,7 +702,7 @@ struct ClipboardImageTextSearchTests {
         store.updateQuery(scope: .all, searchText: "missing")
         await store.waitUntilLoaded()
         let request = Task { try await store.recognizeImageText(id: id) }
-        try await waitUntil { store.imageRecognitionWaiterCounts[id] == 1 }
+        try await waitUntil("the image recognition request is registered") { store.imageRecognitionWaiterCounts[id] == 1 }
         store.removeAllHistory()
         await #expect(throws: CancellationError.self) { try await request.value }
         await gate.complete(.success("discard unpinned"))
@@ -739,7 +739,7 @@ struct ClipboardImageTextSearchTests {
         var requests: [Task<String, any Error>] = []
         for record in records.prefix(513) {
             requests.append(Task { try await store.recognizeImageText(id: record.id) })
-            try await waitUntil { store.imageRecognitionWaiterCounts[record.id] == 1 }
+            try await waitUntil("the queued image recognition request is registered") { store.imageRecognitionWaiterCounts[record.id] == 1 }
         }
         try await gate.waitForCalls(1)
         #expect(store.imageRecognitionStates.count == 513)
@@ -760,7 +760,7 @@ struct ClipboardImageTextSearchTests {
     func callThresholdWaitsCancelWithoutBlockingLaterRecognition() async throws {
         let gate = ImageRecognitionGate()
         let cancelled = Task { try await gate.waitForCalls(2) }
-        try await waitUntil { await gate.pendingCallWaiterCount == 1 }
+        try await waitUntil("the recognizer call waiter is registered") { await gate.pendingCallWaiterCount == 1 }
         cancelled.cancel()
         await #expect(throws: CancellationError.self) { try await cancelled.value }
         #expect(await gate.pendingCallWaiterCount == 0)
@@ -772,13 +772,65 @@ struct ClipboardImageTextSearchTests {
         #expect(await gate.pendingCallWaiterCount == 0)
     }
 
-    private func waitUntil(_ condition: () async -> Bool) async throws {
-        for _ in 0..<256 {
+    @Test
+    func pollingWaitAllowsDelayedWorkOnAnotherQueue() async throws {
+        let (events, continuation) = AsyncStream<Void>.makeStream()
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .milliseconds(50)) {
+            continuation.yield(())
+            continuation.finish()
+        }
+        var ready = false
+        let delivery = Task {
+            for await _ in events { ready = true }
+        }
+        defer { delivery.cancel(); continuation.finish() }
+        var polls = 0
+        try await waitUntil("delayed queue work", timeout: .seconds(1)) {
+            polls += 1
+            return ready
+        }
+        await delivery.value
+        #expect(polls > 1)
+        #expect(ready)
+    }
+
+    @Test
+    func pollingWaitStopsWhenItsTaskIsCancelled() async throws {
+        var checked = false
+        let waiting = Task {
+            try await waitUntil("cancelled condition") {
+                checked = true
+                return false
+            }
+        }
+        try await waitUntil("the cancelled wait has checked its condition") { checked }
+        waiting.cancel()
+        await #expect(throws: CancellationError.self) { try await waiting.value }
+    }
+
+    @Test
+    func pollingWaitTimeoutNamesTheUnmetCondition() async throws {
+        do {
+            try await waitUntil("missing queue response", timeout: .milliseconds(20)) { false }
+            Issue.record("An unmet condition must time out")
+        } catch let error as ClipboardImageWaitTimeout {
+            #expect(error.condition == "missing queue response")
+            #expect(error.localizedDescription == "Timed out waiting for missing queue response")
+        }
+    }
+
+    private func waitUntil(
+        _ description: String,
+        timeout: Duration = .seconds(10),
+        _ condition: () async -> Bool
+    ) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
             try Task.checkCancellation()
             if await condition() { return }
-            await Task.yield()
+            try await Task.sleep(for: .milliseconds(5))
         }
-        throw CocoaError(.coderReadCorrupt)
+        throw ClipboardImageWaitTimeout(condition: description)
     }
 
     @Test
@@ -792,6 +844,12 @@ struct ClipboardImageTextSearchTests {
         #expect(loaded.data == Data([1, 2, 3, 4]))
         #expect(loaded.text == nil)
     }
+}
+
+private struct ClipboardImageWaitTimeout: LocalizedError {
+    let condition: String
+
+    var errorDescription: String? { "Timed out waiting for \(condition)" }
 }
 
 private actor ImageRecognitionGate {
