@@ -246,13 +246,18 @@ struct ToolboxModuleView: View {
 
 struct ToolboxTimerPanel: View {
     @ObservedObject var service: PomodoroService
+    private var timerIDs: [UUID?] { [nil] + service.countdowns.map { $0.id } }
 
     var body: some View {
+        let timerIDs = self.timerIDs
         ScrollView(.vertical) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: service.countdowns.isEmpty ? 1 : 2), spacing: 6) {
-                ToolboxTimerCard(service: service, timerID: nil, compact: !service.countdowns.isEmpty)
-                ForEach(service.countdowns) { countdown in
-                    ToolboxTimerCard(service: service, timerID: countdown.id, compact: true)
+            LazyVStack(spacing: 6) {
+                ForEach(Array(stride(from: 0, to: timerIDs.count, by: 2)), id: \.self) { index in
+                    HStack(spacing: 6) {
+                        ForEach(timerIDs[index..<min(index + 2, timerIDs.count)], id: \.self) { timerID in
+                            ToolboxTimerCard(service: service, timerID: timerID, compact: timerIDs.count > 1)
+                        }
+                    }
                 }
             }
         }
@@ -306,7 +311,7 @@ struct ToolboxTimerCard: View {
             } else {
                 HStack(spacing: 8) {
                     Button(action: toggle) {
-                        Text(toggleTitle)
+                        Image(systemName: engine.phase == .running ? "pause.fill" : "play.fill")
                             .font(.system(size: 11, weight: .semibold))
                             .frame(maxWidth: .infinity)
                             .frame(height: 40)
@@ -318,6 +323,7 @@ struct ToolboxTimerCard: View {
                         bottomLeadingRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(inset: 10)
                     ))
                     .help(toggleTitle)
+                    .accessibilityLabel(toggleTitle)
                     .accessibilityIdentifier("toolbox.toggleTimer.\(identifier)")
                     Button(action: cancel) {
                         Text(AppLocalization.text("取消"))
@@ -384,22 +390,9 @@ struct ToolboxTimerCard: View {
 
     private var controls: some View {
         HStack(spacing: 2) {
-            if engine.phase == .idle {
-                Button(action: toggle) {
-                    Text(toggleTitle)
-                        .font(.system(size: 10, weight: .semibold))
-                        .frame(minWidth: 28, minHeight: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .background(Color.fillControl)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            IconButton(symbol: engine.phase == .running ? "pause.fill" : "play.fill", help: toggleTitle, size: .compact, action: toggle)
+                .accessibilityLabel(toggleTitle)
                 .accessibilityIdentifier("toolbox.toggleTimer.\(identifier)")
-            } else {
-                IconButton(symbol: engine.phase == .running ? "pause.fill" : "play.fill", help: toggleTitle, size: .compact, action: toggle)
-                    .accessibilityLabel(toggleTitle)
-                    .accessibilityIdentifier("toolbox.toggleTimer.\(identifier)")
-            }
             IconButton(symbol: "xmark", help: AppLocalization.text("取消"), size: .compact, action: cancel)
                 .accessibilityLabel(AppLocalization.text("取消"))
                 .accessibilityIdentifier("toolbox.cancelTimer.\(identifier)")

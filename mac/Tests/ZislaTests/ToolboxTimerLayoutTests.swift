@@ -7,7 +7,7 @@ import ZislaKit
 
 @MainActor
 struct ToolboxTimerLayoutTests {
-    @Test(arguments: [0, 1, 4])
+    @Test(arguments: [0, 1, 2, 4])
     func timerCountKeepsTheOriginalLeftWidthAndRightActionsPosition(additionalTimers: Int) async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
@@ -34,6 +34,32 @@ struct ToolboxTimerLayoutTests {
             #expect(abs(document.frame.height - 136) < 0.5,
                     "One or two timers must fill the left panel without an empty lower region")
         }
+    }
+
+    @Test(arguments: [2, 4])
+    func unmatchedLastCardFillsItsRowAndStartsWithAPlayIcon(additionalTimers: Int) async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        for _ in 0..<additionalTimers { fixture.service.addCountdown() }
+        let id = try #require(fixture.service.countdowns.last?.id)
+        let host = fixture.host(ToolboxTimerPanel(service: fixture.service), size: CGSize(width: 236, height: 136))
+        await fixture.layout()
+        let scroll = try #require(Self.scrollView(in: host))
+        let document = try #require(scroll.documentView)
+        scroll.contentView.scroll(to: CGPoint(x: 0, y: document.frame.height))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        await fixture.layout()
+        let card = try #require(Self.element("toolbox.timer.\(id)", in: host) as? any NSAccessibilityElementProtocol).accessibilityFrame()
+        let window = try #require(fixture.window).frame
+        #expect(abs(card.width - scroll.contentView.bounds.width) < 0.5,
+                "The unmatched timer must span the entire final row")
+        #expect(abs(card.minX - window.minX) < 0.5)
+        let button = try #require(Self.element("toolbox.toggleTimer.\(id)", in: host))
+        let frame = try #require(button as? any NSAccessibilityElementProtocol).accessibilityFrame()
+        #expect(abs(frame.width - 24) < 0.5 && abs(frame.height - 24) < 0.5,
+                "Idle timers must use the same compact icon button as paused and running timers")
+        _ = button.perform(NSSelectorFromString("accessibilityPerformPress"))
+        #expect(fixture.service.countdowns.first { $0.id == id }?.engine.phase == .running)
     }
 
     @Test
