@@ -179,7 +179,7 @@ export const de: SiteContent = {
       },
       dailyBriefing: {
         title: 'Ihr Tag als Tagesbericht',
-        description: 'Wählen Sie aus acht Vorlagen und bestimmen Sie Nutzungs-, Tipp-, System- und zisla-Aktivitätsdaten. Prüfen Sie die Vorschau und exportieren Sie ein PNG manuell oder täglich zur gewählten Zeit. Der Bildschirmzeitverlauf wird nur bei Aktivierung und Verfügbarkeit verwendet; fehlende Daten gelten nicht als gemessene Null. Wählen Sie einen eigenen Exportordner unter Einstellungen → Speicherort. Echte Kontingente der Konten und die Zeit ihrer Abfrage lassen sich ebenfalls aufnehmen.',
+        description: "Wählen Sie aus acht Vorlagen und bestimmen Sie Nutzungs-, Tipp-, System- und zisla-Aktivitätsdaten. Prüfen Sie die Vorschau und exportieren Sie ein PNG manuell oder täglich zur gewählten Zeit. Der Bildschirmzeitverlauf wird nur bei Aktivierung und Verfügbarkeit verwendet. Wählen Sie einen eigenen Exportordner unter Einstellungen → Speicherort. Echte Kontingente der Konten und die Zeit ihrer Abfrage lassen sich ebenfalls aufnehmen.",
         detail: '8 Vorlagen · Inhalte wählen · Vorschau und geplanter PNG-Export',
       },
       userCare: {
@@ -199,8 +199,8 @@ export const de: SiteContent = {
       },
       permissions: {
         title: 'Systemberechtigungen an einem Ort',
-        description: 'Prüfen Sie den Status unter Einstellungen → Berechtigungen, starten Sie unterstützte Anfragen oder öffnen Sie die zuständige Systemseite. Die erste Begrüßung nutzt dieselbe Liste und kennzeichnet manuelle Einstellungen. Nach erteilter Freigabe wird der Berechtigungsstatus aktualisiert. Eine Ziehhilfe erleichtert das Hinzufügen der Anwendung bei entsprechenden Berechtigungen.',
-        detail: 'Berechtigungsstatus · Anfragen und Links · Auch bei der Begrüßung',
+        description: "Prüfen Sie den Status unter Einstellungen → Berechtigungen, starten Sie unterstützte Anfragen oder öffnen Sie die zuständige Systemseite. Nach erteilter Freigabe wird der Berechtigungsstatus aktualisiert. Eine Ziehhilfe erleichtert das Hinzufügen der Anwendung bei entsprechenden Berechtigungen.",
+        detail: "Berechtigungsstatus · Anfragen und Links",
       },
       imageTools: {
         title: 'Bildwerkzeuge',
@@ -214,7 +214,7 @@ export const de: SiteContent = {
       },
       pdf: {
         title: 'PDF-Werkzeuge',
-        description: 'In den Einstellungen verfügbar, außerhalb des Modulkarussells der Insel. Vierzehn Vorgänge, die vollständig auf deinem Mac laufen: zusammenführen, aufteilen, drehen, beschneiden, Bilder und Office-Dateien umwandeln, in Bilder umwandeln, Text exportieren, Text- oder Bildwasserzeichen setzen, Seitenzahlen ergänzen, verschlüsseln, Passwort entfernen und Metadaten bearbeiten.',
+        description: "In den Einstellungen verfügbar. Vierzehn Vorgänge, die vollständig auf deinem Mac laufen: zusammenführen, aufteilen, drehen, beschneiden, Bilder und Office-Dateien umwandeln, in Bilder umwandeln, Text exportieren, Text- oder Bildwasserzeichen setzen, Seitenzahlen ergänzen, verschlüsseln, Passwort entfernen und Metadaten bearbeiten.",
         detail: '14 lokale Werkzeuge · Reihenfolge selbst bestimmen · Nichts verlässt den Mac',
       },
 
@@ -269,8 +269,8 @@ export const de: SiteContent = {
       lockScreen: {
         title: 'Informationen im Sperrbildschirm',
         description:
-          'Zeig bei Bedarf Datum, Status und laufende Wiedergabe im Sperrbildschirm von macOS. Es ist ein eigenes Overlay und erscheint nie in der Modulliste oder im Karussell der Island.',
-        detail: 'Eigenes Overlay · Selbst aktivieren · Nimmt keinen Fokus',
+          "Zeig bei Bedarf Datum, Status und laufende Wiedergabe im Sperrbildschirm von macOS.",
+        detail: "Selbst aktivieren · Nimmt keinen Fokus",
       },
       recommendedTools: {
         title: 'Empfohlene Apps',
@@ -281,28 +281,25 @@ export const de: SiteContent = {
     },
   },
   ai: {
-    eyebrow: 'KI OHNE BLACKBOX',
-    title: 'KI-Status sehen, <span>ohne das Gespräch zu lesen.</span>',
-    lede: 'Verfolgen Sie Aufgaben nach Anwendung, Modellnutzung nach Datum und echte Kontingente der Konten. Status und Zahlen bleiben auf Ihrem Mac; Gesprächstexte werden nicht gelesen.',
-    summaryMono: 'LOKALER STATUS / KLARE GRENZEN',
+    eyebrow: "KI-WORKFLOW",
+    title: "KI-Aufgaben verfolgen, <span>Nutzung und Kontingente prüfen.</span>",
+    lede: "Aufgaben nach App, Modellnutzung nach Datum und verbleibende Kontingente der Konten anzeigen.",
+    summaryMono: "AUFGABEN / NUTZUNG / KONTINGENTE",
     summaryLede:
-      'Verbinde die KI-Werkzeuge, die du schon nutzt, und behalte die Kontextgrenzen, die deine Arbeit braucht.',
-    summaryNote:
-      'Diese Seite beschreibt nur Erkennungsumfang, Datengrenze und Anbindung – sie simuliert keine laufende Sitzung.',
+      "KI-Aufgaben, Nutzung und Kontingente an einem Ort.",
     toolsHeading: 'Unterstützte KI-Werkzeuge',
     toolsLede:
-      'Erkennt Aktivität unterstützter CLIs, Desktop-Apps und IDEs und bündelt den Aufgabenstatus.',
+      "Erkennt Aufgaben unterstützter CLIs, Desktop-Apps und IDEs.",
     toolsAriaLabel: 'Unterstützte KI-Werkzeuge',
-    usageNote: 'Sitzungserkennung, Token-Verlauf und Kontingente nutzen getrennte Datenquellen. Delta liest sein lokales Zahlenprotokoll; Orca entfernt doppelte Nutzung des gebundenen CLI und ordnet sie dem ursprünglichen Anbieter zu. WorkBuddy AI kann Sitzungen erkennen und Credits abfragen; Kontextbelegung und Credits werden nicht in Tokens oder US-Dollar umgerechnet. Verfügbare Kontingente hängen vom Anbieter und der Anmeldung ab.',
-    boundariesHeading: 'Aufgezeichnet werden nur Statusgrenzen',
+    boundariesHeading: "Datenschutz",
     privacyPoints: [
-      'Wertet aus strukturierten Ereignissen nur Ereignistyp, Status, Zeit, Modell und Sitzungs-ID aus',
-      'Liest weder Prompt- noch Antworttext',
-      'Protokoll und Status bleiben auf deinem Mac',
+      "Aufgabenstatus und Nutzung bleiben auf deinem Mac",
+      "Prompts und Antworten werden nicht gelesen",
+      "Gespräche werden nicht hochgeladen",
     ],
     bridgeHeading: 'Eigene Aufgaben anbinden',
     bridgeLede:
-      'Mit zislactl schickst du den strukturierten Status externer Aufgaben in die Statusleiste oben.',
+      "Mit zislactl zeigst du Skripte und Build-Aufgaben in der Statusleiste an.",
     zislactlTaskTitle: 'Build und Release',
     copyZislactlAriaLabel: 'zislactl-Befehl kopieren',
   },
@@ -319,7 +316,7 @@ export const de: SiteContent = {
       trigger: {
         phase: 'Auslösen',
         title: 'Zeiger nach oben in die Mitte bewegen',
-        desc: 'Displays mit Notch und externe Bildschirme nutzen dieselbe Bewegung, und im verborgenen Zustand läuft kein Frame-Loop.',
+        desc: "Funktioniert auf Displays mit Notch und externen Bildschirmen.",
       },
       review: {
         phase: 'Ansehen',
@@ -694,10 +691,8 @@ export const de: SiteContent = {
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Unterstützt mehrere Displays, Spaces und gewöhnliche Vollbild-Apps; beim Öffnen wird die App weder aktiviert noch der Fokus entzogen',
-      'Im verborgenen Zustand entsteht kein dauerhaftes transparentes Hotzone-Fenster und es läuft kein Frame-Loop; geöffnet wird über globale Ereignisbeobachtung und Geometrieprüfung',
-      'Nutzt eine einzige Schicht Systemmaterial und wechselt bei aktiviertem „Transparenz reduzieren“ automatisch auf einen deckenden Hintergrund',
+      "Verwendet bei aktivierter Option „Transparenz reduzieren“ einen deckenden Hintergrund",
       'Liquid Glass ab macOS 26, mit automatischem Rückfall auf native Systemmaterialien unter macOS 14 und 15',
-      'Eine physische Notch wird aus dem Sicherheitsbereich des Systems abgeleitet; externe Displays ohne Notch erhalten eine simulierte Statusleiste in einem eigenen Overlay',
     ],
   },
   film: {

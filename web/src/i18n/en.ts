@@ -164,7 +164,7 @@ export const en: SiteContent = {
       },
       dailyBriefing: {
         title: 'Your day, in a daily briefing',
-        description: 'Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available; unavailable data is not presented as measured zero. Choose a separate export folder in Settings → Save Location. Optionally include real account allowances and their sampling times.',
+        description: "Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available. Choose a separate export folder in Settings → Save Location. Optionally include real account allowances and their sampling times.",
         detail: '8 templates · Select content · Preview and scheduled PNG export',
       },
       userCare: {
@@ -184,8 +184,8 @@ export const en: SiteContent = {
       },
       permissions: {
         title: 'System permissions in one place',
-        description: 'Review permission status in Settings → Permissions, start supported requests or open the relevant System Settings page. The same permission list is available during first-launch onboarding; manual permissions are labelled accordingly. Permission status refreshes after access is granted. An application drag helper assists permissions that require adding the app.',
-        detail: 'Permission status · Requests and settings links · Shared with onboarding',
+        description: "Review permission status in Settings → Permissions, start supported requests or open the relevant System Settings page. Permission status refreshes after access is granted. An application drag helper assists permissions that require adding the app.",
+        detail: "Permission status · Requests and settings links",
       },
       imageTools: {
         title: 'Image tools',
@@ -199,7 +199,7 @@ export const en: SiteContent = {
       },
       pdf: {
         title: 'PDF tools',
-        description: 'Available in Settings rather than the island module carousel. Fourteen operations that all run on your Mac: merge, split, rotate, crop, convert images and Office files, render to images, extract text, add text or image watermarks, add page numbers, encrypt, remove a password and edit metadata.',
+        description: "Available in Settings. Fourteen operations that all run on your Mac: merge, split, rotate, crop, convert images and Office files, render to images, extract text, add text or image watermarks, add page numbers, encrypt, remove a password and edit metadata.",
         detail: '14 on-device tools · Merge in your own order · Nothing leaves your Mac',
       },
 
@@ -254,8 +254,8 @@ export const en: SiteContent = {
       lockScreen: {
         title: 'Lock screen information',
         description:
-          'Optionally show the date, status and now playing on the macOS lock screen. It is a separate lock screen overlay and never appears in the island module list or carousel.',
-        detail: 'Separate lock screen overlay · Opt in · Never takes focus',
+          "Optionally show the date, status and now playing on the macOS lock screen.",
+        detail: "Opt in · Never takes focus",
       },
       recommendedTools: {
         title: 'Recommended apps',
@@ -266,27 +266,23 @@ export const en: SiteContent = {
     },
   },
   ai: {
-    eyebrow: 'AI WITHOUT A BLACK BOX',
-    title: 'See AI status <span>without reading the conversation.</span>',
-    lede: 'Follow tasks by application, inspect model usage by date and check real account allowances. Status and numeric records stay on your Mac; conversations are not read.',
-    summaryMono: 'ON-DEVICE STATUS / CLEAR BOUNDARIES',
-    summaryLede: 'Different harnesses. One place for status.',
-    summaryNote:
-      'WorkBuddy and WorkBuddy AI are detected independently, with separate sessions, branding and open actions — not one interchangeable product.',
+    eyebrow: "AI WORKFLOW",
+    title: "Follow AI tasks, <span>usage and allowances.</span>",
+    lede: "Follow tasks by application, view model usage by date and check remaining account allowances.",
+    summaryMono: "TASKS / USAGE / ALLOWANCES",
+    summaryLede: "AI tasks, usage and allowances in one place.",
     toolsHeading: '{tools} AI tools and harnesses',
     toolsLede:
-      'Detects supported CLI, desktop and IDE activity. Delta, Orca, WorkBuddy and WorkBuddy AI each retain their own name.',
+      "Detects tasks from supported CLIs, desktop apps and IDEs.",
     toolsAriaLabel: 'Supported AI tools and harnesses',
-    usageNote:
-      'Session detection, token history and account allowances have separate data sources. Delta uses its local numeric ledger; Orca deduplicates bound CLI usage under the underlying provider. WorkBuddy AI can detect sessions and query credits; context occupancy and credits are not converted into tokens or USD cost. Quota availability follows the provider and login method.',
-    boundariesHeading: 'Only status boundaries are recorded',
+    boundariesHeading: "Privacy",
     privacyPoints: [
-      'Parses status metadata (including session titles, timestamps, models and session identifiers) and reliable numeric usage only',
-      'Does not parse prompt or reply text, or upload conversations',
-      'Third-party session stores are read-only; protocol, status and usage records stay on your Mac',
+      "Task status and usage stay on your Mac",
+      "Prompts and replies are not read",
+      "Conversations are not uploaded",
     ],
     bridgeHeading: 'Bring in your own tasks',
-    bridgeLede: 'Use zislactl to push structured status from external tasks into the status bar.',
+    bridgeLede: "Use zislactl to show your scripts and build tasks in the status bar.",
     zislactlTaskTitle: 'Build and release',
     copyZislactlAriaLabel: 'Copy the zislactl command',
   },
@@ -303,7 +299,7 @@ export const en: SiteContent = {
       trigger: {
         phase: 'Trigger',
         title: 'Move to the top centre of the screen',
-        desc: 'Notched and external displays use the same trigger, and no frame loop runs while it is hidden.',
+        desc: "Works on notched and external displays.",
       },
       review: {
         phase: 'Review',
@@ -678,10 +674,8 @@ export const en: SiteContent = {
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Supports multiple displays, Spaces and ordinary full-screen apps; expanding never activates the app or takes focus',
-      'While hidden it creates no persistent transparent hot-zone window and runs no frame loop; expansion is triggered by global event monitoring and geometry checks',
-      'Uses a single layer of system material, and switches to an opaque background when Reduce Transparency is on',
+      "Uses an opaque background when Reduce Transparency is enabled",
       'Liquid Glass on macOS 26+, with an automatic fallback to native system materials on macOS 14 and 15',
-      'A physical notch is inferred from the system safe area; external displays without one get a simulated status bar in a dedicated overlay',
     ],
   },
   film: {

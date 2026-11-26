@@ -184,7 +184,7 @@ export const fr: SiteContent = {
       },
       dailyBriefing: {
         title: 'Le bilan de votre journée',
-        description: 'Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible ; une donnée absente n’est pas présentée comme un zéro mesuré. Choisissez un dossier d’export indépendant dans Réglages → Emplacement de sauvegarde. Vous pouvez aussi inclure les quotas réels des comptes et l’heure de leur relevé.',
+        description: "Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible. Choisissez un dossier d’export indépendant dans Réglages → Emplacement de sauvegarde. Vous pouvez aussi inclure les quotas réels des comptes et l’heure de leur relevé.",
         detail: '8 modèles · Contenu au choix · Aperçu et export PNG programmé',
       },
       userCare: {
@@ -204,8 +204,8 @@ export const fr: SiteContent = {
       },
       permissions: {
         title: 'Les autorisations au même endroit',
-        description: 'Consultez les états dans Réglages → Autorisations, lancez les demandes prises en charge ou ouvrez la page système correspondante. L’accueil initial utilise la même liste et indique les réglages manuels. L’état des autorisations se met à jour après l’octroi de l’accès. Une aide au glisser-déposer facilite l’ajout de l’application quand il est nécessaire.',
-        detail: 'État des autorisations · Demandes et liens · Commun avec l’accueil',
+        description: "Consultez les états dans Réglages → Autorisations, lancez les demandes prises en charge ou ouvrez la page système correspondante. L’état des autorisations se met à jour après l’octroi de l’accès. Une aide au glisser-déposer facilite l’ajout de l’application quand il est nécessaire.",
+        detail: "État des autorisations · Demandes et liens",
       },
       imageTools: {
         title: 'Outils d’image',
@@ -219,7 +219,7 @@ export const fr: SiteContent = {
       },
       pdf: {
         title: 'Outils PDF',
-        description: 'Accessible dans les réglages, en dehors du carrousel de l’île. Quatorze opérations entièrement locales : fusionner, diviser, faire pivoter, recadrer, convertir des images et fichiers Office, convertir en images, exporter le texte, ajouter un filigrane texte ou image, numéroter les pages, chiffrer, supprimer un mot de passe et modifier les métadonnées.',
+        description: "Accessible dans les réglages. Quatorze opérations entièrement locales : fusionner, diviser, faire pivoter, recadrer, convertir des images et fichiers Office, convertir en images, exporter le texte, ajouter un filigrane texte ou image, numéroter les pages, chiffrer, supprimer un mot de passe et modifier les métadonnées.",
         detail: '14 outils locaux · Fusion dans votre ordre · Rien ne quitte votre Mac',
       },
 
@@ -274,8 +274,8 @@ export const fr: SiteContent = {
       lockScreen: {
         title: 'Informations sur l’écran verrouillé',
         description:
-          'Affichez au besoin la date, l’état et la lecture en cours sur l’écran verrouillé de macOS. Il s’agit d’une surcouche distincte, jamais présente dans la liste des modules ni dans le carrousel de l’île.',
-        detail: 'Surcouche distincte · Activation au choix · Ne prend jamais le focus',
+          "Affichez au besoin la date, l’état et la lecture en cours sur l’écran verrouillé de macOS.",
+        detail: "Activation au choix · Ne prend jamais le focus",
       },
       recommendedTools: {
         title: 'Apps recommandées',
@@ -286,28 +286,25 @@ export const fr: SiteContent = {
     },
   },
   ai: {
-    eyebrow: 'UNE IA SANS BOÎTE NOIRE',
-    title: 'Voir l’état de l’IA <span>sans lire la conversation.</span>',
-    lede: 'Suivez les tâches par application, l’usage des modèles par date et les quotas réels des comptes. Les états et données chiffrées restent sur votre Mac ; le texte des conversations n’est pas lu.',
-    summaryMono: 'ÉTAT LOCAL / LIMITES CLAIRES',
+    eyebrow: "ACTIVITÉ IA",
+    title: "Suivez les tâches IA, <span>l’usage et les quotas.</span>",
+    lede: "Consultez les tâches par application, l’usage des modèles par date et les quotas restants de vos comptes.",
+    summaryMono: "TÂCHES / USAGE / QUOTAS",
     summaryLede:
-      'Reliez les outils IA que vous utilisez déjà tout en gardant les limites de contexte que votre travail exige.',
-    summaryNote:
-      'Cette page décrit seulement la portée de la détection, la limite des données et le mode de connexion : elle ne simule aucune session en cours.',
+      "Tâches IA, usage et quotas au même endroit.",
     toolsHeading: 'Outils IA pris en charge',
     toolsLede:
-      'Détecte l’activité des CLI, apps de bureau et IDE pris en charge, et agrège l’état des tâches.',
+      "Détecte les tâches des CLI, applications de bureau et IDE compatibles.",
     toolsAriaLabel: 'Outils IA pris en charge',
-    usageNote: 'Détection des sessions, historique des tokens et quotas des comptes utilisent des sources distinctes. Delta lit son registre chiffré local ; Orca déduplique l’usage du CLI associé sous le fournisseur d’origine. WorkBuddy AI peut détecter les sessions et consulter les crédits ; occupation du contexte et crédits ne sont pas convertis en tokens ou en coût en dollars. Les quotas disponibles dépendent du fournisseur et du mode de connexion.',
-    boundariesHeading: 'Seules les limites d’état sont enregistrées',
+    boundariesHeading: "Confidentialité",
     privacyPoints: [
-      'Analyse uniquement le type d’événement, l’état, l’horodatage, le modèle et l’identifiant de session des événements structurés',
-      'Ne lit jamais le texte des invites ni des réponses',
-      'Protocole et état sont conservés sur votre Mac',
+      "L’état des tâches et l’usage restent sur votre Mac",
+      "Les prompts et les réponses ne sont pas lus",
+      "Les conversations ne sont pas envoyées",
     ],
     bridgeHeading: 'Reliez vos propres tâches',
     bridgeLede:
-      'Utilisez zislactl pour envoyer l’état structuré de tâches externes vers la barre d’état.',
+      "Utilisez zislactl pour afficher vos scripts et vos tâches de compilation dans la barre d’état.",
     zislactlTaskTitle: 'Compilation et publication',
     copyZislactlAriaLabel: 'Copier la commande zislactl',
   },
@@ -324,7 +321,7 @@ export const fr: SiteContent = {
       trigger: {
         phase: 'Déclencher',
         title: 'Amener le pointeur en haut, au centre',
-        desc: 'Même geste sur les écrans à encoche et externes, et aucune boucle de rendu ne tourne quand l’île est masquée.',
+        desc: "Fonctionne sur les écrans à encoche et les écrans externes.",
       },
       review: {
         phase: 'Consulter',
@@ -699,10 +696,8 @@ export const fr: SiteContent = {
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Prend en charge plusieurs écrans, les Spaces et les apps en plein écran classique ; l’ouverture n’active jamais l’app et ne prend pas le focus',
-      'Masquée, elle ne crée aucune fenêtre transparente permanente et ne fait tourner aucune boucle de rendu : l’ouverture repose sur l’observation d’événements globaux et un calcul de géométrie',
-      'Utilise une seule couche de matériau système et passe à un fond opaque dès que « Réduire la transparence » est activé',
+      "Utilise un fond opaque lorsque « Réduire la transparence » est activé",
       'Liquid Glass sur macOS 26 et versions ultérieures, avec repli automatique sur les matériaux natifs sur macOS 14 et 15',
-      'L’encoche physique est déduite de la zone de sécurité du système ; les écrans externes sans encoche reçoivent une barre d’état simulée dans une surcouche dédiée',
     ],
   },
   film: {

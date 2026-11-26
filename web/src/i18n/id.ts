@@ -107,7 +107,7 @@ export const id = createCatalog({
       },
       dailyBriefing: {
         title: 'Hari Anda dalam ringkasan harian',
-        description: 'Pilih dari delapan templat, tentukan data penggunaan, pengetikan, sistem dan aktivitas zisla, lalu lihat pratinjau. Ekspor PNG secara manual atau pada waktu harian pilihan. Riwayat Durasi Layar dipakai saat aktif dan tersedia; data yang hilang tidak dianggap nol terukur. Pilih folder ekspor terpisah di Pengaturan → Lokasi Penyimpanan. Anda juga dapat menyertakan sisa kuota akun yang sebenarnya dan waktu pengambilannya.',
+        description: "Pilih dari delapan templat, tentukan data penggunaan, pengetikan, sistem dan aktivitas zisla, lalu lihat pratinjau. Ekspor PNG secara manual atau pada waktu harian pilihan. Riwayat Durasi Layar dipakai saat aktif dan tersedia. Pilih folder ekspor terpisah di Pengaturan → Lokasi Penyimpanan. Anda juga dapat menyertakan sisa kuota akun yang sebenarnya dan waktu pengambilannya.",
         detail: '8 templat · Pilih isi · Pratinjau dan ekspor PNG terjadwal',
       },
       userCare: {
@@ -127,8 +127,8 @@ export const id = createCatalog({
       },
       permissions: {
         title: 'Izin sistem di satu tempat',
-        description: 'Tinjau status di Pengaturan → Izin, mulai permintaan yang didukung atau buka halaman sistem terkait. Sambutan pertama memakai daftar yang sama dan menandai izin yang harus diatur manual. Status izin diperbarui setelah akses diberikan. Bantuan menyeret aplikasi mempermudah izin yang mengharuskan penambahan aplikasi.',
-        detail: 'Status izin · Permintaan dan tautan · Sama dengan sambutan',
+        description: "Tinjau status di Pengaturan → Izin, mulai permintaan yang didukung atau buka halaman sistem terkait. Status izin diperbarui setelah akses diberikan. Bantuan menyeret aplikasi mempermudah izin yang mengharuskan penambahan aplikasi.",
+        detail: "Status izin · Permintaan dan tautan",
       },
       imageTools: {
         title: 'Alat Gambar',
@@ -142,7 +142,7 @@ export const id = createCatalog({
       },
       pdf: {
         title: 'Alat PDF',
-        description: 'Tersedia di Pengaturan, di luar karusel modul pulau. Empat belas operasi di perangkat: gabungkan, pisahkan, putar, pangkas, konversi gambar dan Office, render ke gambar, ekstrak teks, tambahkan watermark dan nomor halaman, enkripsi, hapus kata sandi, dan edit metadata.',
+        description: "Tersedia di Pengaturan. Empat belas operasi di perangkat: gabungkan, pisahkan, putar, pangkas, konversi gambar dan Office, render ke gambar, ekstrak teks, tambahkan watermark dan nomor halaman, enkripsi, hapus kata sandi, dan edit metadata.",
         detail: '14 alat di perangkat · Gabungkan sesuai urutan Anda · Tidak ada yang meninggalkan Mac',
       },
 
@@ -159,7 +159,7 @@ export const id = createCatalog({
       copyAssistant: { title: 'Tindakan Cepat dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi. Buka folder berkas melalui Tindakan Cepat setelah unduhan browser atau transfer AirDrop. Mendukung folder unduhan bawaan dan pilihan di Chrome, dengan sakelar terpisah dari tampilan progres unduhan. Alamat IP memiliki tindakan pencarian dan membuka tautan terpisah. Konversi mengenali satuan mata uang kecil; katalog mencakup Emoji 18.0. Teks dan gambar yang disimpan memakai folder Tindakan Cepat terpisah di Pengaturan → Lokasi Penyimpanan. Jika aplikasi tidak dapat dibuka, Tindakan Cepat memeriksa integritas, tanda tangan, dan kebijakan keamanan macOS, lalu menghapus atribut karantina dan membukanya setelah pemeriksaan berhasil. Atur urutan tindakan per jenis yang dikenali di Pengaturan → Tindakan Cepat. Jumlah uang mendukung simbol regional dan kode mata uang dengan prefiks. Deteksi perintah mendukung here-document.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
       aiManagement: { title: 'Pengelolaan CLI AI dan Skills', description: 'Deteksi, pasang, perbarui, dan hapus CLI AI dari Pengaturan, serta tinjau dan kelola Skills lokal agar lebih jarang berpindah terminal.', detail: 'Deteksi dan pasang · Perbarui dan hapus · Skills lokal' },
       pet: { title: 'Hewan peliharaan pulau', description: 'Pilih dari katalog hewan dan karakter yang diperluas, atau impor gambar, animasi atau video yang didukung dan beri nama. Letakkan di salah satu sisi pulau dan hapus hewan impor di Pengaturan. Animasi maksimal 30 detik, berkas maksimal 100 MB.', detail: 'Katalog diperluas · Impor gambar dan video · Hapus hewan kustom' },
-      lockScreen: { title: 'Informasi layar terkunci', description: 'Tampilkan tanggal, status, dan media yang sedang diputar di layar terkunci macOS secara opsional. Ini adalah overlay terpisah dan tidak muncul di daftar atau karusel modul pulau.', detail: 'Overlay terpisah · Pilihan pengguna · Tidak mengambil fokus' },
+      lockScreen: { title: 'Informasi layar terkunci', description: "Tampilkan tanggal, status, dan media yang sedang diputar di layar terkunci macOS secara opsional.", detail: "Pilihan pengguna · Tidak mengambil fokus" },
       recommendedTools: {
         title: 'Aplikasi rekomendasi',
         description:
@@ -169,20 +169,22 @@ export const id = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'AI TANPA KOTAK HITAM',
-    title: 'Lihat status AI <span>tanpa membaca percakapan.</span>',
-    lede: 'Lihat tugas menurut aplikasi, pemakaian model menurut tanggal, dan kuota akun yang sebenarnya. Status dan catatan angka tetap di Mac; isi percakapan tidak dibaca.',
-    summaryMono: 'STATUS LOKAL / BATAS JELAS',
-    summaryLede: 'Hubungkan alat AI yang Anda gunakan sambil menjaga batas konteks yang diperlukan.',
-    summaryNote: 'Halaman ini hanya menjelaskan cakupan deteksi, batas data, dan cara menghubungkan; sesi langsung tidak disimulasikan.',
+    eyebrow: "ALUR AI",
+    title: "Pantau tugas AI, <span>penggunaan dan kuota.</span>",
+    lede: "Lihat tugas per aplikasi, penggunaan model per tanggal, dan sisa kuota akun.",
+    summaryMono: "TUGAS / PENGGUNAAN / KUOTA",
+    summaryLede: "Tugas AI, penggunaan, dan kuota di satu tempat.",
     toolsHeading: 'Alat AI yang didukung',
-    toolsLede: 'Mendeteksi aktivitas CLI, aplikasi desktop, dan IDE yang didukung, lalu menggabungkan status tugas.',
+    toolsLede: "Mendeteksi tugas dari CLI, aplikasi desktop, dan IDE yang didukung.",
     toolsAriaLabel: 'Alat AI yang didukung',
-    usageNote: 'Deteksi sesi, riwayat token, dan kuota akun memakai sumber berbeda. Delta menggunakan catatan angka lokal; Orca menghapus duplikasi pemakaian CLI yang terhubung dan mengaitkannya ke penyedia asal. WorkBuddy AI dapat mendeteksi sesi dan memeriksa kredit; pemakaian konteks dan kredit tidak diubah menjadi token atau biaya dolar. Kuota yang tersedia bergantung pada penyedia dan metode masuk.',
-    boundariesHeading: 'Hanya batas status yang dicatat',
-    privacyPoints: ['Hanya menganalisis jenis peristiwa, status, waktu, model, dan ID sesi dari peristiwa terstruktur', 'Tidak pernah membaca teks prompt atau balasan', 'Protokol dan status disimpan di Mac'],
+    boundariesHeading: "Privasi",
+    privacyPoints: [
+      "Status tugas dan penggunaan disimpan di Mac",
+      "Teks prompt dan balasan tidak dibaca",
+      "Percakapan tidak diunggah",
+    ],
     bridgeHeading: 'Hubungkan tugas Anda sendiri',
-    bridgeLede: 'Gunakan zislactl untuk mengirim status terstruktur tugas eksternal ke bilah status.',
+    bridgeLede: "Gunakan zislactl untuk menampilkan skrip dan tugas build di bilah status.",
     zislactlTaskTitle: 'Build dan rilis',
     copyZislactlAriaLabel: 'Salin perintah zislactl',
   },
@@ -195,7 +197,7 @@ export const id = createCatalog({
     summaryLede: 'Membuka saat diperlukan dan menutup setelah selesai.',
     summaryNote: 'Dipicu posisi penunjuk, tidak memakan ruang saat kosong, dan tidak mengambil fokus.',
     steps: {
-      trigger: { phase: 'Picu', title: 'Gerakkan penunjuk ke tengah atas', desc: 'Layar ber-notch dan eksternal memakai pemicu yang sama; saat tersembunyi tidak ada loop frame.' },
+      trigger: { phase: 'Picu', title: 'Gerakkan penunjuk ke tengah atas', desc: "Dapat digunakan di layar berponi dan layar eksternal." },
       review: { phase: 'Tinjau', title: 'Lihat status saat ini sekilas', desc: 'Media, berkas, AI, agenda, dan alat sistem berada di tempat yang sama.' },
       dismiss: { phase: 'Tutup', title: 'Kembali ke pekerjaan', desc: 'Jauhkan penunjuk dan panel menutup; membuka tidak mengaktifkan aplikasi atau mengambil fokus.' },
     },
@@ -518,10 +520,8 @@ export const id = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Mendukung banyak layar, Spaces, dan aplikasi layar penuh biasa; membuka tidak mengaktifkan aplikasi atau mengambil fokus',
-      'Saat tersembunyi tidak membuat jendela hotspot transparan permanen dan tidak menjalankan loop frame; ekspansi memakai event global dan geometri',
-      'Menggunakan satu lapisan material sistem dan beralih ke latar buram saat Kurangi Transparansi aktif',
+      "Menggunakan latar buram saat Kurangi Transparansi aktif",
       'Liquid Glass di macOS 26+, dengan fallback otomatis ke material native di macOS 14 dan 15',
-      'Notch fisik disimpulkan dari area aman sistem; layar eksternal tanpa notch mendapat bilah status simulasi dalam overlay khusus',
     ],
   },
   film: {

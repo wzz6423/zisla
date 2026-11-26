@@ -161,7 +161,7 @@ export const zhHant: SiteContent = {
       },
       dailyBriefing: {
         title: '每日簡報',
-        description: '從 8 種模板中選擇樣式，勾選使用時間、輸入、系統與 zisla 活動資料，並預覽版面。可手動或在設定時間匯出 PNG；開啟後按可用情況讀取系統螢幕使用時間歷史，不把缺失資料當作實測零值。匯出目錄可在「設定 → 儲存位置」單獨選擇。也可選擇加入真實帳戶剩餘額度與取樣時間。',
+        description: "從 8 種模板中選擇樣式，勾選使用時間、輸入、系統與 zisla 活動資料，並預覽版面。可手動或在設定時間匯出 PNG；開啟後按可用情況讀取系統螢幕使用時間歷史。匯出目錄可在「設定 → 儲存位置」單獨選擇。也可選擇加入真實帳戶剩餘額度與取樣時間。",
         detail: '8 種模板 · 自選內容 · 預覽與定時 PNG 匯出',
       },
       userCare: {
@@ -181,8 +181,8 @@ export const zhHant: SiteContent = {
       },
       permissions: {
         title: '集中管理系統權限',
-        description: '在「設定 → 權限」查看授權狀態、發起支援的要求，或開啟對應系統設定頁。首次歡迎頁共用同一權限清單，並標明需要手動設定的權限。授權後自動更新權限狀態；需要手動加入應用程式的權限可使用應用程式拖曳助手。',
-        detail: '授權狀態 · 要求與系統設定 · 歡迎頁共用',
+        description: "在「設定 → 權限」查看授權狀態、發起支援的要求，或開啟對應系統設定頁。授權後自動更新權限狀態；需要手動加入應用程式的權限可使用應用程式拖曳助手。",
+        detail: "授權狀態 · 要求與系統設定",
       },
       imageTools: {
         title: '圖片工具',
@@ -196,7 +196,7 @@ export const zhHant: SiteContent = {
       },
       pdf: {
         title: 'PDF 工具',
-        description: '入口位於設定，不佔用靈動島模組輪播。在本機完成 PDF 合併、分割、旋轉、裁切、圖片/Office 轉換、轉為圖片、匯出文字、文字/圖片浮水印、頁碼、加密、移除密碼與中介資料編輯等 14 項操作。',
+        description: "在設定中使用 PDF 工具，本機完成合併、分割、旋轉、裁切、圖片/Office 轉換、轉為圖片、匯出文字、文字/圖片浮水印、頁碼、加密、移除密碼與中介資料編輯等 14 項操作。",
         detail: '14 種本機工具 · 依順序合併 · 全程不離開本機',
       },
 
@@ -250,8 +250,8 @@ export const zhHant: SiteContent = {
       lockScreen: {
         title: '鎖定畫面資訊',
         description:
-          '隨需在 macOS 鎖定畫面顯示日期、狀態與正在播放的內容；它是獨立的鎖定畫面覆蓋層，不會出現在靈動島的模組列表或輪播中。',
-        detail: '獨立鎖定畫面覆蓋層 · 隨需開啟 · 不搶焦點',
+          "隨需在 macOS 鎖定畫面顯示日期、狀態與正在播放的內容。",
+        detail: "隨需開啟 · 不搶焦點",
       },
       recommendedTools: {
         title: '推薦應用程式',
@@ -262,24 +262,22 @@ export const zhHant: SiteContent = {
     },
   },
   ai: {
-    eyebrow: '沒有黑箱的 AI',
-    title: '看見 AI 狀態，<span>不讀取對話。</span>',
-    lede: '依應用程式查看任務，依日期查看模型用量，並查詢真實帳戶剩餘額度。狀態和數值紀錄保留在本機，不讀取對話內容。',
-    summaryMono: '本機狀態 / 明確邊界',
-    summaryLede: '接上常用 AI 工具，同時保留目前工作需要的上下文邊界。',
-    summaryNote: '本頁只說明偵測範圍、資料邊界與接入方式，不模擬正在執行的工作階段。',
+    eyebrow: "AI 工作流程",
+    title: "查看 AI 任務，<span>用量與額度。</span>",
+    lede: "依應用程式查看任務，依日期查看模型用量，查詢帳戶剩餘額度。",
+    summaryMono: "任務 / 用量 / 額度",
+    summaryLede: "AI 任務、用量和額度，集中查看。",
     toolsHeading: '支援的 AI 工具',
-    toolsLede: '自動辨識受支援的 CLI、桌面版與 IDE 活動，並彙總任務狀態。',
+    toolsLede: "自動偵測支援的 CLI、桌面應用程式和 IDE 中的任務。",
     toolsAriaLabel: '支援的 AI 工具',
-    usageNote: '工作階段偵測、Token 歷史與帳戶額度各有資料來源。Delta 使用本機數值帳本；Orca 重用已綁定 CLI 的用量並去除重複，歸屬於底層供應商。WorkBuddy AI 可偵測工作階段並查詢 credits；上下文占用和 credits 不換算為 Token 或美元費用。額度查詢能力取決於供應商與登入方式。',
-    boundariesHeading: '只記錄狀態邊界',
+    boundariesHeading: "隱私",
     privacyPoints: [
-      '只解析結構化事件中的事件類型、狀態、時間、模型與工作階段 ID',
-      '不讀取提示詞或回覆內容',
-      '協定與狀態都保存在本機',
+      "任務狀態與用量儲存在本機",
+      "不讀取提示詞和回覆正文",
+      "不上傳對話",
     ],
     bridgeHeading: '接上你自己的任務',
-    bridgeLede: '透過 zislactl 將外部任務的結構化狀態送進頂端狀態列。',
+    bridgeLede: "用 zislactl 在頂部狀態列顯示指令碼和建置任務。",
     zislactlTaskTitle: '打包發佈',
     copyZislactlAriaLabel: '複製 zislactl 指令',
   },
@@ -295,7 +293,7 @@ export const zhHant: SiteContent = {
       trigger: {
         phase: '觸發',
         title: '移到螢幕頂端中央',
-        desc: '瀏海螢幕與外接螢幕使用同樣的觸發方式；隱藏時不執行影格迴圈。',
+        desc: "瀏海螢幕和外接螢幕都能使用。",
       },
       review: {
         phase: '查看',
@@ -652,10 +650,8 @@ export const zhHant: SiteContent = {
     checksumLabel: 'SHA-256',
     performancePoints: [
       '支援多螢幕、Spaces 與一般全螢幕應用程式；展開時不會啟用或搶走目前應用程式的焦點',
-      '隱藏時不建立常駐透明熱區視窗，也不執行影格迴圈；透過全域事件監聽與幾何判斷觸發展開',
-      '使用單層系統材質；系統開啟「降低透明度」後會自動改用實體背景',
+      "開啟「降低透明度」時使用實體背景",
       'macOS 26+ 使用 Liquid Glass；macOS 14/15 自動回退為系統原生材質',
-      '實體瀏海透過系統安全區域推斷；沒有瀏海的外接螢幕使用自有覆蓋層模擬狀態列',
     ],
   },
   film: {

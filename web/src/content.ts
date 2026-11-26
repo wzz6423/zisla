@@ -606,12 +606,9 @@ export interface SiteContent {
     lede: string;
     summaryMono: string;
     summaryLede: string;
-    summaryNote: string;
     toolsHeading: string;
     toolsLede: string;
     toolsAriaLabel: string;
-    /** Integration-specific usage caveats, where the catalog supplies them. */
-    usageNote?: string;
     boundariesHeading: string;
     privacyPoints: readonly [string, string, string];
     bridgeHeading: string;
@@ -688,7 +685,7 @@ export interface SiteContent {
     githubRepoLabel: string;
     giteeRepoLabel: string;
     checksumLabel: string;
-    performancePoints: readonly [string, string, string, string, string];
+    performancePoints: readonly [string, string, string];
   };
   film: {
     title: string;

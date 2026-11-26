@@ -107,7 +107,7 @@ export const vi = createCatalog({
       },
       dailyBriefing: {
         title: 'Một ngày trong báo cáo hằng ngày',
-        description: 'Chọn từ tám mẫu, chọn dữ liệu sử dụng, nhập liệu, hệ thống và hoạt động zisla rồi xem trước. Xuất PNG thủ công hoặc vào giờ hằng ngày đã chọn. Lịch sử Thời gian sử dụng chỉ dùng khi được bật và có sẵn; dữ liệu thiếu không hiển thị thành số 0 đã đo. Chọn thư mục xuất riêng trong Cài đặt → Vị trí lưu. Bạn cũng có thể đưa vào hạn mức thực còn lại của tài khoản và thời điểm lấy dữ liệu.',
+        description: "Chọn từ tám mẫu, chọn dữ liệu sử dụng, nhập liệu, hệ thống và hoạt động zisla rồi xem trước. Xuất PNG thủ công hoặc vào giờ hằng ngày đã chọn. Lịch sử Thời gian sử dụng chỉ dùng khi được bật và có sẵn. Chọn thư mục xuất riêng trong Cài đặt → Vị trí lưu. Bạn cũng có thể đưa vào hạn mức thực còn lại của tài khoản và thời điểm lấy dữ liệu.",
         detail: '8 mẫu · Chọn nội dung · Xem trước và xuất PNG theo lịch',
       },
       userCare: {
@@ -127,8 +127,8 @@ export const vi = createCatalog({
       },
       permissions: {
         title: 'Quyền hệ thống ở một nơi',
-        description: 'Xem trạng thái tại Cài đặt → Quyền, bắt đầu yêu cầu được hỗ trợ hoặc mở trang hệ thống tương ứng. Màn hình chào lần đầu dùng cùng danh sách và chỉ rõ quyền phải đặt thủ công. Trạng thái quyền cập nhật sau khi được cấp quyền truy cập. Trợ giúp kéo ứng dụng hỗ trợ các quyền yêu cầu thêm ứng dụng.',
-        detail: 'Trạng thái quyền · Yêu cầu và liên kết · Dùng chung với màn hình chào',
+        description: "Xem trạng thái tại Cài đặt → Quyền, bắt đầu yêu cầu được hỗ trợ hoặc mở trang hệ thống tương ứng. Trạng thái quyền cập nhật sau khi được cấp quyền truy cập. Trợ giúp kéo ứng dụng hỗ trợ các quyền yêu cầu thêm ứng dụng.",
+        detail: "Trạng thái quyền · Yêu cầu và liên kết",
       },
       imageTools: {
         title: 'Công cụ hình ảnh',
@@ -142,7 +142,7 @@ export const vi = createCatalog({
       },
       pdf: {
         title: 'Công cụ PDF',
-        description: 'Có trong Cài đặt, ngoài danh sách mô-đun của đảo. Mười bốn thao tác ngay trên máy: hợp nhất, tách, xoay, cắt, chuyển đổi ảnh và tệp Office, kết xuất ảnh, trích xuất văn bản, thêm watermark và số trang, mã hóa, xóa mật khẩu và sửa metadata.',
+        description: "Có trong Cài đặt. Mười bốn thao tác ngay trên máy: hợp nhất, tách, xoay, cắt, chuyển đổi ảnh và tệp Office, kết xuất ảnh, trích xuất văn bản, thêm watermark và số trang, mã hóa, xóa mật khẩu và sửa metadata.",
         detail: '14 công cụ trên máy · Hợp nhất theo thứ tự bạn muốn · Không có dữ liệu rời khỏi Mac',
       },
 
@@ -159,7 +159,7 @@ export const vi = createCatalog({
       copyAssistant: { title: 'Thao tác nhanh và bước tiếp theo', description: 'Khi bật, văn bản, liên kết, tệp hoặc ảnh đã sao chép được xem trước trong thanh riêng, kèm đề xuất mở, hiện trong Finder, tìm kiếm, dịch, tính toán hoặc lưu chỉ sau khi bạn xác nhận. Mở thư mục chứa tệp qua Thao tác nhanh sau khi tải bằng trình duyệt hoặc nhận qua AirDrop. Hỗ trợ thư mục tải mặc định và tự chọn của Chrome, với công tắc riêng so với hiển thị tiến trình tải. Địa chỉ IP có thao tác tra cứu và mở liên kết riêng. Chuyển đổi nhận biết đơn vị tiền tệ nhỏ; danh mục gồm Emoji 18.0. Văn bản và ảnh được lưu dùng thư mục Thao tác nhanh riêng trong Cài đặt → Vị trí lưu. Khi ứng dụng không mở được, Thao tác nhanh kiểm tra tính toàn vẹn, chữ ký và chính sách bảo mật của macOS, rồi gỡ thuộc tính cách ly và mở ứng dụng sau khi vượt qua kiểm tra. Đổi thứ tự thao tác cho từng loại nhận dạng tại Cài đặt → Thao tác nhanh. Số tiền hỗ trợ ký hiệu theo khu vực và mã tiền tệ có tiền tố. Nhận diện lệnh hỗ trợ here-document.', detail: 'Bật tùy chọn · Nhận dạng cục bộ · Command+N mặc định' },
       aiManagement: { title: 'Quản lý CLI và Skills AI', description: 'Phát hiện, cài đặt, cập nhật và gỡ CLI AI trong Cài đặt, đồng thời xem và quản lý Skills cục bộ để ít phải chuyển giữa các terminal.', detail: 'Phát hiện và cài đặt · Cập nhật và gỡ · Skills cục bộ' },
       pet: { title: 'Thú cưng trong đảo', description: 'Chọn từ danh mục động vật và nhân vật mở rộng, hoặc nhập ảnh, ảnh động hay video được hỗ trợ rồi đặt tên. Đặt thú cưng ở hai bên đảo và xóa thú cưng đã nhập trong Cài đặt. Hoạt ảnh tối đa 30 giây, tệp tối đa 100 MB.', detail: 'Danh mục mở rộng · Nhập ảnh và video · Xóa thú cưng tùy chỉnh' },
-      lockScreen: { title: 'Thông tin màn hình khóa', description: 'Tùy chọn hiển thị ngày, trạng thái và nội dung đang phát trên màn hình khóa macOS. Đây là lớp phủ riêng, không xuất hiện trong danh sách hay băng chuyền mô-đun của đảo.', detail: 'Lớp phủ riêng · Tùy chọn bật · Không chiếm tiêu điểm' },
+      lockScreen: { title: 'Thông tin màn hình khóa', description: "Tùy chọn hiển thị ngày, trạng thái và nội dung đang phát trên màn hình khóa macOS.", detail: "Tùy chọn bật · Không chiếm tiêu điểm" },
       recommendedTools: {
         title: 'Ứng dụng đề xuất',
         description:
@@ -169,20 +169,22 @@ export const vi = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'AI KHÔNG HỘP ĐEN',
-    title: 'Xem trạng thái AI <span>mà không đọc cuộc trò chuyện.</span>',
-    lede: 'Xem tác vụ theo ứng dụng, mức dùng mô hình theo ngày và hạn mức thực của tài khoản. Trạng thái và số liệu được giữ trên Mac; không đọc nội dung hội thoại.',
-    summaryMono: 'TRẠNG THÁI CỤC BỘ / RANH GIỚI RÕ RÀNG',
-    summaryLede: 'Kết nối các công cụ AI bạn dùng mà vẫn giữ ranh giới ngữ cảnh cần thiết.',
-    summaryNote: 'Chỉ mô tả phạm vi phát hiện, ranh giới dữ liệu và cách kết nối; không mô phỏng phiên trực tiếp.',
+    eyebrow: "CÔNG VIỆC AI",
+    title: "Theo dõi tác vụ AI, <span>mức dùng và hạn mức.</span>",
+    lede: "Xem tác vụ theo ứng dụng, mức dùng mô hình theo ngày và hạn mức còn lại của tài khoản.",
+    summaryMono: "TÁC VỤ / MỨC DÙNG / HẠN MỨC",
+    summaryLede: "Tác vụ AI, mức dùng và hạn mức ở cùng một nơi.",
     toolsHeading: 'Công cụ AI được hỗ trợ',
-    toolsLede: 'Phát hiện hoạt động từ CLI, ứng dụng desktop và IDE được hỗ trợ rồi tổng hợp trạng thái tác vụ.',
+    toolsLede: "Phát hiện tác vụ từ CLI, ứng dụng máy tính và IDE được hỗ trợ.",
     toolsAriaLabel: 'Công cụ AI được hỗ trợ',
-    usageNote: 'Phát hiện phiên, lịch sử token và hạn mức tài khoản dùng các nguồn riêng. Delta dùng sổ số liệu cục bộ; Orca loại trùng mức dùng của CLI đã liên kết và quy về nhà cung cấp gốc. WorkBuddy AI có thể phát hiện phiên và truy vấn tín dụng; mức chiếm dụng ngữ cảnh và tín dụng không được đổi thành token hoặc chi phí đô la. Hạn mức có thể truy vấn tùy thuộc nhà cung cấp và cách đăng nhập.',
-    boundariesHeading: 'Chỉ ghi lại ranh giới trạng thái',
-    privacyPoints: ['Chỉ phân tích loại sự kiện, trạng thái, thời gian, mô hình và ID phiên từ sự kiện có cấu trúc', 'Không đọc văn bản prompt hay câu trả lời', 'Giao thức và trạng thái được lưu trên Mac'],
+    boundariesHeading: "Quyền riêng tư",
+    privacyPoints: [
+      "Trạng thái tác vụ và mức dùng được lưu trên Mac",
+      "Không đọc nội dung câu lệnh hay trả lời",
+      "Không tải cuộc trò chuyện lên",
+    ],
     bridgeHeading: 'Kết nối tác vụ của bạn',
-    bridgeLede: 'Dùng zislactl để gửi trạng thái có cấu trúc của tác vụ bên ngoài vào thanh trạng thái.',
+    bridgeLede: "Dùng zislactl để hiển thị tập lệnh và tác vụ dựng trong thanh trạng thái.",
     zislactlTaskTitle: 'Build và phát hành',
     copyZislactlAriaLabel: 'Sao chép lệnh zislactl',
   },
@@ -195,7 +197,7 @@ export const vi = createCatalog({
     summaryLede: 'Mở rộng khi cần và thu lại khi bạn đọc xong.',
     summaryNote: 'Được kích hoạt theo vị trí con trỏ, không chiếm chỗ khi trống và không lấy tiêu điểm.',
     steps: {
-      trigger: { phase: 'Kích hoạt', title: 'Di chuyển con trỏ đến giữa phía trên', desc: 'Màn hình có notch và màn hình ngoài dùng cùng một bộ kích hoạt; khi ẩn không chạy vòng lặp khung hình.' },
+      trigger: { phase: 'Kích hoạt', title: 'Di chuyển con trỏ đến giữa phía trên', desc: "Dùng được trên màn hình có notch và màn hình ngoài." },
       review: { phase: 'Xem', title: 'Liếc nhanh trạng thái hiện tại', desc: 'Phương tiện, tệp, AI, lịch và công cụ hệ thống ở cùng một nơi.' },
       dismiss: { phase: 'Đóng', title: 'Quay lại công việc', desc: 'Đưa con trỏ ra ngoài và thanh sẽ thu lại; mở rộng không kích hoạt ứng dụng hay lấy tiêu điểm.' },
     },
@@ -518,10 +520,8 @@ export const vi = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Hỗ trợ nhiều màn hình, Spaces và ứng dụng toàn màn hình thông thường; mở rộng không kích hoạt ứng dụng hay lấy tiêu điểm',
-      'Khi ẩn không tạo cửa sổ vùng nóng trong suốt cố định và không chạy vòng lặp khung hình; mở rộng dựa trên sự kiện toàn cục và hình học',
-      'Dùng một lớp vật liệu hệ thống và chuyển sang nền đục khi bật Giảm độ trong suốt',
+      "Dùng nền không trong suốt khi bật Giảm độ trong suốt",
       'Liquid Glass trên macOS 26+, tự động dùng vật liệu nguyên bản trên macOS 14 và 15',
-      'Suy ra notch vật lý từ vùng an toàn hệ thống; màn hình ngoài không có notch dùng thanh trạng thái mô phỏng trong lớp phủ riêng',
     ],
   },
   film: {

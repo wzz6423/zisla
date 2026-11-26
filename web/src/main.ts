@@ -1148,9 +1148,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.ai.summaryMono) +
     '</span><p>' +
     escapeHtml(content.ai.summaryLede) +
-    '</p><span>' +
-    escapeHtml(content.ai.summaryNote) +
-    '</span></aside><div class="ai-detail-list reveal-sequence"><article class="ai-detail reveal-step" style="--reveal-index: 0"><span class="ai-detail-order">01</span><div><h3>' +
+    '</p></aside><div class="ai-detail-list reveal-sequence"><article class="ai-detail reveal-step" style="--reveal-index: 0"><span class="ai-detail-order">01</span><div><h3>' +
     escapeHtml(format(content.ai.toolsHeading, { tools: aiTools.length })) +
     '</h3><p>' +
     escapeHtml(content.ai.toolsLede) +
@@ -1158,9 +1156,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.ai.toolsAriaLabel) +
     '">' +
     toolMarkup +
-    '</ul>' +
-    (content.ai.usageNote ? '<p class="ai-usage-note">' + escapeHtml(content.ai.usageNote) + '</p>' : '') +
-    '</div></article><article class="ai-detail reveal-step" style="--reveal-index: 1"><span class="ai-detail-order">02</span><div><h3>' +
+    '</ul></div></article><article class="ai-detail reveal-step" style="--reveal-index: 1"><span class="ai-detail-order">02</span><div><h3>' +
     escapeHtml(content.ai.boundariesHeading) +
     '</h3><ul class="privacy-list">' +
     content.ai.privacyPoints.map((point) => '<li>' + icon('shield', 15) + '<span>' + escapeHtml(point) + '</span></li>').join('') +

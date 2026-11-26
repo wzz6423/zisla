@@ -161,7 +161,7 @@ export const zhHans: SiteContent = {
       },
       dailyBriefing: {
         title: '每日简报',
-        description: '从 8 种模板中选择样式，勾选使用时间、输入、系统与 zisla 活动数据，并预览版式。可手动或在设定时间导出 PNG；开启后按可用情况读取系统屏幕使用时间历史，不把缺失数据当作实测零值。导出目录可在「设置 → 保存位置」单独选择。也可选择加入真实账户剩余额度与采样时间。',
+        description: "从 8 种模板中选择样式，勾选使用时间、输入、系统与 zisla 活动数据，并预览版式。可手动或在设定时间导出 PNG；开启后按可用情况读取系统屏幕使用时间历史。导出目录可在「设置 → 保存位置」单独选择。也可选择加入真实账户剩余额度与采样时间。",
         detail: '8 种模板 · 自选内容 · 预览与定时 PNG 导出',
       },
       userCare: {
@@ -181,8 +181,8 @@ export const zhHans: SiteContent = {
       },
       permissions: {
         title: '集中管理系统权限',
-        description: '在「设置 → 权限」查看授权状态、发起支持的请求，或打开对应系统设置页。首次欢迎页复用同一权限列表，并标明需要手动配置的权限。授权后自动刷新权限状态；需要手动添加应用的权限可使用应用拖拽助手。',
-        detail: '授权状态 · 请求与系统设置 · 欢迎页共用',
+        description: "在「设置 → 权限」查看授权状态、发起支持的请求，或打开对应系统设置页。授权后自动刷新权限状态；需要手动添加应用的权限可使用应用拖拽助手。",
+        detail: "授权状态 · 请求与系统设置",
       },
       imageTools: {
         title: '图片工具',
@@ -196,7 +196,7 @@ export const zhHans: SiteContent = {
       },
       pdf: {
         title: 'PDF 工具',
-        description: '入口位于设置，不占用灵动岛模块轮播。在本机完成 PDF 合并、拆分、旋转、裁剪、图片/Office 转换、渲染为图片、导出文字、文字/图片水印、页码、加密、解除密码和元数据编辑等 14 项操作。',
+        description: "在设置中使用 PDF 工具，本机完成合并、拆分、旋转、裁剪、图片/Office 转换、渲染为图片、导出文字、文字/图片水印、页码、加密、解除密码和元数据编辑等 14 项操作。",
         detail: '14 种本机工具 · 按顺序合并 · 全程不出本机',
       },
 
@@ -250,8 +250,8 @@ export const zhHans: SiteContent = {
       lockScreen: {
         title: '锁屏信息',
         description:
-          '按需在 macOS 锁屏界面显示日期、状态与正在播放信息；它是独立锁屏叠层，不会出现在灵动岛的模块列表或轮播中。',
-        detail: '独立锁屏叠层 · 按需开启 · 不抢焦点',
+          "按需在 macOS 锁屏界面显示日期、状态与正在播放信息。",
+        detail: "按需开启 · 不抢焦点",
       },
       recommendedTools: {
         title: '推荐应用',
@@ -262,24 +262,22 @@ export const zhHans: SiteContent = {
     },
   },
   ai: {
-    eyebrow: '没有黑箱的 AI',
-    title: '看见 AI 状态，<span>不读取对话。</span>',
-    lede: '按应用查看任务，按日期查看模型用量，并查询真实账户剩余额度。状态和数值记录留在本机，不读取对话正文。',
-    summaryMono: '本机状态 / 明确边界',
-    summaryLede: '不同 Harness，同一个状态入口。',
-    summaryNote: 'WorkBuddy 与 WorkBuddy AI 独立识别，保留各自的会话、品牌和打开入口，不混为一个产品。',
+    eyebrow: "AI 工作流",
+    title: "查看 AI 任务，<span>用量与额度。</span>",
+    lede: "按应用查看任务，按日期查看模型用量，查询账户剩余额度。",
+    summaryMono: "任务 / 用量 / 额度",
+    summaryLede: "AI 任务、用量和额度，集中查看。",
     toolsHeading: '{tools} 个 AI 工具与 Harness',
-    toolsLede: '自动检测受支持的 CLI、桌面端与 IDE 活动；Delta、Orca、WorkBuddy 和 WorkBuddy AI 均保留独立名称。',
+    toolsLede: "自动检测受支持的 CLI、桌面应用和 IDE 中的任务。",
     toolsAriaLabel: '支持的 AI 工具与 Harness',
-    usageNote: '会话检测、Token 历史和账户额度各有数据来源。Delta 使用本机数值账本，Orca 复用绑定 CLI 的用量并去重，按底层供应商归属。WorkBuddy AI 可检测会话并查询 credits；上下文占用和 credits 不换算为 Token 或美元费用。额度查询能力取决于供应商与登录方式。',
-    boundariesHeading: '只记录状态边界',
+    boundariesHeading: "隐私",
     privacyPoints: [
-      '只解析状态元数据（含会话标题、时间、模型和会话标识）及可靠的数值用量',
-      '不解析提示词或回答正文，也不上传对话',
-      '第三方会话存储只读访问；协议、状态与用量记录留在本机',
+      "任务状态与用量保存在本机",
+      "不读取提示词和回复正文",
+      "不上传对话",
     ],
     bridgeHeading: '接入你自己的任务',
-    bridgeLede: '通过 zislactl 将外部任务的结构化状态送入顶部状态条。',
+    bridgeLede: "用 zislactl 在顶部状态条显示脚本和构建任务。",
     zislactlTaskTitle: '打包发布',
     copyZislactlAriaLabel: '复制 zislactl 命令',
   },
@@ -295,7 +293,7 @@ export const zhHans: SiteContent = {
       trigger: {
         phase: '触发',
         title: '移到屏幕顶部中央',
-        desc: '刘海屏和外接屏使用同样的触发方式；隐藏时不运行帧循环。',
+        desc: "刘海屏和外接屏都能使用。",
       },
       review: {
         phase: '查看',
@@ -651,10 +649,8 @@ export const zhHans: SiteContent = {
     checksumLabel: 'SHA-256',
     performancePoints: [
       '支持多显示器、Spaces 和普通全屏应用；展开时不会激活或抢走当前应用焦点',
-      '隐藏时不创建常驻透明热区窗口，也不运行帧循环；通过全局事件监听与几何判断触发展开',
-      '使用单层系统材质；系统开启“降低透明度”后会自动使用实体背景',
+      "开启“降低透明度”时使用实体背景",
       'macOS 26+ 使用 Liquid Glass；macOS 14/15 自动回退为系统原生材质',
-      '物理刘海通过系统安全区域推断；无刘海的外接显示器使用自有覆盖层模拟状态条',
     ],
   },
   film: {

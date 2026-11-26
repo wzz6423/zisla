@@ -166,7 +166,7 @@ export const it = createCatalog({
       },
       dailyBriefing: {
         title: 'La tua giornata in un resoconto',
-        description: 'Scegli tra otto modelli e seleziona dati di utilizzo, digitazione, sistema e attività zisla. Controlla l’anteprima ed esporta un PNG manualmente o ogni giorno all’ora scelta. La cronologia Tempo di utilizzo è inclusa se attiva e disponibile; i dati mancanti non sono mostrati come uno zero misurato. Scegli una cartella di esportazione indipendente in Impostazioni → Posizione di salvataggio. Puoi includere anche le quote reali degli account e l’ora del rilevamento.',
+        description: "Scegli tra otto modelli e seleziona dati di utilizzo, digitazione, sistema e attività zisla. Controlla l’anteprima ed esporta un PNG manualmente o ogni giorno all’ora scelta. La cronologia Tempo di utilizzo è inclusa se attiva e disponibile. Scegli una cartella di esportazione indipendente in Impostazioni → Posizione di salvataggio. Puoi includere anche le quote reali degli account e l’ora del rilevamento.",
         detail: '8 modelli · Contenuti a scelta · Anteprima ed esportazione PNG programmata',
       },
       userCare: {
@@ -186,8 +186,8 @@ export const it = createCatalog({
       },
       permissions: {
         title: 'Permessi del sistema in un unico posto',
-        description: 'Controlla lo stato in Impostazioni → Permessi, avvia richieste supportate o apri la pagina di sistema corretta. Il benvenuto iniziale usa lo stesso elenco e indica i permessi da configurare manualmente. Lo stato dei permessi si aggiorna dopo la concessione dell’accesso. Un assistente al trascinamento aiuta ad aggiungere l’app quando un permesso lo richiede.',
-        detail: 'Stato dei permessi · Richieste e collegamenti · Condiviso con il benvenuto',
+        description: "Controlla lo stato in Impostazioni → Permessi, avvia richieste supportate o apri la pagina di sistema corretta. Lo stato dei permessi si aggiorna dopo la concessione dell’accesso. Un assistente al trascinamento aiuta ad aggiungere l’app quando un permesso lo richiede.",
+        detail: "Stato dei permessi · Richieste e collegamenti",
       },
       imageTools: {
         title: 'Strumenti immagine',
@@ -201,7 +201,7 @@ export const it = createCatalog({
       },
       pdf: {
         title: 'Strumenti PDF',
-        description: 'Disponibile nelle Impostazioni, fuori dal carosello dei moduli dell’isola. Quattordici operazioni sul Mac: unisci, dividi, ruota, ritaglia, converti immagini e file Office, renderizza immagini, estrai testo, aggiungi filigrane e numeri di pagina, cifra, rimuovi password e modifica metadati.',
+        description: "Disponibile nelle Impostazioni. Quattordici operazioni sul Mac: unisci, dividi, ruota, ritaglia, converti immagini e file Office, renderizza immagini, estrai testo, aggiungi filigrane e numeri di pagina, cifra, rimuovi password e modifica metadati.",
         detail: '14 strumenti sul dispositivo · Unisci nell’ordine che vuoi · Nulla lascia il Mac',
       },
 
@@ -255,8 +255,8 @@ export const it = createCatalog({
       lockScreen: {
         title: 'Informazioni della schermata di blocco',
         description:
-          'Mostra facoltativamente data, stato e contenuti in riproduzione nella schermata di blocco di macOS. È una sovrapposizione indipendente e non compare nell’elenco o nel carosello dei moduli.',
-        detail: 'Sovrapposizione indipendente · Attivazione volontaria · Non ruba il focus',
+          "Mostra facoltativamente data, stato e contenuti in riproduzione nella schermata di blocco di macOS.",
+        detail: "Attivazione volontaria · Non ruba il focus",
       },
       recommendedTools: {
         title: 'App consigliate',
@@ -267,25 +267,23 @@ export const it = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'IA SENZA SCATOLA NERA',
-    title: 'Guarda lo stato IA <span>senza leggere la conversazione.</span>',
+    eyebrow: "FLUSSO IA",
+    title: "Segui le attività IA, <span>l’utilizzo e le quote.</span>",
     lede:
-      'Segui le attività per applicazione, l’uso dei modelli per data e le quote reali degli account. Stati e dati numerici restano sul Mac; il testo delle conversazioni non viene letto.',
-    summaryMono: 'STATO LOCALE / CONFINI CHIARI',
-    summaryLede: 'Collega gli strumenti IA che usi, mantenendo i confini di contesto necessari al lavoro.',
-    summaryNote: 'Qui spieghiamo solo ambito di rilevamento, dati e connessione; nessuna sessione dal vivo viene simulata.',
+      "Consulta le attività per app, l’utilizzo dei modelli per data e le quote residue dei tuoi account.",
+    summaryMono: "ATTIVITÀ / UTILIZZO / QUOTE",
+    summaryLede: "Attività IA, utilizzo e quote in un solo posto.",
     toolsHeading: 'Strumenti IA supportati',
-    toolsLede: 'Rileva attività da CLI, app desktop e IDE supportati e aggrega lo stato delle attività.',
+    toolsLede: "Rileva le attività di CLI, app desktop e IDE supportati.",
     toolsAriaLabel: 'Strumenti IA supportati',
-    usageNote: 'Rilevamento delle sessioni, storico dei token e quote usano fonti diverse. Delta utilizza il suo registro numerico locale; Orca deduplica l’uso del CLI associato e lo attribuisce al fornitore originale. WorkBuddy AI può rilevare sessioni e consultare crediti; occupazione del contesto e crediti non sono convertiti in token o costi in dollari. Le quote disponibili dipendono dal fornitore e dal metodo di accesso.',
-    boundariesHeading: 'Viene registrato solo lo stato',
+    boundariesHeading: "Privacy",
     privacyPoints: [
-      'Analizza solo tipo di evento, stato, ora, modello e ID sessione degli eventi strutturati',
-      'Non legge mai il testo di prompt o risposte',
-      'Protocollo e stato sono salvati sul Mac',
+      "Lo stato delle attività e l’utilizzo restano sul Mac",
+      "Prompt e risposte non vengono letti",
+      "Le conversazioni non vengono caricate",
     ],
     bridgeHeading: 'Collega le tue attività',
-    bridgeLede: 'Usa zislactl per inviare lo stato strutturato delle attività esterne alla barra superiore.',
+    bridgeLede: "Usa zislactl per mostrare script e attività di compilazione nella barra di stato.",
     zislactlTaskTitle: 'Build e rilascio',
     copyZislactlAriaLabel: 'Copia il comando zislactl',
   },
@@ -301,7 +299,7 @@ export const it = createCatalog({
       trigger: {
         phase: 'Attiva',
         title: 'Porta il puntatore al centro in alto',
-        desc: 'Schermi con notch ed esterni usano lo stesso trigger; quando è nascosta non gira alcun ciclo di frame.',
+        desc: "Funziona su schermi con notch e monitor esterni.",
       },
       review: {
         phase: 'Controlla',
@@ -655,10 +653,8 @@ export const it = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Supporta più schermi, Spaces e app normali a tutto schermo; l’espansione non attiva l’app né ruba il focus',
-      'Quando è nascosto non crea finestre trasparenti persistenti né esegue loop di frame; usa eventi globali e geometria',
-      'Usa un solo livello di materiale di sistema e passa a uno sfondo opaco con Riduci trasparenza',
+      "Usa uno sfondo opaco quando Riduci trasparenza è attivo",
       'Liquid Glass su macOS 26+, con fallback automatico ai materiali nativi su macOS 14 e 15',
-      'Il notch fisico è dedotto dall’area sicura; gli schermi esterni senza notch ricevono una barra simulata in un overlay dedicato',
     ],
   },
   film: {

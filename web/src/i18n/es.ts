@@ -166,7 +166,7 @@ export const es = createCatalog({
       },
       dailyBriefing: {
         title: 'Tu día en un informe diario',
-        description: 'Elige entre ocho plantillas, selecciona métricas de uso, escritura, sistema y actividad zisla, y revisa la vista previa. Exporta un PNG manualmente o a una hora diaria. El historial de Tiempo de Uso se incluye si está activado y disponible; los datos ausentes no se presentan como un cero medido. Elige una carpeta de exportación independiente en Ajustes → Ubicación de guardado. También puedes incluir las cuotas reales de las cuentas y la hora de su consulta.',
+        description: "Elige entre ocho plantillas, selecciona métricas de uso, escritura, sistema y actividad zisla, y revisa la vista previa. Exporta un PNG manualmente o a una hora diaria. El historial de Tiempo de Uso se incluye si está activado y disponible. Elige una carpeta de exportación independiente en Ajustes → Ubicación de guardado. También puedes incluir las cuotas reales de las cuentas y la hora de su consulta.",
         detail: '8 plantillas · Contenido a elegir · Vista previa y exportación PNG programada',
       },
       userCare: {
@@ -186,8 +186,8 @@ export const es = createCatalog({
       },
       permissions: {
         title: 'Permisos del sistema en un lugar',
-        description: 'Consulta el estado en Ajustes → Permisos, inicia solicitudes compatibles o abre la página correspondiente del sistema. La bienvenida inicial usa la misma lista y marca los permisos que se configuran manualmente. El estado de los permisos se actualiza al conceder acceso. Una ayuda para arrastrar la aplicación facilita los permisos que requieren añadirla.',
-        detail: 'Estado de permisos · Solicitudes y enlaces · Compartido con la bienvenida',
+        description: "Consulta el estado en Ajustes → Permisos, inicia solicitudes compatibles o abre la página correspondiente del sistema. El estado de los permisos se actualiza al conceder acceso. Una ayuda para arrastrar la aplicación facilita los permisos que requieren añadirla.",
+        detail: "Estado de permisos · Solicitudes y enlaces",
       },
       imageTools: {
         title: 'Herramientas de imagen',
@@ -201,7 +201,7 @@ export const es = createCatalog({
       },
       pdf: {
         title: 'Herramientas PDF',
-        description: 'Disponible en Ajustes, fuera del carrusel de módulos de la isla. Catorce operaciones locales: unir, dividir, girar, recortar, convertir imágenes y Office, renderizar a imágenes, extraer texto, añadir marcas de agua y números de página, cifrar, quitar contraseñas y editar metadatos.',
+        description: "Disponible en Ajustes. Catorce operaciones locales: unir, dividir, girar, recortar, convertir imágenes y Office, renderizar a imágenes, extraer texto, añadir marcas de agua y números de página, cifrar, quitar contraseñas y editar metadatos.",
         detail: '14 herramientas en el dispositivo · Une en el orden que quieras · Nada sale de tu Mac',
       },
 
@@ -255,8 +255,8 @@ export const es = createCatalog({
       lockScreen: {
         title: 'Información de la pantalla bloqueada',
         description:
-          'Muestra opcionalmente fecha, estado y reproducción en la pantalla bloqueada de macOS. Es una superposición independiente y nunca aparece en la lista ni el carrusel de módulos.',
-        detail: 'Superposición independiente · Activación voluntaria · No roba el foco',
+          "Muestra opcionalmente fecha, estado y reproducción en la pantalla bloqueada de macOS.",
+        detail: "Activación voluntaria · No roba el foco",
       },
       recommendedTools: {
         title: 'Apps recomendadas',
@@ -267,25 +267,23 @@ export const es = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'IA SIN CAJA NEGRA',
-    title: 'Mira el estado de la IA <span>sin leer la conversación.</span>',
+    eyebrow: "FLUJO DE IA",
+    title: "Sigue las tareas de IA, <span>el uso y las cuotas.</span>",
     lede:
-      'Consulta tareas por aplicación, uso de modelos por fecha y cuotas reales de las cuentas. Los estados y los datos numéricos permanecen en tu Mac; no se lee el texto de las conversaciones.',
-    summaryMono: 'ESTADO LOCAL / LÍMITES CLAROS',
-    summaryLede: 'Conecta tus herramientas de IA y conserva los límites de contexto que necesita tu trabajo.',
-    summaryNote: 'Solo se explican el alcance de detección, los datos y la conexión; no se simula una sesión en vivo.',
+      "Consulta tareas por aplicación, uso de modelos por fecha y cuotas restantes de tus cuentas.",
+    summaryMono: "TAREAS / USO / CUOTAS",
+    summaryLede: "Tareas de IA, uso y cuotas en un solo lugar.",
     toolsHeading: 'Herramientas de IA compatibles',
-    toolsLede: 'Detecta actividad de CLI, apps de escritorio e IDE compatibles y agrupa el estado de las tareas.',
+    toolsLede: "Detecta tareas de las CLI, aplicaciones de escritorio e IDE compatibles.",
     toolsAriaLabel: 'Herramientas de IA compatibles',
-    usageNote: 'La detección de sesiones, el historial de tokens y las cuotas usan fuentes distintas. Delta utiliza su registro numérico local; Orca elimina duplicados del uso del CLI vinculado y lo atribuye al proveedor original. WorkBuddy AI puede detectar sesiones y consultar créditos; la ocupación del contexto y los créditos no se convierten en tokens ni costes en dólares. La disponibilidad de cuotas depende del proveedor y del método de acceso.',
-    boundariesHeading: 'Solo se registra el estado',
+    boundariesHeading: "Privacidad",
     privacyPoints: [
-      'Analiza únicamente tipo de evento, estado, hora, modelo e ID de sesión de eventos estructurados',
-      'Nunca lee el texto de prompts o respuestas',
-      'El protocolo y el estado se guardan en tu Mac',
+      "El estado de las tareas y el uso quedan en tu Mac",
+      "No se leen los prompts ni las respuestas",
+      "No se suben conversaciones",
     ],
     bridgeHeading: 'Conecta tus propias tareas',
-    bridgeLede: 'Usa zislactl para enviar el estado estructurado de tareas externas a la barra superior.',
+    bridgeLede: "Usa zislactl para mostrar tus scripts y tareas de compilación en la barra de estado.",
     zislactlTaskTitle: 'Compilación y publicación',
     copyZislactlAriaLabel: 'Copiar el comando zislactl',
   },
@@ -301,7 +299,7 @@ export const es = createCatalog({
       trigger: {
         phase: 'Activar',
         title: 'Mueve el puntero al centro superior',
-        desc: 'Las pantallas con notch y externas usan el mismo activador; oculta no ejecuta ningún bucle de fotogramas.',
+        desc: "Funciona en pantallas con notch y pantallas externas.",
       },
       review: {
         phase: 'Revisar',
@@ -655,10 +653,8 @@ export const es = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Admite varias pantallas, Spaces y apps normales a pantalla completa; expandirse nunca activa la app ni roba el foco',
-      'Oculta no crea una ventana transparente persistente ni ejecuta un bucle de fotogramas; se activa mediante eventos globales y geometría',
-      'Usa una sola capa de material del sistema y cambia a un fondo opaco con Reducir transparencia',
+      "Usa un fondo opaco cuando está activado Reducir transparencia",
       'Liquid Glass en macOS 26+, con retorno automático a materiales nativos en macOS 14 y 15',
-      'El notch físico se infiere de la zona segura; las pantallas externas sin notch reciben una barra simulada en una superposición dedicada',
     ],
   },
   film: {

@@ -108,7 +108,7 @@ export const tr = createCatalog({
       },
       dailyBriefing: {
         title: 'Gününüz bir günlük özette',
-        description: 'Sekiz şablondan seçin; kullanım, yazma, sistem ve zisla etkinlik verilerini belirleyip önizleyin. PNG’yi elle veya günlük seçilen saatte dışa aktarın. Ekran Süresi geçmişi açık ve kullanılabilir olduğunda kullanılır; eksik veriler ölçülen sıfır sayılmaz. Ayarlar → Kayıt Konumu altında ayrı bir aktarma klasörü seçin. Gerçek hesap kotalarını ve ölçüm zamanlarını da ekleyebilirsiniz.',
+        description: "Sekiz şablondan seçin; kullanım, yazma, sistem ve zisla etkinlik verilerini belirleyip önizleyin. PNG’yi elle veya günlük seçilen saatte dışa aktarın. Ekran Süresi geçmişi açık ve kullanılabilir olduğunda kullanılır. Ayarlar → Kayıt Konumu altında ayrı bir aktarma klasörü seçin. Gerçek hesap kotalarını ve ölçüm zamanlarını da ekleyebilirsiniz.",
         detail: '8 şablon · İçerik seçimi · Önizleme ve zamanlı PNG aktarma',
       },
       userCare: {
@@ -128,8 +128,8 @@ export const tr = createCatalog({
       },
       permissions: {
         title: 'Sistem izinleri tek yerde',
-        description: 'Ayarlar → İzinler bölümünde durumu inceleyin, desteklenen istekleri başlatın veya ilgili sistem sayfasını açın. İlk karşılama aynı listeyi kullanır ve elle ayarlanacak izinleri belirtir. Erişim verildikten sonra izin durumu yenilenir. Uygulama sürükleme yardımcısı, uygulamanın eklenmesini gerektiren izinlerde yardımcı olur.',
-        detail: 'İzin durumu · İstekler ve bağlantılar · Karşılamayla ortak',
+        description: "Ayarlar → İzinler bölümünde durumu inceleyin, desteklenen istekleri başlatın veya ilgili sistem sayfasını açın. Erişim verildikten sonra izin durumu yenilenir. Uygulama sürükleme yardımcısı, uygulamanın eklenmesini gerektiren izinlerde yardımcı olur.",
+        detail: "İzin durumu · İstekler ve bağlantılar",
       },
       imageTools: {
         title: 'Görsel Araçları',
@@ -143,7 +143,7 @@ export const tr = createCatalog({
       },
       pdf: {
         title: 'PDF araçları',
-        description: 'Ada modül karuselinin dışında, Ayarlar’da kullanılabilir. Mac\'inizde çalışan on dört işlem: birleştirme, bölme, döndürme, kırpma, görüntü ve Office dosyalarını dönüştürme, görüntü olarak oluşturma, metin çıkarma, metin veya görüntü filigranı ekleme, sayfa numarası ekleme, şifreleme, parolayı kaldırma ve meta verileri düzenleme.',
+        description: "Ayarlar’da kullanılabilir. Mac'inizde çalışan on dört işlem: birleştirme, bölme, döndürme, kırpma, görüntü ve Office dosyalarını dönüştürme, görüntü olarak oluşturma, metin çıkarma, metin veya görüntü filigranı ekleme, sayfa numarası ekleme, şifreleme, parolayı kaldırma ve meta verileri düzenleme.",
         detail: 'Cihazda çalışan 14 araç · Kendi sıranızla birleştirin · Hiçbir şey Mac\'inizden çıkmaz',
       },
 
@@ -160,7 +160,7 @@ export const tr = createCatalog({
       copyAssistant: { title: 'Hızlı Eylemler ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir. Tarayıcı indirmesi veya AirDrop aktarımı bittikten sonra Hızlı Eylemler ile dosyanın klasörünü açın. Chrome’un varsayılan ve seçilen indirme klasörleri desteklenir; indirme ilerlemesinden bağımsız açılıp kapatılır. IP adreslerinde sorgulama ve bağlantı açma ayrı eylemlerdir. Dönüşüm yerel küçük para birimlerini tanır; katalog Emoji 18.0 içerir. Kaydedilen metin ve görüntüler Ayarlar → Kayıt Konumu altındaki ayrı Hızlı Eylem klasörünü kullanır. Uygulama açılmadığında Hızlı Eylemler bütünlüğünü, imzasını ve macOS güvenlik politikasını kontrol eder; kontroller geçince karantina özniteliklerini kaldırıp uygulamayı açabilir. Ayarlar → Hızlı Eylemler altında tanınan türlerin eylem sırasını değiştirin. Tutarlar bölgesel para simgelerini ve önekli para birimi kodlarını destekler. Komut algılama here-document belgelerini destekler.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
       aiManagement: { title: 'AI CLI ve Skills yönetimi', description: 'Ayarlar\'dan popüler AI CLI\'larını algılayın, kurun, güncelleyin ve kaldırın; yerel Skills\'leri inceleyip yönetin, böylece terminaller ve araçlar arasında daha az geçiş yapın.', detail: 'Algıla ve kur · Güncelle ve kaldır · Yerel Skills' },
       pet: { title: 'Ada evcil hayvanı', description: 'Genişletilmiş hayvan ve karakter kataloğundan seçin ya da desteklenen görüntü, animasyon veya videoyu adlandırarak içe aktarın. Adanın iki yanına yerleştirin ve içe aktarılanları Ayarlar’dan kaldırın. Animasyonlar en fazla 30 saniye, dosyalar en fazla 100 MB olabilir.', detail: 'Genişletilmiş katalog · Görüntü ve video içe aktarma · Özel hayvanları kaldırma' },
-      lockScreen: { title: 'Kilit ekranı bilgileri', description: 'Tarihi, durumu ve çalan içeriği isteğe bağlı olarak macOS kilit ekranında gösterin. Bu ayrı bir kilit ekranı katmanıdır; ada modül listesinde veya döngüsünde görünmez.', detail: 'Ayrı kilit ekranı katmanı · İsteğe bağlı · Odağı almaz' },
+      lockScreen: { title: 'Kilit ekranı bilgileri', description: "Tarihi, durumu ve çalan içeriği isteğe bağlı olarak macOS kilit ekranında gösterin.", detail: "İsteğe bağlı · Odağı almaz" },
       recommendedTools: {
         title: 'Önerilen uygulamalar',
         description:
@@ -170,24 +170,22 @@ export const tr = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'KARA KUTU OLMAYAN AI',
-    title: 'AI durumunu görün <span>konuşmayı okumadan.</span>',
-    lede: 'Görevleri uygulamaya, model kullanımını tarihe göre ve gerçek hesap kotalarını izleyin. Durum ve sayısal kayıtlar Mac’te kalır; konuşma metinleri okunmaz.',
-    summaryMono: 'CİHAZDA DURUM / NET SINIRLAR',
-    summaryLede: 'Kullandığınız AI araçlarını bağlayın ve işinizin gerektirdiği bağlam sınırlarını koruyun.',
-    summaryNote: 'Bu sayfa yalnızca algılama kapsamını, veri sınırını ve bağlantı yöntemini açıklar; canlı bir oturumu taklit etmez.',
+    eyebrow: "AI İŞ AKIŞI",
+    title: "AI görevlerini, <span>kullanımı ve kotaları izleyin.</span>",
+    lede: "Görevleri uygulamaya, model kullanımını tarihe göre ve hesapların kalan kotalarını görüntüleyin.",
+    summaryMono: "GÖREVLER / KULLANIM / KOTALAR",
+    summaryLede: "AI görevleri, kullanım ve kotalar tek yerde.",
     toolsHeading: 'Desteklenen AI araçları',
-    toolsLede: 'Desteklenen CLI\'ların, masaüstü uygulamalarının ve IDE\'lerin etkinliğini algılar ve görev durumunu toplar.',
+    toolsLede: "Desteklenen CLI, masaüstü uygulaması ve IDE görevlerini algılar.",
     toolsAriaLabel: 'Desteklenen AI araçları',
-    usageNote: 'Oturum algılama, token geçmişi ve hesap kotaları farklı kaynaklar kullanır. Delta yerel sayısal defterini okur; Orca bağlı CLI kullanımını tekilleştirip asıl sağlayıcıya atar. WorkBuddy AI oturumları algılayabilir ve kredileri sorgulayabilir; bağlam doluluğu ve krediler tokena ya da dolar maliyetine çevrilmez. Kota erişimi sağlayıcıya ve giriş yöntemine bağlıdır.',
-    boundariesHeading: 'Yalnızca durum sınırları kaydedilir',
+    boundariesHeading: "Gizlilik",
     privacyPoints: [
-      'Yapılandırılmış olaylardan yalnızca olay türünü, durumu, zaman damgasını, modeli ve oturum kimliğini ayrıştırır',
-      'İstem veya yanıt metnini asla okumaz',
-      'Protokol ve durum Mac\'inizde saklanır',
+      "Görev durumu ve kullanım Mac’inizde saklanır",
+      "İstem ve yanıt metinleri okunmaz",
+      "Konuşmalar yüklenmez",
     ],
     bridgeHeading: 'Kendi görevlerinizi bağlayın',
-    bridgeLede: 'Harici görevlerin yapılandırılmış durumunu durum çubuğuna göndermek için zislactl kullanın.',
+    bridgeLede: "Komut dosyalarını ve derleme görevlerini durum çubuğunda göstermek için zislactl kullanın.",
     zislactlTaskTitle: 'Derleme ve yayınlama',
     copyZislactlAriaLabel: 'zislactl komutunu kopyala',
   },
@@ -200,7 +198,7 @@ export const tr = createCatalog({
     summaryLede: 'İhtiyaç duyduğunuzda genişler, okumanız bitince geri çekilir.',
     summaryNote: 'İşaretçi konumuyla tetiklenir. İçerik yokken yer kaplamaz ve kullandığınız uygulamanın odağını asla çalmaz.',
     steps: {
-      trigger: { phase: 'Tetikle', title: 'İşaretçiyi ekranın üst orta kısmına taşıyın', desc: 'Çentikli ve harici ekranlar aynı tetikleyiciyi kullanır; gizliyken kare döngüsü çalışmaz.' },
+      trigger: { phase: 'Tetikle', title: 'İşaretçiyi ekranın üst orta kısmına taşıyın', desc: "Çentikli ekranlarda ve harici monitörlerde çalışır." },
       review: { phase: 'İncele', title: 'Mevcut duruma göz atın', desc: 'Medya, dosyalar, AI, gündem ve sistem araçları aynı yerde bulunur.' },
       dismiss: { phase: 'Kapat', title: 'Yaptığınız işe dönün', desc: 'İşaretçiyi uzaklaştırdığınızda kapanır; genişletme uygulamayı etkinleştirmez ve odağı almaz.' },
     },
@@ -523,10 +521,8 @@ export const tr = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Birden çok ekranı, Spaces\'i ve normal tam ekran uygulamalarını destekler; genişletme uygulamayı etkinleştirmez veya odağı almaz',
-      'Gizliyken kalıcı şeffaf sıcak bölge penceresi oluşturmaz ve kare döngüsü çalıştırmaz; genişletme global olay izleme ve geometri kontrolleriyle tetiklenir',
-      'Tek bir sistem malzemesi katmanı kullanır; Şeffaflığı Azalt etkin olduğunda opak arka plana geçer',
+      "Saydamlığı Azalt açıkken opak bir arka plan kullanır",
       'macOS 26+ üzerinde Liquid Glass kullanır; macOS 14 ve 15\'te yerel sistem malzemelerine otomatik olarak geri döner',
-      'Fiziksel çentik sistemin güvenli alanından çıkarılır; çentiksiz harici ekranlarda özel katmanda benzetilmiş durum çubuğu gösterilir',
     ],
   },
   film: {

@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-This directory contains the repository's TypeScript website, built with Vite. The homepage keeps the product overview, downloads and full feature tour. Copy supports 17 languages; download links and the changelog match v0.1.25 (2026-11-24).
+This directory contains the repository's TypeScript website, built with Vite. The homepage keeps concise feature introductions, downloads and the full feature tour; detailed instructions and limits are in Help. Copy supports 17 languages; download links and the changelog match v0.1.25 (2026-11-24).
 
 ## User help
 

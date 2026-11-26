@@ -865,14 +865,6 @@ svg {
   white-space: nowrap;
 }
 
-.ai-detail .ai-usage-note {
-  margin-top: 24px;
-  padding-inline-start: 16px;
-  border-inline-start: 2px solid var(--accent);
-  font-size: 14px;
-  line-height: 1.7;
-}
-
 .tool-chip-dot {
   flex-shrink: 0;
   width: 5px;

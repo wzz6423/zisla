@@ -166,7 +166,7 @@ export const nl = createCatalog({
       },
       dailyBriefing: {
         title: 'Uw dag in een dagoverzicht',
-        description: 'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul. Kies een aparte exportmap onder Instellingen → Opslaglocatie. Je kunt ook echte accountquota en de tijd van de meting opnemen.',
+        description: "Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar. Kies een aparte exportmap onder Instellingen → Opslaglocatie. Je kunt ook echte accountquota en de tijd van de meting opnemen.",
         detail: '8 sjablonen · Inhoud kiezen · Voorvertoning en geplande PNG-export',
       },
       userCare: {
@@ -186,8 +186,8 @@ export const nl = createCatalog({
       },
       permissions: {
         title: 'Systeemtoestemmingen op één plek',
-        description: 'Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. Het eerste welkomstscherm gebruikt dezelfde lijst en markeert handmatige instellingen. De status van machtigingen wordt vernieuwd nadat toegang is verleend. Een sleephulp helpt bij machtigingen waarvoor de app moet worden toegevoegd.',
-        detail: 'Toestemmingsstatus · Aanvragen en links · Gedeeld met het welkom',
+        description: "Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. De status van machtigingen wordt vernieuwd nadat toegang is verleend. Een sleephulp helpt bij machtigingen waarvoor de app moet worden toegevoegd.",
+        detail: "Toestemmingsstatus · Aanvragen en links",
       },
       imageTools: {
         title: 'Afbeeldingstools',
@@ -201,7 +201,7 @@ export const nl = createCatalog({
       },
       pdf: {
         title: 'PDF-tools',
-        description: 'Beschikbaar in Instellingen, buiten de modulecarrousel van het eiland. Veertien bewerkingen op je Mac: samenvoegen, splitsen, draaien, bijsnijden, afbeeldingen en Office-bestanden converteren, renderen, tekst exporteren, watermerken en paginanummers toevoegen, versleutelen, wachtwoord verwijderen en metadata bewerken.',
+        description: "Beschikbaar in Instellingen. Veertien bewerkingen op je Mac: samenvoegen, splitsen, draaien, bijsnijden, afbeeldingen en Office-bestanden converteren, renderen, tekst exporteren, watermerken en paginanummers toevoegen, versleutelen, wachtwoord verwijderen en metadata bewerken.",
         detail: '14 lokale tools · Samenvoegen in eigen volgorde · Niets verlaat je Mac',
       },
 
@@ -255,8 +255,8 @@ export const nl = createCatalog({
       lockScreen: {
         title: 'Informatie op het vergrendelscherm',
         description:
-          'Toon optioneel datum, status en huidige media op het macOS-vergrendelscherm. Het is een aparte overlay en verschijnt nooit in de modulelijst of carrousel.',
-        detail: 'Aparte vergrendeloverlay · Opt-in · Neemt geen focus',
+          "Toon optioneel datum, status en huidige media op het macOS-vergrendelscherm.",
+        detail: "Opt-in · Neemt geen focus",
       },
       recommendedTools: {
         title: 'Aanbevolen apps',
@@ -267,25 +267,23 @@ export const nl = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'AI ZONDER BLACK BOX',
-    title: 'Zie AI-status <span>zonder het gesprek te lezen.</span>',
+    eyebrow: "AI-WORKFLOW",
+    title: "Volg AI-taken, <span>gebruik en quota.</span>",
     lede:
-      'Bekijk taken per app, modelgebruik per datum en echte accountquota. Status en numerieke gegevens blijven op je Mac; gesprekken worden niet gelezen.',
-    summaryMono: 'LOKALE STATUS / DUIDELIJKE GRENZEN',
-    summaryLede: 'Verbind de AI-tools die je gebruikt en houd de contextgrenzen van je werk intact.',
-    summaryNote: 'Alleen detectiebereik, gegevensgrenzen en verbinding worden uitgelegd; er wordt geen sessie nagebootst.',
+      "Bekijk taken per app, modelgebruik per datum en resterende accountquota.",
+    summaryMono: "TAKEN / GEBRUIK / QUOTA",
+    summaryLede: "AI-taken, gebruik en quota op één plek.",
     toolsHeading: 'Ondersteunde AI-tools',
-    toolsLede: 'Detecteert activiteit van ondersteunde CLI’s, desktopapps en IDE’s en bundelt de taakstatus.',
+    toolsLede: "Detecteert taken van ondersteunde CLI’s, desktopapps en IDE’s.",
     toolsAriaLabel: 'Ondersteunde AI-tools',
-    usageNote: 'Sessiedetectie, tokengeschiedenis en accountquota gebruiken aparte bronnen. Delta gebruikt zijn lokale cijferregister; Orca ontdubbelt het gebruik van de gekoppelde CLI en wijst het toe aan de oorspronkelijke aanbieder. WorkBuddy AI kan sessies detecteren en credits opvragen; contextbezetting en credits worden niet omgerekend naar tokens of kosten in dollars. Beschikbare quota hangen af van de aanbieder en inlogmethode.',
-    boundariesHeading: 'Alleen statusgrenzen worden vastgelegd',
+    boundariesHeading: "Privacy",
     privacyPoints: [
-      'Leest uit gestructureerde gebeurtenissen alleen type, status, tijd, model en sessie-ID',
-      'Leest nooit de tekst van prompts of antwoorden',
-      'Protocol en status worden op je Mac opgeslagen',
+      "Taakstatus en gebruik blijven op je Mac",
+      "Prompts en antwoorden worden niet gelezen",
+      "Gesprekken worden niet geüpload",
     ],
     bridgeHeading: 'Verbind je eigen taken',
-    bridgeLede: 'Gebruik zislactl om gestructureerde status van externe taken naar de statusbalk te sturen.',
+    bridgeLede: "Gebruik zislactl om scripts en bouwtaken in de statusbalk te tonen.",
     zislactlTaskTitle: 'Build en release',
   },
   flow: {
@@ -297,7 +295,7 @@ export const nl = createCatalog({
     summaryLede: 'Klapt uit wanneer je haar nodig hebt en in wanneer je klaar bent.',
     summaryNote: 'Wordt door de cursorpositie geactiveerd, neemt geen ruimte in als ze leeg is en steelt nooit de focus.',
     steps: {
-      trigger: { phase: 'Activeren', title: 'Beweeg naar het midden bovenaan', desc: 'Schermen met notch en externe schermen gebruiken dezelfde trigger; verborgen draait er geen frameloop.' },
+      trigger: { phase: 'Activeren', title: 'Beweeg naar het midden bovenaan', desc: "Werkt op schermen met een notch en externe schermen." },
       review: { phase: 'Bekijken', title: 'Bekijk de huidige status', desc: 'Media, bestanden, AI, agenda en systeemtools staan op één plek.' },
       dismiss: { phase: 'Sluiten', title: 'Ga terug naar je werk', desc: 'Beweeg de cursor weg en het eiland klapt in; uitklappen activeert de app niet en neemt geen focus.' },
     },
@@ -621,10 +619,8 @@ export const nl = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Ondersteunt meerdere schermen, Spaces en gewone apps op volledig scherm; uitklappen activeert de app niet en neemt geen focus',
-      'Verborgen wordt geen permanente transparante hotspot en geen frameloop gebruikt; uitbreiding werkt via globale gebeurtenissen en geometrie',
-      'Gebruikt één laag systeemmateriaal en schakelt naar een ondoorzichtige achtergrond bij Verminder transparantie',
+      "Gebruikt een ondoorzichtige achtergrond als Verminder transparantie aanstaat",
       'Liquid Glass op macOS 26+, met automatische terugval naar native materialen op macOS 14 en 15',
-      'Een fysieke notch wordt afgeleid uit de veilige systeemzone; externe schermen zonder notch krijgen een gesimuleerde statusbalk in een eigen overlay',
     ],
   },
   film: {

@@ -35,7 +35,7 @@ for (const locale of siteLocales) await site.loadSiteContent(locale);
 
 const changedFeatureIds = [
   'floatingIsland', 'dailyBriefing', 'userCare', 'contextNotes', 'recording', 'permissions', 'pdf',
-  'imageTools', 'audioTools',
+  'imageTools', 'audioTools', 'lockScreen',
 ];
 const english = site.getSiteContent('en');
 // Read authored overrides before createCatalog can silently merge missing fields from English.
@@ -125,8 +125,10 @@ const updatedStrings = (content) => [
   ['meta.description', content.meta.description],
   ['meta.ogDescription', content.meta.ogDescription],
   ['extensions.lede', content.extensions.lede],
-  ['ai.lede', content.ai.lede],
-  ['ai.usageNote', content.ai.usageNote],
+  ...['eyebrow', 'title', 'lede', 'summaryMono', 'summaryLede', 'toolsLede', 'boundariesHeading', 'privacyPoints', 'bridgeLede']
+    .flatMap((field) => strings(content.ai[field], `ai.${field}`)),
+  ['flow.steps.trigger.desc', content.flow.steps.trigger.desc],
+  ...strings(content.developers.performancePoints, 'developers.performancePoints'),
   ['download.copy', content.download.copy],
   ['faq.items.permissions.answer', content.faq.items.permissions.answer],
   ['faq.items.storage.answer', content.faq.items.storage.answer],
@@ -334,7 +336,12 @@ test('current feature descriptions keep meeting, power and application-repair co
   assert.match(content.extensions.features.capture.description, /slow automatic scrolling.*HDR screenshots on supported devices/);
   assert.match(content.extensions.features.floatingIsland.description, /Reorder.*Settings → Dynamic Island Layout/);
   assert.match(content.extensions.features.dailyBriefing.description, /real account allowances and their sampling times/);
-  assert.match(content.ai.usageNote, /separate data sources.*credits are not converted into tokens or USD cost/);
+  assert.match(content.ai.lede, /tasks by application.*model usage by date.*remaining account allowances/);
+  assert.match(content.ai.privacyPoints[0], /Task status and usage stay on your Mac/);
+  assert.match(content.ai.privacyPoints[1], /Prompts and replies are not read/);
+  assert.match(content.ai.privacyPoints[2], /Conversations are not uploaded/);
+  assert.match(content.help.guides.ai.permissions, /Allowance checks contact the provider/);
+  assert.match(content.help.guides.ai.output, /provider samples, not token estimates.*unavailable data stays unavailable/);
   assert.doesNotMatch(content.showcase.modules.aiMonitor.caption, /remaining allowances hidden/);
   assert.match(content.showcase.modules.aiMonitor.caption, /Remaining-quota rings.*compact island layouts/);
   assert.match(content.showcase.modules.download.caption, /Settings → Dependency Components.*daily updates for installed components/);
@@ -384,7 +391,9 @@ for (const locale of siteLocales) {
       assert.ok(value.trim().length > 0, path);
       assert.doesNotMatch(value, /\bTODO\b|\bTBD\b/, path);
       assert.deepEqual(value.match(/\{\w+\}/g) ?? [], baseline.get(path).match(/\{\w+\}/g) ?? [], path);
-      if (locale !== 'en' && path !== 'showcase.modules.volumeMixer.points.2') {
+      // "Privacy" is also the native heading in Italian and Dutch; authored-source checks still reject fallback.
+      const sharedPrivacyHeading = path === 'ai.boundariesHeading' && ['it', 'nl'].includes(locale);
+      if (locale !== 'en' && path !== 'showcase.modules.volumeMixer.points.2' && !sharedPrivacyHeading) {
         assert.notEqual(value, baseline.get(path), `${locale}: ${path} must have its own translation`);
       }
     }
@@ -397,7 +406,7 @@ for (const locale of siteLocales) {
     const help = renderHelpInMemory(locale);
     for (const [path, value] of updatedStrings(content)) {
       if (path.startsWith('meta.')) continue;
-      const expected = path.startsWith('faq.') ? value : escapedText(value);
+      const expected = path.startsWith('faq.') || path === 'ai.title' ? value : escapedText(value);
       assert.ok((path.startsWith('help.') ? help.html : rendered.html).includes(expected), `${locale}: ${path} is rendered on its page`);
     }
     assert.equal((rendered.html.match(/class="workflow-module reveal-step"/g) ?? []).length, 12);

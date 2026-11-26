@@ -166,7 +166,7 @@ export const ptBR = createCatalog({
       },
       dailyBriefing: {
         title: 'Seu dia em um relatório diário',
-        description: 'Escolha entre oito modelos, selecione dados de uso, digitação, sistema e atividade zisla e confira a prévia. Exporte um PNG manualmente ou em um horário diário. O histórico de Tempo de Uso entra quando ativado e disponível; dados ausentes não são apresentados como zero medido. Escolha uma pasta de exportação independente em Ajustes → Local de salvamento. Também é possível incluir as cotas reais das contas e o horário da consulta.',
+        description: "Escolha entre oito modelos, selecione dados de uso, digitação, sistema e atividade zisla e confira a prévia. Exporte um PNG manualmente ou em um horário diário. O histórico de Tempo de Uso entra quando ativado e disponível. Escolha uma pasta de exportação independente em Ajustes → Local de salvamento. Também é possível incluir as cotas reais das contas e o horário da consulta.",
         detail: '8 modelos · Conteúdo à escolha · Prévia e exportação PNG agendada',
       },
       userCare: {
@@ -186,8 +186,8 @@ export const ptBR = createCatalog({
       },
       permissions: {
         title: 'Permissões do sistema em um lugar',
-        description: 'Veja os estados em Ajustes → Permissões, inicie pedidos compatíveis ou abra a página correspondente do sistema. As boas-vindas iniciais usam a mesma lista e identificam permissões com configuração manual. O estado das permissões é atualizado após a concessão do acesso. Uma ajuda para arrastar o aplicativo facilita as permissões que exigem adicioná-lo.',
-        detail: 'Estado das permissões · Pedidos e links · Compartilhado com as boas-vindas',
+        description: "Veja os estados em Ajustes → Permissões, inicie pedidos compatíveis ou abra a página correspondente do sistema. O estado das permissões é atualizado após a concessão do acesso. Uma ajuda para arrastar o aplicativo facilita as permissões que exigem adicioná-lo.",
+        detail: "Estado das permissões · Pedidos e links",
       },
       imageTools: {
         title: 'Ferramentas de imagem',
@@ -201,7 +201,7 @@ export const ptBR = createCatalog({
       },
       pdf: {
         title: 'Ferramentas de PDF',
-        description: 'Disponível nos Ajustes, fora do carrossel de módulos da ilha. Quatorze operações no próprio Mac: unir, dividir, girar, recortar, converter imagens e arquivos Office, renderizar imagens, extrair texto, adicionar marcas d’água e números de página, criptografar, remover senha e editar metadados.',
+        description: "Disponível nos Ajustes. Quatorze operações no próprio Mac: unir, dividir, girar, recortar, converter imagens e arquivos Office, renderizar imagens, extrair texto, adicionar marcas d’água e números de página, criptografar, remover senha e editar metadados.",
         detail: '14 ferramentas no dispositivo · Una na ordem que quiser · Nada sai do seu Mac',
       },
 
@@ -255,8 +255,8 @@ export const ptBR = createCatalog({
       lockScreen: {
         title: 'Informações da tela bloqueada',
         description:
-          'Mostre opcionalmente data, estado e reprodução na tela bloqueada do macOS. É uma sobreposição independente e nunca aparece na lista ou no carrossel de módulos da ilha.',
-        detail: 'Sobreposição independente · Ativação opcional · Não rouba o foco',
+          "Mostre opcionalmente data, estado e reprodução na tela bloqueada do macOS.",
+        detail: "Ativação opcional · Não rouba o foco",
       },
       recommendedTools: {
         title: 'Apps recomendados',
@@ -267,25 +267,23 @@ export const ptBR = createCatalog({
     },
   },
   ai: {
-    eyebrow: 'IA SEM CAIXA-PRETA',
-    title: 'Veja o estado da IA <span>sem ler a conversa.</span>',
+    eyebrow: "FLUXO DE IA",
+    title: "Acompanhe tarefas de IA, <span>uso e cotas.</span>",
     lede:
-      'Acompanhe tarefas por aplicativo, uso de modelos por data e cotas reais das contas. Os estados e dados numéricos ficam no Mac; o texto das conversas não é lido.',
-    summaryMono: 'ESTADO LOCAL / LIMITES CLAROS',
-    summaryLede: 'Conecte as ferramentas de IA que você já usa, mantendo os limites de contexto necessários.',
-    summaryNote: 'A página explica apenas escopo de detecção, dados e conexão; não simula uma sessão ao vivo.',
+      "Veja tarefas por aplicativo, uso de modelos por data e cotas restantes das suas contas.",
+    summaryMono: "TAREFAS / USO / COTAS",
+    summaryLede: "Tarefas de IA, uso e cotas em um só lugar.",
     toolsHeading: 'Ferramentas de IA compatíveis',
-    toolsLede: 'Detecta atividade de CLIs, apps e IDEs compatíveis e agrega o estado das tarefas.',
+    toolsLede: "Detecta tarefas de CLIs, aplicativos de desktop e IDEs compatíveis.",
     toolsAriaLabel: 'Ferramentas de IA compatíveis',
-    usageNote: 'Detecção de sessões, histórico de tokens e cotas usam fontes diferentes. Delta utiliza seu registro numérico local; Orca elimina duplicatas do uso do CLI vinculado e o atribui ao provedor original. WorkBuddy AI pode detectar sessões e consultar créditos; ocupação de contexto e créditos não são convertidos em tokens nem custos em dólares. A disponibilidade das cotas depende do provedor e da forma de login.',
-    boundariesHeading: 'Somente o estado é registrado',
+    boundariesHeading: "Privacidade",
     privacyPoints: [
-      'Analisa apenas tipo de evento, estado, horário, modelo e ID da sessão em eventos estruturados',
-      'Nunca lê o texto de prompts ou respostas',
-      'Protocolo e estado ficam armazenados no seu Mac',
+      "O estado das tarefas e o uso ficam no seu Mac",
+      "Prompts e respostas não são lidos",
+      "Conversas não são enviadas",
     ],
     bridgeHeading: 'Conecte suas próprias tarefas',
-    bridgeLede: 'Use zislactl para enviar o estado estruturado de tarefas externas à barra superior.',
+    bridgeLede: "Use zislactl para mostrar scripts e tarefas de compilação na barra de status.",
     zislactlTaskTitle: 'Build e publicação',
     copyZislactlAriaLabel: 'Copiar o comando zislactl',
   },
@@ -301,7 +299,7 @@ export const ptBR = createCatalog({
       trigger: {
         phase: 'Acionar',
         title: 'Mova o cursor para o centro superior',
-        desc: 'Telas com notch e externas usam o mesmo acionador; oculta, nenhum loop de quadros é executado.',
+        desc: "Funciona em telas com notch e monitores externos.",
       },
       review: {
         phase: 'Revisar',
@@ -655,10 +653,8 @@ export const ptBR = createCatalog({
     checksumLabel: 'SHA-256',
     performancePoints: [
       'Compatível com vários monitores, Spaces e apps normais em tela cheia; expandir nunca ativa o app nem rouba o foco',
-      'Oculto, não cria janela transparente persistente nem executa loop de quadros; a expansão usa eventos globais e geometria',
-      'Usa uma única camada de material do sistema e troca para fundo opaco quando Reduzir transparência está ativo',
+      "Usa um fundo opaco quando Reduzir Transparência está ativado",
       'Liquid Glass no macOS 26+, com fallback automático para materiais nativos no macOS 14 e 15',
-      'O notch físico é inferido pela área segura; telas externas sem notch recebem uma barra simulada em uma sobreposição dedicada',
     ],
   },
   film: {
