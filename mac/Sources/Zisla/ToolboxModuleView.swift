@@ -262,6 +262,7 @@ struct ToolboxTimerPanel: View {
             }
         }
         .scrollBounceBehavior(.basedOnSize)
+        .thinScrollChrome(scrollerStyle: .overlay)
         .accessibilityIdentifier("toolbox.timers")
         .frame(width: 236)
         .overlay(alignment: .topTrailing) {
