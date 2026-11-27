@@ -41,7 +41,7 @@ Với công cụ không có nguồn hoạt động cục bộ ổn định, `zis
 | Nhóm | Công cụ có sẵn |
 | --- | --- |
 | Tải xuống và tài liệu | Tải video, âm thanh qua `yt-dlp`; gộp, tách, xoay, cắt, chuyển đổi, kết xuất, xuất chữ, thêm hình mờ/số trang, mã hóa, mở khóa và sửa siêu dữ liệu PDF tại máy. |
-| Tập trung và trình bày | Pomodoro phát một âm báo và thông báo cục bộ khi hết phiên, giữ máy thức, ngăn ngủ khi nhàn rỗi, vệ sinh màn hình/bàn phím, máy nhắc chữ và gương camera. |
+| Tập trung và trình bày | Pomodoro phát một âm báo và thông báo cục bộ khi hết phiên, giữ máy thức, ngăn ngủ khi nhàn rỗi, vệ sinh màn hình/bàn phím, máy nhắc chữ và gương camera. Tên bộ hẹn giờ chỉ áp dụng cho phiên hiện tại và trở về tên mặc định khi phiên kết thúc hoặc bị hủy. |
 | Hệ thống và pin | CPU, GPU, bộ nhớ, đĩa, mạng, quạt, pin và dọn bộ đệm/nhật ký có thể xóa an toàn. |
 | Nhập giọng nói | Phím tắt toàn hệ thống để ghi và chuyển giọng nói thành chữ, tùy chọn xử lý bản chép cục bộ/từ xa và lịch sử giọng nói tại máy. |
 

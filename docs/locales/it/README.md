@@ -41,7 +41,7 @@ Per gli strumenti senza una fonte locale stabile, `zislactl` consente a script, 
 | Area | Strumenti inclusi |
 | --- | --- |
 | Download e documenti | Download di video e audio tramite `yt-dlp`; unione, divisione, rotazione, ritaglio, conversione e rendering dei PDF locali, esportazione del testo, filigrane, numeri di pagina, cifratura, sblocco e modifica dei metadati. |
-| Concentrazione e presentazioni | Timer Pomodoro con un singolo avviso sonoro e una notifica locale a fine sessione, modalità che mantiene il Mac attivo, prevenzione dello stop per inattività, pulizia di schermo e tastiera, suggeritore e specchio della fotocamera. |
+| Concentrazione e presentazioni | Timer Pomodoro con un singolo avviso sonoro e una notifica locale a fine sessione, modalità che mantiene il Mac attivo, prevenzione dello stop per inattività, pulizia di schermo e tastiera, suggeritore e specchio della fotocamera. Il nome del timer vale solo per la sessione corrente e torna a quello predefinito quando termina o viene annullata. |
 | Sistema e batteria | Informazioni su CPU, GPU, memoria, disco, rete, ventole e batteria, oltre alla pulizia di cache e registri eliminabili in sicurezza. |
 | Input vocale | Scorciatoie globali per registrazione e trascrizione, organizzazione facoltativa delle trascrizioni tramite modelli locali o remoti e cronologia vocale locale. |
 

@@ -41,7 +41,7 @@ Bei Werkzeugen ohne stabile lokale Aktivitätsquelle können Skripte, CI und Wer
 | Bereich | Enthaltene Werkzeuge |
 | --- | --- |
 | Downloads und Dokumente | Video- und Audiodownloads mit `yt-dlp`; lokale PDF-Zusammenführung, Aufteilung, Drehung, Zuschnitt, Konvertierung, Darstellung, Textexport, Wasserzeichen, Seitenzahlen, Verschlüsselung, Entsperrung und Metadatenbearbeitung. |
-| Konzentration und Präsentation | Pomodoro-Timer mit einem Signalton und einer lokalen Mitteilung bei Sitzungsende, Wachhaltemodus, Verhinderung des Ruhezustands bei Inaktivität, Bildschirm- und Tastaturreinigung, Teleprompter und Kameraspiegel. |
+| Konzentration und Präsentation | Pomodoro-Timer mit einem Signalton und einer lokalen Mitteilung bei Sitzungsende, Wachhaltemodus, Verhinderung des Ruhezustands bei Inaktivität, Bildschirm- und Tastaturreinigung, Teleprompter und Kameraspiegel. Der Timername gilt nur für die aktuelle Sitzung und wird nach deren Ende oder Abbruch auf den Standardnamen zurückgesetzt. |
 | System und Batterie | Informationen zu CPU, GPU, Arbeitsspeicher, Datenträger, Netzwerk, Lüfter und Batterie sowie Bereinigung sicher entfernbarer Caches und Protokolle. |
 | Spracheingabe | Globale Kurzbefehle zum Aufnehmen und Transkribieren, optionale lokale oder entfernte Aufbereitung von Transkripten und lokaler Sprachverlauf. |
 

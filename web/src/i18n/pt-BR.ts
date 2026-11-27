@@ -137,7 +137,7 @@ export const ptBR = createCatalog({
       toolbox: {
         name: 'Utilitários',
         caption:
-          'Temporizador de foco, manter a tela ligada, limpeza de tela e de teclado que também bloqueia F1-F12, teleprompter, espelho e Lixo na mesma página. Pause, continue ou reinicie o Pomodoro e acompanhe o progresso nas visualizações compactas horizontal e vertical. Inicie a limpeza de arquivos desnecessários nos utilitários com suas configurações de limpeza do sistema e acompanhe o progresso e os resultados na ilha.',
+          'Temporizador de foco, manter a tela ligada, limpeza de tela e de teclado que também bloqueia F1-F12, teleprompter, espelho e Lixo na mesma página. Pause, continue ou reinicie o Pomodoro e acompanhe o progresso nas visualizações compactas horizontal e vertical. Inicie a limpeza de arquivos desnecessários nos utilitários com suas configurações de limpeza do sistema e acompanhe o progresso e os resultados na ilha. O nome do temporizador vale apenas para a sessão atual e volta ao padrão quando ela termina ou é cancelada.',
         points: ['Temporizador de foco', 'Bloqueia F1-F12 durante a limpeza', 'Teleprompter e espelho'],
       },
       system: {

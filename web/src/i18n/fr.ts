@@ -148,7 +148,7 @@ export const fr: SiteContent = {
       toolbox: {
         name: 'Utilitaires',
         caption:
-          'Minuteur de concentration, maintien de l’écran éveillé, nettoyage de l’écran ou du clavier avec blocage des touches F1-F12, téléprompteur, miroir et Corbeille sur une même page. Mettez le Pomodoro en pause, reprenez-le, réinitialisez-le et suivez sa progression dans les vues compactes horizontale et verticale. Lancez le nettoyage des fichiers inutiles depuis les utilitaires avec vos réglages de nettoyage système, puis suivez la progression et le résultat dans l’îlot.',
+          'Minuteur de concentration, maintien de l’écran éveillé, nettoyage de l’écran ou du clavier avec blocage des touches F1-F12, téléprompteur, miroir et Corbeille sur une même page. Mettez le Pomodoro en pause, reprenez-le, réinitialisez-le et suivez sa progression dans les vues compactes horizontale et verticale. Lancez le nettoyage des fichiers inutiles depuis les utilitaires avec vos réglages de nettoyage système, puis suivez la progression et le résultat dans l’îlot. Le nom du minuteur ne vaut que pour la session en cours et revient au nom par défaut à la fin ou après annulation.',
         points: [
           'Minuteur de concentration',
           'Bloque F1-F12 pendant le nettoyage',

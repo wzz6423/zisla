@@ -137,7 +137,7 @@ export const nl = createCatalog({
       toolbox: {
         name: 'Hulpprogramma’s',
         caption:
-          'Focustimer, scherm wakker houden, schermreiniging, toetsenbordreiniging die ook F1-F12 blokkeert, teleprompter, spiegel en prullenmand op één pagina. Pauzeer, hervat of reset de Pomodoro en volg de voortgang in compacte horizontale en verticale weergaven. Start het opruimen van onnodige bestanden vanuit de hulpprogramma’s met je instellingen voor systeemopruiming en volg de voortgang en resultaten in het eiland.',
+          'Focustimer, scherm wakker houden, schermreiniging, toetsenbordreiniging die ook F1-F12 blokkeert, teleprompter, spiegel en prullenmand op één pagina. Pauzeer, hervat of reset de Pomodoro en volg de voortgang in compacte horizontale en verticale weergaven. Start het opruimen van onnodige bestanden vanuit de hulpprogramma’s met je instellingen voor systeemopruiming en volg de voortgang en resultaten in het eiland. De timernaam geldt alleen voor de huidige sessie en keert terug naar de standaardnaam na afloop of annulering.',
         points: ['Focusafteller', 'Blokkeert F1-F12 tijdens reinigen', 'Teleprompter en spiegel'],
       },
       system: {

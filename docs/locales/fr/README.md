@@ -41,7 +41,7 @@ Pour les outils sans source d'activité locale stable, `zislactl` permet aux scr
 | Domaine | Outils inclus |
 | --- | --- |
 | Téléchargements et documents | Téléchargement de vidéos et de fichiers audio avec `yt-dlp` ; fusion, division, rotation, recadrage, conversion, rendu, export de texte, filigranes, numéros de page, chiffrement, déverrouillage et modification des métadonnées PDF en local. |
-| Concentration et présentation | Minuteur Pomodoro avec une alerte sonore et une notification locale à la fin d'une session, mode de maintien en éveil, prévention de la veille après inactivité, nettoyage de l'écran et du clavier, prompteur et miroir de caméra. |
+| Concentration et présentation | Minuteur Pomodoro avec une alerte sonore et une notification locale à la fin d'une session, mode de maintien en éveil, prévention de la veille après inactivité, nettoyage de l'écran et du clavier, prompteur et miroir de caméra. Le nom du minuteur ne vaut que pour la session en cours et revient au nom par défaut à la fin ou après annulation. |
 | Système et batterie | Informations sur le CPU, le GPU, la mémoire, le disque, le réseau, les ventilateurs et la batterie, ainsi que nettoyage des caches et journaux pouvant être supprimés sans risque. |
 | Saisie vocale | Raccourcis globaux d'enregistrement et de transcription, organisation facultative des transcriptions en local ou à distance et historique vocal local. |
 

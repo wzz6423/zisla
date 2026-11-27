@@ -41,7 +41,7 @@ For tools without a stable local activity source, `zislactl` lets scripts, CI, a
 | Area | Included tools |
 | --- | --- |
 | Downloads and documents | Video and audio downloads through `yt-dlp`; local PDF merge, split, rotate, crop, conversion, rendering, text export, watermarks, page numbers, encryption, unlock, and metadata editing. |
-| Focus and presentation | Pomodoro timer with one audible alert and a local notification when a session ends, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, and camera mirror. |
+| Focus and presentation | Pomodoro timer with one audible alert and a local notification when a session ends, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, and camera mirror. Timer names apply only to the current session and return to the default when it ends or is canceled. |
 | System and battery | CPU, GPU, memory, disk, network, fan, and battery information, plus cleanup of caches and logs that are safe to remove. |
 | Voice input | Global shortcuts for recording and transcription, optional local or remote transcript organization, and local voice history. |
 

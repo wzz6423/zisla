@@ -262,7 +262,6 @@ public final class PomodoroService: ObservableObject {
     private let defaults: UserDefaults
     private let focusDurationKey = "zisla.pomodoro.focusDuration"
     private let restDurationKey = "zisla.pomodoro.restDuration"
-    private let nameKey = "zisla.pomodoro.name"
     private var authorizationPromptHost: NSWindow?
 
     public init(
@@ -296,7 +295,6 @@ public final class PomodoroService: ObservableObject {
             defaults.set(restDuration, forKey: restDurationKey)
         }
         engine = PomodoroEngine(focusDuration: focusDuration, restDuration: restDuration)
-        name = defaults.string(forKey: nameKey) ?? ""
         refreshDisplay()
     }
 
@@ -320,7 +318,6 @@ public final class PomodoroService: ObservableObject {
 
     public func setName(_ name: String) {
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        defaults.set(self.name, forKey: nameKey)
     }
 
     @discardableResult
@@ -382,7 +379,10 @@ public final class PomodoroService: ObservableObject {
     }
 
     public func cancelCountdownGroup(_ members: [String]) {
-        if members.contains("pomodoro") { engine.reset() }
+        if members.contains("pomodoro") {
+            engine.reset()
+            name = ""
+        }
         countdowns.removeAll { members.contains($0.id.uuidString) }
         synchronizeTimer()
         refreshDisplay()
@@ -512,12 +512,14 @@ public final class PomodoroService: ObservableObject {
 
     public func reset() {
         engine.reset()
+        name = ""
         synchronizeTimer()
         refreshDisplay()
     }
 
     public func stop() {
         engine.reset()
+        name = ""
         countdowns.removeAll()
         stopTimer()
         refreshDisplay()
@@ -559,6 +561,7 @@ public final class PomodoroService: ObservableObject {
         let completedDuration = engine.duration(for: completedMode)
         let date = date ?? now()
         if engine.completeIfNeeded(at: date) {
+            name = ""
             if completedMode == .focus {
                 onDailyBriefingActivity?(.pomodoroCompleted, 1, completedDuration, date)
             }
