@@ -8,7 +8,7 @@ L'état masqué n'a aucune fenêtre transparente. `PointerEdgeMonitor` installe 
 
 Chaque écran dispose d'une identité stable associant `NSScreenNumber` à son `CGDirectDisplayID`. La disposition s'ancre sur `screen.frame.maxY`, ce qui prend en charge les coordonnées négatives, les écrans superposés verticalement et les écrans externes sans encoche.
 
-Lorsque plusieurs écrans sont connectés, Réglages → Général → Modes des écrans permet de choisir pour chaque écran le mode Dynamic Island (position de la caméra ou personnalisée), le mode encoche ou le masquage. Avec un seul écran, ce réglage est masqué et l’apparence globale s’applique ; la reconnexion rétablit la configuration de chaque écran.
+Lorsque plusieurs écrans sont connectés, Réglages → Général → Modes des écrans permet de choisir pour chaque écran le mode Dynamic Island (position de la caméra ou personnalisée), le mode encoche ou le masquage. Avec un seul écran, ce réglage est masqué et l’apparence globale s’applique ; la reconnexion rétablit la configuration de chaque écran. Chaque écran visible conserve son îlot replié en même temps que les autres. Le déploiement, les actions rapides, l’enregistrement et les messages temporaires remplacent uniquement l’îlot de leur écran ; la sélection des écrans de notification filtre le contenu sans masquer l’îlot au repos.
 
 ## Fenêtre
 

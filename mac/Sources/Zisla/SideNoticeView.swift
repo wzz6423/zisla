@@ -7,6 +7,7 @@ import SwiftUI
 
 @MainActor
 final class SideNoticeDisplayState: ObservableObject {
+    @Published var noticesEnabled = true
     @Published var islandLayoutStyle: IslandLayoutStyle?
     @Published var islandEdge: IslandEdge = .top
     @Published var placementMode: IslandPlacementMode = .camera
@@ -230,6 +231,7 @@ struct CompactStatusBarView: View {
     @Environment(\.layoutDirection) private var layoutDirection
 
     private var height: CGFloat { displayState.compactWingHeight }
+    private var isSweeping: Bool { displayState.noticesEnabled && resultSweep.current != nil }
 
     private var settings: FeatureSettings {
         var settings = settingsStore.settings
@@ -287,10 +289,10 @@ struct CompactStatusBarView: View {
             } else if !displayState.statusIcons.isEmpty {
                 IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge,
                                       date: date, animatesLogo: animatesLogo)
-            } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil,
+            } else if usesCustomPill, displayState.compactStatusHidden, !isSweeping,
                       settingsStore.settings.islandAppIconEnabled {
                 IslandParticleLogo(side: min(18, height), time: animatesLogo ? nil : date.timeIntervalSinceReferenceDate)
-            } else if !displayState.compactStatusHidden || resultSweep.current != nil {
+            } else if !displayState.compactStatusHidden || isSweeping {
                 if usesCustomPill {
                     customStatusContent(at: date, animatesLogo: animatesLogo)
 
@@ -314,7 +316,11 @@ struct CompactStatusBarView: View {
         }
         .frame(width: size.width, height: size.height)
         .background(compactStatusBackground(cornerRadius: pillCornerRadius))
-        .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
+        .overlay {
+            if displayState.noticesEnabled {
+                AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge)
+            }
+        }
         .overlay {
             if displayState.statusIcons.isEmpty || information != nil,
                settingsStore.settings.collapsedProgressGlowEnabled,
@@ -365,7 +371,7 @@ struct CompactStatusBarView: View {
     }
 
     private func compactInformation(at date: Date) -> FloatingIslandInformationLayout? {
-        guard resultSweep.current == nil else { return nil }
+        guard !isSweeping else { return nil }
         return FloatingIslandInformationLayout(
             notices: displayState.compactStatusHidden ? [] : presentationNotices,
             icons: displayState.statusIcons, settings: settings, item: media.snapshot, at: date
@@ -439,7 +445,7 @@ struct CompactStatusBarView: View {
             .padding(displayState.islandEdge.isVertical ? .vertical : .horizontal,
                      CompactPillStatusPresentation.trailingInset)
         } else if let presentation = sizing?.customPillPresentation {
-            let thickness = resultSweep.current == nil ? height
+            let thickness = !isSweeping ? height
                 : max(CGFloat(settingsStore.settings.islandPillHeight), CompactPillStatusPresentation.minimumThickness)
             let text = CompactPillStatusContent.displayText(
                 for: presentation, settings: settings, item: media.snapshot, at: date
@@ -456,7 +462,7 @@ struct CompactStatusBarView: View {
             .frame(width: displayState.islandEdge.isVertical ? thickness : nil,
                    height: displayState.islandEdge.isVertical ? nil : thickness)
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
-        } else if resultSweep.current == nil, settingsStore.settings.islandAppIconEnabled {
+        } else if !isSweeping, settingsStore.settings.islandAppIconEnabled {
             IslandParticleLogo(side: min(18, height), time: animatesLogo ? nil : date.timeIntervalSinceReferenceDate)
         }
     }
@@ -475,6 +481,7 @@ struct CompactStatusBarView: View {
     }
 
     private var presentationNotices: [IslandNotice] {
+        guard displayState.noticesEnabled else { return [] }
         let notices = resultSweep.presentationNotices(from: queue.left + queue.right).filter {
             $0.id != AIAccountBalanceNoticeController.pinnedID || settings.supportsStatusIconsInIsland
         }

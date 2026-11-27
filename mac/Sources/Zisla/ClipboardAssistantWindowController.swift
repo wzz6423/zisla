@@ -148,6 +148,9 @@ final class ClipboardAssistantController: ObservableObject {
 
     private var window: NSWindow?
     private var presentationPoint = CGPoint.zero
+    var presentationDisplayID: CGDirectDisplayID? {
+        screenSnapshotProvider().first { $0.frame.contains(presentationPoint) }?.displayID
+    }
     var screenAtPoint: @MainActor (CGPoint) -> NSScreen? = { WindowPlacement.screenUnderMouse(point: $0) }
     private var dismissTask: Task<Void, Never>?
     private var presentationGeneration = 0

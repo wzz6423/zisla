@@ -38,7 +38,7 @@ macOS 14 en later zijn ondersteund. macOS 26 gebruikt Liquid Glass; macOS 14/15 
 - **Updates:** Release/Preview vraagt eenmaal per start de openbare landcode. `CN` controleert ondertekende Gitee-feed en probeert eenmaal GitHub; andere landen andersom. Fout behoudt Gitee eerst. Sparkle downloadt, verifieert, installeert en herstart. Kanaal geldt voor automatische/handmatige checks.
 - **Uiterlijk en bediening:** systeem/licht/donker, transparant/mat, vastgezet uitklappen, meerdere schermen, Spaces en externe schermen zonder notch.
 - **Standaarden:** nieuwe installaties activeren modules. Functie, compacte indicator, zijmelding, menubalkstatistiek en updategedrag zijn apart instelbaar; bestaande configuraties blijven behouden.
-- Als meerdere schermen zijn aangesloten, kun je onder Instellingen → Algemeen → Schermmodi per scherm de Dynamic Island-modus (camerapositie of eigen positie), notch-modus of verbergen kiezen. Met één scherm is deze instelling verborgen en geldt de algemene weergave; na opnieuw aansluiten worden de opgeslagen scherminstellingen hersteld.
+- Als meerdere schermen zijn aangesloten, kun je onder Instellingen → Algemeen → Schermmodi per scherm de Dynamic Island-modus (camerapositie of eigen positie), notch-modus of verbergen kiezen. Met één scherm is deze instelling verborgen en geldt de algemene weergave; na opnieuw aansluiten worden de opgeslagen scherminstellingen hersteld. Op alle zichtbare schermen blijft het ingeklapte eiland tegelijk zichtbaar. Uitklappen, snelle acties, opnemen en tijdelijke berichten vervangen alleen het eiland op hun eigen scherm; de selectie van meldingsschermen filtert de inhoud zonder het inactieve eiland te verbergen.
 
 ### Afzonderlijk gereedschap en werkstromen
 

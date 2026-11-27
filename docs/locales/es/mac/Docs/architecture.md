@@ -8,7 +8,7 @@ El estado oculto no tiene ventana transparente. `PointerEdgeMonitor` instala obs
 
 Cada pantalla tiene identidad estable al combinar `NSScreenNumber` y `CGDirectDisplayID`. El diseño se ancla en `screen.frame.maxY`, admitiendo coordenadas negativas, monitores apilados verticalmente y pantallas externas sin muesca.
 
-Con varias pantallas conectadas, Ajustes → General → Modos de pantalla permite elegir para cada una el modo Dynamic Island (posición de cámara o personalizada), el modo muesca u ocultarla. Con una sola pantalla, este ajuste se oculta y se usa la apariencia global; al volver a conectarlas se recupera la configuración guardada de cada pantalla.
+Con varias pantallas conectadas, Ajustes → General → Modos de pantalla permite elegir para cada una el modo Dynamic Island (posición de cámara o personalizada), el modo muesca u ocultarla. Con una sola pantalla, este ajuste se oculta y se usa la apariencia global; al volver a conectarlas se recupera la configuración guardada de cada pantalla. Todas las pantallas visibles mantienen su isla contraída al mismo tiempo. La expansión, las acciones rápidas, la grabación y los mensajes temporales sustituyen solo la isla de su propia pantalla; la selección de pantallas para notificaciones filtra el contenido sin ocultar la isla inactiva.
 
 ## Ventana
 

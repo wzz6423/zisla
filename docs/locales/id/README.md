@@ -102,7 +102,7 @@ Pengunduh memerlukan `yt-dlp`; `ffmpeg` opsional. Konversi Office ke PDF memerlu
 ## Dirancang agar tidak mengganggu
 
 - Mendukung banyak layar, Spaces, dan aplikasi layar penuh biasa tanpa mengaktifkan atau mengambil fokus dari aplikasi saat ini.
-- Saat beberapa layar terhubung, Pengaturan → Umum → Mode Layar memungkinkan Anda memilih mode Dynamic Island (posisi kamera atau kustom), mode notch, atau sembunyikan untuk setiap layar. Dengan satu layar, pengaturan ini disembunyikan dan tampilan global digunakan; menghubungkan kembali memulihkan konfigurasi tersimpan setiap layar.
+- Saat beberapa layar terhubung, Pengaturan → Umum → Mode Layar memungkinkan Anda memilih mode Dynamic Island (posisi kamera atau kustom), mode notch, atau sembunyikan untuk setiap layar. Dengan satu layar, pengaturan ini disembunyikan dan tampilan global digunakan; menghubungkan kembali memulihkan konfigurasi tersimpan setiap layar. Semua layar yang diaktifkan menampilkan island yang diciutkan secara bersamaan. Memperluas island, tindakan cepat, perekaman, dan pesan sementara hanya mengganti island pada layarnya sendiri; pemilihan layar notifikasi menyaring konten tanpa menyembunyikan island yang sedang tidak aktif.
 - Keadaan tersembunyi tidak memiliki jendela transparan permanen sebagai area sentuh dan tidak menjalankan loop frame; pemantauan peristiwa global dan pemeriksaan geometri memicu pembukaan.
 - Memakai satu material sistem dan beralih ke latar buram ketika Reduce Transparency aktif.
 - Mendeteksi notch fisik dari area aman sistem; layar eksternal tanpa notch memakai overlay dengan bentuk yang sama.

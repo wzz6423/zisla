@@ -8,7 +8,7 @@ The hidden state has no transparent window. `PointerEdgeMonitor` installs global
 
 Each display has a stable identity by pairing `NSScreenNumber` with its `CGDirectDisplayID`. Layout is anchored to `screen.frame.maxY`, so negative coordinates, vertically stacked displays, and external displays without a notch are supported.
 
-When multiple displays are connected, Settings → General → Display Modes lets you choose Dynamic Island Mode (camera or custom position), Notch Mode, or Hide on This Display for each screen. With one screen, this setting is hidden and the global appearance applies; reconnecting restores each display’s saved configuration.
+When multiple displays are connected, Settings → General → Display Modes lets you choose Dynamic Island Mode (camera or custom position), Notch Mode, or Hide on This Display for each screen. With one screen, this setting is hidden and the global appearance applies; reconnecting restores each display’s saved configuration. All enabled displays show their collapsed islands on startup. Expanding the island, opening Quick Actions, recording, or showing a temporary message affects only that display. Choosing where to show notifications leaves the other islands visible.
 
 ## Window
 

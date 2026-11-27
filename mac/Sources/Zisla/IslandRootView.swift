@@ -793,15 +793,8 @@ struct CollapsedPetView: View {
             if model.settingsStore.settings.petEnabled,
                let sprite = petController.sprite {
                 if let screenLayout, screenLayout.style == .pill {
-                    let compactFrame = SideNoticeLayoutEngine().compactBarFrame(
-                        for: screenLayout,
-                        notices: model.aiResultSweep.presentationNotices(from: model.notices.left + model.notices.right),
-                        settings: model.settingsStore.settings.islandSettings(for: screenLayout),
-                        browserDownloadCount: model.settingsStore.settings.showsBrowserDownloadProgress
-                            ? model.browserDownloads.snapshots.count : 0
-                    )
                     Self.pillPet(sprite: sprite, behavior: petController.behavior, layout: screenLayout,
-                                 compactBarFrame: compactFrame, side: model.settingsStore.settings.petSide)
+                                 compactBarFrame: screenLayout.collapsedFrame, side: model.settingsStore.settings.petSide)
                 } else {
                     let horizontalInset = CollapsedPetLayout.outerGap
                     let verticalInset = min(4, max(2, proxy.size.height * 0.1))

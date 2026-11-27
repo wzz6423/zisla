@@ -145,8 +145,11 @@ final class SideNoticePresenter {
         cancellables.removeAll()
     }
 
-    func setIslandExpanded(_ expanded: Bool) {
-        updateSuppression { $0.isIslandExpanded = expanded }
+    func setIslandExpanded(_ expanded: Bool, on displayID: UInt32? = nil) {
+        updateSuppression {
+            $0.isIslandExpanded = expanded
+            $0.islandDisplayID = expanded ? displayID : nil
+        }
     }
 
     func setPlacementSelectionActive(_ active: Bool) {
@@ -154,21 +157,28 @@ final class SideNoticePresenter {
         updatePanels()
     }
 
-    func setVoiceRecording(_ recording: Bool) {
-        updateSuppression { $0.isVoiceRecording = recording }
+    func setVoiceRecording(_ recording: Bool, on displayID: UInt32? = nil) {
+        updateSuppression {
+            $0.isVoiceRecording = recording
+            $0.voiceDisplayID = recording ? displayID : nil
+        }
     }
 
     /// A transient message borrows the collapsed pill the way recording does, so the status wings
     /// give way instead of crowding the row that just replaced them.
-    func setTransientNoticePresented(_ presented: Bool, message: String? = nil) {
+    func setTransientNoticePresented(_ presented: Bool, message: String? = nil, on displayID: UInt32? = nil) {
         transientMessage = presented ? message : nil
         suppression.isTransientNoticePresented = presented
+        suppression.transientDisplayID = presented ? displayID : nil
         updatePanels()
     }
 
     /// The clipboard assistant takes over the notch row, so notices give way while it is up.
-    func setClipboardAssistantVisible(_ visible: Bool) {
-        updateSuppression { $0.isClipboardAssistantVisible = visible }
+    func setClipboardAssistantVisible(_ visible: Bool, on displayID: UInt32? = nil) {
+        updateSuppression {
+            $0.isClipboardAssistantVisible = visible
+            $0.clipboardDisplayID = visible ? displayID : nil
+        }
     }
 
     func setScreenLocked(_ locked: Bool) {
@@ -180,11 +190,7 @@ final class SideNoticePresenter {
         mutate(&updated)
         guard updated != suppression else { return }
         suppression = updated
-        if updated.hidesNotices {
-            hideAllPanels()
-        } else {
-            updatePanels()
-        }
+        updatePanels()
     }
 
     func setScreenshotActive(_ active: Bool) {
@@ -199,7 +205,7 @@ final class SideNoticePresenter {
 
     private func updatePanels(rejoiningActiveSpace: Bool = false) {
         guard !isStopped else { return }
-        let hidesPanels = isScreenshotActive || isPlacementSelectionActive || suppression.hidesNotices
+        let hidesPanels = isScreenshotActive || isPlacementSelectionActive
         if hidesPanels {
             hideAllPanels()
         }
@@ -215,11 +221,11 @@ final class SideNoticePresenter {
             settingsStore.settings.islandSettings(for: snapshot, displayCount: snapshots.count) == nil
                 ? nil : UInt32(snapshot.displayID)
         })
-        let displayIDs = resolvedDisplayIDs(from: connectedDisplayIDs).intersection(visibleDisplayIDs)
-        removePanels(except: displayIDs)
+        let noticeDisplayIDs = resolvedDisplayIDs(from: connectedDisplayIDs)
+        removePanels(except: visibleDisplayIDs)
         let date = now()
 
-        for currentSnapshot in snapshots where displayIDs.contains(UInt32(currentSnapshot.displayID)) {
+        for currentSnapshot in snapshots where visibleDisplayIDs.contains(UInt32(currentSnapshot.displayID)) {
             guard let settings = settingsStore.settings.islandSettings(for: currentSnapshot, displayCount: snapshots.count) else { continue }
             let panels = panels(for: currentSnapshot.displayID)
             let snapshot = Self.snapshotPreservingPhysicalNotch(
@@ -227,12 +233,14 @@ final class SideNoticePresenter {
                 lastPhysicalSnapshot: &panels.lastPhysicalSnapshot
             )
             let displayState = panels.displayState
+            let noticesEnabled = noticeDisplayIDs.contains(snapshot.displayID)
+            displayState.update(\.noticesEnabled, to: noticesEnabled)
             displayState.update(\.islandLayoutStyle, to: settings.islandLayoutStyle)
             displayState.update(\.systemMonitorAvailable, to: availableStatusIcons.contains(where: \.isSystemMonitor))
             displayState.update(\.hidesVoiceProcessingIndicator, to: hidesVoiceProcessingIndicator(
                 on: snapshot.displayID
             ))
-            var compactNotices = resultSweep.presentationNotices(from: queue.left + queue.right).filter {
+            var compactNotices = (noticesEnabled ? resultSweep.presentationNotices(from: queue.left + queue.right) : []).filter {
                 $0.id != AIAccountBalanceNoticeController.pinnedID || settings.supportsStatusIconsInIsland
             }
             if displayState.hidesVoiceProcessingIndicator {
@@ -242,15 +250,16 @@ final class SideNoticePresenter {
                 notices: compactNotices, settings: settings, displayState: displayState
             )
             let configuration = compactConfiguration(
-                for: compactNotices, at: date, statusHidden: displayState.compactStatusHidden, settings: settings
+                for: compactNotices, at: date, statusHidden: displayState.compactStatusHidden, settings: settings,
+                displayID: snapshot.displayID, noticesEnabled: noticesEnabled
             )
             let screenLayout = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
-            displayState.update(\.statusIcons, to: configuration.statusIconSize == nil || resultSweep.current != nil
+            displayState.update(\.statusIcons, to: configuration.statusIconSize == nil || (noticesEnabled && resultSweep.current != nil)
                 ? [] : availableStatusIcons)
             onCompactLayoutChanged?(snapshot.displayID, configuration.expandsForDetailedStatus,
                                     configuration.compactStatusLength, configuration.compactStatusSideWidth,
                                     configuration.statusIconSize)
-            if hidesPanels {
+            if hidesPanels || suppression.scoped(to: snapshot.displayID).hidesNotices {
                 panels.orderOut()
                 continue
             }
@@ -276,7 +285,7 @@ final class SideNoticePresenter {
             )
             updatePanel(
                 side: .left,
-                notices: queue.left,
+                notices: noticesEnabled ? queue.left : [],
                 screen: snapshot,
                 panels: panels,
                 rejoiningActiveSpace: rejoiningActiveSpace,
@@ -285,7 +294,7 @@ final class SideNoticePresenter {
             )
             updatePanel(
                 side: .right,
-                notices: queue.right,
+                notices: noticesEnabled ? queue.right : [],
                 screen: snapshot,
                 panels: panels,
                 rejoiningActiveSpace: rejoiningActiveSpace,
@@ -327,14 +336,16 @@ final class SideNoticePresenter {
 
     func compactConfiguration(
         for notices: [IslandNotice], at date: Date, statusHidden: Bool = false,
-        settings: FeatureSettings? = nil
+        settings: FeatureSettings? = nil, displayID: UInt32? = nil, noticesEnabled: Bool = true
     ) -> ScreenLayoutConfiguration {
         let settings = settings ?? settingsStore.settings
-        let notices = settings.supportsStatusIconsInIsland ? notices
-            : notices.filter { $0.id != AIAccountBalanceNoticeController.pinnedID }
+        let suppression = displayID.map { self.suppression.scoped(to: $0) } ?? self.suppression
+        let notices = (noticesEnabled ? notices : []).filter {
+            $0.id != AIAccountBalanceNoticeController.pinnedID || settings.supportsStatusIconsInIsland
+        }
         var configuration = settings.islandScreenConfiguration
         if configuration.layoutStyle == .pill, configuration.placement.mode == .custom,
-           let transientMessage {
+           suppression.isTransientNoticePresented, let transientMessage {
             configuration.compactStatusLength = CompactPillStatusContent.transientPresentation(message: transientMessage)
                 .length(thickness: max(configuration.pillSize.height, CompactPillStatusPresentation.minimumThickness),
                         edge: configuration.placement.edge)
@@ -344,7 +355,7 @@ final class SideNoticePresenter {
                notices: statusHidden ? [] : notices, icons: availableStatusIcons,
                settings: settings, item: media.snapshot, at: date
            ), !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
-           resultSweep.current == nil {
+           !noticesEnabled || resultSweep.current == nil {
             configuration.statusIconSize = information.size
             return configuration
         }
@@ -373,7 +384,7 @@ final class SideNoticePresenter {
         if settings.effectiveStatusIconDestination == .island,
            sizing == nil || (selectedPriority == .systemMonitor && sizing?.customPillPresentation?.priority != nil),
            !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
-           resultSweep.current == nil {
+           !noticesEnabled || resultSweep.current == nil {
             configuration.statusIconSize = IslandStatusIconLayout.size(icons: availableStatusIcons,
                                                                        edge: configuration.placement.edge)
             configuration.expandsForDetailedStatus = false
@@ -386,13 +397,18 @@ final class SideNoticePresenter {
         for snapshot: ScreenSnapshot, notices: [IslandNotice], at date: Date = .now,
         statusHidden: Bool = false
     ) -> CGRect? {
-        guard let settings = settingsStore.settings.islandSettings(for: snapshot, displayCount: screenSnapshotProvider().count) else { return nil }
-        let notices = settings.supportsStatusIconsInIsland ? notices
-            : notices.filter { $0.id != AIAccountBalanceNoticeController.pinnedID }
-        let configuration = compactConfiguration(for: notices, at: date, statusHidden: statusHidden, settings: settings)
+        let snapshots = screenSnapshotProvider()
+        guard let settings = settingsStore.settings.islandSettings(for: snapshot, displayCount: snapshots.count) else { return nil }
+        let noticesEnabled = resolvedDisplayIDs(from: Set(snapshots.map(\.displayID))).contains(snapshot.displayID)
+            || configuredDisplayIDs.isEmpty
+        let notices = (noticesEnabled ? notices : []).filter {
+            $0.id != AIAccountBalanceNoticeController.pinnedID || settings.supportsStatusIconsInIsland
+        }
+        let configuration = compactConfiguration(for: notices, at: date, statusHidden: statusHidden, settings: settings,
+                                                 displayID: snapshot.displayID, noticesEnabled: noticesEnabled)
+        let layout = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
         if configuration.layoutStyle == .pill {
-            return ScreenLayoutEngine(configuration: configuration)
-                .layout(for: snapshot).collapsedFrame
+            return layout.collapsedFrame
         }
         return Self.resultSweepFrame(
             statusFrame: layoutEngine.compactBarFrame(
@@ -402,8 +418,8 @@ final class SideNoticePresenter {
             ),
             idleFrame: layoutEngine.compactBarFrame(for: snapshot),
             hasPhysicalNotch: ScreenLayoutEngine().layout(for: snapshot).topology.hasPhysicalNotch,
-            isSweeping: resultSweep.current != nil
-        )
+            isSweeping: noticesEnabled && resultSweep.current != nil
+        ) ?? (snapshots.count > 1 ? layout.collapsedFrame : nil)
     }
 
     static func resultSweepFrame(
@@ -449,12 +465,15 @@ final class SideNoticePresenter {
             settings = settingsStore.settings
         }
         let displayState = panelsByDisplayID[displayID]?.displayState
+        let noticesEnabled = resolvedDisplayIDs(from: Set(snapshots.map(\.displayID))).contains(displayID)
+            || configuredDisplayIDs.isEmpty
         var notices = resultSweep.presentationNotices(from: queue.left + queue.right)
         if hidesVoiceProcessingIndicator(on: displayID) {
             notices = Self.noticesWithoutVoiceProcessing(notices)
         }
         let configuration = compactConfiguration(
-            for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true, settings: settings
+            for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true, settings: settings,
+            displayID: displayID, noticesEnabled: noticesEnabled
         )
         onCompactLayoutChanged?(displayID, configuration.expandsForDetailedStatus, configuration.compactStatusLength,
                                 configuration.compactStatusSideWidth,
@@ -470,15 +489,16 @@ final class SideNoticePresenter {
     ) {
         let displayState = panels.displayState
         guard let settings = settingsStore.settings.islandSettings(for: snapshot, displayCount: screenSnapshotProvider().count) else { return }
-        var compactNotices = resultSweep.presentationNotices(from: queue.left + queue.right).filter {
+        var compactNotices = (displayState.noticesEnabled ? resultSweep.presentationNotices(from: queue.left + queue.right) : []).filter {
             $0.id != AIAccountBalanceNoticeController.pinnedID || settings.supportsStatusIconsInIsland
         }
         if displayState.hidesVoiceProcessingIndicator {
             compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
         }
-        let showsCompactBar = settings.islandLayoutStyle == .pill || resultSweep.current != nil || (
-            !displayState.compactStatusHidden && compactNotices.contains(where: Self.isCompactNotice)
-        )
+        let showsCompactBar = settings.islandLayoutStyle == .pill || screenSnapshotProvider().count > 1
+            || (displayState.noticesEnabled && resultSweep.current != nil) || (
+                !displayState.compactStatusHidden && compactNotices.contains(where: Self.isCompactNotice)
+            )
         guard showsCompactBar || panels.compactBar?.isVisible == true else {
             panels.hideCompactBar()
             return

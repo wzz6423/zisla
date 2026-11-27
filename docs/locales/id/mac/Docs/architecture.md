@@ -8,7 +8,7 @@ Keadaan tersembunyi tidak mempunyai jendela transparan. `PointerEdgeMonitor` mem
 
 Identitas tiap layar stabil melalui pasangan `NSScreenNumber` dan `CGDirectDisplayID`. Tata letak bertumpu pada `screen.frame.maxY` sehingga koordinat negatif, layar bertumpuk vertikal, dan layar eksternal tanpa notch didukung.
 
-Saat beberapa layar terhubung, Pengaturan → Umum → Mode Layar memungkinkan Anda memilih mode Dynamic Island (posisi kamera atau kustom), mode notch, atau sembunyikan untuk setiap layar. Dengan satu layar, pengaturan ini disembunyikan dan tampilan global digunakan; menghubungkan kembali memulihkan konfigurasi tersimpan setiap layar.
+Saat beberapa layar terhubung, Pengaturan → Umum → Mode Layar memungkinkan Anda memilih mode Dynamic Island (posisi kamera atau kustom), mode notch, atau sembunyikan untuk setiap layar. Dengan satu layar, pengaturan ini disembunyikan dan tampilan global digunakan; menghubungkan kembali memulihkan konfigurasi tersimpan setiap layar. Semua layar yang diaktifkan menampilkan island yang diciutkan secara bersamaan. Memperluas island, tindakan cepat, perekaman, dan pesan sementara hanya mengganti island pada layarnya sendiri; pemilihan layar notifikasi menyaring konten tanpa menyembunyikan island yang sedang tidak aktif.
 
 ## Jendela
 

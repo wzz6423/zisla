@@ -117,7 +117,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
     }
 
     @Test @MainActor
-    func voiceRecordingHidesEveryPersistentPetPanelUntilRecordingEnds() throws {
+    func voiceRecordingHidesOnlyItsDisplayPersistentPetPanelUntilRecordingEnds() throws {
         var petViews: [CGDirectDisplayID: NSView] = [:]
         let coordinator = OverlayCoordinator(
             contentView: NSView(),
@@ -135,6 +135,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
 
         let firstPetView = try #require(petViews[Self.screen.displayID])
         let firstPetPanel = try #require(firstPetView.window as? IslandPanel)
+        let recordingPetPanel = try #require(petViews[Self.rightScreen.displayID]?.window as? IslandPanel)
         let originalFrame = firstPetPanel.frame
 
         coordinator.setVoiceRecording(true, at: CGPoint(x: 1_900, y: 450))
@@ -143,13 +144,15 @@ struct OverlayCoordinatorVoiceRecordingTests {
         #expect(coordinator.activeDisplayID == Self.rightScreen.displayID)
 
         #expect(firstPetView.window === firstPetPanel)
-        #expect(!firstPetPanel.isVisible)
+        #expect(firstPetPanel.isVisible)
+        #expect(!recordingPetPanel.isVisible)
         #expect(firstPetPanel.frame == originalFrame)
-        #expect(coordinator.persistentPanelDisplayIDs.isEmpty)
+        #expect(coordinator.persistentPanelDisplayIDs == [Self.screen.displayID])
 
         coordinator.setVoiceRecording(false)
 
         #expect(firstPetPanel.isVisible)
+        #expect(recordingPetPanel.isVisible)
         #expect(coordinator.persistentPanelDisplayIDs == [Self.screen.displayID, Self.rightScreen.displayID])
     }
 
@@ -182,11 +185,11 @@ struct OverlayCoordinatorVoiceRecordingTests {
         coordinator.setVoiceRecording(true, at: CGPoint(x: 1_900, y: 450))
         coordinator.updateScreens([Self.screen, Self.rightScreen], repositionVisiblePanel: false)
 
-        // Recording owns the island slot, so every persistent panel must be hidden.
+        // Recording owns only its display's island slot.
         #expect(firstPetView.window === firstPetPanel, "面板实例不应被替换")
-        #expect(!firstPetPanel.isVisible, "录音期间收起态面板应隐藏")
+        #expect(firstPetPanel.isVisible, "录音期间另一屏幕的收起态面板应保持显示")
         #expect(firstPetPanel.frame == firstPetFrame, "面板 frame 不应改变")
-        #expect(coordinator.persistentPanelDisplayIDs.isEmpty, "录音期间不应显示持久面板")
+        #expect(coordinator.persistentPanelDisplayIDs == [Self.screen.displayID], "录音期间只隐藏所在屏幕的持久面板")
 
         coordinator.setVoiceRecording(false)
 

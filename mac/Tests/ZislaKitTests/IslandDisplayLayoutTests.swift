@@ -11,6 +11,59 @@ struct IslandDisplayLayoutTests {
                                           frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
                                           visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056), persistentID: "external")
 
+    @Test @MainActor
+    func aTransientRowOnOneDisplayKeepsTheOtherPersistentIslandVisible() {
+        let coordinator = OverlayCoordinator(contentView: NSView(),
+                                             persistentContentViewProvider: { _ in NSView() }, persistentPanelFrameProvider: { $0.collapsedFrame })
+        coordinator.screenSnapshotProvider = { [builtIn, external] }
+        coordinator.start()
+        defer { coordinator.stop() }
+        #expect(coordinator.persistentPanelDisplayIDs == [builtIn.displayID, external.displayID])
+        coordinator.setTransientNoticePresented(true, at: CGPoint(x: builtIn.frame.midX, y: builtIn.frame.midY))
+        #expect(coordinator.persistentPanelDisplayIDs == [external.displayID],
+                "A compact row replaces only its own display's persistent island")
+        coordinator.setTransientNoticePresented(false)
+        #expect(coordinator.persistentPanelDisplayIDs == [builtIn.displayID, external.displayID])
+    }
+
+    @Test @MainActor
+    func aQuickActionOnlySuspendsItsOwnDisplayAndOtherDisplaysCanStillExpand() throws {
+        let content = NSView()
+        let coordinator = OverlayCoordinator(contentView: content,
+                                             persistentContentViewProvider: { _ in NSView() }, persistentPanelFrameProvider: { $0.collapsedFrame })
+        coordinator.screenSnapshotProvider = { [builtIn, external] }
+        coordinator.start()
+        defer { coordinator.stop() }
+        coordinator.setHoverActivationSuspended(true, on: builtIn.displayID)
+        #expect(coordinator.persistentPanelDisplayIDs == [external.displayID])
+        let builtInTrigger = ScreenLayoutEngine().layout(for: builtIn).triggerFrame
+        coordinator.handlePointer(at: CGPoint(x: builtInTrigger.midX, y: builtInTrigger.midY))
+        #expect(!coordinator.isVisible)
+        let externalTrigger = ScreenLayoutEngine().layout(for: external).triggerFrame
+        coordinator.handlePointer(at: CGPoint(x: externalTrigger.midX, y: externalTrigger.midY))
+        #expect(coordinator.isVisible && coordinator.activeDisplayID == external.displayID)
+        #expect(try #require(content.window).isVisible)
+        coordinator.setHoverActivationSuspended(false)
+        #expect(coordinator.persistentPanelDisplayIDs == [builtIn.displayID])
+        coordinator.collapseImmediately()
+        #expect(coordinator.persistentPanelDisplayIDs == [builtIn.displayID, external.displayID])
+        coordinator.setHoverActivationSuspended(true)
+        #expect(coordinator.persistentPanelDisplayIDs.isEmpty)
+    }
+
+    @Test @MainActor
+    func recordingKeepsIdleContentOnEveryOtherDisplay() {
+        let coordinator = OverlayCoordinator(contentView: NSView(),
+                                             persistentContentViewProvider: { _ in NSView() }, persistentPanelFrameProvider: { $0.collapsedFrame })
+        coordinator.screenSnapshotProvider = { [builtIn, external] }
+        coordinator.start()
+        defer { coordinator.stop() }
+        coordinator.setVoiceRecording(true, at: CGPoint(x: builtIn.frame.midX, y: builtIn.frame.midY))
+        #expect(coordinator.persistentPanelDisplayIDs == [external.displayID])
+        coordinator.setVoiceRecording(false)
+        #expect(coordinator.persistentPanelDisplayIDs == [builtIn.displayID, external.displayID])
+    }
+
     @Test(arguments: IslandEdge.allCases)
     func mixedModesUseEachDisplaysConfirmedPlacement(edge: IslandEdge) throws {
         let placement = IslandPlacement(mode: .custom, edge: edge, offset: 0.23, inwardDistance: 28)

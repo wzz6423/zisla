@@ -92,6 +92,7 @@ public final class OverlayCoordinator: NSObject {
     private var isVoiceRecording = false
     private var isTransientNoticePresented = false
     private var isHoverActivationSuspended = false
+    private var hoverSuspendedDisplayID: CGDirectDisplayID?
     private var isScreenshotCaptureInProgress = false
     private var isScreenshotActive = false
     private var isScreenLocked = false
@@ -245,6 +246,7 @@ public final class OverlayCoordinator: NSObject {
         isVoiceRecording = false
         isTransientNoticePresented = false
         isHoverActivationSuspended = false
+        hoverSuspendedDisplayID = nil
         isScreenshotCaptureInProgress = false
         isScreenshotActive = false
     }
@@ -450,7 +452,7 @@ public final class OverlayCoordinator: NSObject {
         guard isRunning,
               !isScreenLocked,
               !isVoiceRecording,
-              !isHoverActivationSuspended,
+              !(isHoverActivationSuspended && hoverSuspendedDisplayID == nil),
               !isScreenshotCaptureInProgress
         else { return }
         lastPointerLocation = point
@@ -458,6 +460,7 @@ public final class OverlayCoordinator: NSObject {
             refreshScreensIfNeeded()
         }
         if let triggerLayout = layoutEngine.layout(containing: point, in: layouts),
+           !suppressesHover(on: triggerLayout.displayID),
            collapsedControlContainsPoint?(point) != true {
             let changedDisplay = activeDisplayID != triggerLayout.displayID
             activeDisplayID = triggerLayout.displayID
@@ -622,22 +625,28 @@ public final class OverlayCoordinator: NSObject {
     }
 
     /// Pauses hover expansion while another top-level prompt occupies the island trigger area.
-    public func setHoverActivationSuspended(_ suspended: Bool) {
-        guard isHoverActivationSuspended != suspended else { return }
+    public func setHoverActivationSuspended(_ suspended: Bool, on displayID: CGDirectDisplayID? = nil) {
+        let displayID = suspended ? displayID : nil
+        guard isHoverActivationSuspended != suspended || hoverSuspendedDisplayID != displayID else { return }
         isHoverActivationSuspended = suspended
-        if suspended {
+        hoverSuspendedDisplayID = displayID
+        if suspended, displayID == nil || displayID == activeDisplayID {
             endPointerEntryGrace()
             if isPointerInside {
                 isPointerInside = false
                 process(reducer.send(.pointerExited))
             }
             panel?.orderOut(nil)
-            hidePersistentPanels()
+            updatePersistentPanels()
         } else if isRunning, reducer.state.visibility != .hidden {
             presentCurrentLayout()
         } else {
             updatePersistentPanels()
         }
+    }
+
+    private func suppressesHover(on displayID: CGDirectDisplayID) -> Bool {
+        isHoverActivationSuspended && (hoverSuspendedDisplayID == nil || hoverSuspendedDisplayID == displayID)
     }
 
     /// Hides live island windows after screen capture has produced its frozen frame.
@@ -884,7 +893,7 @@ public final class OverlayCoordinator: NSObject {
                 containing: point,
                 hasSupportedPayload: true,
                 in: layouts
-            ) {
+            ), !suppressesHover(on: triggerLayout.displayID) {
                 let changedDisplay = activeDisplayID != triggerLayout.displayID
                 activeDisplayID = triggerLayout.displayID
                 if changedDisplay, isVisible {
@@ -1116,8 +1125,8 @@ public final class OverlayCoordinator: NSObject {
     private func presentCurrentLayout(forcePresentPersistentPanels: Bool = false) {
         guard !isScreenLocked,
               !isScreenshotActive,
-              !isHoverActivationSuspended,
-              let layout = layout(for: activeDisplayID)
+              let layout = layout(for: activeDisplayID),
+              !suppressesHover(on: layout.displayID)
         else { return }
         // After repositioning to a different screen, don't let a pending collapse task on the old screen prematurely hide the shared panel.
         cancelPendingPanelCollapse()
@@ -1153,9 +1162,6 @@ public final class OverlayCoordinator: NSObject {
     private func updatePersistentPanels(forcePresent: Bool = false) {
         guard !isScreenLocked,
               !isScreenshotActive,
-              !isHoverActivationSuspended,
-              !isVoiceRecording,
-              !isTransientNoticePresented,
               isPersistentContentVisible,
               let persistentContentViewProvider,
               let persistentPanelFrameProvider
@@ -1165,15 +1171,19 @@ public final class OverlayCoordinator: NSObject {
         }
 
         let interactiveDisplayID: CGDirectDisplayID?
-        switch reducer.state.visibility {
-        case .expanded, .pinned:
+        if isVoiceRecording || isTransientNoticePresented {
             interactiveDisplayID = activeDisplayID
-        case .hidden, .collapsed:
-            interactiveDisplayID = nil
+        } else {
+            switch reducer.state.visibility {
+            case .expanded, .pinned:
+                interactiveDisplayID = activeDisplayID
+            case .hidden, .collapsed:
+                interactiveDisplayID = nil
+            }
         }
         var visibleDisplayIDs: Set<CGDirectDisplayID> = []
         for layout in layouts {
-            guard layout.displayID != interactiveDisplayID else {
+            guard layout.displayID != interactiveDisplayID, !suppressesHover(on: layout.displayID) else {
                 persistentPanels[layout.displayID]?.orderOut(nil)
                 continue
             }

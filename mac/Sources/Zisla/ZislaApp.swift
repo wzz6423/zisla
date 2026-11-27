@@ -282,9 +282,11 @@ enum PersistentPetNoticePolicy {
         _ notices: [IslandNotice],
         isVoiceRecording: Bool,
         voiceDisplayID: UInt32?,
-        displayID: UInt32
+        displayID: UInt32,
+        noticesEnabled: Bool = true
     ) -> [IslandNotice] {
-        if isVoiceRecording { return [] }
+        guard noticesEnabled else { return [] }
+        if isVoiceRecording, voiceDisplayID == nil || voiceDisplayID == displayID { return [] }
         guard let voiceDisplayID, voiceDisplayID != displayID else { return notices }
         return notices.filter { !$0.id.hasPrefix("voice-processing-") }
     }
@@ -465,11 +467,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     model.aiResultSweep.presentationNotices(from: model.notices.left + model.notices.right),
                     isVoiceRecording: model.voiceInput.isCapturingInput,
                     voiceDisplayID: self?.voiceRecordingDisplayID,
-                    displayID: layout.displayID
+                    displayID: layout.displayID,
+                    noticesEnabled: model.settingsStore.settings.resolvedActivityNoticeDisplayIDs(
+                        from: Set(NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)).map(\.displayID))
+                    ).contains(layout.displayID)
                 )
                 return CollapsedPetLayout.frame(
                     for: layout,
-                    compactBarFrame: SideNoticeLayoutEngine().compactBarFrame(
+                    compactBarFrame: layout.style == .pill ? layout.collapsedFrame : SideNoticeLayoutEngine().compactBarFrame(
                         for: layout,
                         notices: notices,
                         settings: model.settingsStore.settings.islandSettings(for: layout),
@@ -484,7 +489,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 hostingView.rootView = persistentPetRootView(layout)
             }
         )
-        coordinator.onVisibilityChanged = { [weak self] visible in
+        coordinator.onVisibilityChanged = { [weak self, weak coordinator] visible in
             let wasVisible = model.isIslandVisible
             if visible && !wasVisible {
                 self?.contextNoteController?.prepareShelfCapture(at: NSEvent.mouseLocation)
@@ -504,7 +509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     self?.islandClipboardHandoffTask = nil
                 }
             }
-            self?.noticePresenter?.setIslandExpanded(visible)
+            self?.noticePresenter?.setIslandExpanded(visible, on: coordinator?.activeDisplayID)
             if visible {
                 self?.flushVoiceRecordingPanelRestore()
                 model.clipboardAssistant.dismiss(animated: false)
@@ -525,6 +530,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         coordinator.onActiveLayoutChanged = { [weak self] layout in
             model.islandScreenLayout = layout
+            self?.noticePresenter?.setIslandExpanded(model.isIslandVisible, on: layout?.displayID)
             if let displayID = layout?.displayID { self?.noticePresenter?.publishCompactLayout(on: displayID) }
         }
         coordinator.onPinnedChanged = { pinned in model.isPinned = pinned }
@@ -653,8 +659,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         model.clipboardAssistant.onPresentationChanged = { [weak self, weak coordinator] visible in
             if visible { model.clearUserCareMessage() }
-            coordinator?.setHoverActivationSuspended(visible)
-            self?.noticePresenter?.setClipboardAssistantVisible(visible)
+            let displayID = model.clipboardAssistant.presentationDisplayID
+            coordinator?.setHoverActivationSuspended(visible, on: displayID)
+            self?.noticePresenter?.setClipboardAssistantVisible(visible, on: displayID)
         }
         coordinator.setPersistentContentVisible(model.settingsStore.settings.petEnabled)
         coordinator.setCollapsedOnTop(model.settingsStore.settings.islandCollapsedOnTop)
@@ -929,7 +936,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     if recording {
-                        self.noticePresenter?.setVoiceRecording(true)
                         let model = AppModel.shared
                         self.voiceRecordingSavedPanelSize = Self.expandedPanelSize(
                             module: model.selectedModule,
@@ -947,6 +953,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         self.expandedSizeUpdateTask?.cancel()
                         self.pendingVoiceRecordingPanelRestore = nil
                         self.overlayCoordinator?.setVoiceRecording(true)
+                        let voiceDisplayID = self.overlayCoordinator?.activeDisplayID
+                        self.voiceRecordingDisplayID = voiceDisplayID
+                        self.noticePresenter?.setVoiceRecording(true, on: voiceDisplayID)
+                        self.noticePresenter?.setVoiceProcessingDisplayID(voiceDisplayID)
                         // Read the collapsed pill metrics only after `setVoiceRecording` resolved the
                         // active display: before the island has ever been presented they still hold
                         // the launch defaults, which sizes the first take's surface wrong.
@@ -957,11 +967,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         ).panelSize
                         self.overlayCoordinator?.updateExpandedSize(recordingSize)
                         self.lastAppliedPanelSize = recordingSize
-                        // Scope the post-recording processing indicator to the display where
-                        // dictation happened.
-                        let voiceDisplayID = self.overlayCoordinator?.activeDisplayID
-                        self.voiceRecordingDisplayID = voiceDisplayID
-                        self.noticePresenter?.setVoiceProcessingDisplayID(voiceDisplayID)
                     } else {
                         let model = AppModel.shared
                         self.overlayCoordinator?.setVoiceRecording(false)
@@ -989,9 +994,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .combineLatest(model.aiResultSweep.$current)
             .map { message, sweep in AIResultSweepController.presentationMessage(message, sweep: sweep) }
             .removeDuplicates()
-            .sink { [weak self, weak coordinator] message in
+            .combineLatest(model.$islandScreenLayout.map { $0?.displayID }.removeDuplicates())
+            .sink { [weak self, weak coordinator] message, displayID in
                 Task { @MainActor [weak self, weak coordinator] in
-                    self?.noticePresenter?.setTransientNoticePresented(message != nil, message: message)
+                    self?.noticePresenter?.setTransientNoticePresented(message != nil, message: message, on: displayID)
                     coordinator?.setTransientNoticePresented(message != nil)
                 }
             }

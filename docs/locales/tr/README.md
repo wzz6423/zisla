@@ -102,7 +102,7 @@ swift run zisla
 ## İşinizi bölmemek için tasarlandı
 
 - Mevcut uygulamayı etkinleştirmeden veya odağını almadan birden çok ekranı, Spaces'ı ve normal tam ekran uygulamalarını destekler.
-- Birden çok ekran bağlıyken Ayarlar → Genel → Ekran Modları bölümünde her ekran için Dynamic Island modu (kamera veya özel konum), çentik modu ya da gizleme seçilebilir. Tek ekranda bu ayar gizlenir ve genel görünüm kullanılır; yeniden bağlanınca her ekranın kayıtlı yapılandırması geri yüklenir.
+- Birden çok ekran bağlıyken Ayarlar → Genel → Ekran Modları bölümünde her ekran için Dynamic Island modu (kamera veya özel konum), çentik modu ya da gizleme seçilebilir. Tek ekranda bu ayar gizlenir ve genel görünüm kullanılır; yeniden bağlanınca her ekranın kayıtlı yapılandırması geri yüklenir. Görünür tüm ekranlarda daraltılmış ada aynı anda görünür kalır. Genişletme, hızlı işlemler, kayıt ve geçici mesajlar yalnızca kendi ekranlarındaki adanın yerini alır; bildirim ekranı seçimi boşta duran adayı gizlemeden içeriği filtreler.
 - Gizli durumda kalıcı saydam tetikleme penceresi veya kare döngüsü yoktur; genel olay izleme ve geometrik denetimler genişlemeyi tetikler.
 - Tek sistem malzemesi kullanır; Saydamlığı Azalt açıkken opak arka plana geçer.
 - Fiziksel çentiği sistemin güvenli alanından algılar; çentiksiz harici ekranlarda aynı hatlara sahip kaplama kullanır.
