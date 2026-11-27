@@ -35,7 +35,7 @@ struct PermissionsSettingsViewTests {
     func grantedSystemPermissionsRefreshAfterRevocationAndRecovery() async throws {
         let fixture = Fixture()
         defer { fixture.close() }
-        let permissions: [OnboardingPermissionID] = [.systemAudio, .automation, .files, .fullDiskAccess]
+        let permissions: [OnboardingPermissionID] = [.systemAudio, .location, .automation, .files, .fullDiskAccess]
         for permission in permissions { fixture.statuses[permission] = .granted }
         await fixture.layout()
         for permission in permissions { #expect(fixture.button(permission) == nil) }

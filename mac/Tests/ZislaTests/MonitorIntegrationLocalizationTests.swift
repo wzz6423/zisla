@@ -65,6 +65,7 @@ struct MonitorIntegrationLocalizationTests {
         )
         let table = try #require(NSDictionary(contentsOf: url) as? [String: String])
         let purpose = try #require(table["NSLocationWhenInUseUsageDescription"])
+        #expect(table["NSLocationUsageDescription"] == purpose)
         let networkName = switch language {
         case .german: "WLAN"
         case .dutch: "wifi"
@@ -78,6 +79,7 @@ struct MonitorIntegrationLocalizationTests {
             let plistURL = Self.packageRoot.appendingPathComponent("Resources/Info.plist")
             let plist = try #require(NSDictionary(contentsOf: plistURL) as? [String: Any])
             #expect(plist["NSLocationWhenInUseUsageDescription"] as? String == purpose)
+            #expect(plist["NSLocationUsageDescription"] as? String == purpose)
         }
     }
 

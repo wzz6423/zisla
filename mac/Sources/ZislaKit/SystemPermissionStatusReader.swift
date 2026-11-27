@@ -7,7 +7,7 @@ struct SystemPermissionStatusReader: Sendable {
     private let preflight: @Sendable (String) -> Int?
     private let automation: @Sendable (String, Bool) -> OSStatus
     private let runningApplications: @Sendable () -> Set<String>
-    private let fullDiskAccess: @Sendable () -> OnboardingPermissionStatus
+    private let probeFullDiskAccess: @Sendable () -> OnboardingPermissionStatus
 
     init(
         preflight: @escaping @Sendable (String) -> Int? = TCCPermissionPreflight.read,
@@ -22,7 +22,7 @@ struct SystemPermissionStatusReader: Sendable {
         self.preflight = preflight
         self.automation = automation
         self.runningApplications = runningApplications
-        self.fullDiskAccess = fullDiskAccess
+        self.probeFullDiskAccess = fullDiskAccess
     }
 
     func read(_ id: OnboardingPermissionID) -> OnboardingPermissionStatus {
@@ -46,6 +46,11 @@ struct SystemPermissionStatusReader: Sendable {
         default:
             return .unknown
         }
+    }
+
+    private func fullDiskAccess() -> OnboardingPermissionStatus {
+        let status = Self.preflightStatus(preflight("kTCCServiceSystemPolicyAllFiles"))
+        return status == .unknown ? probeFullDiskAccess() : status
     }
 
     private static let automationTargets = [
@@ -80,20 +85,29 @@ struct SystemPermissionStatusReader: Sendable {
     }
 
     static func fullDiskAccessStatus(
-        path: String = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/com.apple.TCC/TCC.db").path,
+        paths: [String] = [
+            FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/com.apple.TCC/TCC.db").path,
+            "/Library/Application Support/com.apple.TCC/TCC.db",
+        ],
         openFile: (String, Int32) -> Int32 = { Darwin.open($0, $1) },
         errorCode: () -> Int32 = { errno },
         closeFile: (Int32) -> Void = { _ = Darwin.close($0) }
     ) -> OnboardingPermissionStatus {
-        // Open and immediately close a protected canary; never inspect the user's permission records.
-        let descriptor = openFile(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
-        if descriptor >= 0 {
-            closeFile(descriptor)
-            return .granted
+        // The per-user database may not exist. Only open and close a protected file, without reading its contents.
+        for path in paths {
+            let descriptor = openFile(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+            if descriptor >= 0 {
+                closeFile(descriptor)
+                return .granted
+            }
+            switch errorCode() {
+            case ENOENT: continue
+            case EACCES, EPERM: return .denied
+            default: return .unknown
+            }
         }
-        let error = errorCode()
-        return error == EACCES || error == EPERM ? .denied : .unknown
+        return .unknown
     }
 }
 

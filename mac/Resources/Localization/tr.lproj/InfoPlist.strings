@@ -2,6 +2,7 @@
 "NSAudioCaptureUsageDescription" = "zisla, medya oynatılırken, bir uygulamanın ses düzeyini ayarladığınızda veya ekran kaydı için sistem sesini etkinleştirdiğinizde sistem sesini okuyarak dalga biçimini gösterir, ses düzeyini ayarlar veya çalınan sesi kaydeder.";
 "NSCameraUsageDescription" = "zisla kamerayı yalnızca aynayı açtığınızda veya ekran kaydı için kamera katmanını etkinleştirdiğinizde kullanır.";
 "NSRemindersFullAccessUsageDescription" = "zisla, takvim etkinlikleriyle birlikte göstermek için tarihli hatırlatıcıları okur.";
+"NSLocationUsageDescription" = "zisla, yerel hava durumunu, yer adlarını ve yakındaki Wi-Fi ağlarını göstermek için konum erişimine ihtiyaç duyar.";
 "NSLocationWhenInUseUsageDescription" = "zisla, yerel hava durumunu, yer adlarını ve yakındaki Wi-Fi ağlarını göstermek için konum erişimine ihtiyaç duyar.";
 "NSMicrophoneUsageDescription" = "zisla yalnızca ses girişini başlattığınızda veya ekran kaydı için mikrofonu etkinleştirdiğinizde ses kaydeder.";
 "NSSpeechRecognitionUsageDescription" = "zisla bilinçli olarak kaydettiğiniz konuşmayı metne dönüştürür ve ekran kaydı altyazıları oluşturduğunuzda aygıtta yazıya döker.";

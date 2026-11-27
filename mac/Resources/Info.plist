@@ -74,6 +74,8 @@
   <string>zisla 需要读取带日期的提醒事项并与日历事件一起展示。</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSLocationUsageDescription</key>
+    <string>zisla 需要定位权限来显示本地天气、地区名称和附近的 Wi-Fi 网络。</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>zisla 需要定位权限来显示本地天气、地区名称和附近的 Wi-Fi 网络。</string>
     <key>NSMicrophoneUsageDescription</key>

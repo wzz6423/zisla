@@ -1,12 +1,56 @@
 import AppKit
+import CoreLocation
 import Darwin
 import Foundation
 import Testing
 
 @testable import ZislaKit
 
+private final class PermissionLocationManager: CLLocationManager {
+    var reportedStatus: CLAuthorizationStatus = .notDetermined
+    override var authorizationStatus: CLAuthorizationStatus { reportedStatus }
+    override func requestWhenInUseAuthorization() { Issue.record("A status read must not request access") }
+    override func requestLocation() { Issue.record("A status read must not request coordinates") }
+}
+
 @MainActor
 struct SystemPermissionStatusReaderTests {
+    @Test
+    func locationReadsUseTheLatestDelegateDecisionWithoutRequestingCoordinatesOrAccess() {
+        let manager = PermissionLocationManager()
+        let system = OnboardingSystemPermissions(makeLocationManager: { manager }, locationServicesEnabled: { true })
+        let decisions: [(CLAuthorizationStatus, OnboardingPermissionStatus)] = [
+            (.authorizedAlways, .granted), (.denied, .denied), (.restricted, .restricted), (.notDetermined, .notDetermined),
+        ]
+        for (native, expected) in decisions {
+            var state: OnboardingPermissionStatus?
+            system.read(.location) { state = $0 }
+            #expect(state == nil)
+            manager.reportedStatus = native
+            manager.delegate?.locationManagerDidChangeAuthorization?(manager)
+            #expect(state == expected)
+        }
+    }
+
+    @Test
+    func aNewLocationReadSupersedesAnOlderOneAndSurvivesUnrelatedRequestCleanup() {
+        let old = PermissionLocationManager()
+        let current = PermissionLocationManager()
+        var nextManager = old
+        let system = OnboardingSystemPermissions(makeLocationManager: { nextManager }, locationServicesEnabled: { false })
+        var state: OnboardingPermissionStatus?
+        system.read(.location) { _ in Issue.record("The superseded read delivered a stale decision") }
+        nextManager = current
+        system.read(.location) { state = $0 }
+        system.cancel()
+        old.reportedStatus = .authorizedAlways
+        system.locationManagerDidChangeAuthorization(old)
+        #expect(state == nil)
+        current.reportedStatus = .denied
+        current.delegate?.locationManagerDidChangeAuthorization?(current)
+        #expect(state == .unavailable)
+    }
+
     @Test(
         arguments: [OnboardingPermissionID.systemAudio, .automation, .files, .fullDiskAccess],
         [OnboardingPermissionStatus.granted, .denied, .unknown, .partiallyGranted]
@@ -98,7 +142,10 @@ struct SystemPermissionStatusReaderTests {
 
     @Test(arguments: [Int?(0), 1, 2, nil])
     func folderPermissionStatesMatchKnownAndUnknownSystemResults(result: Int?) {
-        let reader = SystemPermissionStatusReader(preflight: { _ in result }, fullDiskAccess: { .denied })
+        let reader = SystemPermissionStatusReader(
+            preflight: { $0 == "kTCCServiceSystemPolicyAllFiles" ? 1 : result },
+            fullDiskAccess: { .denied }
+        )
         let expected: OnboardingPermissionStatus = result == 0 ? .granted : result == 1 ? .denied : .unknown
         #expect(reader.read(.files) == expected)
     }
@@ -120,20 +167,58 @@ struct SystemPermissionStatusReaderTests {
     }
 
     @Test
-    func fullDiskAccessAlsoGrantsFilesWithoutReadingFolderContents() {
+    func confirmedFullDiskGrantCoversBothRowsWithoutOpeningPrivateFiles() {
         let reader = SystemPermissionStatusReader(
-            preflight: { _ in Issue.record("Full Disk Access already covers folder access"); return 1 },
+            preflight: { service in
+                #expect(service == "kTCCServiceSystemPolicyAllFiles")
+                return 0
+            },
+            fullDiskAccess: { Issue.record("A confirmed grant needs no file probe"); return .unknown }
+        )
+        #expect(reader.read(.fullDiskAccess) == .granted)
+        #expect(reader.read(.files) == .granted)
+    }
+
+    @Test
+    func revokedFullDiskAccessKeepsIndependentFolderGrants() {
+        let reader = SystemPermissionStatusReader(
+            preflight: { $0 == "kTCCServiceSystemPolicyDownloadsFolder" ? 0 : 1 },
+            fullDiskAccess: { .granted }
+        )
+        #expect(reader.read(.fullDiskAccess) == .denied)
+        #expect(reader.read(.files) == .partiallyGranted)
+    }
+
+    @Test(arguments: [Int?(2), nil])
+    func fullDiskAccessAlsoGrantsFilesWithoutReadingFolderContents(inconclusive: Int?) {
+        let reader = SystemPermissionStatusReader(
+            preflight: { service in
+                #expect(service == "kTCCServiceSystemPolicyAllFiles")
+                return inconclusive
+            },
             fullDiskAccess: { .granted }
         )
         #expect(reader.read(.files) == .granted)
         #expect(reader.read(.fullDiskAccess) == .granted)
     }
 
+    @Test
+    func missingUserDatabaseFallsBackToTheProtectedSystemDatabase() {
+        let systemPath = "/Library/Application Support/com.apple.TCC/TCC.db"
+        var closed: [Int32] = []
+        let status = SystemPermissionStatusReader.fullDiskAccessStatus(
+            openFile: { path, _ in path == systemPath ? 42 : -1 },
+            errorCode: { ENOENT }, closeFile: { closed.append($0) }
+        )
+        #expect(status == .granted)
+        #expect(closed == [42])
+    }
+
     @Test(arguments: [Int32(0), 42])
     func fullDiskAccessProbeClosesItsReadOnlyDescriptorWithoutReading(descriptor: Int32) {
         var closed: [Int32] = []
         let status = SystemPermissionStatusReader.fullDiskAccessStatus(
-            path: "/fake/permission-canary",
+            paths: ["/fake/permission-canary"],
             openFile: { path, flags in
                 #expect(path == "/fake/permission-canary")
                 #expect(flags == O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
@@ -150,7 +235,7 @@ struct SystemPermissionStatusReaderTests {
     func fullDiskAccessProbeDistinguishesDenialFromMissingFilesAndSystemFailures(error: Int32) {
         var closed: [Int32] = []
         let status = SystemPermissionStatusReader.fullDiskAccessStatus(
-            path: "/fake/permission-canary", openFile: { _, _ in -1 }, errorCode: { error },
+            paths: ["/fake/permission-canary"], openFile: { _, _ in -1 }, errorCode: { error },
             closeFile: { closed.append($0) }
         )
         #expect(status == (error == EACCES || error == EPERM ? .denied : .unknown))
@@ -171,14 +256,14 @@ struct SystemPermissionStatusReaderTests {
         let file = root.appendingPathComponent("canary")
         let bytes = Data("private-fixture-content".utf8)
         try bytes.write(to: file)
-        #expect(SystemPermissionStatusReader.fullDiskAccessStatus(path: file.path) == .granted)
+        #expect(SystemPermissionStatusReader.fullDiskAccessStatus(paths: [file.path]) == .granted)
         #expect(try Data(contentsOf: file) == bytes)
         let missing = root.appendingPathComponent("missing")
-        #expect(SystemPermissionStatusReader.fullDiskAccessStatus(path: missing.path) == .unknown)
+        #expect(SystemPermissionStatusReader.fullDiskAccessStatus(paths: [missing.path]) == .unknown)
         #expect(!FileManager.default.fileExists(atPath: missing.path))
         let link = root.appendingPathComponent("link")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
-        #expect(SystemPermissionStatusReader.fullDiskAccessStatus(path: link.path) == .unknown)
+        #expect(SystemPermissionStatusReader.fullDiskAccessStatus(paths: [link.path]) == .unknown)
         #expect(try Data(contentsOf: file) == bytes)
     }
 }

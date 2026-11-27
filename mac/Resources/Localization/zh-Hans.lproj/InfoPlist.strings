@@ -3,6 +3,7 @@
 "NSBluetoothAlwaysUsageDescription" = "zisla 仅在你打开电池页面时读取已连接或已配对蓝牙设备公开的电量信息。";
 "NSCameraUsageDescription" = "zisla 仅在你打开镜子或启用录屏摄像头叠加时使用摄像头。";
 "NSRemindersFullAccessUsageDescription" = "zisla 需要读取带日期的提醒事项并与日历事件一起展示。";
+"NSLocationUsageDescription" = "zisla 需要定位权限来显示本地天气、地区名称和附近的 Wi-Fi 网络。";
 "NSLocationWhenInUseUsageDescription" = "zisla 需要定位权限来显示本地天气、地区名称和附近的 Wi-Fi 网络。";
 "NSMicrophoneUsageDescription" = "zisla 仅在你主动语音输入或启用录屏麦克风时录音。";
 "NSSpeechRecognitionUsageDescription" = "zisla 需要将你主动录入的语音转为文字，并在你生成录屏字幕时在本机转写。";
