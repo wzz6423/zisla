@@ -141,27 +141,35 @@ final class MediaAppSpecialist {
         return Self.qqMusicPlaybackModeControl(pid: pid)?.mode
     }
 
-    /// Apple Music and Spotify use their public scripting dictionaries; QQ Music prioritises pressable menu items.
-    func sendPlaybackCommand(
+    func sendScriptedPlaybackCommand(
+        _ command: NowPlayingService.Command,
+        bundleIdentifier: String?
+    ) -> Bool {
+        guard let script = Self.playbackScript(for: command, bundleIdentifier: bundleIdentifier) else { return false }
+        return Self.runAppleScript(script)
+    }
+
+    func prepareQQMusicPlaybackCommand(
         _ command: NowPlayingService.Command,
         pid: pid_t?,
         bundleIdentifier: String?
-    ) -> Bool? {
-        if let script = Self.playbackScript(for: command, bundleIdentifier: bundleIdentifier) {
-            return Self.runAppleScript(script) ? true : nil
-        }
+    ) -> (@Sendable () -> Bool)? {
         guard bundleIdentifier == Self.qqMusicBundleIdentifier,
               let pid,
-              hasQQMusicAccessibilityAccess(),
-              let labels = Self.qqMusicMenuLabels(for: command)
+              let labels = Self.qqMusicMenuLabels(for: command),
+              hasQQMusicAccessibilityAccess()
         else { return nil }
-        if Self.performQQMusicMenuCommand(pid: pid, matching: labels) {
-            return true
+        return {
+            if let menuBar = Self.elementAttribute(kAXMenuBarAttribute, of: AXUIElementCreateApplication(pid)),
+               let item = Self.findQQMusicMenuItem(in: menuBar, depth: 0, matching: labels),
+               Self.performPress(on: item, pid: pid) {
+                return true
+            }
+            guard let button = Self.qqMusicControlRoots(pid: pid).lazy.compactMap({
+                Self.findButton(in: $0, depth: 0, matching: labels)
+            }).first else { return false }
+            return Self.performPress(on: button, pid: pid)
         }
-        guard let button = Self.qqMusicControlRoots(pid: pid).lazy.compactMap({
-            Self.findButton(in: $0, depth: 0, matching: labels)
-        }).first else { return nil }
-        return Self.performPress(on: button, pid: pid) ? true : nil
     }
 
     /// Apple Music's mode property is writable in its public scripting dictionary; other players continue through their own control channels.

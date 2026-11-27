@@ -798,6 +798,146 @@ struct NowPlayingServiceTests {
         #expect(NowPlayingService.optimisticPlaybackValue(after: .next, current: true) == nil)
     }
 
+    @Test @MainActor
+    func qqMusicPauseKeepsTheMainThreadResponsive() async {
+        let release = DispatchSemaphore(value: 0)
+        let service = qqMusicPlaybackService(sendCommand: { _, _ in
+            Issue.record("A successful Accessibility command must not toggle playback a second time")
+            return false
+        }) { command, pid, bundleIdentifier in
+            #expect(command == .togglePlayPause)
+            #expect(pid == 2_000_101)
+            #expect(bundleIdentifier == "com.tencent.QQMusicMac")
+            return {
+                DispatchQueue.main.async { release.signal() }
+                let result = release.wait(timeout: .now() + 2)
+                #expect(result == .success, "The main thread must respond while QQ Music is handling the pause")
+                return true
+            }
+        }
+
+        #expect(service.send(.togglePlayPause))
+        await service.qqMusicPlaybackTask?.value
+        #expect(service.snapshot == nil)
+    }
+
+    @Test(arguments: [true, false], [true, false]) @MainActor
+    func qqMusicPauseUsesRemoteFallbackWhenAccessibilityIsUnavailable(canPrepare: Bool, remoteAccepts: Bool) async {
+        let acceptPause: NowPlayingService.SendCommandFunction = { command, _ in
+            command == NowPlayingService.Command.togglePlayPause.rawValue
+        }
+        let reject: NowPlayingService.SendCommandFunction = { _, _ in false }
+        let service = qqMusicPlaybackService(sendCommand: remoteAccepts ? acceptPause : reject) { _, _, _ in
+            guard canPrepare else { return nil }
+            return { false }
+        }
+
+        #expect(service.send(.togglePlayPause) == (canPrepare || remoteAccepts))
+        await service.qqMusicPlaybackTask?.value
+        #expect((service.snapshot == nil) == remoteAccepts)
+    }
+
+    enum PendingQQMusicChange: CaseIterable {
+        case track, playerProcess, sourcePreference, serviceStop
+    }
+
+    @Test(arguments: PendingQQMusicChange.allCases, [true, false]) @MainActor
+    func lateQQMusicPauseLeavesTheCurrentPlaybackAlone(change: PendingQQMusicChange, accessibilitySucceeds: Bool) async throws {
+        let entered = AsyncStream<Void>.makeStream()
+        let release = DispatchSemaphore(value: 0)
+        defer { release.signal(); entered.continuation.finish() }
+        let service = qqMusicPlaybackService(sendCommand: { _, _ in
+            Issue.record("A late failure must not send a global command to the current player")
+            return false
+        }) { _, _, _ in
+            {
+                entered.continuation.yield(())
+                #expect(release.wait(timeout: .now() + 2) == .success)
+                return accessibilitySucceeds
+            }
+        }
+        #expect(service.send(.togglePlayPause))
+        let pending = try #require(service.qqMusicPlaybackTask)
+        for await _ in entered.stream { break }
+
+        switch change {
+        case .track, .playerProcess:
+            service.consumeAdapterPayload(MediaRemoteAdapterPayload(
+                title: change == .track ? "New track" : "Track", artist: "Artist", playing: true,
+                processIdentifier: change == .playerProcess ? 2_000_102 : 2_000_101, bundleIdentifier: "com.tencent.QQMusicMac"
+            ), from: [])
+        case .sourcePreference:
+            service.setPreferredSource(.spotify)
+            service.setPreferredSource(.automatic)
+        case .serviceStop:
+            service.stop()
+            service.consumeAdapterPayload(MediaRemoteAdapterPayload(
+                title: "Track", artist: "Artist", playing: true,
+                processIdentifier: 2_000_101, bundleIdentifier: "com.tencent.QQMusicMac"
+            ), from: [])
+        }
+        release.signal()
+        await pending.value
+        #expect(service.snapshot?.isPlaying == true)
+    }
+
+    @Test @MainActor
+    func queuedQQMusicCommandsDoNotOvertakeOrResumeAPausedPlayer() async {
+        let commands = AsyncStream<NowPlayingService.Command>.makeStream()
+        let service = qqMusicPlaybackService { command, _, _ in
+            {
+                commands.continuation.yield(command)
+                return true
+            }
+        }
+
+        #expect(service.send(.next))
+        #expect(service.send(.previous))
+        #expect(service.send(.togglePlayPause))
+        #expect(service.send(.togglePlayPause))
+        await service.qqMusicPlaybackTask?.value
+        commands.continuation.finish()
+        var received: [NowPlayingService.Command] = []
+        for await command in commands.stream { received.append(command) }
+        #expect(received == [.next, .previous, .togglePlayPause])
+        #expect(service.snapshot == nil)
+    }
+
+    @Test @MainActor
+    func queuedQQMusicPauseSkipsAPlayerThatIsNoLongerSelected() async throws {
+        let service = qqMusicPlaybackService { _, _, _ in
+            {
+                Issue.record("A queued pause must not press a control in the previous player")
+                return true
+            }
+        }
+        #expect(service.send(.togglePlayPause))
+        let pending = try #require(service.qqMusicPlaybackTask)
+        service.consumeAdapterPayload(MediaRemoteAdapterPayload(
+            title: "Track", artist: "Artist", playing: true,
+            processIdentifier: 2_000_102, bundleIdentifier: "com.spotify.client"
+        ), from: [])
+        await pending.value
+        #expect(service.snapshot?.sourceBundleIdentifier == "com.spotify.client")
+    }
+
+    @MainActor
+    private func qqMusicPlaybackService(
+        sendCommand: NowPlayingService.SendCommandFunction? = nil,
+        prepare: @escaping NowPlayingService.PrepareQQMusicPlaybackCommand
+    ) -> NowPlayingService {
+        let service = NowPlayingService(
+            loadLyrics: { _, _, _ in LyricsSearchResult(lyrics: nil, artistName: nil) },
+            sendCommand: sendCommand,
+            prepareQQMusicPlaybackCommand: prepare
+        )
+        service.consumeAdapterPayload(MediaRemoteAdapterPayload(
+            title: "Track", artist: "Artist", playing: true,
+            processIdentifier: 2_000_101, bundleIdentifier: "com.tencent.QQMusicMac"
+        ), from: [])
+        return service
+    }
+
     @Test
     func favoriteStateMatchesTheSelectedRemoteControl() throws {
         let likedDictionary: NSDictionary = [
