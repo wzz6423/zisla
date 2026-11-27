@@ -3554,9 +3554,9 @@ final class AppModel: ObservableObject {
         clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
         if settings.aiProgressEnabled {
             aiMonitor.configureAccountBalanceProviders(settings.aiAccountBalanceMonitoredProviders,
-                                                      qoderRegions: settings.aiAccountBalanceQoderRegions,
-                                                      antigravityGroups: settings.aiAccountBalanceMonitoredAntigravityGroups,
-                                                      geminiSources: settings.aiAccountBalanceMonitoredGeminiSources)
+                                                       qoderRegions: settings.aiAccountBalanceQoderRegions,
+                                                       antigravityGroups: settings.aiAccountBalanceMonitoredAntigravityGroups,
+                                                       geminiSources: settings.aiAccountBalanceMonitoredGeminiSources)
             aiMonitor.start()
             if selectedModule == .aiMonitor {
                 aiMonitor.loadUsageHistory()

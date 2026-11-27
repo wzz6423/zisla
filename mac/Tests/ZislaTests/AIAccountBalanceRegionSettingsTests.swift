@@ -147,8 +147,8 @@ struct AIAccountBalanceRegionSettingsTests {
 private struct AntigravityStatusDetector: AIAccountBalanceDetecting {
     func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>) async throws -> [AIAccountBalance] {
         AIAccountBalanceCatalog.antigravityBalances(.init(id: "antigravity", providers: [.antigravity], status: .available,
-                                                        windows: [.init(id: "additional:claude-gpt:weekly", kind: .weekly,
-                                                                        remainingPercent: 80, durationSeconds: 604_800, name: "Claude/GPT")])).reversed()
+                                                          windows: [.init(id: "additional:claude-gpt:weekly", kind: .weekly,
+                                                                          remainingPercent: 80, durationSeconds: 604_800, name: "Claude/GPT")])).reversed()
     }
 }
 

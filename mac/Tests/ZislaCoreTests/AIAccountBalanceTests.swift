@@ -10,10 +10,10 @@ struct AIAccountBalanceTests {
         #expect(cli.providerTitle(language: .english) == "Gemini CLI" && app.providerTitle(language: .english) == "Gemini App")
         #expect(cli.noticeID != app.noticeID)
         let rows = AIAccountBalanceCatalog.displayedBalances([cli, app], monitoredProviders: [.gemini], displayedProviders: [.gemini],
-                                                            monitoredGeminiSources: [.app], displayedGeminiSources: [.app])
+                                                             monitoredGeminiSources: [.app], displayedGeminiSources: [.app])
         #expect(rows == [app])
         #expect(AIAccountBalanceCatalog.displayedBalances([cli, app], monitoredProviders: [.gemini], displayedProviders: [.gemini],
-                                                         monitoredGeminiSources: [.app], displayedGeminiSources: [.cli]).isEmpty)
+                                                          monitoredGeminiSources: [.app], displayedGeminiSources: [.cli]).isEmpty)
         let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"aiAccountBalanceMonitoredProviders":["gemini"],"aiAccountBalanceDisplayedProviders":["gemini"]}"#.utf8))
         #expect(legacy.aiAccountBalanceMonitoredProviders == [.gemini])
         #expect(legacy.aiAccountBalanceMonitoredGeminiSources == [.cli, .app] && legacy.aiAccountBalanceDisplayedGeminiSources == [.cli, .app])
@@ -290,7 +290,7 @@ struct AIAccountBalanceTests {
         let window = AIAccountQuotaWindow(id: "additional:argon:five_hour", kind: .fiveHours,
                                           remainingPercent: 60, durationSeconds: 18_000, name: "Gemini 4 Argon")
         let rows = AIAccountBalanceCatalog.antigravityBalances(.init(id: "antigravity", providers: [.antigravity],
-                                                                    status: .available, windows: [window]))
+                                                                     status: .available, windows: [window]))
         #expect(rows[0].quotaGroup == "gemini" && rows[0].windows == [window])
         #expect(rows[0].fiveHourWindow == nil && rows[0].weeklyWindow == nil)
         #expect(rows[0].compactLines(language: .english).joined().contains("Gemini 4 Argon"))
@@ -328,14 +328,14 @@ struct AIAccountBalanceTests {
         ])
         let rows = AIAccountBalanceCatalog.antigravityBalances(sample)
         let shown = AIAccountBalanceCatalog.displayedBalances(rows, monitoredProviders: [.antigravity], displayedProviders: [.antigravity],
-                                                             monitoredAntigravityGroups: [.gemini, .claudeGPT], displayedAntigravityGroups: [.gemini])
+                                                              monitoredAntigravityGroups: [.gemini, .claudeGPT], displayedAntigravityGroups: [.gemini])
         #expect(shown.map(\.quotaGroup) == ["gemini"])
         #expect(rows[1].matchesAntigravityGroups([.claudeGPT]))
         #expect(!rows[1].matchesAntigravityGroups([.gemini]))
         #expect(AIAccountBalanceCatalog.displayedBalances(rows, monitoredProviders: [.antigravity], displayedProviders: [.antigravity],
-                                                         monitoredAntigravityGroups: [.claudeGPT], displayedAntigravityGroups: [.gemini]).isEmpty)
+                                                          monitoredAntigravityGroups: [.claudeGPT], displayedAntigravityGroups: [.gemini]).isEmpty)
         #expect(AIAccountBalanceCatalog.displayedBalances(rows, monitoredProviders: [.antigravity], displayedProviders: [.antigravity],
-                                                         displayedAntigravityGroups: []).isEmpty)
+                                                          displayedAntigravityGroups: []).isEmpty)
     }
 
     @Test func antigravitySettingsMigrateDefaultsAndPreserveEmptyOrUnknownSelections() throws {

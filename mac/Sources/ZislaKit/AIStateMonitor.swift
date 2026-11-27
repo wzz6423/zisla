@@ -528,8 +528,8 @@ public final class AIStateMonitor: ObservableObject {
 
     /// Invalidates old provider/region work and removes stale selection immediately, before the next query completes.
     public func configureAccountBalanceProviders(_ providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion> = [.global],
-                                                antigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
-                                                geminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases)) {
+                                                 antigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
+                                                 geminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases)) {
         #if DEBUG
             let fixtures = AIAccountBalanceDebug.balances(environment: debugEnvironment, now: now())
             let providers = fixtures.map { Set($0.flatMap(\.providers)) } ?? providers

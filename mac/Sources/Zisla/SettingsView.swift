@@ -1772,10 +1772,10 @@ struct SettingsView: View {
                                     AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: .antigravity,
                                                                    language: model.languageStore.language, antigravityGroup: group)
                                     Toggle(AppLocalization.text("监控额度"), isOn: Self.antigravityGroupBinding(group, monitored: true,
-                                                                                                         settings: $settingsStore.settings))
+                                                                                                            settings: $settingsStore.settings))
                                         .toggleStyle(.switch).fixedSize()
                                     Toggle(AppLocalization.text("展示额度"), isOn: Self.antigravityGroupBinding(group, monitored: false,
-                                                                                                         settings: $settingsStore.settings))
+                                                                                                            settings: $settingsStore.settings))
                                         .toggleStyle(.switch).fixedSize()
                                 }
                                 .disabled(!settingsStore.settings.aiAccountBalanceMonitoredProviders.contains(.antigravity))
@@ -1788,10 +1788,10 @@ struct SettingsView: View {
                                     AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: .gemini,
                                                                    language: model.languageStore.language, geminiSource: source)
                                     Toggle(AppLocalization.text("监控额度"), isOn: Self.geminiSourceBinding(source, monitored: true,
-                                                                                                      settings: $settingsStore.settings))
+                                                                                                        settings: $settingsStore.settings))
                                         .toggleStyle(.switch).fixedSize()
                                     Toggle(AppLocalization.text("展示额度"), isOn: Self.geminiSourceBinding(source, monitored: false,
-                                                                                                      settings: $settingsStore.settings))
+                                                                                                        settings: $settingsStore.settings))
                                         .toggleStyle(.switch).fixedSize()
                                 }
                                 .disabled(!settingsStore.settings.aiAccountBalanceMonitoredProviders.contains(.gemini))
@@ -3576,7 +3576,7 @@ struct SettingsView: View {
     }
 
     static func antigravityGroupBinding(_ group: AIAccountBalanceAntigravityGroup, monitored: Bool,
-                                       settings: Binding<FeatureSettings>) -> Binding<Bool> {
+                                        settings: Binding<FeatureSettings>) -> Binding<Bool> {
         let path: WritableKeyPath<FeatureSettings, Set<AIAccountBalanceAntigravityGroup>> = monitored
             ? \.aiAccountBalanceMonitoredAntigravityGroups : \.aiAccountBalanceDisplayedAntigravityGroups
         return Binding(get: { settings.wrappedValue[keyPath: path].contains(group) }, set: { selected in
