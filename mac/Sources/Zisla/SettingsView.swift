@@ -5118,11 +5118,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var iconColor: Color {
         switch self {
         case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
-        case .info, .dailyBriefing, .mail, .saveLocations, .networkProxy: Color(nsColor: .systemBlue)
+        case .info, .dailyBriefing, .mail, .saveLocations, .networkProxy, .weather: Color(nsColor: .systemBlue)
         case .clipboardAssistant, .screenshot, .imageTools, .ai, .recommendations: Color(nsColor: .systemIndigo)
         case .notifications, .recording, .pdfTools, .audioTools, .voice, .scheduledCleanup: Color(nsColor: .systemRed)
         case .workflow, .download, .updates: Color(nsColor: .systemGreen)
-        case .weather: Color(nsColor: .systemCyan)
         case .pet: Color(nsColor: .systemOrange)
         }
     }
@@ -5283,6 +5282,7 @@ struct SettingsSidebar: View {
                 }
                 .padding(.vertical, 4)
                 .padding(.trailing, 20)
+                .background(SidebarDocumentWidth().frame(width: 0, height: 0))
             }
             .scrollIndicators(.visible)
             .thinScrollChrome(visibleWhenScrollable: true)
@@ -5356,6 +5356,40 @@ struct SettingsSidebar: View {
         }
         .accessibilityLabel(AppLocalization.format("%@设置", locale: locale, [AppLocalization.string(section.title, locale: locale)]))
         .accessibilityAddTraits(input.selection == section ? .isSelected : [])
+    }
+
+    private struct SidebarDocumentWidth: NSViewRepresentable {
+        func makeNSView(context: Context) -> Marker { Marker() }
+        func updateNSView(_ view: Marker, context: Context) { view.updateWidthConstraint() }
+
+        final class Marker: NSView {
+            private var widthConstraint: NSLayoutConstraint?
+            private var previousAutoresizingMaskTranslation = false
+
+            override func viewDidMoveToWindow() {
+                super.viewDidMoveToWindow()
+                updateWidthConstraint()
+            }
+
+            func updateWidthConstraint() {
+                let scroll = window == nil ? nil : enclosingScrollView
+                let document = scroll?.documentView
+                let clip = scroll?.contentView
+                guard widthConstraint?.firstItem !== document || widthConstraint?.secondItem !== clip else { return }
+
+                if let previous = widthConstraint?.firstItem as? NSView {
+                    widthConstraint?.isActive = false
+                    previous.translatesAutoresizingMaskIntoConstraints = previousAutoresizingMaskTranslation
+                }
+                widthConstraint = nil
+                guard let document, let clip else { return }
+                // The legacy scrollbar occupies part of SwiftUI's proposed document width.
+                previousAutoresizingMaskTranslation = document.translatesAutoresizingMaskIntoConstraints
+                document.translatesAutoresizingMaskIntoConstraints = false
+                widthConstraint = document.widthAnchor.constraint(equalTo: clip.widthAnchor)
+                widthConstraint?.isActive = true
+            }
+        }
     }
 
     private var settingsSearchField: some View {

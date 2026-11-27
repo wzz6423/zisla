@@ -33,6 +33,35 @@ struct SettingsSplitViewTests {
         #expect(!fixture.window.isVisible)
     }
 
+    @Test(arguments: [AppLanguage.english, .arabic])
+    func sidebarListScrollsVerticallyWithoutHorizontalMovement(language: AppLanguage) async throws {
+        let fixture = Fixture()
+        defer { fixture.close() }
+        fixture.state.language = language
+        fixture.state.isEnabled = true
+        await fixture.layout()
+
+        let split = try fixture.controller()
+        let view = split.splitViewItems[0].viewController.view
+        let scroll = try #require(fixture.descendants(in: view).compactMap { $0 as? NSScrollView }.first)
+        let clip = scroll.contentView
+        let initialWidth = view.frame.width
+        for width in [initialWidth, initialWidth + 80] {
+            split.splitView.setPosition(width, ofDividerAt: 0)
+            await fixture.layout()
+            #expect(view.frame.width == width)
+            let origin = clip.bounds.origin
+            for deltaX: CGFloat in [-60, 60] {
+                let target = clip.constrainBoundsRect(clip.bounds.offsetBy(dx: deltaX, dy: 60))
+                clip.scroll(to: target.origin)
+                scroll.reflectScrolledClipView(clip)
+                #expect(clip.bounds.minX == origin.x)
+            }
+            #expect(clip.bounds.minY > origin.y)
+            #expect(scroll.horizontalScrollElasticity != .allowed)
+        }
+    }
+
     @Test
     func nativeHistoryButtonsRestoreSearchAnchorsAndVoicePagesAndSkipDisabledFeatures() async throws {
         let fixture = Fixture()
