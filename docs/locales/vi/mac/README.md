@@ -34,7 +34,7 @@ Hỗ trợ macOS 14 trở lên. macOS 26 dùng Liquid Glass; 14/15 dùng vật l
 - **Nhập giọng nói:** Phím bật/tắt hoặc giữ để nói, phím toàn cục tự chọn, nhận dạng hệ thống, xử lý bản chép tại máy/từ xa, lịch sử ghi tại máy.
 - **Thao tác Nhanh:** Sau mỗi sao chép hiện đảo nhỏ với bản xem trước, mở liên kết, Finder, tìm với máy tìm kiếm chọn, dịch, tính, tạo sự kiện từ ngày và lưu chữ dài/ảnh. Tải xong/AirDrop dùng cùng phím mở thư mục, độc lập với tiến độ trình duyệt. Nhận URL, đường dẫn, email, điện thoại, màu CSS xem mẫu, tính, ngày giờ, ngôn ngữ khác hệ thống, mã, chữ có đếm, ảnh thu nhỏ, tham chiếu tệp. Kích hoạt bằng nút, Command+N bổ sung mặc định hoặc phím bổ trợ/nút chuột bên. Có cử chỉ “giữ trái + nhấp phải” sao chép nhanh tắt mặc định, danh sách chặn, công tắc loại, chế độ nhắc nhẹ.
 - **CLI và Skills:** Phát hiện/cài/cập nhật/gỡ CLI AI phổ biến, quản lý Skills tại Cài đặt.
-- **Thú cưng máy tính:** Chọn thú cưng có sẵn hoặc được nhập và đặt ở bên trái hoặc bên phải đảo. Khi bạn mở rộng đảo trên một màn hình, thú cưng trên các màn hình khác vẫn ở nguyên vị trí.
+- **Thú cưng máy tính:** Trong Cài đặt → Thú cưng, bạn có thể xem trước thú cưng có sẵn và thú cưng đã nhập. “Thú cưng cố định” luôn hiển thị con bạn chọn. Theo mặc định, “Luân phiên ngẫu nhiên” chọn từ tất cả thú cưng vào nửa đêm theo giờ địa phương. Mở “Danh sách chọn ngẫu nhiên” để thu hẹp danh sách. Chọn “Tùy chỉnh” trong “Khoảng thời gian đổi” để đặt từ 1 giây đến 99:59:59. Giá trị ban đầu là 1 giờ. Đặt thú cưng ở bên trái hoặc bên phải đảo. Khi bạn mở rộng đảo trên một màn hình, thú cưng trên các màn hình khác vẫn ở nguyên vị trí.
 - **Cập nhật:** Kênh Release hoặc Preview được chọn tra mã quốc gia của kết nối Internet công khai một lần mỗi lần mở ứng dụng. `CN` kiểm tra appcast Gitee đã ký trước rồi thử GitHub một lần; quốc gia khác kiểm tra GitHub trước rồi Gitee một lần. Nếu không tra được, vẫn ưu tiên Gitee. Sau đó Sparkle tải, xác minh, cài đặt và khởi động lại ứng dụng. Đổi kênh áp dụng cho cả kiểm tra tự động và thủ công.
 - **Giao diện và tương tác:** Cài đặt có thể theo giao diện hệ thống, sáng hoặc tối. Đảo hỗ trợ bề mặt trong suốt hoặc mờ, ghim trạng thái mở, nhiều màn hình, Spaces và màn hình ngoài không có phần khuyết.
 - **Mặc định:** Cài mới bật mô-đun; tính năng, chỉ báo thu gọn, thông báo bên, số liệu thanh menu, cập nhật điều chỉnh độc lập; cài cũ giữ cấu hình.
@@ -116,6 +116,8 @@ swift run zisla
 ```
 
 Ứng dụng khởi động như tiện ích thanh menu. Đưa con trỏ vào vùng 6 px ở giữa mép trên của màn hình hiện tại để mở đảo, hoặc chọn “Show Island” từ biểu tượng thanh menu.
+
+Để thử khoảng thời gian 5 giây trong bản gỡ lỗi, chạy `ZISLA_DEBUG_PET_ROTATION_SECONDS=5 make run` tại thư mục gốc của kho mã, bật “Luân phiên ngẫu nhiên” và chọn ít nhất hai thú cưng. Chạy `make update` mà không đặt biến để khôi phục khoảng thời gian đã lưu.
 
 ### Xây `.app`
 

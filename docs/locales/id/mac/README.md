@@ -34,7 +34,7 @@ macOS 14 dan lebih baru didukung. macOS 26 memakai Liquid Glass; macOS 14/15 mem
 - **Masukan suara:** Pintasan toggle atau tekan-untuk-bicara, pintasan global khusus, pengenalan ucapan sistem, pengolahan transkrip lokal/jarak jauh, dan riwayat rekaman lokal.
 - **Tindakan Cepat:** Setelah setiap penyalinan, notifikasi kecil bergaya pulau menampilkan pratinjau kaya dan tindakan sesuai isi: membuka tautan, menampilkan berkas di Finder, mencari dengan mesin pilihan, menerjemahkan, menghitung, membuat acara dari tanggal, serta menyimpan teks panjang atau gambar. Setelah unduhan selesai atau AirDrop diterima, pintasan yang sama membuka folder berkas; sakelar Tindakan Cepat mengendalikannya terpisah dari progres unduhan. Mengenali URL, jalur berkas, surel, nomor telepon, warna CSS dengan contoh langsung, aritmetika, tanggal/waktu, teks bukan bahasa sistem, cuplikan kode, teks dengan hitungan, gambar mini, dan referensi berkas. Pemicu berupa tombol tindakan, pintasan tambahan default Command+N, atau modifier/tombol samping yang diatur. Ada gestur salin “tahan kiri + klik kanan” yang nonaktif secara default, daftar blokir aplikasi, sakelar jenis pengenalan, dan mode pengingat ringan.
 - **Pengelolaan CLI dan Skills:** Mendeteksi, memasang, memperbarui, menghapus CLI AI umum, dan mengelola Skills lokal dari Pengaturan.
-- **Peliharaan desktop:** Pilih peliharaan bawaan atau impor dan letakkan di salah satu sisi pulau. Saat Anda membuka pulau di satu layar, hewan peliharaan di layar lain tetap di tempatnya.
+- **Peliharaan desktop:** Di Pengaturan → Pet, lihat pratinjau peliharaan bawaan dan yang diimpor. Mode Peliharaan tetap menampilkan satu peliharaan. Rotasi acak mengundi dari semua peliharaan kecuali Anda membatasi Daftar undian. Secara bawaan, undian berlangsung pada tengah malam waktu setempat. Pilih Kustom pada Interval pergantian untuk mengatur durasi dari 1 detik hingga 99:59:59. Nilai awalnya 1 jam. Letakkan peliharaan di sisi kiri atau kanan pulau. Saat Anda membuka pulau di satu layar, hewan peliharaan di layar lain tetap di tempatnya.
 - **Pembaruan:** Kanal Release atau Preview terpilih mencari kode negara koneksi publik sekali per peluncuran. `CN` memeriksa appcast Gitee bertanda tangan dahulu, lalu mencoba GitHub sekali; negara lain memeriksa GitHub dahulu lalu Gitee sekali. Jika pencarian gagal, Gitee tetap pertama. Sparkle kemudian mengunduh, memverifikasi, memasang, dan meluncurkan ulang. Perubahan kanal berlaku bagi pemeriksaan otomatis maupun manual.
 - **Tampilan dan interaksi:** Pengaturan mengikuti tema sistem, terang, atau gelap. Pulau mendukung permukaan transparan atau berkabut, pembukaan yang disematkan, banyak layar, Spaces, serta layar eksternal tanpa notch.
 - **Default:** Pemasangan baru mengaktifkan modul fitur. Fitur, indikator terlipat, pemberitahuan samping, metrik bilah menu, dan perilaku pembaruan dapat diatur sendiri-sendiri; pemasangan lama mempertahankan konfigurasi.
@@ -116,6 +116,8 @@ swift run zisla
 ```
 
 Aplikasi berjalan sebagai aksesori bilah menu. Masukkan penunjuk ke area 6 px di tengah atas layar saat ini atau pilih “Show Island” dari ikon bilah menu.
+
+Untuk menguji interval 5 detik pada build debug, jalankan `ZISLA_DEBUG_PET_ROTATION_SECONDS=5 make run` dari direktori utama repositori, aktifkan Rotasi acak dan pilih setidaknya dua peliharaan. Jalankan `make update` tanpa variabel tersebut untuk memulihkan interval yang tersimpan.
 
 ### Membangun `.app`
 

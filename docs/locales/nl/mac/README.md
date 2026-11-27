@@ -34,7 +34,7 @@ macOS 14 en later zijn ondersteund. macOS 26 gebruikt Liquid Glass; macOS 14/15 
 - **Spraakinvoer:** schakelen of ingedrukt praten, eigen globale sneltoetsen, systeemspraakherkenning, lokale/externe tekstverwerking en lokale opnamegeschiedenis.
 - **Snelle acties:** na kopiëren toont een kleine eilandmelding voorvertoning en acties voor links openen, Finder, zoeken met gekozen zoekmachine, vertalen, rekenen, agenda uit datums en lange tekst/afbeeldingen opslaan. Na browserdownload of AirDrop opent dezelfde toets de map, onafhankelijk van de voortgangschakelaar. Herkent URL's, paden, mail, telefoon, CSS-kleuren met voorbeelden, sommen, datum/tijd, tekst in andere taal, code, tekst met tellingen, afbeeldingen met miniaturen en bestandsverwijzingen. Toegang via knoppen, aanvullende standaard `Command+N` of ingestelde modificatietoets/muiszijtoets. Optioneel links vasthouden plus rechts klikken kopieert, standaard uit; appuitsluitingen, typen en lichte herinneringsmodus zijn instelbaar.
 - **CLI en Skills:** detecteren, installeren, bijwerken, verwijderen en lokale Skills beheren in Instellingen.
-- **Desktophuisdieren:** ingebouwde of geïmporteerde dieren aan één van beide kanten. Als je het eiland op één scherm uitklapt, blijven de huisdieren op de andere schermen op hun plek.
+- **Desktophuisdieren:** Bekijk ingebouwde en geïmporteerde dieren via Instellingen → Huisdier. ‘Vast huisdier’ toont steeds hetzelfde dier. ‘Willekeurig wisselen’ loot standaard uit alle dieren. Beperk de selectie via ‘Huisdieren voor de loting’. Standaard wisselt het dier om middernacht lokale tijd. Kies bij ‘Wisselinterval’ voor ‘Aangepast’ om een duur van 1 seconde tot 99:59:59 in te stellen. De beginwaarde is 1 uur. Plaats je huisdier links of rechts van het eiland. Als je het eiland op één scherm uitklapt, blijven de huisdieren op de andere schermen op hun plek.
 - **Updates:** Release/Preview vraagt eenmaal per start de openbare landcode. `CN` controleert ondertekende Gitee-feed en probeert eenmaal GitHub; andere landen andersom. Fout behoudt Gitee eerst. Sparkle downloadt, verifieert, installeert en herstart. Kanaal geldt voor automatische/handmatige checks.
 - **Uiterlijk en bediening:** systeem/licht/donker, transparant/mat, vastgezet uitklappen, meerdere schermen, Spaces en externe schermen zonder notch.
 - **Standaarden:** nieuwe installaties activeren modules. Functie, compacte indicator, zijmelding, menubalkstatistiek en updategedrag zijn apart instelbaar; bestaande configuraties blijven behouden.
@@ -116,6 +116,8 @@ swift run zisla
 ```
 
 Start als menubalkaccessoire. Beweeg binnen de bovenste centrale 6 px van het huidige scherm of kies “Toon eiland” in het menu.
+
+Voer vanuit de hoofdmap van de repository `ZISLA_DEBUG_PET_ROTATION_SECONDS=5 make run` uit om in een debugbuild een interval van 5 seconden te testen. Kies ‘Willekeurig wisselen’ en selecteer minstens twee dieren. Voer `make update` zonder de variabele uit om het opgeslagen interval te herstellen.
 
 ### Een `.app` bouwen
 

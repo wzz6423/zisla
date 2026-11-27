@@ -916,8 +916,15 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var appearanceMode: AppearanceMode
     /// Whether to keep a pet beside the Dynamic Island (compatible with Codex hatch-pet format; pets sourced from codex-pets.net and similar community libraries).
     public var petEnabled: Bool
-    /// The currently selected pet id (corresponds to a built-in or imported pet in `PetLibrary`).
+    /// Retains the fixed selection while daily rotation is active.
     public var petID: String
+    public var petSelectionMode: PetSelectionMode
+    /// A nil pool includes the whole library, including future imports.
+    public var petRandomPool: Set<String>?
+    /// A nil interval rotates at local midnight.
+    public var petRotationInterval: TimeInterval? {
+        didSet { petRotationInterval = petRotationInterval.map(UserCareInterval.normalized) }
+    }
     /// Which side of the Dynamic Island the pet appears on.
     public var petSide: PetSide
     /// Whether the Dynamic Island shows lyrics and song info while music plays.
@@ -1103,6 +1110,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         appearanceMode: AppearanceMode = .system,
         petEnabled: Bool = true,
         petID: String = "chiikawa",
+        petSelectionMode: PetSelectionMode = .fixed,
+        petRandomPool: Set<String>? = nil,
+        petRotationInterval: TimeInterval? = nil,
         petSide: PetSide = .left,
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
@@ -1265,6 +1275,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.appearanceMode = appearanceMode
         self.petEnabled = petEnabled
         self.petID = petID
+        self.petSelectionMode = petSelectionMode
+        self.petRandomPool = petRandomPool
+        self.petRotationInterval = petRotationInterval.map(UserCareInterval.normalized)
         self.petSide = petSide
         self.mediaShowLyricsAndInfo = mediaShowLyricsAndInfo
         self.mediaCompactStyle = mediaCompactStyle
@@ -1442,6 +1455,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case appearanceMode
         case petEnabled
         case petID
+        case petSelectionMode
+        case petRandomPool
+        case petRotationInterval
         case petSide
         case mediaShowLyricsAndInfo
         case mediaCompactStyle
@@ -1821,6 +1837,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         ].contains(petID) {
             petID = defaults.petID
         }
+        petSelectionMode = (try? container.decode(PetSelectionMode.self, forKey: .petSelectionMode)) ?? defaults.petSelectionMode
+        petRandomPool = try? container.decode(Set<String>.self, forKey: .petRandomPool)
+        petRotationInterval = (try? container.decode(TimeInterval.self, forKey: .petRotationInterval))
+            .map(UserCareInterval.normalized)
         petSide = try container.decodeIfPresent(PetSide.self, forKey: .petSide) ?? defaults.petSide
         mediaShowLyricsAndInfo = try container.decodeIfPresent(Bool.self, forKey: .mediaShowLyricsAndInfo) ?? defaults.mediaShowLyricsAndInfo
         mediaCompactStyle = try container.decodeIfPresent(

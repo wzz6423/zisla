@@ -198,6 +198,13 @@
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Atur tampilan pet di dalam Dynamic Island.";
 "在灵动岛养一只小宠物" = "Pelihara pet di Dynamic Island";
+"宠物模式" = "Mode peliharaan";
+"固定宠物" = "Peliharaan tetap";
+"随机轮换" = "Rotasi acak";
+"切换间隔" = "Interval pergantian";
+"每天随机" = "Acak harian";
+"随机范围" = "Daftar undian";
+"选择宠物" = "Pilih peliharaan";
 "当前宠物" = "Pet Saat Ini";
 "选择内置的宠物形象" = "Pilih tampilan pet bawaan";
 "在岛的哪一侧" = "Sisi Island Mana";

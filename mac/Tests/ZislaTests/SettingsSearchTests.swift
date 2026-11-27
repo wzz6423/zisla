@@ -502,6 +502,18 @@ struct SettingsSearchTests {
     }
 
     @Test
+    func petModeAndPreviewAreSearchableAndThePoolFollowsTheMode() {
+        var settings = Self.enabledSettings
+        #expect(results("每天随机", settings: settings).contains { $0.section == .pet && $0.anchor == .row("宠物模式") })
+        #expect(results("预览", settings: settings).contains { $0.section == .pet && $0.anchor == .row("当前宠物") })
+        #expect(results("随机范围", settings: settings).isEmpty)
+        #expect(results("切换间隔", settings: settings).isEmpty)
+        settings.petSelectionMode = .randomRotation
+        #expect(results("选择宠物", settings: settings).contains { $0.section == .pet && $0.anchor == .row("随机范围") })
+        #expect(results("切换间隔", settings: settings).contains { $0.section == .pet && $0.anchor == .row("切换间隔") })
+    }
+
+    @Test
     func reusesDynamicSettingCatalogs() {
         let items = SettingsSearchIndex.items(settings: Self.enabledSettings, displayCount: 2)
         for lexicon in VoiceLexicon.allCases {

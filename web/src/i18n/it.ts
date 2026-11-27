@@ -249,8 +249,8 @@ export const it = createCatalog({
       },
       pet: {
         title: 'Mascotte dell’isola',
-        description: 'Scegli dal catalogo ampliato di animali e personaggi oppure importa un’immagine, animazione o video compatibile con un nome personalizzato. Posiziona il compagno ai lati dell’isola ed elimina quelli importati nelle Impostazioni. Animazioni fino a 30 secondi e file fino a 100 MB. Quando espandi l’isola su uno schermo, gli animali sugli altri schermi restano al loro posto.',
-        detail: 'Catalogo ampliato · Importa immagini e video · Elimina compagni personalizzati',
+        description: 'Scegli dal catalogo ampliato di animali e personaggi oppure importa un’immagine, animazione o video compatibile con un nome personalizzato. Guarda l’anteprima degli animali e tienine uno fisso, oppure lascia che zisla ne estragga uno dalla tua lista a mezzanotte, ora locale, o con un intervallo personalizzato. Posiziona il compagno ai lati dell’isola ed elimina quelli importati nelle Impostazioni. Animazioni fino a 30 secondi e file fino a 100 MB. Quando espandi l’isola su uno schermo, gli animali sugli altri schermi restano al loro posto.',
+        detail: 'Anteprima e rotazione casuale · Importa immagini e video · Elimina compagni personalizzati',
       },
       lockScreen: {
         title: 'Informazioni della schermata di blocco',
@@ -493,6 +493,7 @@ export const it = createCatalog({
     "videoNotice": "Estratti della presentazione esistente con dati dimostrativi. I sottotitoli del video sono in inglese; i passaggi seguono la tua lingua. Il video completo di 2:40 e i crediti musicali sono sotto.",
     "preferencesTitle": "Preferenze utili",
     "preferences": [
+      "In Impostazioni → Pet puoi vedere in anteprima gli animali integrati e importati. «Animale fisso» mantiene lo stesso animale. «Rotazione casuale» include tutti gli animali per impostazione predefinita. Limita la scelta in «Animali per il sorteggio». Il sorteggio avviene a mezzanotte, ora locale. In «Intervallo di cambio», seleziona «Personalizzato» per impostare una durata da 1 secondo a 99:59:59. Il valore iniziale è di 1 ora.",
       "Attiva lo scuotimento durante il trascinamento per mostrare il vassoio. Le note di contesto usano un proprio tasto da tenere premuto.",
       "Scegli l’uscita audio nell’area multimediale e sorgente automatica o lettore preferito nelle impostazioni. Questo non assegna dispositivi distinti alle app.",
       "Suoni e statistiche tastiera sono indipendenti e usano Monitoraggio input. Il mixer richiede macOS 14.4+ e Registrazione audio di sistema.",

@@ -399,7 +399,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.lidCloseController = lidCloseController
         lidCloseController.start()
 
-        let petController = IslandPetController(model: model)
+        let petController = IslandPetController(settingsStore: model.settingsStore, aiMonitor: model.aiMonitor)
         self.petController = petController
         if model.settingsStore.settings.petEnabled {
             petController.start()
@@ -2085,7 +2085,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func showSettings() {
-        guard runningModel != nil else {
+        guard let runningModel, let petController else {
             onboardingController?.show()
             return
         }
@@ -2093,7 +2093,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if settingsWindowController == nil {
             let input = settingsInput ?? SettingsInput()
             settingsInput = input
-            let rootView = SettingsView(model: AppModel.shared, input: input)
+            let rootView = SettingsView(model: runningModel, petController: petController, input: input)
             let window = SettingsWindow(
                 contentRect: CGRect(x: 0, y: 0, width: 960, height: 680),
                 styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],

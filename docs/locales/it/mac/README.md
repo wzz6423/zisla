@@ -34,7 +34,7 @@ Sono supportati macOS 14 e successivi. macOS 26 usa Liquid Glass; macOS 14/15 us
 - **Input vocale:** scorciatoie a commutazione o premi-per-parlare, scorciatoie globali personalizzate, riconoscimento di sistema, organizzazione locale o remota delle trascrizioni e cronologia locale delle registrazioni.
 - **Azioni rapide:** dopo ogni copia, una piccola notifica dell'isola mostra anteprima e azioni: aprire link, mostrare file nel Finder, cercare con motore selezionabile, tradurre, calcolare, creare eventi dalle date riconosciute e salvare testi lunghi o immagini. A download completato o file AirDrop ricevuto, la stessa scorciatoia apre la cartella; ciò dipende dalle azioni rapide e non dall'avanzamento download. Riconosce URL, percorsi, email, telefoni, colori CSS con campioni, calcoli, date/orari, testo in lingua diversa dal sistema, codice, testo con conteggi, immagini con miniature e riferimenti a file. Si attiva con pulsanti, `Command+N` aggiuntivo predefinito o modificatore/pulsante laterale configurato. Offre anche copia tramite pulsante sinistro tenuto più clic destro, inizialmente disattivata, blacklist di app, interruttori per tipo e modalità promemoria leggera.
 - **CLI e Skills:** rileva, installa, aggiorna e rimuove CLI AI comuni e gestisce Skills locali dalle impostazioni.
-- **Animali desktop:** scegli un animale integrato o importato e posizionalo su un lato dell'isola. Quando espandi l’isola su uno schermo, gli animali sugli altri schermi restano al loro posto.
+- **Animali desktop:** In Impostazioni → Pet puoi vedere in anteprima gli animali integrati e importati. «Animale fisso» mantiene lo stesso animale. «Rotazione casuale» include tutti gli animali per impostazione predefinita. Limita la scelta in «Animali per il sorteggio». Il sorteggio avviene a mezzanotte, ora locale. In «Intervallo di cambio», seleziona «Personalizzato» per impostare una durata da 1 secondo a 99:59:59. Il valore iniziale è di 1 ora. Puoi posizionare l’animale a destra o a sinistra dell’isola. Quando espandi l’isola su uno schermo, gli animali sugli altri schermi restano al loro posto.
 - **Aggiornamenti:** Release/Preview determina il paese dell'IP pubblico una volta per avvio. `CN` verifica prima l'appcast firmato Gitee e ritenta GitHub una volta; gli altri paesi fanno il contrario. Se la ricerca fallisce, Gitee resta primo. Sparkle scarica, verifica, installa e riavvia. Il canale vale per verifiche automatiche e manuali.
 - **Aspetto e interazione:** tema di sistema, chiaro o scuro, superfici trasparenti o satinate, espansione fissata, più schermi, Spaces e schermi esterni senza notch.
 - **Predefiniti:** le nuove installazioni abilitano i moduli. Funzioni, indicatori compatti, notifiche laterali, statistiche della barra dei menu e aggiornamenti sono regolabili separatamente; le installazioni esistenti conservano la configurazione.
@@ -116,6 +116,8 @@ swift run zisla
 ```
 
 L'app parte come accessorio della barra dei menu. Entra con il puntatore nei 6 px superiori centrali dello schermo corrente oppure scegli “Mostra isola” dal menu.
+
+Per provare un intervallo di 5 secondi nella build di debug, esegui `ZISLA_DEBUG_PET_ROTATION_SECONDS=5 make run` dalla radice del repository, attiva «Rotazione casuale» e scegli almeno due animali. Esegui `make update` senza la variabile per ripristinare l’intervallo salvato.
 
 ### Compilare una `.app`
 

@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    private let petController: IslandPetController
     @ObservedObject private var settingsStore: FeatureSettingsStore
     @ObservedObject private var clipboardAssistant: ClipboardAssistantController
     @ObservedObject private var immediateCleanup: ImmediateCleanupController
@@ -35,14 +36,18 @@ struct SettingsView: View {
     @State private var voiceHotkeyValidationMessage: String?
     @State private var assistantHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
+    @State private var petEntries: [PetLibrary.Entry] = []
+    @State private var currentPetID: String?
+    @State private var isPetSelectionPresented = false
     @State private var petImportSource: PetImportSource?
-    @State private var isPetRemovalConfirmationPresented = false
+    @State private var petPendingRemoval: PetLibrary.Entry?
     @State private var petRemovalError: String?
     @StateObject private var aiUsageHistory: AIUsageHistoryController
     @StateObject private var aiUsageHistoryPresentation = SystemMetricsHistoryPanelPresentationState()
 
-    init(model: AppModel, input: SettingsInput = SettingsInput()) {
+    init(model: AppModel, petController: IslandPetController, input: SettingsInput = SettingsInput()) {
         self.model = model
+        self.petController = petController
         _input = StateObject(wrappedValue: input)
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         _clipboardAssistant = ObservedObject(wrappedValue: model.clipboardAssistant)
@@ -98,7 +103,10 @@ struct SettingsView: View {
         }
         .sheet(item: $petImportSource) { source in
             PetImportView(sourceURL: source.url) { entry in
-                model.settingsStore.settings.petID = entry.id
+                if settingsStore.settings.petSelectionMode == .fixed {
+                    settingsStore.settings.petID = entry.id
+                }
+                NotificationCenter.default.post(name: .petLibraryDidChange, object: nil)
             }
         }
         .alert(
@@ -1586,10 +1594,10 @@ struct SettingsView: View {
                         title: "关怀提醒间隔",
                         detail: "小时 0–99，分、秒 0–59，总时长至少 1 秒"
                     ) {
-                        UserCareIntervalControl(interval: Binding(
+                        DurationIntervalControl(interval: Binding(
                             get: { model.settingsStore.settings.userCareReminderInterval },
                             set: { model.settingsStore.settings.userCareReminderInterval = $0 }
-                        ))
+                        ), identifierPrefix: "user-care")
                     }
                 }
             }
@@ -2323,52 +2331,97 @@ struct SettingsView: View {
     }
 
     private var petContent: some View {
-        let entries = petEntries
+        let settings = settingsStore.settings
+        let isFixed = settings.petSelectionMode == .fixed
+        let id = isFixed ? settings.petID : currentPetID
+        let current = petEntries.first { $0.id == id }
+            ?? (isFixed ? petEntries.first { $0.id == FeatureSettings.default.petID } : nil)
         return VStack(alignment: .leading, spacing: 20) {
             settingsGroup("宠物") {
-                settingRow(
-                    symbol: "shippingbox.fill",
-                    title: "当前宠物",
-                    detail: ""
-                ) {
-                    Picker(
-                        "",
-                        selection: Binding(
-                            get: {
-                                let id = model.settingsStore.settings.petID
-                                return entries.contains { $0.id == id } ? id : FeatureSettings.default.petID
-                            },
-                            set: { model.settingsStore.settings.petID = $0 }
-                        )
-                    ) {
-                        ForEach(entries, id: \.id) { entry in
-                            Text(petDisplayLabel(entry)).tag(entry.id)
-                        }
+                settingRow(symbol: "arrow.triangle.2.circlepath", title: "宠物模式", detail: "") {
+                    Picker(AppLocalization.text("宠物模式"), selection: $settingsStore.settings.petSelectionMode) {
+                        AppLocalizedText("固定宠物").tag(PetSelectionMode.fixed)
+                        AppLocalizedText("随机轮换").tag(PetSelectionMode.randomRotation)
                     }
+                    .pickerStyle(.segmented)
                     .labelsHidden()
-                    .pickerStyle(.menu)
                     .keepsIntrinsicWidth()
-                    .disabled(!model.settingsStore.settings.petEnabled)
-                    if let entry = entries.first(where: { $0.id == model.settingsStore.settings.petID }),
-                       entry.origin == .imported {
-                        Button(AppLocalization.text("移除"), role: .destructive) {
-                            petRemovalError = nil
-                            isPetRemovalConfirmationPresented = true
+                    .disabled(!settings.petEnabled)
+                }
+                rowDivider
+                settingRow(symbol: "shippingbox.fill", title: "当前宠物", detail: "") {
+                    if let current {
+                        Button {
+                            isPetSelectionPresented = true
+                        } label: {
+                            PetPreviewView(petID: current.id, size: CGSize(width: 32, height: 32))
+                                .contentShape(Rectangle())
                         }
-                        .keepsIntrinsicWidth()
-                        .alert(
-                            AppLocalization.text("删除“%@”？", entry.manifest.displayName),
-                            isPresented: $isPetRemovalConfirmationPresented
-                        ) {
-                            Button(AppLocalization.text("取消"), role: .cancel) {}
-                            Button(AppLocalization.text("移除"), role: .destructive) {
-                                do {
-                                    try Self.removeSelectedPet(settings: &model.settingsStore.settings)
-                                } catch {
-                                    petRemovalError = error.localizedDescription
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(AppLocalization.text("预览"))
+                        .accessibilityValue(petDisplayLabel(current))
+                        .help(AppLocalization.text("预览"))
+                        if isFixed {
+                            Picker(AppLocalization.text("当前宠物"), selection: Binding(
+                                get: { current.id }, set: { settingsStore.settings.petID = $0 }
+                            )) {
+                                ForEach(petEntries) { entry in
+                                    Text(petDisplayLabel(entry))
+                                        .fitsMenuItem(maxWidth: 200)
+                                        .tag(entry.id)
                                 }
                             }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .keepsIntrinsicWidth()
+                            .disabled(!settings.petEnabled)
+                        } else {
+                            Text(petDisplayLabel(current)).lineLimit(1)
                         }
+                        if current.origin == .imported {
+                            Button(AppLocalization.text("移除"), role: .destructive) {
+                                petRemovalError = nil
+                                petPendingRemoval = current
+                            }
+                            .keepsIntrinsicWidth()
+                        }
+                    }
+                }
+                if !isFixed {
+                    rowDivider
+                    settingRow(symbol: "timer", title: "切换间隔", detail: "") {
+                        Picker(AppLocalization.text("切换间隔"), selection: Binding(
+                            get: { settingsStore.settings.petRotationInterval != nil },
+                            set: { custom in settingsStore.settings.petRotationInterval = custom ? 3_600 : nil }
+                        )) {
+                            AppLocalizedText("每天随机").tag(false)
+                            AppLocalizedText("自定义").tag(true)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
+                    }
+                    if let interval = settings.petRotationInterval {
+                        DurationIntervalControl(interval: Binding(
+                            get: { settingsStore.settings.petRotationInterval ?? interval },
+                            set: { settingsStore.settings.petRotationInterval = $0 }
+                        ), identifierPrefix: "pet-rotation")
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.trailing, 4)
+                            .padding(.bottom, 8)
+                            .help(AppLocalization.text("小时 0–99，分、秒 0–59，总时长至少 1 秒"))
+                    }
+                    rowDivider
+                    settingRow(symbol: "checklist", title: "随机范围", detail: "") {
+                        if let pool = settings.petRandomPool {
+                            AppLocalizedFormatText("已选择 %ld 个项目", petEntries.filter { pool.contains($0.id) }.count)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            AppLocalizedText("全部").foregroundStyle(.secondary)
+                        }
+                        Button(AppLocalization.text("选择宠物")) { isPetSelectionPresented = true }
+                            .keepsIntrinsicWidth()
+                            .disabled(petEntries.isEmpty)
                     }
                 }
                 if let petRemovalError {
@@ -2409,19 +2462,41 @@ struct SettingsView: View {
                 }
             }
         }
+        .onAppear { petEntries = PetLibrary.entries() }
+        .onReceive(petController.$currentPetID) { currentPetID = $0 }
+        .onReceive(NotificationCenter.default.publisher(for: .petLibraryDidChange)) { _ in
+            petEntries = PetLibrary.entries()
+        }
+        .sheet(isPresented: $isPetSelectionPresented) {
+            PetSelectionView(entries: petEntries, settings: $settingsStore.settings,
+                             currentID: current?.id, displayLabel: petDisplayLabel)
+        }
+        .alert(
+            petPendingRemoval.map { AppLocalization.text("删除“%@”？", $0.manifest.displayName) } ?? "",
+            isPresented: Binding(get: { petPendingRemoval != nil }, set: { if !$0 { petPendingRemoval = nil } }),
+            presenting: petPendingRemoval
+        ) { entry in
+            Button(AppLocalization.text("取消"), role: .cancel) {}
+            Button(AppLocalization.text("移除"), role: .destructive) {
+                do {
+                    try Self.removePet(id: entry.id, settings: &settingsStore.settings)
+                    NotificationCenter.default.post(name: .petLibraryDidChange, object: nil)
+                } catch {
+                    petRemovalError = error.localizedDescription
+                }
+            }
+        }
     }
 
-    private var petEntries: [PetLibrary.Entry] {
-        PetLibrary.entries()
-    }
-
-    static func removeSelectedPet(
+    static func removePet(
+        id: String,
         settings: inout FeatureSettings,
         userPetsDirectory: URL = PetLibrary.userPetsDirectory,
         fileManager: FileManager = .default
     ) throws {
-        try PetLibrary.removeImportedPet(id: settings.petID, userPetsDirectory: userPetsDirectory, fileManager: fileManager)
-        settings.petID = FeatureSettings.default.petID
+        try PetLibrary.removeImportedPet(id: id, userPetsDirectory: userPetsDirectory, fileManager: fileManager)
+        if settings.petID == id { settings.petID = FeatureSettings.default.petID }
+        settings.petRandomPool?.remove(id)
     }
 
     private func choosePetMedia() {

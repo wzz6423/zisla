@@ -34,7 +34,7 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 - **Voice input:** Supports toggle or push-to-talk shortcuts, custom global shortcuts, system speech recognition, local or remote transcript organization, and local recording history.
 - **Quick Actions:** After every copy, a small island-style toast shows a rich preview and smart next actions — open links, reveal files in Finder, search (engine selectable), translate, calculate, create calendar events from recognized dates, and save long text or images. After a browser download completes or an AirDrop file is received, the same shortcut can open the containing folder; this is controlled by Quick Actions independently of browser download progress. Recognizes URLs, file paths, emails, phone numbers, CSS colors with live swatches, arithmetic, dates and times, text in a non-system language, code snippets, plain text with counts, images with thumbnails, and file references. Triggers: action buttons, the additional default Command+N shortcut, or a configured modifier-key/mouse-side trigger. Also offers a hold-left + right-click quick-copy mouse gesture (off by default), an app blacklist, per-type recognition switches, and a lightweight reminder mode.
 - **CLI and Skills management:** Detects, installs, updates, and removes common AI CLIs and manages local Skills from Settings.
-- **Desktop pets:** Select a built-in or imported pet and place it on either side of the island. When you expand the island on one display, pets on the other displays stay in place.
+- **Desktop pets:** In Settings → Pet, preview built-in or imported pets. Fixed Pet keeps one pet. Random Rotation draws from all pets unless you narrow the Random Pool. By default it picks at local midnight. Set Rotation Interval to Custom for a timer from 1 second to 99:59:59, initially set to 1 hour. Place your pet on either side of the island. When you expand the island on one display, pets on the other displays stay in place.
 - **Updates:** The selected Release or Preview channel resolves the public egress country code once per app run. `CN` checks its signed Gitee appcast first and retries GitHub once; other country codes check GitHub first and retry Gitee once. An unavailable lookup preserves the Gitee-first order. Sparkle then downloads, verifies, installs, and relaunches updates. Changing the channel applies to both automatic and manual checks.
 - **Appearance and interaction:** Settings can follow the system, light, or dark appearance. The island supports transparent or frosted surfaces, pinned expansion, multiple displays, Spaces, and external displays without a notch.
 - **Defaults:** New installations enable feature modules by default. Each feature, collapsed-state indicator, side notice, menu-bar metric, and update behavior can be adjusted independently; existing installations keep their current configuration.
@@ -116,6 +116,8 @@ swift run zisla
 ```
 
 The app starts as a menu-bar accessory. Move the pointer into the 6 px area at the top center of the current display to expand it, or choose “Show Island” from the menu bar icon.
+
+To test a 5-second interval in a debug build, run `ZISLA_DEBUG_PET_ROTATION_SECONDS=5 make run` from the repository root, choose Random Rotation and include at least two pets. Run `make update` without the variable to restore the saved interval.
 
 ### Build an `.app`
 

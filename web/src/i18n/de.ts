@@ -263,8 +263,8 @@ export const de: SiteContent = {
       pet: {
         title: 'Maskottchen in der Island',
         description:
-          'Wählen Sie aus dem erweiterten Tier- und Figurenkatalog oder importieren Sie ein unterstütztes Bild, eine Animation oder ein Video mit eigenem Namen. Platzieren Sie das Tier auf einer Seite der Insel und entfernen Sie importierte Tiere in den Einstellungen. Animationen dürfen höchstens 30 Sekunden, Dateien höchstens 100 MB umfassen. Wenn Sie die Insel auf einem Bildschirm ausklappen, bleiben die Haustiere auf den anderen Bildschirmen an ihrem Platz.',
-        detail: 'Erweiterter Katalog · Bilder und Videos importieren · Eigene Tiere entfernen',
+          'Wählen Sie aus dem erweiterten Tier- und Figurenkatalog oder importieren Sie ein unterstütztes Bild, eine Animation oder ein Video mit eigenem Namen. Sehen Sie sich die Tiere in der Vorschau an. Behalten Sie eines oder lassen Sie zisla um Mitternacht nach Ortszeit oder in einem eigenen Intervall ein Tier aus Ihrer Auswahl auslosen. Platzieren Sie das Tier auf einer Seite der Insel und entfernen Sie importierte Tiere in den Einstellungen. Animationen dürfen höchstens 30 Sekunden, Dateien höchstens 100 MB umfassen. Wenn Sie die Insel auf einem Bildschirm ausklappen, bleiben die Haustiere auf den anderen Bildschirmen an ihrem Platz.',
+        detail: 'Tiervorschau und zufälliger Wechsel · Bilder und Videos importieren · Eigene Tiere entfernen',
       },
       lockScreen: {
         title: 'Informationen im Sperrbildschirm',
@@ -510,6 +510,7 @@ export const de: SiteContent = {
     "videoNotice": "Ausschnitte der vorhandenen Produkttour mit Demodaten. Video-Untertitel sind Englisch, die Schritte folgen deiner Sprache. Die vollständige 2:40-Tour und Musikangaben stehen weiter unten.",
     "preferencesTitle": "Nützliche Einstellungen",
     "preferences": [
+      "Unter „Einstellungen → Haustier“ sehen Sie integrierte und importierte Tiere in der Vorschau. „Festes Haustier“ zeigt immer dasselbe Tier. „Zufälliger Wechsel“ lost standardmäßig unter allen Tieren aus. Unter „Haustiere für die Auslosung“ schränken Sie die Auswahl ein. Der Wechsel erfolgt standardmäßig um Mitternacht nach Ortszeit. Wählen Sie beim Wechselintervall „Eigen“, um eine Dauer zwischen 1 Sekunde und 99:59:59 einzustellen. Voreingestellt ist 1 Stunde.",
       "Aktiviere Schütteln beim Ziehen, um die Ablage einzublenden. Kontextnotizen nutzen eine eigene gehaltene Taste.",
       "Wähle die Audioausgabe im Medienbereich und automatische Quelle oder bevorzugten Player in Einstellungen. Diese Wahl weist Apps keine getrennten Geräte zu.",
       "Tastentöne und Tippstatistik sind unabhängig und nutzen Eingabeüberwachung. Der App-Mixer benötigt macOS 14.4+ und Systemaudioaufnahme.",
