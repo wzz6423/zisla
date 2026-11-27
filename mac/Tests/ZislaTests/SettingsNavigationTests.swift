@@ -26,6 +26,16 @@ struct SettingsNavigationTests {
     }
 
     @Test
+    func weatherIconsUseNetworkBlue() {
+        let networkBlue = SettingsSection.networkProxy.iconColor
+        #expect(networkBlue == Color(nsColor: .systemBlue))
+        #expect(SettingsSection.weather.iconColor == networkBlue)
+        for symbol in ["location.fill", "mappin.and.ellipse", SettingsSection.weather.symbol] {
+            #expect(SettingsSection.weather.iconColor(for: symbol) == networkBlue)
+        }
+    }
+
+    @Test
     func keyboardSoundRowsUseTheKeyboardCategoryColor() {
         for symbol in ["waveform", "speaker.wave.2", "arrow.uturn.backward", "waveform.path.ecg", "chart.bar.xaxis"] {
             #expect(SettingsSection.keyboardSound.iconColor(for: symbol) == SettingsSection.keyboardSound.iconColor,
