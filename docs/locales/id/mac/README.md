@@ -24,7 +24,7 @@ macOS 14 dan lebih baru didukung. macOS 26 memakai Liquid Glass; macOS 14/15 mem
 | Surel | Membaca akun Mail.app terpilih untuk melihat kotak masuk, menandai dibaca, membalas, menulis, dan memindahkan pesan ke sampah. |
 | Catatan | Apple Notes sebagai satu-satunya sumber data untuk melihat, menyunting, membuat, dan menghapus catatan Markdown, dengan pratinjau langsung serta penyimpanan otomatis. |
 | Mixer Volume Aplikasi | macOS 14.4+ mengatur dan membisukan setiap aplikasi yang memutar audio serta mengingat volumenya; memerlukan izin Rekaman Audio Sistem. |
-| Utilitas | Timer Pomodoro dengan satu bunyi dan notifikasi lokal saat sesi selesai, mode tetap terjaga, pencegah tidur saat menganggur, pembersihan layar/papan ketik, teleprompter, cermin kamera, dan pengosongan sampah dengan konfirmasi. Nama pengatur waktu hanya berlaku untuk sesi saat ini dan kembali ke nama bawaan saat sesi berakhir atau dibatalkan. |
+| Utilitas | Timer Pomodoro dengan satu bunyi dan notifikasi lokal saat sesi selesai, mode tetap terjaga, pencegah tidur saat menganggur, pembersihan layar/papan ketik, teleprompter, cermin kamera, dan pengosongan sampah dengan konfirmasi. Nama pengatur waktu hanya berlaku untuk sesi saat ini dan kembali ke nama bawaan saat sesi berakhir atau dibatalkan. Saat island diciutkan, ikon matahari berarti layar tetap menyala, sedangkan ikon laptop berarti Mac tidak akan tertidur saat tidak digunakan. |
 | Sistem | CPU, GPU, memori, disk, jaringan, suhu, dan kipas; pelepasan memori dan pemindaian cache/log/data sementara yang aman dihapus; kesehatan baterai dan daya aksesori. |
 
 ### Kemampuan lintas modul

@@ -4694,24 +4694,11 @@ final class AppModel: ObservableObject {
             return
         }
 
-        let reminders = [
-            IslandNotice(
-                id: "toolbox-reminder-left",
-                title: content.title,
-                detail: content.compactTitle,
-                kind: .info,
-                side: .left
-            ),
-            IslandNotice(
-                id: "toolbox-reminder-right",
-                title: content.title,
-                detail: content.compactTitle,
-                kind: .info,
-                side: .right
-            ),
-        ]
-        for reminder in reminders where !notices.updateIfPresent(reminder) {
-            notices.enqueue(reminder, expiresAfter: nil)
+        for side in [NoticeSide.left, .right] {
+            let reminder = content.notice(for: side)
+            if !notices.updateIfPresent(reminder) {
+                notices.enqueue(reminder, expiresAfter: nil)
+            }
         }
     }
 

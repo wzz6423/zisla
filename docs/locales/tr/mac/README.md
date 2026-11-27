@@ -24,7 +24,7 @@ macOS 14 ve sonrası desteklenir. macOS 26 Liquid Glass kullanır; macOS 14/15 y
 | Posta | Seçilen Mail.app hesaplarının gelen kutularını okur; okundu işareti, yanıt, yeni posta ve çöp kutusuna taşıma sunar. |
 | Notlar | Markdown notlarını görüntüleme, düzenleme, oluşturma ve silmede tek kaynak Apple Notlar'dır; canlı önizleme ve otomatik yazma sunar. |
 | Uygulama ses düzeyi karıştırıcısı | macOS 14.4+ üzerinde ses üreten her uygulamanın düzeyini ve sessizliğini ayarlayıp hatırlar; Sistem Sesi Kaydı izni gerekir. |
-| Araçlar | Oturum sonunda bir sesli uyarı ve yerel bildirim veren Pomodoro, uyanık tutma, boşta uyku önleme, ekran/klavye temizliği, teleprompter, kamera aynası ve onaylı çöp boşaltma. Zamanlayıcı adı yalnızca geçerli oturum için kullanılır ve oturum bittiğinde veya iptal edildiğinde varsayılan ada döner. |
+| Araçlar | Oturum sonunda bir sesli uyarı ve yerel bildirim veren Pomodoro, uyanık tutma, boşta uyku önleme, ekran/klavye temizliği, teleprompter, kamera aynası ve onaylı çöp boşaltma. Zamanlayıcı adı yalnızca geçerli oturum için kullanılır ve oturum bittiğinde veya iptal edildiğinde varsayılan ada döner. Ada daraltıldığında güneş simgesi ekranın açık kaldığını, dizüstü bilgisayar simgesi ise Mac’in boşta kaldığında uyumasının engellendiğini gösterir. |
 | Sistem | CPU, GPU, bellek, disk, ağ, sıcaklık ve fan; belleği boşaltma, güvenli önbellek/günlük/geçici veri tarama, pil sağlığı ve aksesuar düzeyleri. |
 
 ### Modüller arası işlevler

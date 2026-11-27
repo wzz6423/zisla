@@ -24,7 +24,7 @@ Se admite macOS 14 y posteriores. macOS 26 usa Liquid Glass; macOS 14/15 recurre
 | Correo | Lee cuentas de Mail.app seleccionadas para ver entradas, marcar leído, responder, redactar y mover mensajes a la papelera. |
 | Notas | Usa Notas de Apple como única fuente para consultar, editar, crear y eliminar Markdown con vista previa en directo y escritura automática. |
 | Mezclador de volumen de aplicaciones | En macOS 14.4+, ajusta volumen y silencio de cada aplicación en reproducción y recuerda su volumen; requiere grabación de audio del sistema. |
-| Utilidades | Pomodoro con un aviso sonoro y notificación local al finalizar, mantener despierto, prevenir reposo por inactividad, limpiar pantalla y teclado, teleprompter, espejo de cámara y vaciado confirmado de papelera. El nombre del temporizador solo se aplica a la sesión actual y vuelve al predeterminado cuando termina o se cancela. |
+| Utilidades | Pomodoro con un aviso sonoro y notificación local al finalizar, mantener despierto, prevenir reposo por inactividad, limpiar pantalla y teclado, teleprompter, espejo de cámara y vaciado confirmado de papelera. El nombre del temporizador solo se aplica a la sesión actual y vuelve al predeterminado cuando termina o se cancela. En la isla contraída, el sol indica que la pantalla se mantiene encendida y el portátil que se impide el reposo por inactividad. |
 | Sistema | CPU, GPU, memoria, disco, red, temperatura y ventiladores; libera memoria y analiza cachés, registros y temporales seguros de eliminar; incluye salud de batería y niveles de accesorios. |
 
 ### Funciones entre módulos

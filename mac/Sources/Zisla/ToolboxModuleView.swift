@@ -134,7 +134,7 @@ struct ToolboxModuleView: View {
         HStack(spacing: 8) {
             ToolToggleButton(
                 title: AppLocalization.text(model.powerAssertions.isChangingDisplayAwake ? "正在处理…" : "保持亮屏"),
-                symbol: "sun.max.fill",
+                symbol: ToolboxReminder.displayAwakeSymbol,
                 isOn: model.powerAssertions.keepDisplayAwake,
                 help: AppLocalization.text("包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。"),
                 isDisabled: model.powerAssertions.isChangingDisplayAwake
@@ -146,7 +146,7 @@ struct ToolboxModuleView: View {
 
             ToolToggleButton(
                 title: AppLocalization.text("防止空闲休眠"),
-                symbol: "laptopcomputer",
+                symbol: ToolboxReminder.preventIdleSleepSymbol,
                 isOn: model.powerAssertions.preventIdleSystemSleep,
                 help: AppLocalization.text("防止用户闲置导致系统休眠；合盖、低电量或用户主动休眠仍会让 Mac 进入睡眠")
             ) {

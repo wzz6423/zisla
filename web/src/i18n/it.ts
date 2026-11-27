@@ -137,7 +137,7 @@ export const it = createCatalog({
       toolbox: {
         name: 'Utility',
         caption:
-          'Timer di concentrazione, schermo sempre attivo, pulizia dello schermo e della tastiera con blocco anche di F1-F12, teleprompter, specchio e Cestino su una pagina. Metti in pausa, riprendi o reimposta il Pomodoro e segui i progressi nelle viste compatte orizzontale e verticale. Avvia la pulizia dei file inutili dalle utilità con le impostazioni di pulizia del sistema e segui avanzamento e risultati nell’isola. Il nome del timer vale solo per la sessione corrente e torna a quello predefinito quando termina o viene annullata.',
+          'Timer di concentrazione, schermo sempre attivo, pulizia dello schermo e della tastiera con blocco anche di F1-F12, teleprompter, specchio e Cestino su una pagina. Metti in pausa, riprendi o reimposta il Pomodoro e segui i progressi nelle viste compatte orizzontale e verticale. Avvia la pulizia dei file inutili dalle utilità con le impostazioni di pulizia del sistema e segui avanzamento e risultati nell’isola. Il nome del timer vale solo per la sessione corrente e torna a quello predefinito quando termina o viene annullata. Quando l’isola è compressa, il sole indica che lo schermo resta acceso e il portatile indica che la sospensione per inattività è bloccata.',
         points: ['Timer di concentrazione', 'Blocca F1-F12 durante la pulizia', 'Teleprompter e specchio'],
       },
       system: {

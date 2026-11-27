@@ -2031,6 +2031,23 @@ struct DetailedMediaBar: View {
     }
 }
 
+struct CompactNoticeSymbol: View {
+    let notice: IslandNotice
+    let fallback: String
+
+    var body: some View {
+        let symbol = notice.symbolName ?? fallback
+        if let secondary = notice.metadata?[ToolboxReminder.secondarySymbolKey] {
+            HStack(spacing: 1) {
+                Image(systemName: symbol).resizable().scaledToFit()
+                Image(systemName: secondary).resizable().scaledToFit()
+            }
+        } else {
+            Image(systemName: symbol)
+        }
+    }
+}
+
 private struct CompactToolboxWing: View {
     var notice: IslandNotice
     var side: NoticeSide
@@ -2040,7 +2057,7 @@ private struct CompactToolboxWing: View {
     var body: some View {
         Group {
             if side == .left {
-                Image(systemName: "toolbox.fill")
+                CompactNoticeSymbol(notice: notice, fallback: "wrench.and.screwdriver.fill")
                     .font(.system(size: min(15, height * 0.56), weight: .semibold))
             } else {
                 Text(notice.detail ?? AppLocalization.text("工具"))
