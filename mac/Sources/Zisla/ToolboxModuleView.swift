@@ -392,8 +392,8 @@ struct ToolboxTimerCard: View {
         .overlay { shape.strokeBorder(Color.strokeCard, lineWidth: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("toolbox.timer.\(identifier)")
-        .onChange(of: engine.phase) { _, phase in
-            if phase == .idle { isEditingName = false }
+        .onReceive(service.$name) { _ in
+            if timerID == nil { isEditingName = false }
         }
     }
 
@@ -452,7 +452,6 @@ struct ToolboxTimerCard: View {
     }
 
     private func cancel() {
-        isEditingName = false
         if let timerID { service.cancelCountdown(id: timerID) }
         else { service.reset() }
     }

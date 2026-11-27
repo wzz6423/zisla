@@ -134,21 +134,35 @@ struct IndependentCountdownPresentationTests {
         #expect(try #require(fixture.window).frame.height == 136)
     }
 
-    @Test
-    func renamingATimerEntersAnEditableFieldAndKeepsItsRunningDeadline() async throws {
+    @Test(arguments: [false, true])
+    func renamingATimerEntersAnEditableFieldAndKeepsItsRunningDeadline(independent: Bool) async throws {
         let fixture = try Fixture(edge: .top)
         defer { fixture.close() }
         let service = fixture.service
-        let id = service.addCountdown(name: "Tea", duration: 60)
-        service.toggleCountdown(id: id)
-        let deadline = service.countdowns.first?.engine.deadline
+        let id: UUID?
+        if independent {
+            let countdownID = service.addCountdown(name: "Tea", duration: 60)
+            id = countdownID
+            service.toggleCountdown(id: countdownID)
+        } else {
+            id = nil
+            service.setName("Tea")
+            service.start()
+        }
+        let identifier = id?.uuidString ?? "pomodoro"
+        let deadline = independent ? service.countdowns.first?.engine.deadline : service.engine.deadline
         let host = fixture.host(ToolboxTimerCard(service: service, timerID: id, compact: true), size: CGSize(width: 115, height: 136))
         await fixture.layout()
-        let rename = try #require(Self.element("toolbox.renameTimer.\(id)", in: host))
+        let rename = try #require(Self.element("toolbox.renameTimer.\(identifier)", in: host))
         _ = rename.perform(NSSelectorFromString("accessibilityPerformPress"))
         await fixture.layout()
-        let field = try #require(Self.element("toolbox.timerName.\(id)", in: host))
+        let field = try #require(Self.element("toolbox.timerName.\(identifier)", in: host))
         #expect(field.value(forKey: "accessibilityValue") as? String == "Tea")
+        if independent {
+            service.reset()
+            await fixture.layout()
+            #expect(Self.element("toolbox.timerName.\(identifier)", in: host) != nil)
+        }
         func textField(in view: NSView) -> NSTextField? {
             (view as? NSTextField).flatMap { $0.isEditable ? $0 : nil }
                 ?? view.subviews.compactMap { textField(in: $0) }.first
@@ -161,18 +175,18 @@ struct IndependentCountdownPresentationTests {
         editor.insertText("Meeting prep", replacementRange: editor.selectedRange())
         editor.insertNewline(nil)
         await fixture.layout()
-        #expect(service.countdowns.first?.name == "Meeting prep")
-        #expect(service.countdowns.first?.engine.deadline == deadline)
+        #expect((independent ? service.countdowns.first?.name : service.name) == "Meeting prep")
+        #expect((independent ? service.countdowns.first?.engine.deadline : service.engine.deadline) == deadline)
     }
 
-    @Test(arguments: ["complete", "reset", "group", "stop", "idle"], ["Writing", ""])
+    @Test(arguments: ["complete", "reset", "group", "stop", "idle", "idle-reset", "idle-group", "idle-stop"], ["Writing", ""])
     func endingPomodoroWhileEditingCannotRestoreThePreviousSessionName(action: String, name: String) async throws {
         let fixture = try Fixture(edge: .top)
         defer { fixture.close() }
         let service = fixture.service
         service.setFocusDuration(1)
         service.setName(name)
-        if action != "idle" { service.start() }
+        if !action.hasPrefix("idle") { service.start() }
         let host = fixture.host(ToolboxTimerCard(service: service, timerID: nil, compact: false), size: CGSize(width: 236, height: 136))
         await fixture.layout()
         let rename = try #require(Self.element("toolbox.renameTimer.pomodoro", in: host))
@@ -180,7 +194,7 @@ struct IndependentCountdownPresentationTests {
         await fixture.layout()
         let field = try #require(Self.element("toolbox.timerName.pomodoro", in: host))
         #expect(field.value(forKey: "accessibilityValue") as? String == name)
-        if action != "idle" {
+        if !action.hasPrefix("idle") {
             service.pause()
             await fixture.layout()
             #expect(Self.element("toolbox.timerName.pomodoro", in: host) != nil)
@@ -201,7 +215,8 @@ struct IndependentCountdownPresentationTests {
         case "reset", "idle":
             let cancel = try #require(Self.element("toolbox.cancelTimer.pomodoro", in: host))
             _ = cancel.perform(NSSelectorFromString("accessibilityPerformPress"))
-        case "group": service.cancelCountdownGroup(["pomodoro"])
+        case "idle-reset": service.reset()
+        case "group", "idle-group": service.cancelCountdownGroup(["pomodoro"])
         default: service.stop()
         }
         await fixture.layout()
