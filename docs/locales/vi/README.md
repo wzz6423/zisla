@@ -28,7 +28,7 @@ Nhạc: “Funkorama” của Kevin MacLeod · [CC BY 4.0](https://creativecommo
 | Đang phát | Hiện ảnh bìa, tiêu đề, tiến độ, lời bài hát và điều khiển phát; khi thiếu siêu dữ liệu, Core Audio có thể xác định ứng dụng thực sự phát âm thanh. |
 | Chuyển và chia sẻ | Thả tệp, nội dung đa phương tiện hoặc liên kết vào vùng kích hoạt trên cùng để giữ trong khay, hiện trong Finder hoặc mở menu chia sẻ macOS. Nén tệp và thư mục đã chọn thành ZIP, đổi kích thước hoặc định dạng ảnh bằng Công cụ Ảnh rồi đưa kết quả thành công về khay, hoặc nhập ảnh, video và âm thanh vào thư viện ghi hình mà giữ nguyên dự án và dòng thời gian hiện tại. |
 | Bảng nhớ tạm và thông báo | Tùy chọn lưu lịch sử cục bộ, nhận diện liên kết mới trên máy, và hiện nội dung đa phương tiện, AI, tải trình duyệt, bộ hẹn giờ, thư, cập nhật ở trạng thái thu gọn. Thao tác Nhanh tùy chọn hiện thông báo đảo nhỏ sau mỗi lần sao chép với bản xem trước phong phú và hành động phù hợp: mở, hiện trong Finder, tìm, dịch, tính, lưu. Khi trình duyệt tải xong hoặc nhận tệp AirDrop, cùng phím tắt có thể mở thư mục. Ảnh mới trong lịch sử được xếp hàng nhận diện chữ trên thiết bị; tìm chữ để tìm ảnh gốc, hoặc nhấp phải ảnh để nhận diện hay sao chép chữ. |
-| Không gian hằng ngày | Thời tiết, lịch, lời nhắc, Mail.app, ghi chú Markdown lưu trong Apple Notes, thông tin màn hình khóa và thú cưng máy tính tùy chọn. |
+| Không gian hằng ngày | Thời tiết, lịch, lời nhắc, Mail.app, ghi chú Markdown lưu trong Apple Notes, thông tin màn hình khóa và thú cưng máy tính tùy chọn. Khi thông tin thời tiết chưa đầy đủ, các nguồn khác bổ sung cho kết quả đầy đủ nhất; dữ liệu hiện có được giữ lại nếu không lấy được phần còn thiếu. |
 
 ### Hiển thị công việc AI
 

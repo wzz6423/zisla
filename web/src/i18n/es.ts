@@ -114,7 +114,7 @@ export const es = createCatalog({
       agenda: {
         name: 'Agenda y tiempo',
         caption:
-          'Muestra el tiempo de tu ubicación y hasta seis lugares elegidos. Consulta, añade o elimina eventos y recordatorios y marca estos como completados. Los eventos con enlace de reunión muestran una cuenta atrás 10 minutos antes de empezar y permiten unirse con un clic. Crea una nota de reunión o vincula y desvincula notas contextuales existentes. La hora de actualización de la lista del tiempo aparece en la cabecera, a la izquierda del botón de actualizar.',
+          'Muestra el tiempo de tu ubicación y hasta seis lugares elegidos. Consulta, añade o elimina eventos y recordatorios y marca estos como completados. Los eventos con enlace de reunión muestran una cuenta atrás 10 minutos antes de empezar y permiten unirse con un clic. Crea una nota de reunión o vincula y desvincula notas contextuales existentes. La hora de actualización de la lista del tiempo aparece en la cabecera, a la izquierda del botón de actualizar. Si faltan datos del tiempo, otras fuentes completan el resultado más completo; los datos disponibles se conservan cuando no se puede obtener el resto.',
         points: ['Tiempo y calendario', 'Cuenta atrás de 10 minutos', 'Unirse y vincular notas'],
       },
       mail: {
@@ -249,7 +249,7 @@ export const es = createCatalog({
       },
       pet: {
         title: 'Mascota de la isla',
-        description: 'Elige del catálogo ampliado de animales y personajes o importa una imagen, animación o vídeo compatible con un nombre propio. Coloca la mascota a un lado de la isla y elimina las importadas en Ajustes. Las animaciones admiten hasta 30 segundos y los archivos hasta 100 MB.',
+        description: 'Elige del catálogo ampliado de animales y personajes o importa una imagen, animación o vídeo compatible con un nombre propio. Coloca la mascota a un lado de la isla y elimina las importadas en Ajustes. Las animaciones admiten hasta 30 segundos y los archivos hasta 100 MB. Al desplegar la isla en una pantalla, las mascotas de las demás pantallas permanecen en su sitio.',
         detail: 'Catálogo ampliado · Importar imágenes y vídeos · Eliminar mascotas propias',
       },
       lockScreen: {
@@ -366,6 +366,20 @@ export const es = createCatalog({
         "shortcuts": "Arrastra con el puntero. El gesto de agitar se configura por separado; no requiere atajo fijo.",
         "permissions": "El selector y los marcadores seguros dan acceso a archivos elegidos. Las capturas requieren Grabación de pantalla.",
         "output": "Los originales permanecen en su ubicación. Referencias y capturas persisten localmente; el PNG usa el destino elegido. Los ZIP y los resultados de imagen correctos vuelven a la bandeja; los medios importados se añaden a la biblioteca del proyecto de grabación."
+      },
+      "weather": {
+        "title": "Ver el tiempo más completo disponible",
+        "summary": "Consulta el tiempo de tu ubicación o lugares guardados y completa los datos que faltan.",
+        "entry": "Isla → Agenda; Ajustes → Tiempo.",
+        "steps": [
+          "Activa Tiempo en Ajustes → Funciones; busca y guarda otros lugares en los ajustes del tiempo.",
+          "Abre Agenda o actualiza el tiempo. Si faltan datos, otras fuentes completan el resultado más completo.",
+          "Si las fuentes adicionales no están disponibles, conserva los datos obtenidos y oculta las medidas que faltan.",
+          "Consulta los enlaces bajo la lista del tiempo para ver las fuentes utilizadas; las alertas oficiales se obtienen por separado."
+        ],
+        "shortcuts": "Usa el botón de actualización en Agenda; no hay un atajo global fijo.",
+        "permissions": "La ubicación actual necesita permiso de ubicación; los lugares añadidos manualmente no. El tiempo y las alertas usan la red.",
+        "output": "El tiempo se mantiene en memoria y los lugares guardados permanecen localmente. Se muestran los datos parciales cuando no se pueden completar; las previsiones de más de una hora se ocultan."
       },
       "meeting": {
         "title": "Únete a una reunión y guarda notas",

@@ -131,12 +131,12 @@ struct IslandDisplayPresentationTests {
 
         presenter.setClipboardAssistantVisible(true, on: primary.displayID)
         #expect(primaryHost.window?.isVisible == false && externalHost.window?.isVisible == true)
-        presenter.setIslandExpanded(true, on: external.displayID)
+        presenter.setExpandedIslandDisplayID(external.displayID)
         presenter.setClipboardAssistantVisible(false, on: primary.displayID)
         #expect(primaryHost.window?.isVisible == true && externalHost.window?.isVisible == false)
-        presenter.setIslandExpanded(true, on: primary.displayID)
+        presenter.setExpandedIslandDisplayID(primary.displayID)
         #expect(primaryHost.window?.isVisible == false && externalHost.window?.isVisible == true)
-        presenter.setIslandExpanded(false)
+        presenter.setExpandedIslandDisplayID(nil)
 
         let externalFrame = externalHost.window?.frame
         presenter.setVoiceRecording(true, on: primary.displayID)

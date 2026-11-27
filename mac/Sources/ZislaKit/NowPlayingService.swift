@@ -199,6 +199,8 @@ public final class NowPlayingService: ObservableObject {
         case removeTrackFromWishList = 108
     }
 
+    typealias PrepareQQMusicPlaybackCommand = @MainActor (Command, pid_t?, String?) -> (@Sendable () -> Bool)?
+
     @Published public private(set) var snapshot: NowPlayingSnapshot?
     @Published public private(set) var isAvailable = false
     public var isCyclingPlaybackMode: Bool { specialistPlaybackModeCycleTask != nil }
@@ -210,7 +212,7 @@ public final class NowPlayingService: ObservableObject {
     private typealias GetPlayingFunction = @convention(c) (DispatchQueue, BoolCallback) -> Void
     private typealias GetPIDFunction = @convention(c) (DispatchQueue, PIDCallback) -> Void
     private typealias RegisterFunction = @convention(c) (DispatchQueue) -> Void
-    private typealias SendCommandFunction = @convention(c) (Int, NSDictionary?) -> Bool
+    typealias SendCommandFunction = @convention(c) (Int, NSDictionary?) -> Bool
     private typealias SetModeFunction = @convention(c) (Int) -> Void
     private typealias SetElapsedTimeFunction = @convention(c) (Double) -> Void
 
@@ -219,6 +221,9 @@ public final class NowPlayingService: ObservableObject {
     private let loadLyrics: @Sendable (String, String, Double?) async -> LyricsSearchResult
     private let adapterClient = MediaRemoteAdapterClient()
     private let specialist = MediaAppSpecialist.shared
+    private let prepareQQMusicPlaybackCommand: PrepareQQMusicPlaybackCommand
+    private(set) var qqMusicPlaybackTask: Task<Void, Never>?
+    private var qqMusicPlaybackGeneration: UInt64 = 0
     private var activeProfile: MediaAppProfile?
     private var framework: UnsafeMutableRawPointer?
     private var getInfo: GetInfoFunction?
@@ -273,12 +278,11 @@ public final class NowPlayingService: ObservableObject {
 
     private let controlOverrideLifetime: TimeInterval = 2
 
-    public init() {
-        iconCache = .shared
+    public convenience init() {
         let lyricsService = LyricsService()
-        loadLyrics = { title, artist, duration in
+        self.init(loadLyrics: { title, artist, duration in
             await lyricsService.lyrics(title: title, artist: artist, duration: duration)
-        }
+        })
     }
 
     init(
@@ -286,10 +290,14 @@ public final class NowPlayingService: ObservableObject {
         initialRemoteSnapshot: NowPlayingSnapshot? = nil,
         initialRemotePID: pid_t? = nil,
         systemAudioIsAudible: Bool = false,
-        iconCache: ApplicationIconDataCache = .shared
+        iconCache: ApplicationIconDataCache = .shared,
+        sendCommand: SendCommandFunction? = nil,
+        prepareQQMusicPlaybackCommand: @escaping PrepareQQMusicPlaybackCommand = MediaAppSpecialist.shared.prepareQQMusicPlaybackCommand
     ) {
         self.loadLyrics = loadLyrics
         self.iconCache = iconCache
+        sendCommandFunction = sendCommand
+        self.prepareQQMusicPlaybackCommand = prepareQQMusicPlaybackCommand
         remoteSnapshot = initialRemoteSnapshot
         remotePlaybackState = initialRemoteSnapshot.map { $0.isPlaying ? .playing : .paused } ?? .unavailable
         remotePID = initialRemotePID ?? initialRemoteSnapshot?.sourcePID
@@ -299,6 +307,8 @@ public final class NowPlayingService: ObservableObject {
     public func setPreferredSource(_ preference: MediaSourcePreference) {
         guard preferredSource != preference else { return }
         preferredSource = preference
+        qqMusicPlaybackGeneration &+= 1
+        qqMusicPlaybackTask = nil
         playbackModeOverride = nil
         playbackStateOverride = nil
         favoriteOverride = nil
@@ -453,6 +463,8 @@ public final class NowPlayingService: ObservableObject {
     public func stop() {
         isRunning = false
         lifecycleGeneration &+= 1
+        qqMusicPlaybackGeneration &+= 1
+        qqMusicPlaybackTask = nil
         spectrumMonitoringEnabled = false
         spectrumVisualizationEnabled = false
         for observer in observers {
@@ -541,38 +553,51 @@ public final class NowPlayingService: ObservableObject {
         resolveSnapshot()
     }
 
+    /// QQ Music Accessibility waits on the player process, so success on that path means the command was queued.
     @discardableResult
     public func send(_ command: Command) -> Bool {
         guard let current = snapshot, current.supportsControls else { return false }
-        let sent =
-            if let profile = activeProfile,
-            profile.prefersAccessibilityControls,
-            profile.supportsPlaybackControls,
-            command.rawValue <= Command.previous.rawValue,
-            specialist.sendPlaybackCommand(
-                command,
-                pid: current.sourcePID,
-                bundleIdentifier: current.sourceBundleIdentifier
-            ) == true {
-                true
-            } else if usesAdapter, command.rawValue <= Command.previous.rawValue {
-                adapterClient.run(["send", "\(command.rawValue)"])
-            } else if let direct = sendCommandFunction?(command.rawValue, nil), direct {
-                direct
-            } else if let profile = activeProfile,
-                      profile.supportsPlaybackControls,
-                      command.rawValue <= Command.previous.rawValue,
-                      let specialized = specialist.sendPlaybackCommand(
-                          command,
-                          pid: current.sourcePID,
-                          bundleIdentifier: current.sourceBundleIdentifier
-                      ) {
-                specialized
-            } else {
-                false
+        if activeProfile?.prefersAccessibilityControls == true,
+           let perform = prepareQQMusicPlaybackCommand(command, current.sourcePID, current.sourceBundleIdentifier) {
+            let previous = qqMusicPlaybackTask
+            let generation = qqMusicPlaybackGeneration
+            qqMusicPlaybackTask = Task { [weak self] in
+                await previous?.value
+                guard let target = self?.snapshot, target.supportsControls,
+                      self?.qqMusicPlaybackGeneration == generation,
+                      !Self.sourceChanged(target, current) else { return }
+                let sent = await withCheckedContinuation { continuation in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        continuation.resume(returning: perform())
+                    }
+                }
+                guard let self, self.qqMusicPlaybackGeneration == generation,
+                      let latest = self.snapshot, latest.supportsControls,
+                      !Self.sourceChanged(latest, target),
+                      ControlIdentity(latest) == ControlIdentity(target),
+                      sent || self.sendRemoteCommand(command)
+                else { return }
+                self.applyPlaybackCommand(command, to: target)
             }
-        guard sent else { return false }
+            return true
+        }
+        guard sendRemoteCommand(command)
+            || (activeProfile?.supportsPlaybackControls == true
+                && !usesAdapter
+                && specialist.sendScriptedPlaybackCommand(command, bundleIdentifier: current.sourceBundleIdentifier))
+        else { return false }
+        applyPlaybackCommand(command, to: current)
+        return true
+    }
 
+    private func sendRemoteCommand(_ command: Command) -> Bool {
+        if usesAdapter, command.rawValue <= Command.previous.rawValue {
+            return adapterClient.run(["send", "\(command.rawValue)"])
+        }
+        return sendCommandFunction?(command.rawValue, nil) == true
+    }
+
+    private func applyPlaybackCommand(_ command: Command, to current: NowPlayingSnapshot) {
         if let value = Self.optimisticPlaybackValue(after: command, current: current.isPlaying) {
             playbackRefreshGeneration &+= 1
             playbackStateOverride = TimedControlOverride(
@@ -589,7 +614,6 @@ public final class NowPlayingService: ObservableObject {
             }
             resolveSnapshot()
         }
-        return true
     }
 
     @discardableResult

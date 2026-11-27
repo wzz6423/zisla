@@ -114,7 +114,7 @@ export const it = createCatalog({
       agenda: {
         name: 'Agenda e meteo',
         caption:
-          'Mostra il meteo della posizione attuale e di un massimo di sei luoghi scelti. Consulta, aggiungi o elimina eventi e promemoria e segna questi ultimi come completati. Gli eventi con un link di riunione mostrano un conto alla rovescia 10 minuti prima dell’inizio e permettono di partecipare con un clic. Crea una nota di riunione o collega e scollega note contestuali esistenti. L’ora di aggiornamento del meteo appare nell’intestazione, a sinistra del pulsante di aggiornamento.',
+          'Mostra il meteo della posizione attuale e di un massimo di sei luoghi scelti. Consulta, aggiungi o elimina eventi e promemoria e segna questi ultimi come completati. Gli eventi con un link di riunione mostrano un conto alla rovescia 10 minuti prima dell’inizio e permettono di partecipare con un clic. Crea una nota di riunione o collega e scollega note contestuali esistenti. L’ora di aggiornamento del meteo appare nell’intestazione, a sinistra del pulsante di aggiornamento. Se i dati meteo sono incompleti, altre fonti completano il risultato più dettagliato; i dati disponibili restano visibili se non è possibile ottenere il resto.',
         points: ['Meteo e calendario', 'Conto alla rovescia di 10 minuti', 'Partecipa e collega le note'],
       },
       mail: {
@@ -249,7 +249,7 @@ export const it = createCatalog({
       },
       pet: {
         title: 'Mascotte dell’isola',
-        description: 'Scegli dal catalogo ampliato di animali e personaggi oppure importa un’immagine, animazione o video compatibile con un nome personalizzato. Posiziona il compagno ai lati dell’isola ed elimina quelli importati nelle Impostazioni. Animazioni fino a 30 secondi e file fino a 100 MB.',
+        description: 'Scegli dal catalogo ampliato di animali e personaggi oppure importa un’immagine, animazione o video compatibile con un nome personalizzato. Posiziona il compagno ai lati dell’isola ed elimina quelli importati nelle Impostazioni. Animazioni fino a 30 secondi e file fino a 100 MB. Quando espandi l’isola su uno schermo, gli animali sugli altri schermi restano al loro posto.',
         detail: 'Catalogo ampliato · Importa immagini e video · Elimina compagni personalizzati',
       },
       lockScreen: {
@@ -366,6 +366,20 @@ export const it = createCatalog({
         "shortcuts": "Trascina con il puntatore. Il gesto di scuotimento si imposta separatamente; nessuna scorciatoia fissa richiesta.",
         "permissions": "Selettore file e segnalibri sicuri permettono l’accesso ai file scelti. Le catture richiedono Registrazione schermo.",
         "output": "Gli originali restano al loro posto. Riferimenti e catture restano locali; il PNG usa la destinazione scelta. Gli ZIP e i risultati immagini riusciti tornano sullo scaffale; i media importati entrano nella libreria del progetto di registrazione."
+      },
+      "weather": {
+        "title": "Visualizzare il meteo più completo disponibile",
+        "summary": "Controlla il meteo della posizione attuale o dei luoghi salvati e completa i dati mancanti.",
+        "entry": "Isola → Agenda; Impostazioni → Meteo.",
+        "steps": [
+          "Attiva Meteo in Impostazioni → Funzionalità; cerca e salva altri luoghi nelle impostazioni meteo.",
+          "Apri Agenda o aggiorna il meteo. Se mancano informazioni, altre fonti completano il risultato più dettagliato.",
+          "Se le fonti aggiuntive non sono disponibili, mantieni le informazioni ottenute e nascondi le misure mancanti.",
+          "Controlla le fonti utilizzate nei link sotto l’elenco meteo; le allerte ufficiali vengono recuperate separatamente."
+        ],
+        "shortcuts": "Usa il pulsante di aggiornamento in Agenda; non è prevista una scorciatoia globale fissa.",
+        "permissions": "La posizione attuale richiede accesso alla localizzazione; i luoghi aggiunti manualmente no. Meteo e allerte usano la rete.",
+        "output": "Il meteo resta in memoria e i luoghi salvati rimangono sul dispositivo. I dati parziali sono visibili se non possono essere completati; le previsioni più vecchie di un’ora vengono nascoste."
       },
       "meeting": {
         "title": "Partecipa a una riunione e conserva note",

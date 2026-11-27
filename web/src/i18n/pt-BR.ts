@@ -114,7 +114,7 @@ export const ptBR = createCatalog({
       agenda: {
         name: 'Agenda e clima',
         caption:
-          'Mostra o tempo da sua localização e de até seis lugares escolhidos. Consulte, adicione ou exclua eventos e lembretes e marque os lembretes como concluídos. Eventos com link de reunião exibem uma contagem regressiva 10 minutos antes do início e permitem entrar com um clique. Crie uma nota de reunião ou vincule e desvincule notas contextuais existentes. O horário de atualização da lista do tempo aparece no cabeçalho, à esquerda do botão de atualizar.',
+          'Mostra o tempo da sua localização e de até seis lugares escolhidos. Consulte, adicione ou exclua eventos e lembretes e marque os lembretes como concluídos. Eventos com link de reunião exibem uma contagem regressiva 10 minutos antes do início e permitem entrar com um clique. Crie uma nota de reunião ou vincule e desvincule notas contextuais existentes. O horário de atualização da lista do tempo aparece no cabeçalho, à esquerda do botão de atualizar. Quando faltam dados meteorológicos, outras fontes complementam o resultado mais completo; os dados disponíveis são mantidos se o restante não puder ser obtido.',
         points: ['Tempo e calendário', 'Contagem regressiva de 10 minutos', 'Entrar e vincular notas'],
       },
       mail: {
@@ -249,7 +249,7 @@ export const ptBR = createCatalog({
       },
       pet: {
         title: 'Mascote da ilha',
-        description: 'Escolha no catálogo ampliado de animais e personagens ou importe uma imagem, animação ou vídeo compatível com um nome próprio. Posicione o mascote em um lado da ilha e remova os importados nos Ajustes. Animações de até 30 segundos e arquivos de até 100 MB.',
+        description: 'Escolha no catálogo ampliado de animais e personagens ou importe uma imagem, animação ou vídeo compatível com um nome próprio. Posicione o mascote em um lado da ilha e remova os importados nos Ajustes. Animações de até 30 segundos e arquivos de até 100 MB. Ao expandir a ilha em uma tela, os mascotes das outras telas permanecem no lugar.',
         detail: 'Catálogo ampliado · Importar imagens e vídeos · Remover mascotes personalizados',
       },
       lockScreen: {
@@ -366,6 +366,20 @@ export const ptBR = createCatalog({
         "shortcuts": "Arraste com o ponteiro. Agitar para soltar é configurável separadamente; não exige atalho fixo.",
         "permissions": "O seletor e os marcadores seguros permitem acesso aos arquivos escolhidos. Capturas exigem Gravação de Tela.",
         "output": "Os originais ficam no lugar. Referências e capturas persistem localmente; o PNG vai ao destino escolhido. Os ZIP e os resultados de imagem concluídos voltam à prateleira; a mídia importada entra na biblioteca do projeto de gravação."
+      },
+      "weather": {
+        "title": "Ver os dados meteorológicos mais completos",
+        "summary": "Consulte sua localização ou locais salvos e preencha lacunas com outras fontes.",
+        "entry": "Ilha → Agenda; Ajustes → Clima.",
+        "steps": [
+          "Ative Clima em Ajustes → Recursos; pesquise e salve outros lugares nos ajustes do clima.",
+          "Abra a Agenda ou atualize o clima. Se faltarem informações, outras fontes complementam o resultado mais completo.",
+          "Se as fontes adicionais estiverem indisponíveis, mantenha os dados disponíveis e oculte as métricas ausentes.",
+          "Consulte os links abaixo da lista do clima para identificar as fontes usadas; alertas oficiais são obtidos separadamente."
+        ],
+        "shortcuts": "Use o botão de atualização na Agenda; não há atalho global fixo.",
+        "permissions": "A localização atual precisa de permissão de localização; lugares adicionados manualmente não. Clima e alertas usam a rede.",
+        "output": "O clima fica na memória e os locais salvos permanecem no dispositivo. Dados parciais são exibidos quando não podem ser completados; previsões com mais de uma hora são ocultadas."
       },
       "meeting": {
         "title": "Entre em uma reunião e guarde notas",

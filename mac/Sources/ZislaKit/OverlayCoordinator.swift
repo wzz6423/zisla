@@ -937,7 +937,7 @@ public final class OverlayCoordinator: NSObject {
                 panel?.ignoresMouseEvents = true
                 applyPanelFocusPolicy()
                 applyPanelLevel()
-                updatePersistentPanels()
+                updatePersistentPanels(.visibility)
                 if stopsAfterTransientReveal { schedulePanelDismiss() }
             case .hide:
                 cancelPendingPanelCollapse()
@@ -1122,7 +1122,11 @@ public final class OverlayCoordinator: NSObject {
         return layouts.first { $0.displayID == displayID }
     }
 
-    private func presentCurrentLayout(forcePresentPersistentPanels: Bool = false) {
+    private enum PersistentPanelUpdate {
+        case visibility, layout, rejoinSpace
+    }
+
+    private func presentCurrentLayout(persistentPanelUpdate: PersistentPanelUpdate = .visibility) {
         guard !isScreenLocked,
               !isScreenshotActive,
               let layout = layout(for: activeDisplayID),
@@ -1156,10 +1160,10 @@ public final class OverlayCoordinator: NSObject {
             crossesDisplay: crossesDisplay
         )
         presentedDisplayID = layout.displayID
-        updatePersistentPanels(forcePresent: forcePresentPersistentPanels)
+        updatePersistentPanels(persistentPanelUpdate)
     }
 
-    private func updatePersistentPanels(forcePresent: Bool = false) {
+    private func updatePersistentPanels(_ update: PersistentPanelUpdate = .layout) {
         guard !isScreenLocked,
               !isScreenshotActive,
               isPersistentContentVisible,
@@ -1190,6 +1194,10 @@ public final class OverlayCoordinator: NSObject {
             let panel: IslandPanel
             let isNewPanel: Bool
             if let existingPanel = persistentPanels[layout.displayID] {
+                if update == .visibility, existingPanel.isVisible {
+                    visibleDisplayIDs.insert(layout.displayID)
+                    continue
+                }
                 if let contentView = existingPanel.contentView {
                     persistentContentViewUpdater?(contentView, layout)
                 }
@@ -1213,7 +1221,7 @@ public final class OverlayCoordinator: NSObject {
 
             let targetFrame = persistentPanelFrameProvider(layout)
             // Present only new, previously hidden, resized, or explicitly refronted panels.
-            let needsPresent = isNewPanel || !panel.isVisible || panel.frame != targetFrame || forcePresent
+            let needsPresent = isNewPanel || !panel.isVisible || panel.frame != targetFrame || update == .rejoinSpace
             if needsPresent {
                 panel.present(at: targetFrame, animated: false)
             }
@@ -1255,9 +1263,9 @@ public final class OverlayCoordinator: NSObject {
     private func activeSpaceDidChange(_ notification: Notification) {
         refreshScreensIfNeeded()
         if isVisible {
-            presentCurrentLayout(forcePresentPersistentPanels: true)
+            presentCurrentLayout(persistentPanelUpdate: .rejoinSpace)
         } else {
-            updatePersistentPanels(forcePresent: true)
+            updatePersistentPanels(.rejoinSpace)
         }
     }
 }

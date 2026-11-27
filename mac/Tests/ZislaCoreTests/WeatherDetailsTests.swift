@@ -78,11 +78,11 @@ struct WeatherDetailsTests {
         let response = try JSONDecoder().decode(OpenMeteoResponse.self, from: Data(json.utf8))
 
         #expect(response.current.precipitation == 1.5)
-        #expect(response.daily?.sunrise.first == "2026-07-23T05:04")
-        #expect(response.daily?.temperatureMin?.first == 24.1)
-        #expect(response.daily?.temperatureMax?.first == 33.8)
-        #expect(response.daily?.precipitationProbabilityMax.first == 82)
-        #expect(response.daily?.precipitationSum.first == 18.5)
+        #expect((response.daily?.sunrise?.first ?? nil) == "2026-07-23T05:04")
+        #expect((response.daily?.temperatureMin?.first ?? nil) == 24.1)
+        #expect((response.daily?.temperatureMax?.first ?? nil) == 33.8)
+        #expect((response.daily?.precipitationProbabilityMax?.first ?? nil) == 82)
+        #expect((response.daily?.precipitationSum?.first ?? nil) == 18.5)
     }
 
     @Test

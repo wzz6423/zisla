@@ -185,6 +185,27 @@ test('clipboard image text search is authored and rendered in every locale', () 
   assert.match(instructions, /Right-click.*recognize or copy its text/);
 });
 
+test('weather fusion is authored and reachable in every locale', () => {
+  for (const locale of siteLocales) {
+    const authored = authoredCatalogs.get(locale)?.showcase?.modules?.agenda?.caption;
+    assert.equal(typeof authored, 'string', `${locale} must author its weather overview`);
+    assert.ok(renderInMemory(locale).html.includes(escapedText(authored)), `${locale} must render its weather overview`);
+    const guide = authoredCatalogs.get(locale)?.help?.guides?.weather;
+    assert.ok(guide?.steps.length >= 3, `${locale} must author its weather instructions`);
+    const { html } = renderHelpInMemory(locale);
+    assert.ok(html.includes('href="#guide-weather"') && html.includes('id="guide-weather"'),
+      `${locale} must link to its weather instructions`);
+    for (const step of guide.steps) {
+      assert.ok(html.includes(escapedText(step)), `${locale} must render its authored weather instructions`);
+    }
+    if (locale !== 'en') {
+      assert.notEqual(guide.output, english.help.guides.weather.output, `${locale} must translate the fallback behavior`);
+    }
+  }
+  assert.match(english.help.guides.weather.steps.join(' '), /most complete result/);
+  assert.match(english.help.guides.weather.output, /partial data/);
+});
+
 test('launch film sits after the changelog and before the footer with explicit playback', () => {
   const content = site.getSiteContent('zh-Hans');
   const { html } = renderInMemory('zh-Hans');

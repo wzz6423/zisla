@@ -114,7 +114,7 @@ export const nl = createCatalog({
       agenda: {
         name: 'Agenda en weer',
         caption:
-          'Toont het weer op je locatie en op maximaal zes gekozen plaatsen. Bekijk, voeg toe of verwijder agenda-items en herinneringen en markeer herinneringen als voltooid. Items met een vergaderlink tellen vanaf 10 minuten voor de start af en laten je met één klik deelnemen. Maak een vergadernotitie of koppel en ontkoppel bestaande contextnotities. Het tijdstip van de weerupdate staat in de kop, links van de vernieuwknop.',
+          'Toont het weer op je locatie en op maximaal zes gekozen plaatsen. Bekijk, voeg toe of verwijder agenda-items en herinneringen en markeer herinneringen als voltooid. Items met een vergaderlink tellen vanaf 10 minuten voor de start af en laten je met één klik deelnemen. Maak een vergadernotitie of koppel en ontkoppel bestaande contextnotities. Het tijdstip van de weerupdate staat in de kop, links van de vernieuwknop. Bij onvolledige weergegevens vullen andere bronnen het meest volledige resultaat aan; beschikbare gegevens blijven behouden als de rest niet kan worden opgehaald.',
         points: ['Weer en agenda', 'Aftellen vanaf 10 minuten vooraf', 'Deelnemen en notities koppelen'],
       },
       mail: {
@@ -249,7 +249,7 @@ export const nl = createCatalog({
       },
       pet: {
         title: 'Huisdier in het eiland',
-        description: 'Kies uit de uitgebreide dieren- en personagecatalogus of importeer een ondersteunde afbeelding, animatie of video met een eigen naam. Plaats het dier aan een kant van het eiland en verwijder geïmporteerde dieren in Instellingen. Animaties tot 30 seconden en bestanden tot 100 MB.',
+        description: 'Kies uit de uitgebreide dieren- en personagecatalogus of importeer een ondersteunde afbeelding, animatie of video met een eigen naam. Plaats het dier aan een kant van het eiland en verwijder geïmporteerde dieren in Instellingen. Animaties tot 30 seconden en bestanden tot 100 MB. Als je het eiland op één scherm uitklapt, blijven de huisdieren op de andere schermen op hun plek.',
         detail: 'Uitgebreide catalogus · Afbeeldingen en video importeren · Eigen dieren verwijderen',
       },
       lockScreen: {
@@ -353,6 +353,20 @@ export const nl = createCatalog({
         "shortcuts": "Sleep met de aanwijzer. Schudden is apart instelbaar; geen vaste sneltoets nodig.",
         "permissions": "Bestandskiezer en beveiligde bladwijzers geven toegang tot gekozen bestanden. Vastleggen vereist Schermopname.",
         "output": "Originelen blijven waar ze zijn. Verwijzingen en beelden blijven lokaal bewaard; PNG gaat naar de gekozen bestemming. ZIP-archieven en geslaagde afbeeldingsresultaten keren terug naar de plank; geïmporteerde media worden aan de bibliotheek van het opnameproject toegevoegd."
+      },
+      "weather": {
+        "title": "Het meest volledige beschikbare weer bekijken",
+        "summary": "Bekijk weer voor je huidige of opgeslagen locaties en vul ontbrekende gegevens aan.",
+        "entry": "Island → Agenda; Instellingen → Weer.",
+        "steps": [
+          "Schakel Weer in via Instellingen → Functies; zoek en bewaar andere plaatsen bij de weerinstellingen.",
+          "Open Agenda of vernieuw het weer. Andere bronnen vullen ontbrekende gegevens aan op basis van het meest volledige resultaat.",
+          "Als aanvullende bronnen niet beschikbaar zijn, blijven beschikbare gegevens staan en worden ontbrekende waarden verborgen.",
+          "Bekijk de gebruikte bronnen via de links onder de weerlijst; officiële waarschuwingen worden afzonderlijk opgehaald."
+        ],
+        "shortcuts": "Gebruik de vernieuwknop in Agenda; er is geen vaste algemene sneltoets.",
+        "permissions": "De huidige locatie vraagt locatietoegang; handmatig toegevoegde plaatsen niet. Weer en officiële waarschuwingen gebruiken het netwerk.",
+        "output": "Weer blijft in het geheugen en opgeslagen plaatsen blijven lokaal. Beschikbare deelgegevens blijven zichtbaar als aanvullen niet lukt; voorspellingen ouder dan een uur worden verborgen."
       },
       "meeting": {
         "title": "Neem deel aan een vergadering en bewaar notities",

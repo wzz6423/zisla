@@ -575,7 +575,7 @@ struct ClipboardAssistantIslandPresentationTests {
         let handler = source[handlerStart.lowerBound..<handlerEnd.lowerBound]
         // Dismissal must not clear the expanded island's suppression of the collapsed status bar.
         #expect(handler.contains("setClipboardAssistantVisible(visible, on: displayID)"))
-        #expect(!handler.contains("setIslandExpanded"))
+        #expect(!handler.contains("setExpandedIslandDisplayID"))
     }
 
 }

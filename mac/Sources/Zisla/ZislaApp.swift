@@ -489,7 +489,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 hostingView.rootView = persistentPetRootView(layout)
             }
         )
-        coordinator.onVisibilityChanged = { [weak self, weak coordinator] visible in
+        coordinator.onVisibilityChanged = { [weak self] visible in
             let wasVisible = model.isIslandVisible
             if visible && !wasVisible {
                 self?.contextNoteController?.prepareShelfCapture(at: NSEvent.mouseLocation)
@@ -509,7 +509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     self?.islandClipboardHandoffTask = nil
                 }
             }
-            self?.noticePresenter?.setIslandExpanded(visible, on: coordinator?.activeDisplayID)
+            self?.noticePresenter?.setExpandedIslandDisplayID(visible ? model.islandScreenLayout?.displayID : nil)
             if visible {
                 self?.flushVoiceRecordingPanelRestore()
                 model.clipboardAssistant.dismiss(animated: false)
@@ -530,7 +530,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         coordinator.onActiveLayoutChanged = { [weak self] layout in
             model.islandScreenLayout = layout
-            self?.noticePresenter?.setIslandExpanded(model.isIslandVisible, on: layout?.displayID)
+            if model.isIslandVisible { self?.noticePresenter?.setExpandedIslandDisplayID(layout?.displayID) }
             if let displayID = layout?.displayID { self?.noticePresenter?.publishCompactLayout(on: displayID) }
         }
         coordinator.onPinnedChanged = { pinned in model.isPinned = pinned }
@@ -684,6 +684,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
+        if model.isIslandVisible { noticePresenter?.setExpandedIslandDisplayID(coordinator.activeDisplayID) }
         noticePresenter?.onJoinMeeting = { model.joinMeetingNotice($0) }
         coordinator.collapsedControlContainsPoint = { [weak self] point in
             self?.noticePresenter?.containsCompactPomodoroControl(at: point) == true

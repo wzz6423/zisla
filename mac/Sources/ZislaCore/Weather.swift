@@ -5,10 +5,10 @@ public struct OpenMeteoResponse: Decodable, Equatable, Sendable {
     public struct Current: Decodable, Equatable, Sendable {
         public var time: String
         public var temperature: Double
-        public var apparentTemperature: Double
-        public var weatherCode: Int
-        public var isDay: Bool
-        public var precipitation: Double
+        public var apparentTemperature: Double?
+        public var weatherCode: Int?
+        public var isDay: Bool?
+        public var precipitation: Double?
 
         private enum CodingKeys: String, CodingKey {
             case time
@@ -23,21 +23,21 @@ public struct OpenMeteoResponse: Decodable, Equatable, Sendable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             time = try container.decode(String.self, forKey: .time)
             temperature = try container.decode(Double.self, forKey: .temperature)
-            apparentTemperature = try container.decode(Double.self, forKey: .apparentTemperature)
-            weatherCode = try container.decode(Int.self, forKey: .weatherCode)
+            apparentTemperature = try container.decodeIfPresent(Double.self, forKey: .apparentTemperature)
+            weatherCode = try container.decodeIfPresent(Int.self, forKey: .weatherCode)
             // Open-Meteo encodes day/night as 0/1.
-            isDay = try container.decode(Int.self, forKey: .isDay) != 0
-            precipitation = try container.decodeIfPresent(Double.self, forKey: .precipitation) ?? 0
+            isDay = try container.decodeIfPresent(Int.self, forKey: .isDay).map { $0 != 0 }
+            precipitation = try container.decodeIfPresent(Double.self, forKey: .precipitation)
         }
     }
 
     public struct Daily: Decodable, Equatable, Sendable {
-        public var sunrise: [String]
-        public var sunset: [String]
-        public var temperatureMin: [Double]?
-        public var temperatureMax: [Double]?
-        public var precipitationProbabilityMax: [Int]
-        public var precipitationSum: [Double]
+        public var sunrise: [String?]?
+        public var sunset: [String?]?
+        public var temperatureMin: [Double?]?
+        public var temperatureMax: [Double?]?
+        public var precipitationProbabilityMax: [Int?]?
+        public var precipitationSum: [Double?]?
 
         private enum CodingKeys: String, CodingKey {
             case sunrise
@@ -58,6 +58,8 @@ public struct OpenMeteoResponse: Decodable, Equatable, Sendable {
 public struct WeatherCondition: Equatable, Sendable {
     public let summary: String
     public let symbolName: String
+    /// A provider can supply a valid description without a matching symbol.
+    package private(set) var isKnown = true
 
     public init(summary: String, symbolName: String) {
         self.summary = summary
@@ -138,6 +140,7 @@ public struct WeatherCondition: Equatable, Sendable {
         default:
             summary = AppLocalization.text("天气未知")
             symbolName = "questionmark.circle"
+            isKnown = false
         }
     }
 }

@@ -145,11 +145,13 @@ final class SideNoticePresenter {
         cancellables.removeAll()
     }
 
-    func setIslandExpanded(_ expanded: Bool, on displayID: UInt32? = nil) {
-        updateSuppression {
-            $0.isIslandExpanded = expanded
-            $0.islandDisplayID = expanded ? displayID : nil
-        }
+    func setExpandedIslandDisplayID(_ displayID: CGDirectDisplayID?) {
+        let previousDisplayID = suppression.islandDisplayID
+        guard previousDisplayID != displayID else { return }
+        suppression.islandDisplayID = displayID
+        suppression.isIslandExpanded = displayID != nil
+        if let displayID { panelsByDisplayID[displayID]?.orderOut() }
+        if let previousDisplayID { updatePanels(on: previousDisplayID) }
     }
 
     func setPlacementSelectionActive(_ active: Bool) {
@@ -203,12 +205,8 @@ final class SideNoticePresenter {
         }
     }
 
-    private func updatePanels(rejoiningActiveSpace: Bool = false) {
+    private func updatePanels(on displayID: CGDirectDisplayID? = nil, rejoiningActiveSpace: Bool = false) {
         guard !isStopped else { return }
-        let hidesPanels = isScreenshotActive || isPlacementSelectionActive
-        if hidesPanels {
-            hideAllPanels()
-        }
         let snapshots = screenSnapshotProvider()
         guard !snapshots.isEmpty else {
             hideAllPanels()
@@ -226,6 +224,7 @@ final class SideNoticePresenter {
         let date = now()
 
         for currentSnapshot in snapshots where visibleDisplayIDs.contains(UInt32(currentSnapshot.displayID)) {
+            if let displayID, currentSnapshot.displayID != displayID { continue }
             guard let settings = settingsStore.settings.islandSettings(for: currentSnapshot, displayCount: snapshots.count) else { continue }
             let panels = panels(for: currentSnapshot.displayID)
             let snapshot = Self.snapshotPreservingPhysicalNotch(
@@ -259,7 +258,7 @@ final class SideNoticePresenter {
             onCompactLayoutChanged?(snapshot.displayID, configuration.expandsForDetailedStatus,
                                     configuration.compactStatusLength, configuration.compactStatusSideWidth,
                                     configuration.statusIconSize)
-            if hidesPanels || suppression.scoped(to: snapshot.displayID).hidesNotices {
+            if isScreenshotActive || isPlacementSelectionActive || suppression.scoped(to: snapshot.displayID).hidesNotices {
                 panels.orderOut()
                 continue
             }

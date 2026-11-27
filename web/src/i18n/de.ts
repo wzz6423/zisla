@@ -120,7 +120,7 @@ export const de: SiteContent = {
       agenda: {
         name: 'Termine und Wetter',
         caption:
-          'Zeigt das Wetter am aktuellen Standort und an bis zu sechs gewählten Orten. Kalenderereignisse und Erinnerungen lassen sich ansehen, hinzufügen, löschen und abschließen. Ereignisse mit einem Besprechungslink zeigen ab 10 Minuten vor Beginn einen Countdown und erlauben den Beitritt per Klick. Erstellen Sie eine Besprechungsnotiz oder verknüpfen und lösen Sie vorhandene ortsbezogene Notizen. Die Aktualisierungszeit der Wetterliste steht in der Kopfzeile links neben der Schaltfläche zum Aktualisieren.',
+          'Zeigt das Wetter am aktuellen Standort und an bis zu sechs gewählten Orten. Kalenderereignisse und Erinnerungen lassen sich ansehen, hinzufügen, löschen und abschließen. Ereignisse mit einem Besprechungslink zeigen ab 10 Minuten vor Beginn einen Countdown und erlauben den Beitritt per Klick. Erstellen Sie eine Besprechungsnotiz oder verknüpfen und lösen Sie vorhandene ortsbezogene Notizen. Die Aktualisierungszeit der Wetterliste steht in der Kopfzeile links neben der Schaltfläche zum Aktualisieren. Bei unvollständigen Wetterdaten ergänzen weitere Quellen das vollständigste Ergebnis. Verfügbare Teilinformationen bleiben erhalten, wenn die übrigen Daten nicht abrufbar sind.',
         points: ['Wetter und Kalender', 'Countdown 10 Minuten vorher', 'Beitreten und Notizen verknüpfen'],
       },
       mail: {
@@ -263,7 +263,7 @@ export const de: SiteContent = {
       pet: {
         title: 'Maskottchen in der Island',
         description:
-          'Wählen Sie aus dem erweiterten Tier- und Figurenkatalog oder importieren Sie ein unterstütztes Bild, eine Animation oder ein Video mit eigenem Namen. Platzieren Sie das Tier auf einer Seite der Insel und entfernen Sie importierte Tiere in den Einstellungen. Animationen dürfen höchstens 30 Sekunden, Dateien höchstens 100 MB umfassen.',
+          'Wählen Sie aus dem erweiterten Tier- und Figurenkatalog oder importieren Sie ein unterstütztes Bild, eine Animation oder ein Video mit eigenem Namen. Platzieren Sie das Tier auf einer Seite der Insel und entfernen Sie importierte Tiere in den Einstellungen. Animationen dürfen höchstens 30 Sekunden, Dateien höchstens 100 MB umfassen. Wenn Sie die Insel auf einem Bildschirm ausklappen, bleiben die Haustiere auf den anderen Bildschirmen an ihrem Platz.',
         detail: 'Erweiterter Katalog · Bilder und Videos importieren · Eigene Tiere entfernen',
       },
       lockScreen: {
@@ -383,6 +383,20 @@ export const de: SiteContent = {
         "shortcuts": "Mit dem Zeiger ziehen. Die Schüttelgeste ist separat einstellbar; kein festes Tastenkürzel nötig.",
         "permissions": "Dateiauswahl und sichere Lesezeichen erlauben Zugriff auf ausgewählte Dateien. Bildschirmfotos benötigen Bildschirmaufnahme.",
         "output": "Originale bleiben am Ort. Verweise und geparkte Bilder bleiben lokal gespeichert; PNG geht an den gewählten Zielort. ZIP-Archive und erfolgreiche Bildergebnisse kehren in die Ablage zurück; importierte Medien kommen in die Bibliothek des Aufnahmeprojekts."
+      },
+      "weather": {
+        "title": "Das vollständigste verfügbare Wetter anzeigen",
+        "summary": "Wetter am aktuellen oder gespeicherten Standort prüfen und fehlende Daten aus weiteren Quellen ergänzen.",
+        "entry": "Island → Termine; Einstellungen → Wetter.",
+        "steps": [
+          "Aktivieren Sie Wetter unter Einstellungen → Funktionen; weitere Orte suchen und speichern Sie in den Wettereinstellungen.",
+          "Öffnen Sie Termine oder aktualisieren Sie das Wetter. Fehlende Daten werden aus weiteren Quellen anhand des vollständigsten Ergebnisses ergänzt.",
+          "Sind zusätzliche Quellen nicht erreichbar, bleiben verfügbare Daten erhalten und fehlende Messwerte werden ausgeblendet.",
+          "Prüfen Sie die beitragenden Quellen über die Links unter der Wetterliste; amtliche Warnungen werden separat abgerufen."
+        ],
+        "shortcuts": "Verwenden Sie die Aktualisierung in Termine; es gibt keinen festen globalen Kurzbefehl.",
+        "permissions": "Der aktuelle Standort benötigt Standortzugriff; manuell hinzugefügte Orte nicht. Wetter und amtliche Warnungen nutzen das Netzwerk.",
+        "output": "Wetterdaten bleiben im Arbeitsspeicher, gespeicherte Orte lokal. Verfügbare Teilinformationen werden auch ohne Ergänzung angezeigt; Vorhersagen älter als eine Stunde werden ausgeblendet."
       },
       "meeting": {
         "title": "An einem Meeting teilnehmen und Notizen behalten",
