@@ -20,7 +20,7 @@ macOS 14 ve sonrası desteklenir. macOS 26 Liquid Glass kullanır; macOS 14/15 y
 | Pano | Aranabilir yerel geçmiş tutar, görüntü/URL/dosya filtreleri ve favoriler sunar; geçmiş ve bağlantı algılama ayrıdır. Yeni geçmiş görüntüleri cihazda metin tanımaya alınır; metinle özgün görüntüyü bulun veya sağ tıklayarak tanıyın ya da kopyalayın. Devam eden tanıma iptal edilebilir; arka plan tanıma metni otomatik kopyalamaz. |
 | Yapay Zekâ İzleme | Desteklenen CLI, masaüstü uygulaması ve IDE'lerden görevleri, durumları, token eğilimlerini, katkı haritalarını ve yan bildirimleri toplar. |
 | İndirmeler | Video ve ses için `yt-dlp`; `ffmpeg` yoksa AVFoundation uyumlu kanalları paketler ve Bilibili salt okunur alternatif sunar. |
-| Ajanda | Geçerli konum ve en fazla altı kayıtlı yer için hava durumu; etkinlik ve anımsatıcıları görüntüleme, oluşturma, silme ve anımsatıcı tamamlama. |
+| Ajanda | Geçerli konum ve en fazla altı kayıtlı yer için hava durumu; etkinlik ve anımsatıcıları görüntüleme, oluşturma, silme ve anımsatıcı tamamlama. Hava durumu listesinin güncelleme zamanı, başlık satırında yenileme düğmesinin solunda görünür. |
 | Posta | Seçilen Mail.app hesaplarının gelen kutularını okur; okundu işareti, yanıt, yeni posta ve çöp kutusuna taşıma sunar. |
 | Notlar | Markdown notlarını görüntüleme, düzenleme, oluşturma ve silmede tek kaynak Apple Notlar'dır; canlı önizleme ve otomatik yazma sunar. |
 | Uygulama ses düzeyi karıştırıcısı | macOS 14.4+ üzerinde ses üreten her uygulamanın düzeyini ve sessizliğini ayarlayıp hatırlar; Sistem Sesi Kaydı izni gerekir. |

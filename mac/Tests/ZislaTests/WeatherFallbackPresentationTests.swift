@@ -229,7 +229,7 @@ struct WeatherFallbackPresentationTests {
     }
 
     @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
-    func weatherColumnShowsOneTimestampBetweenTheTitleAndCitiesAndSharedSourcesAtTheBottom(language: AppLanguage) async throws {
+    func weatherColumnShowsOneTimestampBesideRefreshAndSharedSourcesAtTheBottom(language: AppLanguage) async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("weather-metadata-\(UUID())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -277,7 +277,7 @@ struct WeatherFallbackPresentationTests {
                 }
                 var result: [(String, CGRect)] = []
                 if let element = object as? any NSAccessibilityElementProtocol,
-                   let text = ["accessibilityLabel", "accessibilityValue"].compactMap({ value($0) as? String }).first {
+                   let text = ["accessibilityHelp", "accessibilityLabel", "accessibilityValue"].compactMap({ value($0) as? String }).first {
                     result.append((text, host.convert(window.convertFromScreen(element.accessibilityFrame()), from: nil)))
                 }
                 return result + (value("accessibilityChildren") as? [NSObject] ?? []).flatMap { visit($0) }
@@ -296,6 +296,8 @@ struct WeatherFallbackPresentationTests {
                 await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
             }
             let frames = textFrames()
+            let refresh = try #require(frames.first { $0.0 == AppLocalization.text("刷新天气") }).1
+            #expect(host.bounds.contains(refresh), "The refresh button must remain inside the weather column")
             if phase == 3 {
                 #expect(frames.allSatisfy {
                     !$0.0.contains("1970") && !["Open-Meteo", "MET Norway", "CC BY 4.0"].contains($0.0)
@@ -308,14 +310,21 @@ struct WeatherFallbackPresentationTests {
             #expect(timestamps.count == 1, "The weather column must display exactly one update timestamp")
             let timestamp = try #require(timestamps.first).1
             let title = try #require(frames.first { $0.0 == AppLocalization.text("天气") }).1
-            #expect(title.maxY <= timestamp.minY, "The timestamp must be below the Weather title")
+            #expect(abs(timestamp.midY - refresh.midY) < 0.5,
+                    "The timestamp must share the refresh button's row")
+            if language.isRightToLeft {
+                #expect(refresh.maxX <= timestamp.minX && timestamp.maxX <= title.minX,
+                        "The timestamp must sit between the title and refresh button in right-to-left layouts")
+            } else {
+                #expect(title.maxX <= timestamp.minX && timestamp.maxX <= refresh.minX,
+                        "The timestamp must sit immediately to the left of the refresh button")
+            }
             func scrollViews(in view: NSView) -> [NSScrollView] {
                 (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrollViews(in: $0) }
             }
             let scroll = try #require(scrollViews(in: host).first)
             #expect(timestamp.maxY <= scroll.convert(scroll.bounds, to: host).minY,
                     "The timestamp must remain above the scrolling city list")
-            #expect(abs(timestamp.maxX - host.bounds.maxX) < 0.5, "The timestamp must be right aligned")
             let sources = frames.filter { ["Open-Meteo", "MET Norway", "CC BY 4.0"].contains($0.0) }
             #expect(sources.count == (phase == 1 ? 3 : 2), "Provider names and the shared license must appear once")
             #expect(sources.allSatisfy { $0.1.minY >= title.maxY }, "Shared attribution must follow the weather content")

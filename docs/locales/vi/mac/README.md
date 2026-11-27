@@ -20,7 +20,7 @@ Hỗ trợ macOS 14 trở lên. macOS 26 dùng Liquid Glass; 14/15 dùng vật l
 | Bảng nhớ tạm | Lịch sử tại máy có tìm kiếm, lọc ảnh/URL/tệp và yêu thích; lịch sử/liên kết độc lập. Ảnh mới xếp hàng nhận chữ tại máy, tìm chữ tìm ảnh gốc hoặc nhấp phải nhận/sao chép. Có thể hủy nhận diện đang chạy; nền không tự sao chép chữ. |
 | Theo dõi AI | Tổng hợp tác vụ, trạng thái, xu hướng token, bản đồ đóng góp và thông báo từ CLI, ứng dụng, IDE hỗ trợ. |
 | Tải xuống | `yt-dlp` cho video/âm thanh; thiếu `ffmpeg` dùng AVFoundation đóng gói rãnh tương thích và Bilibili chỉ đọc dự phòng. |
-| Lịch trình | Thời tiết hiện tại và tối đa sáu nơi lưu; xem/tạo/xóa sự kiện và lời nhắc, đánh dấu hoàn thành. |
+| Lịch trình | Thời tiết hiện tại và tối đa sáu nơi lưu; xem/tạo/xóa sự kiện và lời nhắc, đánh dấu hoàn thành. Thời gian cập nhật danh sách thời tiết nằm trên hàng tiêu đề, bên trái nút làm mới. |
 | Thư | Đọc các tài khoản Mail.app được chọn để xem hộp thư đến, đánh dấu đã đọc, trả lời, soạn thư và chuyển thư vào thùng rác. |
 | Ghi chú | Dùng Apple Notes làm nguồn dữ liệu duy nhất để xem, sửa, tạo và xóa ghi chú Markdown, với bản xem trước trực tiếp và tự động ghi thay đổi trở lại. |
 | Trộn âm lượng ứng dụng | Trên macOS 14.4+, chỉnh âm lượng hoặc tắt tiếng từng ứng dụng đang phát và ghi nhớ mức âm lượng; cần quyền ghi âm thanh hệ thống. |

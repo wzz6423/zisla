@@ -20,7 +20,7 @@ macOS 14 dan lebih baru didukung. macOS 26 memakai Liquid Glass; macOS 14/15 mem
 | Papan Klip | Riwayat lokal yang dapat dicari, filter gambar/URL/berkas, dan favorit; riwayat serta deteksi tautan memiliki sakelar terpisah. Gambar baru masuk antrean pengenalan teks di perangkat; cari teks untuk menemukan gambar asal, atau klik kanan untuk mengenali/menyalin teks. Pengenalan yang berjalan dapat dibatalkan; pengenalan latar tidak menyalin teks otomatis. |
 | Pemantauan AI | Menggabungkan tugas aktif, status, tren token, peta panas kontribusi, dan pemberitahuan samping dari CLI, aplikasi desktop, serta IDE yang didukung. |
 | Unduhan | Memakai `yt-dlp` untuk video dan audio; tanpa `ffmpeg`, AVFoundation membungkus trek yang kompatibel, dan tersedia alternatif Bilibili hanya-baca. |
-| Jadwal | Cuaca lokasi saat ini dan hingga enam lokasi tersimpan; melihat, membuat, menghapus acara/pengingat, dan menandai pengingat selesai. |
+| Jadwal | Cuaca lokasi saat ini dan hingga enam lokasi tersimpan; melihat, membuat, menghapus acara/pengingat, dan menandai pengingat selesai. Waktu pembaruan daftar cuaca muncul di bagian atas, di sebelah kiri tombol muat ulang. |
 | Surel | Membaca akun Mail.app terpilih untuk melihat kotak masuk, menandai dibaca, membalas, menulis, dan memindahkan pesan ke sampah. |
 | Catatan | Apple Notes sebagai satu-satunya sumber data untuk melihat, menyunting, membuat, dan menghapus catatan Markdown, dengan pratinjau langsung serta penyimpanan otomatis. |
 | Mixer Volume Aplikasi | macOS 14.4+ mengatur dan membisukan setiap aplikasi yang memutar audio serta mengingat volumenya; memerlukan izin Rekaman Audio Sistem. |

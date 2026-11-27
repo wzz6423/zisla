@@ -20,7 +20,7 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 | Clipboard | Stores a searchable local history, filters by image, URL, and file, and marks favorites; history and link detection are independent switches. New history images are queued for on-device text recognition; search their text to find the original image, or right-click an image to recognize or copy its text. Running recognition can be cancelled; background recognition does not copy text automatically. |
 | AI monitoring | Aggregates activity tasks, status, token trends, contribution heatmaps, and side notices from supported CLIs, desktop apps, and IDEs. |
 | Downloads | Uses `yt-dlp` for video and audio; without `ffmpeg`, AVFoundation wraps compatible tracks and a read-only Bilibili fallback is available. |
-| Schedule | Shows weather for the current location and up to six saved locations; view, create, and delete calendar events and reminders and mark reminders complete. |
+| Schedule | Shows weather for the current location and up to six saved locations; view, create, and delete calendar events and reminders and mark reminders complete. The weather list shows its update time to the left of the refresh button in the header. |
 | Mail | Reads selected Mail.app accounts to view inboxes, mark messages read, reply, compose, and move messages to the trash. |
 | Notes | Uses Apple Notes as the sole data source for viewing, editing, creating, and deleting Markdown notes with live preview and automatic write-back. |
 | Application volume mixer | On macOS 14.4+, adjust and mute each playing application and remember its volume; requires System Audio Recording permission. |

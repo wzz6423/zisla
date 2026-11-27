@@ -114,7 +114,7 @@ export const es = createCatalog({
       agenda: {
         name: 'Agenda y tiempo',
         caption:
-          'Muestra el tiempo de tu ubicación y hasta seis lugares elegidos. Consulta, añade o elimina eventos y recordatorios y marca estos como completados. Los eventos con enlace de reunión muestran una cuenta atrás 10 minutos antes de empezar y permiten unirse con un clic. Crea una nota de reunión o vincula y desvincula notas contextuales existentes.',
+          'Muestra el tiempo de tu ubicación y hasta seis lugares elegidos. Consulta, añade o elimina eventos y recordatorios y marca estos como completados. Los eventos con enlace de reunión muestran una cuenta atrás 10 minutos antes de empezar y permiten unirse con un clic. Crea una nota de reunión o vincula y desvincula notas contextuales existentes. La hora de actualización de la lista del tiempo aparece en la cabecera, a la izquierda del botón de actualizar.',
         points: ['Tiempo y calendario', 'Cuenta atrás de 10 minutos', 'Unirse y vincular notas'],
       },
       mail: {

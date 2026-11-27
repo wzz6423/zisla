@@ -121,7 +121,7 @@ export const fr: SiteContent = {
       agenda: {
         name: 'Agenda et météo',
         caption:
-          'Affiche la météo de votre position et de six lieux choisis au maximum. Consultez, ajoutez ou supprimez des événements et rappels, puis marquez les rappels comme terminés. Les événements avec un lien de réunion affichent un compte à rebours 10 minutes avant le début et permettent de rejoindre en un clic. Créez une note de réunion ou associez et dissociez des notes contextuelles existantes.',
+          'Affiche la météo de votre position et de six lieux choisis au maximum. Consultez, ajoutez ou supprimez des événements et rappels, puis marquez les rappels comme terminés. Les événements avec un lien de réunion affichent un compte à rebours 10 minutes avant le début et permettent de rejoindre en un clic. Créez une note de réunion ou associez et dissociez des notes contextuelles existantes. L’heure de mise à jour de la météo apparaît dans l’en-tête, à gauche du bouton d’actualisation.',
         points: ['Météo et calendrier', 'Compte à rebours de 10 minutes', 'Rejoindre et associer des notes'],
       },
       mail: {

@@ -20,7 +20,7 @@ macOS 14 en later zijn ondersteund. macOS 26 gebruikt Liquid Glass; macOS 14/15 
 | Klembord | Doorzoekbare lokale geschiedenis, filters voor afbeelding, URL en bestand en favorieten; geschiedenis en linkdetectie hebben aparte schakelaars. Nieuwe afbeeldingen krijgen lokale tekstherkenning: vind het origineel via tekst of klik rechts voor herkennen/kopiëren. Lopende herkenning is annuleerbaar; achtergrondherkenning kopieert niet automatisch. |
 | AI-monitor | Verzamelt taken, status, tokentrends, bijdragekaarten en zijmeldingen uit ondersteunde CLI's, desktopapps en IDE's. |
 | Downloads | `yt-dlp` voor video/audio; zonder `ffmpeg` verpakt AVFoundation compatibele sporen en is een alleen-lezen Bilibili-alternatief beschikbaar. |
-| Agenda | Weer voor huidige en maximaal zes opgeslagen locaties; afspraken en herinneringen bekijken, maken, verwijderen en herinneringen voltooien. |
+| Agenda | Weer voor huidige en maximaal zes opgeslagen locaties; afspraken en herinneringen bekijken, maken, verwijderen en herinneringen voltooien. Het tijdstip van de weerupdate staat in de kop, links van de vernieuwknop. |
 | Mail | Geselecteerde Mail.app-accounts voor inbox, gelezen markeren, antwoorden, schrijven en naar prullenmand verplaatsen. |
 | Notities | Apple Notities is de enige bron voor Markdown-notities bekijken, bewerken, maken en verwijderen, met voorvertoning en automatisch terugschrijven. |
 | Appvolumemixer | Volume en dempen per spelende app op macOS 14.4+, met onthouden volume; vereist Systeemaudio-opname. |

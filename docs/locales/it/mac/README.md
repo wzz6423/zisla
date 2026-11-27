@@ -20,7 +20,7 @@ Sono supportati macOS 14 e successivi. macOS 26 usa Liquid Glass; macOS 14/15 us
 | Appunti | Cronologia locale ricercabile, filtri per immagini, URL e file e preferiti; cronologia e rilevamento link hanno interruttori indipendenti. Le nuove immagini entrano nella coda locale di riconoscimento: cerca il testo per ritrovare l'originale oppure fai clic destro per riconoscerlo o copiarlo. La riconoscizione in corso può essere annullata; quella in background non copia automaticamente il testo. |
 | Monitoraggio AI | Riunisce attività, stato, tendenze token, mappe dei contributi e notifiche laterali da CLI, app desktop e IDE supportati. |
 | Download | Usa `yt-dlp` per video e audio; senza `ffmpeg`, AVFoundation combina le tracce compatibili ed è disponibile un percorso Bilibili di sola lettura. |
-| Agenda | Meteo della posizione corrente e di fino a sei località salvate; consulta, crea ed elimina eventi e promemoria e segna questi ultimi come completati. |
+| Agenda | Meteo della posizione corrente e di fino a sei località salvate; consulta, crea ed elimina eventi e promemoria e segna questi ultimi come completati. L’ora di aggiornamento del meteo appare nell’intestazione, a sinistra del pulsante di aggiornamento. |
 | Posta | Legge account Mail.app selezionati: posta in arrivo, stato di lettura, risposte, composizione e spostamento nel cestino. |
 | Note | Usa Note di Apple come unica fonte per consultare, modificare, creare ed eliminare note Markdown, con anteprima e scrittura automatica delle modifiche. |
 | Mixer volume applicazioni | Su macOS 14.4+, modifica volume e silenziamento di ogni app in riproduzione e ne ricorda il volume; richiede Registrazione audio di sistema. |

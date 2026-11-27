@@ -20,7 +20,7 @@ Se admite macOS 14 y posteriores. macOS 26 usa Liquid Glass; macOS 14/15 recurre
 | Portapapeles | Guarda historial local buscable, filtra imágenes, URL y archivos y marca favoritos; historial y detección de enlaces son independientes. Las nuevas imágenes se ponen en cola para reconocimiento de texto en el dispositivo; busca su texto para encontrar la imagen original o haz clic derecho para reconocerlo o copiarlo. Puedes cancelar el reconocimiento en curso; el reconocimiento de fondo no copia texto automáticamente. |
 | Supervisión de IA | Agrupa tareas, estados, tendencias de tokens, mapas de calor de contribuciones y avisos de CLI, aplicaciones e IDE compatibles. |
 | Descargas | Usa `yt-dlp` para vídeo y audio; sin `ffmpeg`, AVFoundation empaqueta pistas compatibles y existe una alternativa de Bilibili de solo lectura. |
-| Agenda | Muestra tiempo actual y hasta seis ubicaciones guardadas; consulta, crea y elimina eventos y recordatorios y marca los recordatorios como completados. |
+| Agenda | Muestra tiempo actual y hasta seis ubicaciones guardadas; consulta, crea y elimina eventos y recordatorios y marca los recordatorios como completados. La hora de actualización de la lista del tiempo aparece en la cabecera, a la izquierda del botón de actualizar. |
 | Correo | Lee cuentas de Mail.app seleccionadas para ver entradas, marcar leído, responder, redactar y mover mensajes a la papelera. |
 | Notas | Usa Notas de Apple como única fuente para consultar, editar, crear y eliminar Markdown con vista previa en directo y escritura automática. |
 | Mezclador de volumen de aplicaciones | En macOS 14.4+, ajusta volumen y silencio de cada aplicación en reproducción y recuerda su volumen; requiere grabación de audio del sistema. |

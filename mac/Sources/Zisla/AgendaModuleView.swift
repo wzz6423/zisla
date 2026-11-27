@@ -56,15 +56,14 @@ struct AgendaModuleView: View {
                 Text(AppLocalization.text("天气"))
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
+                if let fetchedAt = snapshots.map(\.fetchedAt).min() {
+                    Text(AppLocalization.text("更新于 %@", fetchedAt.formatted(date: .numeric, time: .shortened)))
+                        .font(.system(size: 8))
+                        .foregroundStyle(.secondary)
+                        .fitsSingleLine()
+                        .environment(\.layoutDirection, .leftToRight)
+                }
                 IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新天气"), action: refresh)
-            }
-            if let fetchedAt = snapshots.map(\.fetchedAt).min() {
-                Text(AppLocalization.text("更新于 %@", fetchedAt.formatted(date: .numeric, time: .shortened)))
-                    .font(.system(size: 8))
-                    .foregroundStyle(.secondary)
-                    .fitsSingleLine()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .environment(\.layoutDirection, .leftToRight)
             }
             weatherContent(
                 locations: locations,
