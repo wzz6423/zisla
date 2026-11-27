@@ -143,7 +143,7 @@ export const de: SiteContent = {
       toolbox: {
         name: 'Kleine Werkzeuge',
         caption:
-          'Fokustimer, Bildschirm wach halten, Bildschirmreinigung, Tastaturreinigung mit Sperre auch für F1-F12, Teleprompter, Spiegel und Papierkorb auf einer Seite. Den Pomodoro können Sie auch in der horizontalen und vertikalen Kompaktansicht pausieren, fortsetzen oder zurücksetzen und den Fortschritt verfolgen. Starten Sie die Bereinigung unnötiger Dateien in den Dienstprogrammen mit Ihren Systemeinstellungen und verfolgen Sie Fortschritt und Ergebnisse in der Insel.',
+          'Fokustimer, Bildschirm wach halten, Bildschirmreinigung, Tastaturreinigung mit Sperre auch für F1-F12, Teleprompter, Spiegel und Papierkorb auf einer Seite. Den Pomodoro können Sie auch in der horizontalen und vertikalen Kompaktansicht pausieren, fortsetzen oder zurücksetzen und den Fortschritt verfolgen. Starten Sie die Bereinigung unnötiger Dateien in den Dienstprogrammen mit Ihren Systemeinstellungen und verfolgen Sie Fortschritt und Ergebnisse in der Insel. Der Timername gilt nur für die aktuelle Sitzung und wird nach deren Ende oder Abbruch auf den Standardnamen zurückgesetzt.',
         points: [
           'Fokus-Timer',
           'Blockiert F1-F12 beim Reinigen',

@@ -41,7 +41,7 @@ Untuk alat tanpa sumber aktivitas lokal yang stabil, `zislactl` memungkinkan skr
 | Bidang | Alat yang tersedia |
 | --- | --- |
 | Unduhan dan dokumen | Unduhan video dan audio melalui `yt-dlp`; penggabungan, pemisahan, rotasi, pemotongan, konversi, rendering, ekspor teks, tanda air, nomor halaman, enkripsi, pembukaan kunci, dan penyuntingan metadata PDF secara lokal. |
-| Fokus dan presentasi | Timer Pomodoro dengan satu bunyi dan notifikasi lokal ketika sesi berakhir, mode tetap terjaga, pencegah tidur saat menganggur, pembersihan layar dan papan ketik, teleprompter, dan cermin kamera. |
+| Fokus dan presentasi | Timer Pomodoro dengan satu bunyi dan notifikasi lokal ketika sesi berakhir, mode tetap terjaga, pencegah tidur saat menganggur, pembersihan layar dan papan ketik, teleprompter, dan cermin kamera. Nama pengatur waktu hanya berlaku untuk sesi saat ini dan kembali ke nama bawaan saat sesi berakhir atau dibatalkan. |
 | Sistem dan baterai | Informasi CPU, GPU, memori, disk, jaringan, kipas, dan baterai, serta pembersihan cache dan log yang aman dihapus. |
 | Masukan suara | Pintasan global untuk merekam dan mentranskripsikan, pengolahan transkrip lokal atau jarak jauh opsional, dan riwayat suara lokal. |
 

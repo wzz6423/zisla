@@ -137,7 +137,7 @@ export const es = createCatalog({
       toolbox: {
         name: 'Utilidades',
         caption:
-          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado que bloquea también F1-F12, teleprónter, espejo y Papelera en una página. Pausa, reanuda o reinicia el Pomodoro y sigue su progreso en las vistas compactas horizontal y vertical. Inicia la limpieza de archivos innecesarios desde las utilidades con tus ajustes de limpieza del sistema y sigue el progreso y los resultados en la isla.',
+          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado que bloquea también F1-F12, teleprónter, espejo y Papelera en una página. Pausa, reanuda o reinicia el Pomodoro y sigue su progreso en las vistas compactas horizontal y vertical. Inicia la limpieza de archivos innecesarios desde las utilidades con tus ajustes de limpieza del sistema y sigue el progreso y los resultados en la isla. El nombre del temporizador solo se aplica a la sesión actual y vuelve al predeterminado cuando termina o se cancela.',
         points: ['Temporizador de concentración', 'Bloquea F1-F12 durante la limpieza', 'Teleprompter y espejo'],
       },
       system: {

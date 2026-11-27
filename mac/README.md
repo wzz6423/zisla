@@ -24,7 +24,7 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 | Mail | Reads selected Mail.app accounts to view inboxes, mark messages read, reply, compose, and move messages to the trash. |
 | Notes | Uses Apple Notes as the sole data source for viewing, editing, creating, and deleting Markdown notes with live preview and automatic write-back. |
 | Application volume mixer | On macOS 14.4+, adjust and mute each playing application and remember its volume; requires System Audio Recording permission. |
-| Utilities | Provides a Pomodoro timer that plays one audible alert and shows a local notification when a session ends, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, camera mirror, and confirmed trash emptying. |
+| Utilities | Provides a Pomodoro timer that plays one audible alert and shows a local notification when a session ends, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, camera mirror, and confirmed trash emptying. Timer names apply only to the current session and return to the default when it ends or is canceled. |
 | System | Shows CPU, GPU, memory, disk, network, temperature, and fan status; releases memory and scans caches, logs, and temporary data that are safe to remove; also includes battery health and accessory levels. |
 
 ### Cross-module capabilities

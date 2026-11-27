@@ -6,6 +6,7 @@ import ZislaCore
 @testable import Zisla
 
 @MainActor
+@Suite(.serialized)
 struct IndependentCountdownPresentationTests {
     @Test(arguments: IslandEdge.allCases)
     func countdownRowsStartAfterTheMonitoringRowAndUseTheEntireIsland(edge: IslandEdge) async throws {
@@ -162,6 +163,53 @@ struct IndependentCountdownPresentationTests {
         await fixture.layout()
         #expect(service.countdowns.first?.name == "Meeting prep")
         #expect(service.countdowns.first?.engine.deadline == deadline)
+    }
+
+    @Test(arguments: ["complete", "reset", "group", "stop", "idle"], ["Writing", ""])
+    func endingPomodoroWhileEditingCannotRestoreThePreviousSessionName(action: String, name: String) async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        let service = fixture.service
+        service.setFocusDuration(1)
+        service.setName(name)
+        if action != "idle" { service.start() }
+        let host = fixture.host(ToolboxTimerCard(service: service, timerID: nil, compact: false), size: CGSize(width: 236, height: 136))
+        await fixture.layout()
+        let rename = try #require(Self.element("toolbox.renameTimer.pomodoro", in: host))
+        _ = rename.perform(NSSelectorFromString("accessibilityPerformPress"))
+        await fixture.layout()
+        let field = try #require(Self.element("toolbox.timerName.pomodoro", in: host))
+        #expect(field.value(forKey: "accessibilityValue") as? String == name)
+        if action != "idle" {
+            service.pause()
+            await fixture.layout()
+            #expect(Self.element("toolbox.timerName.pomodoro", in: host) != nil)
+            service.start()
+            await fixture.layout()
+            #expect(Self.element("toolbox.timerName.pomodoro", in: host) != nil)
+        } else {
+            let other = service.addCountdown(name: "Tea", duration: 100)
+            service.toggleCountdown(id: other)
+            service.tick()
+            await fixture.layout()
+            #expect(Self.element("toolbox.timerName.pomodoro", in: host) != nil)
+        }
+        switch action {
+        case "complete":
+            fixture.date += 1
+            service.tick()
+        case "reset", "idle":
+            let cancel = try #require(Self.element("toolbox.cancelTimer.pomodoro", in: host))
+            _ = cancel.perform(NSSelectorFromString("accessibilityPerformPress"))
+        case "group": service.cancelCountdownGroup(["pomodoro"])
+        default: service.stop()
+        }
+        await fixture.layout()
+        #expect(Self.element("toolbox.timerName.pomodoro", in: host) == nil)
+        #expect(Self.element("toolbox.renameTimer.pomodoro", in: host) != nil)
+        #expect(service.name.isEmpty)
+        service.start()
+        #expect(service.name.isEmpty)
     }
 
     @Test(arguments: IslandEdge.allCases)

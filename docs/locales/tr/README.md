@@ -41,7 +41,7 @@ Kararlı bir yerel etkinlik kaynağı olmayan araçlarda `zislactl`, betiklerin,
 | Alan | Dahil edilen araçlar |
 | --- | --- |
 | İndirmeler ve belgeler | `yt-dlp` ile video ve ses indirme; yerel PDF birleştirme, bölme, döndürme, kırpma, dönüştürme, görüntü oluşturma, metin dışa aktarma, filigran, sayfa numarası, şifreleme, kilit açma ve meta veri düzenleme. |
-| Odaklanma ve sunum | Oturum bittiğinde bir sesli uyarı ve yerel bildirim veren Pomodoro sayacı, uyanık tutma, boşta uykuya geçmeyi önleme, ekran ve klavye temizliği, teleprompter ve kamera aynası. |
+| Odaklanma ve sunum | Oturum bittiğinde bir sesli uyarı ve yerel bildirim veren Pomodoro sayacı, uyanık tutma, boşta uykuya geçmeyi önleme, ekran ve klavye temizliği, teleprompter ve kamera aynası. Zamanlayıcı adı yalnızca geçerli oturum için kullanılır ve oturum bittiğinde veya iptal edildiğinde varsayılan ada döner. |
 | Sistem ve pil | CPU, GPU, bellek, disk, ağ, fan ve pil bilgileri; güvenle kaldırılabilen önbellekleri ve günlükleri temizleme. |
 | Sesli giriş | Kayıt ve yazıya dökme için genel kısayollar, isteğe bağlı yerel veya uzak transkript düzenleme ve yerel ses geçmişi. |
 

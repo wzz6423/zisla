@@ -136,7 +136,7 @@ export const en: SiteContent = {
       toolbox: {
         name: 'Utilities',
         caption:
-          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning that blocks keys including F1-F12, a teleprompter, a mirror and the Trash, all on one page. Pause, resume or reset the Pomodoro timer and follow its progress in compact horizontal and vertical layouts. Start junk cleanup from Utilities using your system cleanup settings, and follow progress and results in the island.',
+          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning that blocks keys including F1-F12, a teleprompter, a mirror and the Trash, all on one page. Pause, resume or reset the Pomodoro timer and follow its progress in compact horizontal and vertical layouts. Start junk cleanup from Utilities using your system cleanup settings, and follow progress and results in the island. Timer names apply only to the current session and return to the default when it ends or is canceled.',
         points: ['Focus countdown', 'Blocks F1-F12 while cleaning', 'Teleprompter and mirror'],
       },
       system: {
