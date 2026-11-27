@@ -176,6 +176,32 @@ struct WeatherFallbackTests {
         #expect(ForecastURLProtocol.requests.count == 2)
     }
 
+    @Test(arguments: [true, false])
+    func richestIndividualForecastWinsAfterEarlierSourcesCombine(includesSunrise: Bool) throws {
+        let unknown = WeatherCondition(code: -1, isDay: nil)
+        let date = Date(timeIntervalSince1970: 1793874600)
+        let first = WeatherSnapshot(
+            temperature: 10, temperatureMin: 7, temperatureMax: 15, condition: unknown, sunrise: "06:40",
+            timezone: "UTC", fetchedAt: date, coordinate: coordinate, source: "First", sourceURL: URL(string: "https://first.example/")
+        )
+        let second = WeatherSnapshot(
+            temperature: 11, condition: unknown, currentPrecipitation: 0, precipitationProbability: 20, precipitationSum: 2,
+            timezone: "UTC", fetchedAt: date, coordinate: coordinate, source: "Second", sourceURL: URL(string: "https://second.example/")
+        )
+        let third = WeatherSnapshot(
+            temperature: 12, temperatureMin: 8, temperatureMax: 16, apparentTemperature: includesSunrise ? nil : 13,
+            condition: WeatherCondition(code: 0, isDay: true), sunrise: includesSunrise ? "06:45" : "", sunset: "18:20",
+            timezone: "UTC", fetchedAt: date, coordinate: coordinate, source: "Third", sourceURL: URL(string: "https://third.example/")
+        )
+
+        let merged = try #require(WeatherSnapshot.mergedForecasts([first, second, third]))
+        #expect(merged.source == third.source && merged.temperature == third.temperature)
+        #expect(merged.temperatureMin == 8 && merged.temperatureMax == 16)
+        #expect(merged.sunrise == (includesSunrise ? "06:45" : "06:40"))
+        #expect(merged.currentPrecipitation == 0 && merged.precipitationProbability == 20 && merged.precipitationSum == 2)
+        #expect(merged.supplementalSources.map(\.name) == (includesSunrise ? ["Second"] : ["First", "Second"]))
+    }
+
     @Test(arguments: ["absent", "null", "night", "day"])
     func openMeteoDaylightAvailabilityKeepsKnownWeather(kind: String) throws {
         var payload = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]

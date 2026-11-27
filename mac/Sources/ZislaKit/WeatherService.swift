@@ -88,16 +88,20 @@ public struct WeatherSnapshot: Equatable, Sendable {
         ].filter { $0 }.count
     }
 
-    fileprivate func mergingForecast(_ other: WeatherSnapshot) -> WeatherSnapshot {
-        let otherIsMoreComplete = other.completeness > completeness
-        let preferred = otherIsMoreComplete ? other : self
-        let supplement = otherIsMoreComplete ? self : other
-        var merged = preferred
+    static func mergedForecasts(_ forecasts: [Self]) -> Self? {
+        // Stable sorting preserves regional provider priority when field counts tie.
+        let ranked = forecasts.sorted { $0.completeness > $1.completeness }
+        guard let preferred = ranked.first else { return nil }
+        return ranked.dropFirst().reduce(preferred) { $0.supplemented(by: $1) }
+    }
+
+    private func supplemented(by supplement: Self) -> Self {
+        var merged = self
         merged.temperatureMin = merged.temperatureMin ?? supplement.temperatureMin
         merged.temperatureMax = merged.temperatureMax ?? supplement.temperatureMax
         if let minimum = merged.temperatureMin, let maximum = merged.temperatureMax, minimum > maximum {
-            merged.temperatureMin = preferred.temperatureMin
-            merged.temperatureMax = preferred.temperatureMax
+            merged.temperatureMin = temperatureMin
+            merged.temperatureMax = temperatureMax
         }
         merged.apparentTemperature = merged.apparentTemperature ?? supplement.apparentTemperature
         merged.currentPrecipitation = merged.currentPrecipitation ?? supplement.currentPrecipitation
@@ -106,7 +110,7 @@ public struct WeatherSnapshot: Equatable, Sendable {
         if merged.sunrise.isEmpty { merged.sunrise = supplement.sunrise }
         if merged.sunset.isEmpty { merged.sunset = supplement.sunset }
         if !merged.condition.isKnown { merged.condition = supplement.condition }
-        if merged != preferred {
+        if merged != self {
             if let name = supplement.source, let url = supplement.sourceURL {
                 merged.supplementalSources.append(SourceAttribution(name: name, url: url))
             }
@@ -182,6 +186,7 @@ public actor WeatherService {
         }
         let providers: [WeatherForecastSource] = ["CN", "HK", "MO", "TW"].contains(country?.uppercased() ?? "")
             ? [.chinaWeather, .openMeteo, .metNorway] : [.openMeteo, .metNorway]
+        var responses: [WeatherSnapshot] = []
         var forecast: WeatherSnapshot?
         var lastError: Error = WeatherServiceError.invalidResponse
         for provider in providers {
@@ -190,7 +195,8 @@ public actor WeatherService {
                 let candidate = try await fetchForecast(
                     provider, latitude: latitude, longitude: longitude, locationName: locationName
                 )
-                forecast = forecast.map { $0.mergingForecast(candidate) } ?? candidate
+                responses.append(candidate)
+                forecast = WeatherSnapshot.mergedForecasts(responses)
                 if forecast?.completeness == 9 { break }
             } catch {
                 try Self.rethrowCancellation(error)
