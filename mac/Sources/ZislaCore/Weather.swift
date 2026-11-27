@@ -58,6 +58,8 @@ public struct OpenMeteoResponse: Decodable, Equatable, Sendable {
 public struct WeatherCondition: Equatable, Sendable {
     public let summary: String
     public let symbolName: String
+    /// A provider can supply a valid description without a matching symbol.
+    package private(set) var isKnown = true
 
     public init(summary: String, symbolName: String) {
         self.summary = summary
@@ -138,6 +140,7 @@ public struct WeatherCondition: Equatable, Sendable {
         default:
             summary = AppLocalization.text("天气未知")
             symbolName = "questionmark.circle"
+            isKnown = false
         }
     }
 }

@@ -84,7 +84,7 @@ public struct WeatherSnapshot: Equatable, Sendable {
             temperatureMin != nil, temperatureMax != nil, apparentTemperature != nil,
             currentPrecipitation != nil, !sunrise.isEmpty, !sunset.isEmpty,
             precipitationProbability != nil, precipitationSum != nil,
-            condition.symbolName != "questionmark.circle",
+            condition.isKnown,
         ].filter { $0 }.count
     }
 
@@ -105,7 +105,7 @@ public struct WeatherSnapshot: Equatable, Sendable {
         merged.precipitationSum = merged.precipitationSum ?? supplement.precipitationSum
         if merged.sunrise.isEmpty { merged.sunrise = supplement.sunrise }
         if merged.sunset.isEmpty { merged.sunset = supplement.sunset }
-        if merged.condition.symbolName == "questionmark.circle" { merged.condition = supplement.condition }
+        if !merged.condition.isKnown { merged.condition = supplement.condition }
         if merged != preferred {
             if let name = supplement.source, let url = supplement.sourceURL {
                 merged.supplementalSources.append(SourceAttribution(name: name, url: url))

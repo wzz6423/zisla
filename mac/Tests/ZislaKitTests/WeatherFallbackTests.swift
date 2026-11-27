@@ -131,10 +131,11 @@ struct WeatherFallbackTests {
         }
     }
 
-    @Test
-    func equallyCompleteSupplementKeepsProviderPriorityWhileFillingMissingRange() async throws {
-        let partial = Data(#"{"timezone":"Asia/Shanghai","current":{"time":"2026-11-05T10:45","temperature_2m":28.5,"apparent_temperature":30.2,"weather_code":2,"is_day":1,"precipitation":0}}"#.utf8)
-        ForecastURLProtocol.reset([.data(Self.station), .data(Self.china), .data(partial), .data(Self.met)])
+    @Test(arguments: ["n01", "n999"])
+    func equallyCompleteSupplementKeepsProviderPriorityWhileFillingMissingRange(code: String) async throws {
+        let partial = Data(#"{"timezone":"Asia/Shanghai","current":{"time":"2026-11-05T10:45","temperature_2m":28.5,"apparent_temperature":30.2,"weather_code":3,"is_day":1,"precipitation":0}}"#.utf8)
+        let chinese = String(decoding: Self.china, as: UTF8.self).replacingOccurrences(of: "n01", with: code)
+        ForecastURLProtocol.reset([.data(Self.station), .data(Data(chinese.utf8)), .data(partial), .data(Self.met)])
         let snapshot = try await makeService().fetch(
             latitude: coordinate.latitude, longitude: coordinate.longitude,
             locationName: "上海", isoCountryCode: "CN"
@@ -142,7 +143,8 @@ struct WeatherFallbackTests {
 
         #expect(snapshot.source == AppLocalization.text("中国天气网（中国气象局）"))
         #expect(snapshot.temperature == 16.1 && snapshot.temperatureMin == 14 && snapshot.temperatureMax == 18)
-        #expect(snapshot.condition.symbolName == "cloud.sun.fill")
+        #expect(snapshot.condition.summary == AppLocalization.text("多云"))
+        #expect(snapshot.condition.symbolName == (code == "n01" ? "cloud.sun.fill" : "questionmark.circle"))
         #expect(snapshot.apparentTemperature == 30.2 && snapshot.currentPrecipitation == 0)
         #expect(snapshot.sunrise.isEmpty && snapshot.sunset.isEmpty)
         #expect(snapshot.precipitationProbability == nil && snapshot.precipitationSum == nil)
@@ -336,6 +338,22 @@ struct WeatherFallbackTests {
         let snapshot = try await makeService().fetch(latitude: 51, longitude: 0, isoCountryCode: "GB")
         #expect(snapshot.source == "MET Norway")
         #expect(snapshot.temperatureMin == nil && snapshot.temperatureMax == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func invertedChineseRangePreservesObservationAndAcceptsValidBounds(hasSupplement: Bool) async throws {
+        let chinese = String(decoding: Self.china, as: UTF8.self).replacingOccurrences(of: "\"18\"", with: "\"10\"")
+        let partial = Data(#"{"timezone":"Asia/Shanghai","current":{"time":"2026-11-05T10:45","temperature_2m":28.5},"daily":{"temperature_2m_min":[12]}}"#.utf8)
+        ForecastURLProtocol.reset([
+            .data(Self.station), .data(Data(chinese.utf8)), hasSupplement ? .data(partial) : .http(503, Data(), [:]),
+            .http(503, Data(), [:]),
+        ])
+        let snapshot = try await makeService().fetch(latitude: 31.2, longitude: 121.4, locationName: "上海", isoCountryCode: "CN")
+
+        #expect(snapshot.temperature == 16.1 && snapshot.condition.summary == AppLocalization.text("多云"))
+        #expect(snapshot.temperatureMin == (hasSupplement ? 12 : nil))
+        #expect(snapshot.temperatureMax == nil)
+        #expect(snapshot.supplementalSources.map(\.name) == (hasSupplement ? ["Open-Meteo"] : []))
     }
 
     @Test(arguments: ["apparent_temperature", "temperature_2m_min", "temperature_2m_max"])

@@ -68,8 +68,12 @@ enum WeatherForecastDecoder {
         calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
         let day = "\(calendar.component(.month, from: now))/\(calendar.component(.day, from: now))"
         let daily = forecast?.f.first { $0.fi == day }
-        let minimum = daily?.fd.flatMap(Double.init).flatMap { (-100...100).contains($0) ? $0 : nil }
-        let maximum = daily?.fc.flatMap(Double.init).flatMap { (-100...100).contains($0) ? $0 : nil }
+        var minimum = daily?.fd.flatMap(Double.init).flatMap { (-100...100).contains($0) ? $0 : nil }
+        var maximum = daily?.fc.flatMap(Double.init).flatMap { (-100...100).contains($0) ? $0 : nil }
+        if let low = minimum, let high = maximum, low > high {
+            minimum = nil
+            maximum = nil
+        }
         return WeatherSnapshot(
             temperature: temperature,
             temperatureMin: minimum,
