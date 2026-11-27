@@ -120,7 +120,7 @@ export const de: SiteContent = {
       agenda: {
         name: 'Termine und Wetter',
         caption:
-          'Zeigt das Wetter am aktuellen Standort und an bis zu sechs gewählten Orten. Kalenderereignisse und Erinnerungen lassen sich ansehen, hinzufügen, löschen und abschließen. Ereignisse mit einem Besprechungslink zeigen ab 10 Minuten vor Beginn einen Countdown und erlauben den Beitritt per Klick. Erstellen Sie eine Besprechungsnotiz oder verknüpfen und lösen Sie vorhandene ortsbezogene Notizen.',
+          'Zeigt das Wetter am aktuellen Standort und an bis zu sechs gewählten Orten. Kalenderereignisse und Erinnerungen lassen sich ansehen, hinzufügen, löschen und abschließen. Ereignisse mit einem Besprechungslink zeigen ab 10 Minuten vor Beginn einen Countdown und erlauben den Beitritt per Klick. Erstellen Sie eine Besprechungsnotiz oder verknüpfen und lösen Sie vorhandene ortsbezogene Notizen. Die Aktualisierungszeit der Wetterliste steht in der Kopfzeile links neben der Schaltfläche zum Aktualisieren.',
         points: ['Wetter und Kalender', 'Countdown 10 Minuten vorher', 'Beitreten und Notizen verknüpfen'],
       },
       mail: {

@@ -114,7 +114,7 @@ export const it = createCatalog({
       agenda: {
         name: 'Agenda e meteo',
         caption:
-          'Mostra il meteo della posizione attuale e di un massimo di sei luoghi scelti. Consulta, aggiungi o elimina eventi e promemoria e segna questi ultimi come completati. Gli eventi con un link di riunione mostrano un conto alla rovescia 10 minuti prima dell’inizio e permettono di partecipare con un clic. Crea una nota di riunione o collega e scollega note contestuali esistenti.',
+          'Mostra il meteo della posizione attuale e di un massimo di sei luoghi scelti. Consulta, aggiungi o elimina eventi e promemoria e segna questi ultimi come completati. Gli eventi con un link di riunione mostrano un conto alla rovescia 10 minuti prima dell’inizio e permettono di partecipare con un clic. Crea una nota di riunione o collega e scollega note contestuali esistenti. L’ora di aggiornamento del meteo appare nell’intestazione, a sinistra del pulsante di aggiornamento.',
         points: ['Meteo e calendario', 'Conto alla rovescia di 10 minuti', 'Partecipa e collega le note'],
       },
       mail: {

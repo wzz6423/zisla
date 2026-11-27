@@ -113,7 +113,7 @@ export const en: SiteContent = {
       agenda: {
         name: 'Agenda and weather',
         caption:
-          'Shows weather for your current location and up to six chosen places. View, add and delete calendar events and reminders, and complete reminders. Events with a meeting link show a countdown from 10 minutes before the start and a one-click join action. Create a meeting note or link and unlink existing context notes.',
+          'Shows weather for your current location and up to six chosen places. View, add and delete calendar events and reminders, and complete reminders. Events with a meeting link show a countdown from 10 minutes before the start and a one-click join action. Create a meeting note or link and unlink existing context notes. The weather list shows its update time to the left of the refresh button in the header.',
         points: ['Weather and calendar', '10-minute meeting countdown', 'Join meetings and link notes'],
       },
       mail: {
