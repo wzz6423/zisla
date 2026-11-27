@@ -202,6 +202,13 @@
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Set pet appearance inside Dynamic Island.";
 "在灵动岛养一只小宠物" = "Raise a pet in Dynamic Island";
+"宠物模式" = "Pet Mode";
+"固定宠物" = "Fixed Pet";
+"随机轮换" = "Random Rotation";
+"切换间隔" = "Rotation Interval";
+"每天随机" = "Daily Random";
+"随机范围" = "Random Pool";
+"选择宠物" = "Choose Pets";
 "当前宠物" = "Current Pet";
 "选择内置的宠物形象" = "Select built-in pet appearance";
 "在岛的哪一侧" = "Which Side of the Island";

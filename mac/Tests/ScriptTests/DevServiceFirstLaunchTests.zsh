@@ -1,6 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_AI_ACCOUNT_BALANCE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL ZISLA_DEBUG_IGNORE_KEYBOARD_STATS ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS
+unset ZISLA_DEBUG_PET_ROTATION_SECONDS
 
 MAC_ROOT="${0:A:h:h:h}"
 TEMPORARY_ROOT="$(mktemp -d "${TMPDIR%/}/zisla-first-launch-tests.XXXXXX")"
@@ -63,6 +64,9 @@ if home != "none":
     assert bundle == "dev.wzz.zisla.debug.fresh." + Path(home).suffix[1:], "Preferences and home must identify the same fresh launch"
     assert not any(Path(home).iterdir()), "Fresh launch must not copy existing data"
 assert agent["KeepAlive"] is True, "Automatic restarts must keep the same launch environment"
+if "TEST_EXPECT_PET_ROTATION" in os.environ:
+    expected_interval = os.environ["TEST_EXPECT_PET_ROTATION"] or None
+    assert agent["EnvironmentVariables"].get("ZISLA_DEBUG_PET_ROTATION_SECONDS") == expected_interval, "Pet rotation seconds must reach launchd and clear on the next normal launch"
 if "TEST_EXPECT_AI_BALANCE" in os.environ:
     expected_balance = os.environ["TEST_EXPECT_AI_BALANCE"]
     actual_balance = agent["EnvironmentVariables"].get("ZISLA_DEBUG_AI_ACCOUNT_BALANCE")
@@ -163,6 +167,13 @@ function expect_fixture_launch() {
   }
   (( tests_run += 1 ))
 }
+
+expect_fixture_launch TEST_EXPECT_PET_ROTATION "run forwards pet rotation from the environment" 5 \
+  env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_PET_ROTATION_SECONDS=5 make -C "$TEST_ROOT" run
+expect_fixture_launch TEST_EXPECT_PET_ROTATION "update replaces the pet rotation interval" 10 \
+  env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" update ZISLA_DEBUG_PET_ROTATION_SECONDS=10
+expect_fixture_launch TEST_EXPECT_PET_ROTATION "update clears the previous pet rotation interval" '' \
+  env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" update
 
 for target in run update; do
   expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target forwards environment quota" 'codex:20:10,claude:0' \

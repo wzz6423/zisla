@@ -9,6 +9,63 @@ import ZislaKit
 
 @MainActor
 struct PetSpriteRenderingTests {
+    @Test
+    func settingsPreviewKeepsTheDisplayedSpriteUntilThePetChanges() async throws {
+        let files = FileManager.default
+        let directory = files.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try files.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? files.removeItem(at: directory) }
+        let original = try image(size: CGSize(width: 32, height: 24))
+        let bitmap = NSBitmapImageRep(cgImage: try #require(original.cgImage(forProposedRect: nil, context: nil, hints: nil)))
+        let source = directory.appendingPathComponent("test.png")
+        try #require(bitmap.representation(using: .png, properties: [:])).write(to: source)
+        let pets = directory.appendingPathComponent("pets", isDirectory: true)
+        let entry = try await PetMediaImporter.importPet(from: source, name: "Test", directory: pets)
+
+        func preview(_ id: String, side: CGFloat = 32, reduceMotion: Bool = false) -> some View {
+            PetPreviewView(petID: id, size: CGSize(width: side, height: side), userPetsDirectory: pets)
+                .environment(\._accessibilityReduceMotion, reduceMotion)
+        }
+        let host = NSHostingView(rootView: preview("chiikawa"))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 64, height: 64),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        func layout() async {
+            for _ in 0..<4 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+        }
+
+        await layout()
+        #expect(spriteLayer(in: host)?.animation(forKey: "pet.frames") != nil)
+        host.rootView = preview(entry.id)
+        await layout()
+        #expect(spriteLayer(in: host)?.animation(forKey: "pet.bobbing") != nil)
+
+        try files.removeItem(at: pets.appendingPathComponent(entry.id))
+        host.rootView = preview(entry.id, side: 64)
+        await layout()
+        #expect(spriteLayer(in: host)?.animation(forKey: "pet.bobbing") != nil)
+        host.rootView = preview(entry.id, side: 64, reduceMotion: true)
+        await layout()
+        #expect(spriteLayer(in: host)?.animation(forKey: "pet.bobbing") == nil)
+        let still = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: still)
+        let pixel = try #require(still.colorAt(x: still.pixelsWide / 4, y: still.pixelsHigh / 2)?.usingColorSpace(.sRGB))
+        #expect(pixel.redComponent - pixel.greenComponent > 0.5 && pixel.alphaComponent > 0.9)
+
+        host.rootView = preview("chiikawa")
+        await layout()
+        #expect(spriteLayer(in: host)?.animation(forKey: "pet.frames") != nil)
+        host.rootView = preview(entry.id)
+        await layout()
+        #expect(spriteLayer(in: host)?.animation(forKey: "pet.frames") == nil)
+        #expect(spriteLayer(in: host)?.animation(forKey: "pet.bobbing") == nil)
+    }
+
     @Test(arguments: [CGSize(width: 182, height: 136), CGSize(width: 137, height: 184), CGSize(width: 136, height: 136)], [false, true])
     func animatedSpritesPreserveAspectAtCollapsedAndExpandedSizes(sourceSize: CGSize, matchesPillHeight: Bool) throws {
         let sprite = PetSprite(image: try image(size: sourceSize))

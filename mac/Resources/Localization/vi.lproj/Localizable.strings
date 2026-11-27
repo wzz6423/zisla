@@ -198,6 +198,13 @@
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Thiết lập ngoại hình thú cưng bên trong Dynamic Island.";
 "在灵动岛养一只小宠物" = "Nuôi một thú cưng trong Dynamic Island";
+"宠物模式" = "Chế độ thú cưng";
+"固定宠物" = "Thú cưng cố định";
+"随机轮换" = "Luân phiên ngẫu nhiên";
+"切换间隔" = "Khoảng thời gian đổi";
+"每天随机" = "Ngẫu nhiên mỗi ngày";
+"随机范围" = "Danh sách chọn ngẫu nhiên";
+"选择宠物" = "Chọn thú cưng";
 "当前宠物" = "Thú cưng Hiện tại";
 "选择内置的宠物形象" = "Chọn ngoại hình thú cưng tích hợp";
 "在岛的哪一侧" = "Phía nào của Island";

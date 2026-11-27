@@ -248,8 +248,8 @@ export const en: SiteContent = {
       pet: {
         title: 'Island pet',
         description:
-          'Choose from the expanded built-in animal and character catalogue, or import a supported image, animated image or video as a named pet. Place it on either side of the island and remove imported pets in Settings. Imports support animations up to 30 seconds and files up to 100 MB. When you expand the island on one display, pets on the other displays stay in place.',
-        detail: 'Expanded catalogue · Image and video import · Remove custom pets',
+          'Choose from the expanded built-in animal and character catalogue, or import a supported image, animated image or video as a named pet. Preview pets and keep one, or let zisla draw from your selection at local midnight or at a custom interval. Place it on either side of the island and remove imported pets in Settings. Imports support animations up to 30 seconds and files up to 100 MB. When you expand the island on one display, pets on the other displays stay in place.',
+        detail: 'Pet previews and random rotation · Image and video import · Remove custom pets',
       },
       lockScreen: {
         title: 'Lock screen information',
@@ -493,6 +493,7 @@ export const en: SiteContent = {
     "videoNotice": "These are excerpts from the existing feature tour, built with demonstration data. Its embedded captions are English; the steps here follow your language. The complete 2:40 tour and music credits remain below.",
     "preferencesTitle": "Useful preferences",
     "preferences": [
+      "In Settings → Pet, preview built-in or imported pets. Fixed Pet keeps one pet. Random Rotation draws from all pets unless you narrow the Random Pool. By default it picks at local midnight. Set Rotation Interval to Custom for a timer from 1 second to 99:59:59, initially set to 1 hour.",
       "Enable Shake to Drop in Settings to reveal a shelf target while dragging files. Context-note shaking uses its own configured hold key.",
       "Choose an audio output device from the media area. In Settings, choose automatic media source or a preferred player; this does not route each app to a different device.",
       "Keyboard sounds and typing statistics have independent switches and use Input Monitoring. The application volume mixer needs macOS 14.4+ and System Audio Recording permission.",

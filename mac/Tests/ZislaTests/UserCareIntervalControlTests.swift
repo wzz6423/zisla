@@ -10,7 +10,7 @@ import ZislaCore
 struct UserCareIntervalControlTests {
     @Test
     func draftDecomposesTheStoredIntervalAndRejectsZeroInvalidAndOverflowingInputs() {
-        var draft = UserCareIntervalDraft(interval: 3_723)
+        var draft = DurationIntervalDraft(interval: 3_723)
         #expect(draft.hours == "1")
         #expect(draft.minutes == "2")
         #expect(draft.seconds == "3")
@@ -36,7 +36,7 @@ struct UserCareIntervalControlTests {
 
     @Test
     func localizedAndFullWidthDigitsHaveTheSameSecondPrecision() {
-        var draft = UserCareIntervalDraft(interval: 2_700)
+        var draft = DurationIntervalDraft(interval: 2_700)
         draft.hours = "١"
         draft.minutes = "０２"
         draft.seconds = "٣"
@@ -147,16 +147,16 @@ struct UserCareIntervalControlTests {
         let language: AppLanguage
 
         var body: some View {
-            UserCareIntervalControl(interval: Binding(
+            DurationIntervalControl(interval: Binding(
                 get: { input.interval },
                 set: {
                     input.interval = $0
                     input.commits.append($0)
                 }
-            ))
-            .environment(\.locale, language.locale)
-            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
-            .frame(width: 480, height: 56)
+            ), identifierPrefix: "user-care")
+                .environment(\.locale, language.locale)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+                .frame(width: 480, height: 56)
         }
     }
 

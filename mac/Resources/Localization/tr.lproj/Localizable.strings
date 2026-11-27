@@ -198,6 +198,13 @@
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Dynamic Island içindeki evcil hayvan görünümünü ayarlayın.";
 "在灵动岛养一只小宠物" = "Dynamic Island'da bir evcil hayvan besle";
+"宠物模式" = "Evcil hayvan modu";
+"固定宠物" = "Sabit evcil hayvan";
+"随机轮换" = "Rastgele değişim";
+"切换间隔" = "Değişim aralığı";
+"每天随机" = "Her gün rastgele";
+"随机范围" = "Rastgele seçim listesi";
+"选择宠物" = "Evcil hayvanları seç";
 "当前宠物" = "Mevcut Evcil Hayvan";
 "选择内置的宠物形象" = "Yerleşik evcil hayvan görünümünü seçin";
 "在岛的哪一侧" = "Island'ın Hangi Tarafı";

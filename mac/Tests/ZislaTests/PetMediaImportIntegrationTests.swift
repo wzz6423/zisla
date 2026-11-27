@@ -42,7 +42,7 @@ struct PetMediaImportIntegrationTests {
         var settings = FeatureSettings(petEnabled: false, petID: entry.id, petSide: .right)
         var expected = settings
         expected.petID = FeatureSettings.default.petID
-        try SettingsView.removeSelectedPet(settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
+        try SettingsView.removePet(id: entry.id, settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
         #expect(settings == expected)
         #expect(try FileManager.default.contentsOfDirectory(atPath: pets.path).isEmpty)
         #expect(PetLibrary.loadSprite(for: entry.id, userPetsDirectory: pets) == nil)
@@ -58,13 +58,14 @@ struct PetMediaImportIntegrationTests {
         let source = try await fixture.createVideo(duration: 1)
         let pets = fixture.root.appendingPathComponent("pets/user_pets")
         let entry = try await PetMediaImporter.importPet(from: source, name: "Retained", directory: pets)
-        var settings = FeatureSettings(petID: entry.id, petSide: .right)
+        var settings = FeatureSettings(petID: "bear", petSelectionMode: .randomRotation,
+                                       petRandomPool: ["bear", entry.id], petSide: .right)
         let before = settings
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: pets.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pets.path) }
 
         #expect(throws: (any Error).self) {
-            try SettingsView.removeSelectedPet(settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
+            try SettingsView.removePet(id: entry.id, settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
         }
         #expect(settings == before)
         #expect(PetLibrary.entry(for: entry.id, userPetsDirectory: pets) == entry)
@@ -72,8 +73,9 @@ struct PetMediaImportIntegrationTests {
         #expect(FileManager.default.fileExists(atPath: source.path))
 
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pets.path)
-        try SettingsView.removeSelectedPet(settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
-        #expect(settings.petID == FeatureSettings.default.petID)
+        try SettingsView.removePet(id: entry.id, settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
+        #expect(settings.petID == before.petID)
+        #expect(settings.petRandomPool == ["bear"])
         #expect(settings.petSide == before.petSide)
         #expect(settings.petEnabled == before.petEnabled)
         #expect(try FileManager.default.contentsOfDirectory(atPath: pets.path).isEmpty)
@@ -112,20 +114,49 @@ struct PetMediaImportIntegrationTests {
         #expect(FileManager.default.fileExists(atPath: source.path))
     }
 
+    @Test
+    func browsingPetsAndEditingThePoolOnlyTakeEffectOnConfirmation() {
+        var settings = FeatureSettings(petID: "bear", petSelectionMode: .randomRotation, petRandomPool: ["bear"])
+        let ids = ["bear", "kirby", "pikachu"]
+        var draft = PetSelectionDraft(settings: settings, availableIDs: ids, currentID: "bear")
+        draft.previewID = "kirby"
+        #expect(draft.selectedIDs == ["bear"])
+        draft.selectedIDs = []
+        #expect(!draft.canApply)
+        draft.apply(to: &settings)
+        #expect(settings.petRandomPool == ["bear"])
+        draft.selectedIDs = ["pikachu"]
+        #expect(settings.petRandomPool == ["bear"])
+        draft.apply(to: &settings)
+        #expect(settings.petRandomPool == ["pikachu"])
+        #expect(settings.petID == "bear")
+        draft.selectedIDs = Set(ids)
+        draft.apply(to: &settings)
+        #expect(settings.petRandomPool == nil)
+
+        settings.petSelectionMode = .fixed
+        var fixed = PetSelectionDraft(settings: settings, availableIDs: ids, currentID: "bear")
+        fixed.previewID = "kirby"
+        #expect(settings.petID == "bear")
+        fixed.apply(to: &settings)
+        #expect(settings.petID == "kirby")
+        #expect(settings.petRandomPool == nil)
+    }
+
     @Test(arguments: AppLanguage.allCases)
-    func petImportStringsResolveInEveryLanguage(language: AppLanguage) throws {
+    func petSettingsStringsResolveInEveryLanguage(language: AppLanguage) throws {
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let settingsSource = try String(contentsOf: package.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
         let petContent = try #require(settingsSource.range(of: "private var petContent:"))
-        let petEntries = try #require(settingsSource.range(of: "private var petEntries:"))
-        let sources = try ["Zisla/PetImportView.swift", "ZislaKit/PetMediaImporter.swift"].map {
+        let removePet = try #require(settingsSource.range(of: "static func removePet("))
+        let sources = try ["Zisla/PetImportView.swift", "Zisla/PetSelectionView.swift", "ZislaKit/PetMediaImporter.swift"].map {
             try String(contentsOf: package.appendingPathComponent("Sources/" + $0), encoding: .utf8)
-        }.joined(separator: "\n") + String(settingsSource[petContent.lowerBound..<petEntries.lowerBound])
-        let expression = try NSRegularExpression(pattern: #"AppLocalization\.(?:text|format)\("([^"]+)""#)
+        }.joined(separator: "\n") + String(settingsSource[petContent.lowerBound..<removePet.lowerBound])
+        let expression = try NSRegularExpression(pattern: #"(?:AppLocalization\.(?:text|format)\(|AppLocalized(?:Format)?Text\(|title: |detail: )"([^"]+)""#)
         let keys = Set(expression.matches(in: sources, range: NSRange(sources.startIndex..., in: sources)).compactMap {
             Range($0.range(at: 1), in: sources).map { String(sources[$0]) }
         })
-        #expect(keys.count == 14)
+        #expect(Set(["宠物模式", "固定宠物", "随机轮换", "切换间隔", "每天随机", "自定义", "随机范围", "选择宠物", "预览", "导入宠物", "移除"]).isSubset(of: keys))
         #expect(AppLanguage.allCases.count == 17)
         let placeholders = try NSRegularExpression(pattern: #"%(?:\d+\$)?(?:ld|@)"#)
         let localization = package.appendingPathComponent("Resources/Localization")

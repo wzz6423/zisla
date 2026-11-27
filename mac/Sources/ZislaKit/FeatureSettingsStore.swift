@@ -10,10 +10,21 @@ public final class FeatureSettingsStore: ObservableObject {
 
     private let defaults: UserDefaults
     private let key = "feature-settings-v1"
+    private static let petRotationKey = "pet-rotation-selection"
     private let persistenceDelay: Duration
     private let defaultUpdateChannel: UpdateChannel
     private var persistedSettings: FeatureSettings
     private var persistenceTask: Task<Void, Never>?
+    /// Keep short pet rotations independent of the debounced, full settings snapshot.
+    public var petRotationSelection: PetRotationSelection? {
+        didSet {
+            if let petRotationSelection, let data = try? JSONEncoder().encode(petRotationSelection) {
+                defaults.set(data, forKey: Self.petRotationKey)
+            } else {
+                defaults.removeObject(forKey: Self.petRotationKey)
+            }
+        }
+    }
 
     public init(
         defaults: UserDefaults = .standard,
@@ -21,6 +32,9 @@ public final class FeatureSettingsStore: ObservableObject {
         defaultUpdateChannel: UpdateChannel? = nil
     ) {
         self.defaults = defaults
+        petRotationSelection = defaults.data(forKey: Self.petRotationKey).flatMap {
+            try? JSONDecoder().decode(PetRotationSelection.self, from: $0)
+        }
         self.persistenceDelay = persistenceDelay
         self.defaultUpdateChannel = defaultUpdateChannel ?? Self.bundledDefaultUpdateChannel
         let initialSettings: FeatureSettings
@@ -51,6 +65,7 @@ public final class FeatureSettingsStore: ObservableObject {
     }
 
     public func reset() {
+        petRotationSelection = nil
         var settings = FeatureSettings.default
         settings.updateChannel = defaultUpdateChannel
         self.settings = settings

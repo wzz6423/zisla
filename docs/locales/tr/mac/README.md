@@ -34,7 +34,7 @@ macOS 14 ve sonrası desteklenir. macOS 26 Liquid Glass kullanır; macOS 14/15 y
 - **Sesli giriş:** Aç/kapat veya bas-konuş kısayolları, özel genel kısayollar, sistem konuşma tanıma, yerel/uzak transkript düzenleme ve yerel kayıt geçmişi.
 - **Hızlı İşlemler:** Her kopyalamadan sonra zengin önizlemeli küçük bildirim gösterir: bağlantı açma, Finder'da dosya gösterme, seçilebilir arama motoru, çeviri, hesaplama, tanınan tarihlerden etkinlik oluşturma ve uzun metin/görüntü kaydetme. İndirme veya AirDrop tamamlanınca aynı kısayol klasörü açar; Hızlı İşlemler bunu tarayıcı ilerlemesinden bağımsız denetler. URL, dosya yolu, e-posta, telefon, canlı örnekli CSS rengi, aritmetik, tarih/saat, sistemden farklı dilde metin, kod, sayımlı düz metin, küçük resimli görüntü ve dosya başvurularını tanır. Düğmeler, ek varsayılan Command+N veya ayarlı değiştirici/fare yan tuşu tetikler. Sol tuşu tutup sağ tıklama hızlı kopya hareketi varsayılan kapalıdır; uygulama engel listesi, tür anahtarları ve hafif anımsatma modu da vardır.
 - **CLI ve Skills yönetimi:** Ayarlar'da yaygın yapay zekâ CLI'larını algılar, kurar, günceller, kaldırır ve yerel Skills öğelerini yönetir.
-- **Masaüstü evcil hayvanları:** Yerleşik veya içe aktarılmış hayvanı adanın iki yanından birine koyun. Adayı bir ekranda genişlettiğinizde diğer ekranlardaki evcil hayvanlar yerinde kalır.
+- **Masaüstü evcil hayvanları:** Ayarlar → Evcil Hayvan bölümünde yerleşik ve içe aktarılmış hayvanların önizlemesine bakabilirsiniz. “Sabit evcil hayvan” seçtiğiniz hayvanı gösterir. “Rastgele değişim” varsayılan olarak yerel saatle gece yarısında tüm hayvanlar arasından seçim yapar. Adayları “Rastgele seçim listesi” ile sınırlandırabilirsiniz. “Değişim aralığı” altında “Özel” seçeneğiyle 1 saniye ile 99:59:59 arasında bir süre belirleyebilirsiniz. Başlangıç değeri 1 saattir. Evcil hayvanı adanın soluna veya sağına yerleştirin. Adayı bir ekranda genişlettiğinizde diğer ekranlardaki evcil hayvanlar yerinde kalır.
 - **Güncellemeler:** Seçilen Release veya Preview kanalı genel çıkış ülkesini her çalışmada bir kez çözer. `CN` önce imzalı Gitee appcast'ini, sonra bir kez GitHub'ı dener; diğerleri GitHub sonra bir kez Gitee. Sorgu yoksa Gitee önceliği korunur. Sparkle indirir, doğrular, kurar ve yeniden başlatır. Kanal değişimi otomatik ve elle denetimi etkiler.
 - **Görünüm ve etkileşim:** Ayarlar sistem/açık/koyu görünümü seçer. Ada saydam veya buzlu yüzey, sabit genişleme, çoklu ekran, Spaces ve çentiksiz harici ekran sunar.
 - **Varsayılanlar:** Yeni kurulumlarda modüller açıktır. Her özellik, daraltılmış gösterge, yan bildirim, menü ölçümü ve güncelleme davranışı ayrıdır; mevcut kurulumlar ayarlarını korur.
@@ -116,6 +116,8 @@ swift run zisla
 ```
 
 Uygulama menü çubuğu aksesuarı olarak açılır. Üst ortadaki 6 px alana işaretçiyi götürün veya menü simgesinden “Adayı Göster” seçin.
+
+Hata ayıklama derlemesinde 5 saniyelik aralığı denemek için depo kökünde `ZISLA_DEBUG_PET_ROTATION_SECONDS=5 make run` komutunu çalıştırın. “Rastgele değişim” modunu açın ve en az iki hayvan seçin. Kayıtlı aralığa dönmek için `make update` komutunu değişkeni belirtmeden çalıştırın.
 
 ### `.app` derleme
 

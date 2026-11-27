@@ -268,8 +268,8 @@ export const fr: SiteContent = {
       pet: {
         title: 'Mascotte de l’île',
         description:
-          'Choisissez dans le catalogue enrichi d’animaux et de personnages, ou importez une image, une animation ou une vidéo compatible et nommez votre compagnon. Placez-le d’un côté de l’île et supprimez les compagnons importés dans les réglages. Animations de 30 secondes maximum, fichiers de 100 MB maximum. Quand vous déployez l’îlot sur un écran, les compagnons des autres écrans restent en place.',
-        detail: 'Catalogue enrichi · Import d’images et vidéos · Suppression des compagnons personnalisés',
+          'Choisissez dans le catalogue enrichi d’animaux et de personnages, ou importez une image, une animation ou une vidéo compatible et nommez votre compagnon. Prévisualisez les compagnons et gardez-en un, ou laissez zisla en tirer un au sort parmi ceux de votre choix à minuit, heure locale, ou à intervalles personnalisés. Placez-le d’un côté de l’île et supprimez les compagnons importés dans les réglages. Animations de 30 secondes maximum, fichiers de 100 MB maximum. Quand vous déployez l’îlot sur un écran, les compagnons des autres écrans restent en place.',
+        detail: 'Aperçu et rotation aléatoire · Import d’images et vidéos · Suppression des compagnons personnalisés',
       },
       lockScreen: {
         title: 'Informations sur l’écran verrouillé',
@@ -515,6 +515,7 @@ export const fr: SiteContent = {
     "videoNotice": "Extraits de la présentation existante, avec données de démonstration. Les sous-titres vidéo sont en anglais ; les étapes suivent votre langue. La présentation complète de 2 min 40 et les crédits musicaux sont plus bas.",
     "preferencesTitle": "Préférences utiles",
     "preferences": [
+      "Dans Réglages → Compagnon, prévisualisez les compagnons intégrés ou importés. « Compagnon fixe » conserve le même compagnon. La rotation aléatoire inclut tous les compagnons par défaut. Limitez la sélection dans « Compagnons du tirage ». Le tirage a lieu à minuit, heure locale. Pour fixer une durée entre 1 seconde et 99:59:59, choisissez « Personnalisé » sous « Intervalle de rotation ». La durée initiale est de 1 heure.",
       "Activez le dépôt par secousse dans Réglages. Les notes de contexte utilisent leur propre touche maintenue.",
       "Choisissez la sortie audio dans la zone média, puis la source automatique ou le lecteur préféré dans Réglages. Ce choix ne répartit pas les applications entre appareils.",
       "Sons et statistiques clavier ont des interrupteurs distincts et utilisent Surveillance de l’entrée. Le mélangeur nécessite macOS 14.4+ et Enregistrement audio système.",

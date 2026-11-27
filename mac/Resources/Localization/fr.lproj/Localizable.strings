@@ -196,6 +196,13 @@
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Définir l'apparence du compagnon à l'intérieur de Dynamic Island.";
 "在灵动岛养一只小宠物" = "Élever un compagnon dans Dynamic Island";
+"宠物模式" = "Mode du compagnon";
+"固定宠物" = "Compagnon fixe";
+"随机轮换" = "Rotation aléatoire";
+"切换间隔" = "Intervalle de rotation";
+"每天随机" = "Tirage quotidien";
+"随机范围" = "Compagnons du tirage";
+"选择宠物" = "Choisir les compagnons";
 "当前宠物" = "Compagnon actuel";
 "选择内置的宠物形象" = "Sélectionner l'apparence du compagnon intégré";
 "在岛的哪一侧" = "Quel côté de l'île";

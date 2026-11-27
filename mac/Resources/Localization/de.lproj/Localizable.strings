@@ -199,6 +199,13 @@
 /* Settings - Pet */
 "设置灵动岛内部的宠物形象。" = "Haustier-Erscheinungsbild in Dynamic Island festlegen.";
 "在灵动岛养一只小宠物" = "Ein Haustier in Dynamic Island aufziehen";
+"宠物模式" = "Haustiermodus";
+"固定宠物" = "Festes Haustier";
+"随机轮换" = "Zufälliger Wechsel";
+"切换间隔" = "Wechselintervall";
+"每天随机" = "Täglich zufällig";
+"随机范围" = "Haustiere für die Auslosung";
+"选择宠物" = "Haustiere auswählen";
 "当前宠物" = "Aktuelles Haustier";
 "选择内置的宠物形象" = "Integriertes Haustier-Erscheinungsbild auswählen";
 "在岛的哪一侧" = "Welche Seite der Insel";

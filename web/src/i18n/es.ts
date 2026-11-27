@@ -249,8 +249,8 @@ export const es = createCatalog({
       },
       pet: {
         title: 'Mascota de la isla',
-        description: 'Elige del catálogo ampliado de animales y personajes o importa una imagen, animación o vídeo compatible con un nombre propio. Coloca la mascota a un lado de la isla y elimina las importadas en Ajustes. Las animaciones admiten hasta 30 segundos y los archivos hasta 100 MB. Al desplegar la isla en una pantalla, las mascotas de las demás pantallas permanecen en su sitio.',
-        detail: 'Catálogo ampliado · Importar imágenes y vídeos · Eliminar mascotas propias',
+        description: 'Elige del catálogo ampliado de animales y personajes o importa una imagen, animación o vídeo compatible con un nombre propio. Previsualiza las mascotas y conserva una, o deja que zisla elija de tu lista a medianoche, según la hora local, o con el intervalo que indiques. Coloca la mascota a un lado de la isla y elimina las importadas en Ajustes. Las animaciones admiten hasta 30 segundos y los archivos hasta 100 MB. Al desplegar la isla en una pantalla, las mascotas de las demás pantallas permanecen en su sitio.',
+        detail: 'Vista previa y rotación aleatoria · Importar imágenes y vídeos · Eliminar mascotas propias',
       },
       lockScreen: {
         title: 'Información de la pantalla bloqueada',
@@ -493,6 +493,7 @@ export const es = createCatalog({
     "videoNotice": "Fragmentos de la presentación existente con datos de demostración. Los subtítulos del vídeo están en inglés; los pasos usan tu idioma. La presentación completa de 2:40 y los créditos musicales están abajo.",
     "preferencesTitle": "Preferencias útiles",
     "preferences": [
+      "En Ajustes → Mascota puedes previsualizar las mascotas integradas e importadas. «Mascota fija» mantiene una sola mascota. «Rotación aleatoria» incluye todas por defecto. Limita la lista en «Mascotas para el sorteo». El cambio se hace a medianoche según la hora local. En «Intervalo de cambio», elige «Personalizado» para indicar una duración entre 1 segundo y 99:59:59. El valor inicial es de 1 hora.",
       "Activa agitar al arrastrar para mostrar la bandeja. Las notas de contexto tienen su propia tecla mantenida.",
       "Elige salida de audio en la zona multimedia y fuente automática o reproductor preferido en Ajustes. Esta opción no asigna dispositivos distintos por app.",
       "Sonidos y estadísticas de teclado son independientes y usan Monitorización de entrada. El mezclador necesita macOS 14.4+ y Grabación de audio del sistema.",

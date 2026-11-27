@@ -242,7 +242,13 @@ enum SettingsSearchIndex {
         entry(.weather, "地点", anchor: .group("地点"), keywords: ["城市、区县或地区", "搜索地区"])
         rows(.weather, ["天气数据"])
         rows(.networkProxy, ["代理链接", "启用本地代理", "代理状态"])
-        rows(.pet, ["当前宠物", "在岛的哪一侧"])
+        entry(.pet, "宠物模式", anchor: .row("宠物模式"), keywords: ["固定宠物", "随机轮换", "每天随机"])
+        entry(.pet, "当前宠物", anchor: .row("当前宠物"), keywords: ["预览"])
+        if settings.petSelectionMode == .randomRotation {
+            entry(.pet, "切换间隔", anchor: .row("切换间隔"), keywords: ["每天随机", "自定义"])
+            entry(.pet, "随机范围", anchor: .row("随机范围"), keywords: ["选择宠物"])
+        }
+        rows(.pet, ["导入宠物", "在岛的哪一侧"])
         for permission in OnboardingPermissionID.allCases {
             entry(.permissions, permission.titleKey, anchor: .row(permission.titleKey), keywords: [permission.bodyKey])
         }

@@ -2,7 +2,7 @@ import SwiftUI
 import ZislaCore
 import ZislaKit
 
-struct UserCareIntervalDraft: Equatable {
+struct DurationIntervalDraft: Equatable {
     var hours: String
     var minutes: String
     var seconds: String
@@ -31,30 +31,32 @@ struct UserCareIntervalDraft: Equatable {
     }
 }
 
-struct UserCareIntervalControl: View {
+struct DurationIntervalControl: View {
+    let identifierPrefix: String
     @Binding private var interval: TimeInterval
-    @State private var draft: UserCareIntervalDraft
+    @State private var draft: DurationIntervalDraft
     @Environment(\.locale) private var locale
 
-    init(interval: Binding<TimeInterval>) {
+    init(interval: Binding<TimeInterval>, identifierPrefix: String) {
+        self.identifierPrefix = identifierPrefix
         _interval = interval
-        _draft = State(initialValue: UserCareIntervalDraft(interval: interval.wrappedValue))
+        _draft = State(initialValue: DurationIntervalDraft(interval: interval.wrappedValue))
     }
 
     var body: some View {
         HStack(spacing: 8) {
-            durationInput("小时", text: $draft.hours, identifier: "user-care-hours")
-            durationInput("分钟", text: $draft.minutes, identifier: "user-care-minutes")
-            durationInput("秒", text: $draft.seconds, identifier: "user-care-seconds")
+            durationInput("小时", text: $draft.hours, identifier: "hours")
+            durationInput("分钟", text: $draft.minutes, identifier: "minutes")
+            durationInput("秒", text: $draft.seconds, identifier: "seconds")
             Button(action: save) {
                 AppLocalizedText("保存")
             }
             .disabled(draft.interval == nil || draft.interval == interval)
-            .accessibilityIdentifier("user-care-save")
+            .accessibilityIdentifier("\(identifierPrefix)-save")
         }
         .font(.system(size: 11))
         .onChange(of: interval) { _, value in
-            draft = UserCareIntervalDraft(interval: value)
+            draft = DurationIntervalDraft(interval: value)
         }
     }
 
@@ -66,7 +68,7 @@ struct UserCareIntervalControl: View {
                 .multilineTextAlignment(.trailing)
                 .frame(width: 44)
                 .accessibilityLabel(AppLocalization.string(title, locale: locale))
-                .accessibilityIdentifier(identifier)
+                .accessibilityIdentifier("\(identifierPrefix)-\(identifier)")
                 .onSubmit(save)
             AppLocalizedText(title)
                 .foregroundStyle(.secondary)

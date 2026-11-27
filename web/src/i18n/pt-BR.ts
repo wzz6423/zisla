@@ -249,8 +249,8 @@ export const ptBR = createCatalog({
       },
       pet: {
         title: 'Mascote da ilha',
-        description: 'Escolha no catálogo ampliado de animais e personagens ou importe uma imagem, animação ou vídeo compatível com um nome próprio. Posicione o mascote em um lado da ilha e remova os importados nos Ajustes. Animações de até 30 segundos e arquivos de até 100 MB. Ao expandir a ilha em uma tela, os mascotes das outras telas permanecem no lugar.',
-        detail: 'Catálogo ampliado · Importar imagens e vídeos · Remover mascotes personalizados',
+        description: 'Escolha no catálogo ampliado de animais e personagens ou importe uma imagem, animação ou vídeo compatível com um nome próprio. Veja uma prévia dos mascotes e mantenha um fixo ou deixe o zisla sortear um da sua lista à meia-noite no horário local ou em um intervalo personalizado. Posicione o mascote em um lado da ilha e remova os importados nos Ajustes. Animações de até 30 segundos e arquivos de até 100 MB. Ao expandir a ilha em uma tela, os mascotes das outras telas permanecem no lugar.',
+        detail: 'Prévia e rotação aleatória · Importar imagens e vídeos · Remover mascotes personalizados',
       },
       lockScreen: {
         title: 'Informações da tela bloqueada',
@@ -493,6 +493,7 @@ export const ptBR = createCatalog({
     "videoNotice": "Trechos da apresentação existente com dados de demonstração. As legendas do vídeo estão em inglês; as etapas usam seu idioma. O vídeo completo de 2:40 e os créditos musicais estão abaixo.",
     "preferencesTitle": "Preferências úteis",
     "preferences": [
+      "Em Ajustes → Pet, veja uma prévia dos mascotes integrados e importados. “Mascote fixo” mantém o mesmo mascote. A rotação aleatória inclui todos por padrão. Escolha quem participa em “Mascotes para o sorteio”. O sorteio ocorre à meia-noite no horário local. Em “Intervalo de troca”, escolha “Personalizado” para definir uma duração de 1 segundo a 99:59:59. O valor inicial é de 1 hora.",
       "Ative agitar ao arrastar para revelar a prateleira. Notas de contexto usam sua própria tecla mantida.",
       "Escolha a saída de áudio na área de mídia e fonte automática ou player preferido nos Ajustes. Isso não atribui um dispositivo diferente a cada app.",
       "Sons e estatísticas do teclado são independentes e usam Monitoramento de Entrada. O mixer exige macOS 14.4+ e Gravação de Áudio do Sistema.",

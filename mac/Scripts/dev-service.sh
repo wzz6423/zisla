@@ -198,6 +198,9 @@ function start_service() {
   if [[ -n "${ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS:-}" ]]; then
     plutil -insert EnvironmentVariables.ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS -string "$ZISLA_DEBUG_RECOMMENDED_TOOL_ERRORS" "$LAUNCH_AGENT"
   fi
+  if [[ -n "${ZISLA_DEBUG_PET_ROTATION_SECONDS:-}" ]]; then
+    plutil -insert EnvironmentVariables.ZISLA_DEBUG_PET_ROTATION_SECONDS -string "$ZISLA_DEBUG_PET_ROTATION_SECONDS" "$LAUNCH_AGENT"
+  fi
   plutil -insert EnvironmentVariables.ZISLA_DEBUG_SHOW_CHARGE_TO_FULL -string "${ZISLA_DEBUG_SHOW_CHARGE_TO_FULL:-0}" "$LAUNCH_AGENT"
   plutil -insert EnvironmentVariables.ZISLA_DEBUG_IGNORE_KEYBOARD_STATS -string "${ZISLA_DEBUG_IGNORE_KEYBOARD_STATS:-0}" "$LAUNCH_AGENT"
   if [[ -n "$profile_directory" ]]; then

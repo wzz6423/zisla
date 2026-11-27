@@ -34,7 +34,7 @@ Se admite macOS 14 y posteriores. macOS 26 usa Liquid Glass; macOS 14/15 recurre
 - **Entrada de voz:** Atajos con alternancia o pulsar para hablar, atajos globales personalizados, reconocimiento del sistema, organización local o remota e historial local.
 - **Acciones rápidas:** Tras cada copia, un pequeño aviso de la isla ofrece vista previa enriquecida y acciones: abrir enlaces, mostrar archivos en Finder, buscar con motor elegible, traducir, calcular, crear eventos desde fechas y guardar textos largos o imágenes. Tras una descarga o AirDrop, el mismo atajo abre la carpeta; lo controla Acciones rápidas independientemente del progreso del navegador. Reconoce URL, rutas, correos, teléfonos, colores CSS con muestra en vivo, aritmética, fechas y horas, texto de idioma distinto al sistema, código, texto con recuentos, miniaturas de imagen y referencias de archivos. Se activa por botones, el atajo adicional predeterminado Command+N o modificador/botón lateral configurado. Incluye gesto de copia manteniendo botón izquierdo y clic derecho, desactivado por defecto, lista de aplicaciones excluidas, interruptores por tipo y modo ligero de recordatorio.
 - **Gestión de CLI y Skills:** Detecta, instala, actualiza y elimina CLI de IA habituales y gestiona Skills locales en Ajustes.
-- **Mascotas de escritorio:** Elige una mascota integrada o importada y colócala a cualquier lado de la isla. Al desplegar la isla en una pantalla, las mascotas de las demás pantallas permanecen en su sitio.
+- **Mascotas de escritorio:** En Ajustes → Mascota puedes previsualizar las mascotas integradas e importadas. «Mascota fija» mantiene una sola mascota. «Rotación aleatoria» incluye todas por defecto. Limita la lista en «Mascotas para el sorteo». El cambio se hace a medianoche según la hora local. En «Intervalo de cambio», elige «Personalizado» para indicar una duración entre 1 segundo y 99:59:59. El valor inicial es de 1 hora. Coloca la mascota a cualquier lado de la isla. Al desplegar la isla en una pantalla, las mascotas de las demás pantallas permanecen en su sitio.
 - **Actualizaciones:** El canal Release o Preview resuelve una vez por ejecución el código de país de salida pública. `CN` consulta primero el appcast firmado de Gitee y reintenta GitHub una vez; otros códigos consultan GitHub y reintentan Gitee una vez. Si la consulta no está disponible, Gitee sigue primero. Sparkle descarga, verifica, instala y reinicia. Cambiar canal afecta comprobaciones automáticas y manuales.
 - **Apariencia e interacción:** Ajustes sigue el sistema o usa tema claro u oscuro. La isla admite superficies transparentes o esmeriladas, expansión fijada, varios monitores, Spaces y pantallas externas sin muesca.
 - **Valores predeterminados:** Las instalaciones nuevas habilitan los módulos. Cada función, indicador contraído, aviso lateral, métrica de menú y comportamiento de actualización se ajusta independientemente; las instalaciones anteriores conservan su configuración.
@@ -116,6 +116,8 @@ swift run zisla
 ```
 
 La aplicación inicia como accesorio de la barra de menús. Mueve el puntero a los 6 px del centro superior de la pantalla actual para desplegar o elige «Mostrar isla» en el icono de menú.
+
+Para probar un intervalo de 5 segundos en la versión de depuración, ejecuta `ZISLA_DEBUG_PET_ROTATION_SECONDS=5 make run` desde la raíz del repositorio. Activa «Rotación aleatoria» y selecciona al menos dos mascotas. Ejecuta `make update` sin la variable para recuperar el intervalo guardado.
 
 ### Compilar una `.app`
 
