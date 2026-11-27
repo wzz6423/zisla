@@ -282,9 +282,11 @@ enum PersistentPetNoticePolicy {
         _ notices: [IslandNotice],
         isVoiceRecording: Bool,
         voiceDisplayID: UInt32?,
-        displayID: UInt32
+        displayID: UInt32,
+        noticesEnabled: Bool = true
     ) -> [IslandNotice] {
-        if isVoiceRecording { return [] }
+        guard noticesEnabled else { return [] }
+        if isVoiceRecording, voiceDisplayID == nil || voiceDisplayID == displayID { return [] }
         guard let voiceDisplayID, voiceDisplayID != displayID else { return notices }
         return notices.filter { !$0.id.hasPrefix("voice-processing-") }
     }
@@ -443,7 +445,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             layoutStyle: model.settingsStore.settings.islandLayoutStyle,
             placement: model.settingsStore.settings.islandPlacement,
             pillSize: CGSize(width: model.settingsStore.settings.islandPillWidth, height: model.settingsStore.settings.islandPillHeight),
-            edgeInset: model.settingsStore.settings.islandEdgeInset
+            edgeInset: model.settingsStore.settings.islandEdgeInset,
+            displaySettings: model.settingsStore.settings.islandDisplaySettings
         ))
         let persistentPetRootView = { (layout: ScreenOverlayLayout) in
             AppLanguageEnvironment(languageStore: model.languageStore, content: CollapsedPetView(
@@ -464,14 +467,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     model.aiResultSweep.presentationNotices(from: model.notices.left + model.notices.right),
                     isVoiceRecording: model.voiceInput.isCapturingInput,
                     voiceDisplayID: self?.voiceRecordingDisplayID,
-                    displayID: layout.displayID
+                    displayID: layout.displayID,
+                    noticesEnabled: model.settingsStore.settings.resolvedActivityNoticeDisplayIDs(
+                        from: Set(NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)).map(\.displayID))
+                    ).contains(layout.displayID)
                 )
                 return CollapsedPetLayout.frame(
                     for: layout,
-                    compactBarFrame: SideNoticeLayoutEngine().compactBarFrame(
+                    compactBarFrame: layout.style == .pill ? layout.collapsedFrame : SideNoticeLayoutEngine().compactBarFrame(
                         for: layout,
                         notices: notices,
-                        settings: model.settingsStore.settings,
+                        settings: model.settingsStore.settings.islandSettings(for: layout),
                         browserDownloadCount: model.settingsStore.settings.showsBrowserDownloadProgress
                             ? model.browserDownloads.snapshots.count : 0
                     ),
@@ -527,8 +533,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if model.isIslandVisible { self?.noticePresenter?.setExpandedIslandDisplayID(layout?.displayID) }
             if let displayID = layout?.displayID { self?.noticePresenter?.publishCompactLayout(on: displayID) }
         }
-        model.onChooseIslandPlacement = { [weak self, weak coordinator] in
+        coordinator.onPinnedChanged = { pinned in model.isPinned = pinned }
+        model.onChooseIslandPlacement = { [weak self, weak coordinator] displayID in
             guard let self else { return }
+            let target = displayID.flatMap { id in
+                NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)).first { $0.displayID == id }
+            }
+            if displayID != nil, target == nil { return }
+            let displaySettings = target.map { model.settingsStore.settings.islandDisplaySettings(for: $0.persistentID) }
             let selector = self.islandPlacementController ?? IslandPlacementController()
             guard !selector.isSelecting else { return }
             self.islandPlacementController = selector
@@ -536,10 +548,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             coordinator?.setHoverActivationSuspended(true)
             self.noticePresenter?.setPlacementSelectionActive(true)
             selector.show(
-                initialPlacement: model.settingsStore.settings.islandPlacement,
+                initialPlacement: displaySettings?.placement ?? model.settingsStore.settings.islandPlacement,
                 configuration: model.settingsStore.settings.islandScreenConfiguration,
+                displayID: displayID,
                 completion: { [weak self, weak coordinator] placement in
-                    model.settingsStore.settings.islandPlacement = placement
+                    if let target, var displaySettings {
+                        displaySettings.placement = placement
+                        model.settingsStore.settings.islandDisplaySettings[target.persistentID] = displaySettings
+                    } else {
+                        model.settingsStore.settings.islandPlacement = placement
+                    }
                     coordinator?.setHoverActivationSuspended(false)
                     self?.noticePresenter?.setPlacementSelectionActive(false)
                 },
@@ -641,8 +659,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         model.clipboardAssistant.onPresentationChanged = { [weak self, weak coordinator] visible in
             if visible { model.clearUserCareMessage() }
-            coordinator?.setHoverActivationSuspended(visible)
-            self?.noticePresenter?.setClipboardAssistantVisible(visible)
+            let displayID = model.clipboardAssistant.presentationDisplayID
+            coordinator?.setHoverActivationSuspended(visible, on: displayID)
+            self?.noticePresenter?.setClipboardAssistantVisible(visible, on: displayID)
         }
         coordinator.setPersistentContentVisible(model.settingsStore.settings.petEnabled)
         coordinator.setCollapsedOnTop(model.settingsStore.settings.islandCollapsedOnTop)
@@ -737,6 +756,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
+            }
+            .store(in: &cancellables)
+
         model.$systemMonitorHeadphoneTransient
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
@@ -783,7 +808,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         layoutStyle: configuration.layoutStyle,
                         placement: configuration.placement,
                         pillSize: configuration.pillSize,
-                        edgeInset: configuration.edgeInset
+                        edgeInset: configuration.edgeInset,
+                        displaySettings: configuration.displaySettings
                     )
                 }
             }
@@ -911,7 +937,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     if recording {
-                        self.noticePresenter?.setVoiceRecording(true)
                         let model = AppModel.shared
                         self.voiceRecordingSavedPanelSize = Self.expandedPanelSize(
                             module: model.selectedModule,
@@ -919,9 +944,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             isTeleprompterPresented: model.isTeleprompterPresented,
                             dashboardCardCount: model.dashboardCardCount,
                             includesPet: model.settingsStore.settings.petEnabled,
-                            layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+                            layoutStyle: model.islandScreenLayout?.style ?? model.settingsStore.settings.islandLayoutStyle,
                             contentTopInset: IslandRootView.contentTopInset(
-                                layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+                                layoutStyle: model.islandScreenLayout?.style ?? model.settingsStore.settings.islandLayoutStyle,
                                 screenLayout: model.islandScreenLayout
                             )
                         ).panelSize
@@ -929,6 +954,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         self.expandedSizeUpdateTask?.cancel()
                         self.pendingVoiceRecordingPanelRestore = nil
                         self.overlayCoordinator?.setVoiceRecording(true)
+                        let voiceDisplayID = self.overlayCoordinator?.activeDisplayID
+                        self.voiceRecordingDisplayID = voiceDisplayID
+                        self.noticePresenter?.setVoiceRecording(true, on: voiceDisplayID)
+                        self.noticePresenter?.setVoiceProcessingDisplayID(voiceDisplayID)
                         // Read the collapsed pill metrics only after `setVoiceRecording` resolved the
                         // active display: before the island has ever been presented they still hold
                         // the launch defaults, which sizes the first take's surface wrong.
@@ -939,11 +968,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         ).panelSize
                         self.overlayCoordinator?.updateExpandedSize(recordingSize)
                         self.lastAppliedPanelSize = recordingSize
-                        // Scope the post-recording processing indicator to the display where
-                        // dictation happened.
-                        let voiceDisplayID = self.overlayCoordinator?.activeDisplayID
-                        self.voiceRecordingDisplayID = voiceDisplayID
-                        self.noticePresenter?.setVoiceProcessingDisplayID(voiceDisplayID)
                     } else {
                         let model = AppModel.shared
                         self.overlayCoordinator?.setVoiceRecording(false)
@@ -971,9 +995,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .combineLatest(model.aiResultSweep.$current)
             .map { message, sweep in AIResultSweepController.presentationMessage(message, sweep: sweep) }
             .removeDuplicates()
-            .sink { [weak self, weak coordinator] message in
+            .combineLatest(model.$islandScreenLayout.map { $0?.displayID }.removeDuplicates())
+            .sink { [weak self, weak coordinator] message, displayID in
                 Task { @MainActor [weak self, weak coordinator] in
-                    self?.noticePresenter?.setTransientNoticePresented(message != nil, message: message)
+                    self?.noticePresenter?.setTransientNoticePresented(message != nil, message: message, on: displayID)
                     coordinator?.setTransientNoticePresented(message != nil)
                 }
             }
@@ -1187,9 +1212,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 return Self.expandedPanelSize(
                     module: module, isMirrorPresented: mirror,
                     isTeleprompterPresented: teleprompter, dashboardCardCount: cardCount,
-                    includesPet: settings.petEnabled, layoutStyle: settings.islandLayoutStyle,
+                    includesPet: settings.petEnabled, layoutStyle: layout?.style ?? settings.islandLayoutStyle,
                     contentTopInset: IslandRootView.contentTopInset(
-                        layoutStyle: settings.islandLayoutStyle, screenLayout: layout
+                        layoutStyle: layout?.style ?? settings.islandLayoutStyle, screenLayout: layout
                     )
                 ).panelSize
             }
@@ -1402,7 +1427,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             IslandStatusIcon.Reading(metric: metric,
                                      text: SystemMonitorCombinedMenuBarPresentation.value(metric, snapshot: AppModel.shared.systemMonitor.snapshot))
         }
-        let icons = IslandStatusIconRouting.update(destination: settings.effectiveStatusIconDestination,
+        let displayIDs = NSScreen.screens.compactMap { ScreenSnapshot(screen: $0)?.persistentID }
+        let destination = settings.supportsStatusIconsInIsland(on: displayIDs) ? settings.statusIconDestination : .menuBar
+        let icons = IslandStatusIconRouting.update(destination: destination,
                                                    application: statusItem, metrics: metrics, stacked: mergedMonitorStatusItem, readings: readings,
                                                    combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle,
                                                    islandAppIconEnabled: settings.islandAppIconEnabled)

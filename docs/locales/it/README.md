@@ -102,6 +102,7 @@ Il downloader richiede `yt-dlp`; `ffmpeg` è facoltativo. Per convertire Office 
 ## Progettato per non intralciare
 
 - Supporta più schermi, Spaces e normali app a tutto schermo senza attivare l'app né sottrarre il focus a quella corrente.
+- Con più schermi collegati, Impostazioni → Generali → Modalità degli schermi permette di scegliere per ciascuno la modalità Dynamic Island (posizione della fotocamera o personalizzata), la modalità notch o di nasconderla. Con un solo schermo questa impostazione è nascosta e si usa l’aspetto globale; ricollegando gli schermi si ripristinano le configurazioni salvate. Tutti gli schermi visibili mantengono l’isola chiusa contemporaneamente. L’espansione, le azioni rapide, la registrazione e i messaggi temporanei sostituiscono solo l’isola del proprio schermo; la selezione degli schermi per le notifiche filtra il contenuto senza nascondere l’isola inattiva.
 - Lo stato nascosto non usa una finestra trasparente permanente né un ciclo di rendering; l'espansione dipende da eventi globali e controlli geometrici.
 - Usa un solo materiale di sistema e passa a uno sfondo opaco quando è attiva Riduci trasparenza.
 - Rileva il notch fisico tramite l'area sicura di sistema; sugli schermi esterni senza notch usa una sovrapposizione con lo stesso contorno.

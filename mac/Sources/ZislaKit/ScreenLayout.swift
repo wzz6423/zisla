@@ -23,6 +23,7 @@ public struct ScreenInsets: Equatable, Sendable {
 
 public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
     public let displayID: CGDirectDisplayID
+    public let persistentID: String
     public var frame: CGRect
     public var visibleFrame: CGRect
     public var safeAreaInsets: ScreenInsets
@@ -62,9 +63,11 @@ public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
         safeAreaInsets: ScreenInsets = ScreenInsets(),
         auxiliaryTopLeftArea: CGRect? = nil,
         auxiliaryTopRightArea: CGRect? = nil,
-        menuBarHeightFallback: CGFloat = 0
+        menuBarHeightFallback: CGFloat = 0,
+        persistentID: String? = nil
     ) {
         self.displayID = displayID
+        self.persistentID = persistentID ?? String(displayID)
         self.frame = frame
         self.visibleFrame = visibleFrame
         self.safeAreaInsets = safeAreaInsets
@@ -93,7 +96,9 @@ public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
             ),
             auxiliaryTopLeftArea: screen.auxiliaryTopLeftArea,
             auxiliaryTopRightArea: screen.auxiliaryTopRightArea,
-            menuBarHeightFallback: max(24, NSStatusBar.system.thickness)
+            menuBarHeightFallback: max(24, NSStatusBar.system.thickness),
+            persistentID: CGDisplayCreateUUIDFromDisplayID(number.uint32Value)
+                .map { CFUUIDCreateString(nil, $0.takeRetainedValue()) as String }
         )
     }
 }
@@ -136,6 +141,7 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
     public var compactStatusLength: CGFloat?
     public var compactStatusSideWidth: CGFloat? = nil
     public var statusIconSize: CGSize?
+    public var displaySettings: [String: IslandDisplaySettings]
 
     public init(
         simulatedIslandSize: CGSize = CGSize(width: 240, height: 34),
@@ -149,7 +155,8 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
         edgeInset: CGFloat = 8,
         expandsForDetailedStatus: Bool = false,
         compactStatusLength: CGFloat? = nil,
-        statusIconSize: CGSize? = nil
+        statusIconSize: CGSize? = nil,
+        displaySettings: [String: IslandDisplaySettings] = [:]
     ) {
         self.simulatedIslandSize = simulatedIslandSize
         self.expandedSize = expandedSize
@@ -163,6 +170,7 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
         self.expandsForDetailedStatus = expandsForDetailedStatus
         self.compactStatusLength = compactStatusLength
         self.statusIconSize = statusIconSize
+        self.displaySettings = displaySettings
     }
 }
 
@@ -179,6 +187,7 @@ public struct ScreenOverlayLayout: Equatable, Identifiable, Sendable {
     public let physicalOcclusionFrame: CGRect?
     public let placementBounds: CGRect
     public let placementMode: IslandPlacementMode
+    public let placement: IslandPlacement
 
     public var id: CGDirectDisplayID { displayID }
     public var collapsedFrame: CGRect { topology.anchorFrame }
@@ -214,7 +223,8 @@ public struct ScreenOverlayLayout: Equatable, Identifiable, Sendable {
         edge: IslandEdge = .top,
         physicalOcclusionFrame: CGRect? = nil,
         placementBounds: CGRect? = nil,
-        placementMode: IslandPlacementMode = .camera
+        placementMode: IslandPlacementMode = .camera,
+        placement: IslandPlacement? = nil
     ) {
         self.displayID = displayID
         self.screenFrame = screenFrame
@@ -229,6 +239,7 @@ public struct ScreenOverlayLayout: Equatable, Identifiable, Sendable {
             ?? (topology.hasPhysicalNotch ? topology.anchorFrame : nil)
         self.placementBounds = placementBounds ?? screenFrame
         self.placementMode = placementMode
+        self.placement = placement ?? IslandPlacement(mode: placementMode, edge: edge)
     }
 
     public func containsTrigger(_ point: CGPoint) -> Bool {
@@ -251,7 +262,20 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
     }
 
     public func layouts(for screens: [ScreenSnapshot]) -> [ScreenOverlayLayout] {
-        screens.map(layout(for:))
+        screens.compactMap { screen in
+            guard let configuration = configuration(for: screen, displayCount: screens.count) else { return nil }
+            return ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+        }
+    }
+
+    public func configuration(for screen: ScreenSnapshot, displayCount: Int) -> ScreenLayoutConfiguration? {
+        var configuration = configuration
+        if displayCount > 1, let settings = configuration.displaySettings[screen.persistentID] {
+            guard let style = settings.mode.layoutStyle else { return nil }
+            configuration.layoutStyle = style
+            configuration.placement = settings.placement
+        }
+        return configuration
     }
 
     public func layout(for screen: ScreenSnapshot) -> ScreenOverlayLayout {
@@ -478,7 +502,8 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
             edge: edge,
             physicalOcclusionFrame: occlusion,
             placementBounds: bounds,
-            placementMode: configuration.placement.mode
+            placementMode: configuration.placement.mode,
+            placement: isCamera ? IslandPlacement() : configuration.placement
         )
     }
 

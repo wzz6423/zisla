@@ -38,6 +38,7 @@ Sono supportati macOS 14 e successivi. macOS 26 usa Liquid Glass; macOS 14/15 us
 - **Aggiornamenti:** Release/Preview determina il paese dell'IP pubblico una volta per avvio. `CN` verifica prima l'appcast firmato Gitee e ritenta GitHub una volta; gli altri paesi fanno il contrario. Se la ricerca fallisce, Gitee resta primo. Sparkle scarica, verifica, installa e riavvia. Il canale vale per verifiche automatiche e manuali.
 - **Aspetto e interazione:** tema di sistema, chiaro o scuro, superfici trasparenti o satinate, espansione fissata, più schermi, Spaces e schermi esterni senza notch.
 - **Predefiniti:** le nuove installazioni abilitano i moduli. Funzioni, indicatori compatti, notifiche laterali, statistiche della barra dei menu e aggiornamenti sono regolabili separatamente; le installazioni esistenti conservano la configurazione.
+- Con più schermi collegati, Impostazioni → Generali → Modalità degli schermi permette di scegliere per ciascuno la modalità Dynamic Island (posizione della fotocamera o personalizzata), la modalità notch o di nasconderla. Con un solo schermo questa impostazione è nascosta e si usa l’aspetto globale; ricollegando gli schermi si ripristinano le configurazioni salvate. Tutti gli schermi visibili mantengono l’isola chiusa contemporaneamente. L’espansione, le azioni rapide, la registrazione e i messaggi temporanei sostituiscono solo l’isola del proprio schermo; la selezione degli schermi per le notifiche filtra il contenuto senza nascondere l’isola inattiva.
 
 ### Strumenti indipendenti e flussi
 

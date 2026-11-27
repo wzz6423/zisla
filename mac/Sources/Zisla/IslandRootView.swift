@@ -23,6 +23,14 @@ struct IslandRootView: View {
     @StateObject private var cleanupPanelPresentation = SystemCleanupPanelPresentationState()
     @StateObject private var historyPanelPresentation = SystemMetricsHistoryPanelPresentationState()
 
+    private var islandLayoutStyle: IslandLayoutStyle {
+        model.islandScreenLayout?.style ?? settingsStore.settings.islandLayoutStyle
+    }
+
+    private var islandPlacementMode: IslandPlacementMode {
+        model.islandScreenLayout?.placementMode ?? settingsStore.settings.islandPlacement.mode
+    }
+
     init(
         model: AppModel,
         petController: IslandPetController,
@@ -48,7 +56,7 @@ struct IslandRootView: View {
     var body: some View {
         GeometryReader { proxy in
             let contentTopInset = Self.contentTopInset(
-                layoutStyle: settingsStore.settings.islandLayoutStyle,
+                layoutStyle: islandLayoutStyle,
                 screenLayout: model.islandScreenLayout
             )
             let surfaceSize = IslandSurfaceTransform.fittingSize(
@@ -69,7 +77,7 @@ struct IslandRootView: View {
                 && !model.isTeleprompterPresented
                 && model.settingsStore.settings.petEnabled
                 && !usesCompactSurface
-                && settingsStore.settings.islandLayoutStyle == .notch
+                && islandLayoutStyle == .notch
             let petSlotWidth = reservesPetSlot
                 ? min(
                     ExpandedPetLayout.sideSlotWidth,
@@ -153,7 +161,7 @@ struct IslandRootView: View {
                     usesCompactGlassSurface: usesCompactSurface,
                     collapsedCenterOffsetX: collapsedCenterOffsetX,
                     resultSweep: model.aiResultSweep,
-                    layoutStyle: settingsStore.settings.islandLayoutStyle,
+                    layoutStyle: islandLayoutStyle,
                     collapsedFrame: pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: .leftToRight),
                     edge: model.islandEdge,
                     contentTopInset: contentTopInset
@@ -183,8 +191,8 @@ struct IslandRootView: View {
                                         transcript: voiceInput.transcript,
                                         errorDescription: voiceInput.errorDescription,
                                         geometry: voiceRecordingGeometry,
-                                        keepsIconsAdjacent: settingsStore.settings.islandLayoutStyle == .pill
-                                            && settingsStore.settings.islandPlacement.mode == .custom
+                                        keepsIconsAdjacent: islandLayoutStyle == .pill
+                                            && islandPlacementMode == .custom
                                     )
                                     .frame(height: layout.islandSize.height, alignment: .top)
                                 } else if showsCompactTransientNotice, let notice = model.transientMessage {
@@ -351,7 +359,7 @@ struct IslandRootView: View {
                 .environment(\.islandVisualStyle, settingsStore.settings.islandVisualStyle)
                 .environment(\.mediaVisualizationStyle, settingsStore.settings.mediaVisualizationStyle)
                 .contentShape(IslandSilhouette(
-                    topCornerRadius: settingsStore.settings.islandLayoutStyle == .pill
+                    topCornerRadius: islandLayoutStyle == .pill
                         ? IslandSurfaceGeometry.expandedBottomCornerRadius : 0
                 ))
                 .onHover { hovering in
@@ -511,8 +519,8 @@ struct IslandRootView: View {
 
     private var customTransientPresentation: CompactPillStatusPresentation? {
         guard showsCompactTransientNotice,
-              settingsStore.settings.islandLayoutStyle == .pill,
-              settingsStore.settings.islandPlacement.mode == .custom,
+              islandLayoutStyle == .pill,
+              islandPlacementMode == .custom,
               let message = model.transientMessage else { return nil }
         return CompactPillStatusContent.transientPresentation(message: message)
     }
@@ -527,7 +535,7 @@ struct IslandRootView: View {
     }
 
     private func pillCollapsedFrame(in surface: CGSize, panelSize: CGSize, direction: LayoutDirection) -> CGRect? {
-        guard settingsStore.settings.islandLayoutStyle == .pill,
+        guard islandLayoutStyle == .pill,
               let layout = model.islandScreenLayout else { return nil }
         return Self.pillCollapsedFrame(for: layout, in: surface, panelSize: panelSize, direction: direction)
     }
@@ -596,7 +604,7 @@ struct IslandRootView: View {
     /// Matches `reservesPetSlot`: the surface keeps hugging the same panel edge while collapsed, so
     /// the recycle fold starts exactly where the expanded surface stood.
     private var islandSurfaceAlignment: Alignment {
-        if settingsStore.settings.islandLayoutStyle == .pill {
+        if islandLayoutStyle == .pill {
             let sideAnchorsAtTop = model.islandScreenLayout.map {
                 $0.collapsedFrame.midY >= $0.screenFrame.midY
             } ?? true
@@ -670,7 +678,7 @@ struct IslandRootView: View {
             for: activeModule,
             dashboardCardCount: model.dashboardCardCount,
             contentTopInset: Self.contentTopInset(
-                layoutStyle: settingsStore.settings.islandLayoutStyle,
+                layoutStyle: islandLayoutStyle,
                 screenLayout: model.islandScreenLayout
             )
         )
@@ -789,15 +797,8 @@ struct CollapsedPetView: View {
             if model.settingsStore.settings.petEnabled,
                let sprite = petController.sprite {
                 if let screenLayout, screenLayout.style == .pill {
-                    let compactFrame = SideNoticeLayoutEngine().compactBarFrame(
-                        for: screenLayout,
-                        notices: model.aiResultSweep.presentationNotices(from: model.notices.left + model.notices.right),
-                        settings: model.settingsStore.settings,
-                        browserDownloadCount: model.settingsStore.settings.showsBrowserDownloadProgress
-                            ? model.browserDownloads.snapshots.count : 0
-                    )
                     Self.pillPet(sprite: sprite, behavior: petController.behavior, layout: screenLayout,
-                                 compactBarFrame: compactFrame, side: model.settingsStore.settings.petSide)
+                                 compactBarFrame: screenLayout.collapsedFrame, side: model.settingsStore.settings.petSide)
                 } else {
                     let horizontalInset = CollapsedPetLayout.outerGap
                     let verticalInset = min(4, max(2, proxy.size.height * 0.1))

@@ -3798,3 +3798,5 @@
 "Gemini App 使用同一账号的网页版额度，请添加网站额度凭据" = "Gemini App partage les quotas web du même compte. Ajoutez les identifiants de quota web.";
 "请在默认浏览器登录 Gemini App 使用的同一 Google 账号" = "Connectez-vous dans le navigateur par défaut au même compte Google que Gemini App.";
 "Gemini App 网站额度" = "Quota web de Gemini App";
+"显示器模式" = "Modes des écrans";
+"在该屏幕不显示" = "Masquer sur cet écran";

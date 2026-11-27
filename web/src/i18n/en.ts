@@ -159,7 +159,7 @@ export const en: SiteContent = {
     features: {
       floatingIsland: {
         title: 'A floating island that follows your layout',
-        description: 'Use the camera position or choose a custom position along a screen edge. Your custom placement is remembered when switching modes. Compact horizontal and vertical layouts adapt their length to status icons, AI tasks, downloads and media, with an option to show more information. Reorder island modules or restore the default order in Settings → Dynamic Island Layout. Set the priority of compact status information on the same page.',
+        description: 'Use the camera position or choose a custom position along a screen edge. Your custom placement is remembered when switching modes. Compact horizontal and vertical layouts adapt their length to status icons, AI tasks, downloads and media, with an option to show more information. Reorder island modules or restore the default order in Settings → Dynamic Island Layout. Set the priority of compact status information on the same page. When multiple displays are connected, Settings → General → Display Modes lets you choose Dynamic Island Mode (camera or custom position), Notch Mode, or Hide on This Display for each screen. With one screen, this setting is hidden and the global appearance applies; reconnecting restores each display’s saved configuration. All enabled displays show their collapsed islands on startup. Expanding the island, opening Quick Actions, recording, or showing a temporary message affects only that display. Choosing where to show notifications leaves the other islands visible.',
         detail: 'Custom placement · Persistent status icons · Adaptive information',
       },
       dailyBriefing: {
@@ -643,7 +643,7 @@ export const en: SiteContent = {
       multiDisplay: {
         question: 'Does zisla support multiple displays?',
         answer:
-          'Yes — multiple displays, Spaces and ordinary full-screen apps, and expanding never takes focus.',
+          'Yes — multiple displays, Spaces and ordinary full-screen apps, and expanding never takes focus. When multiple displays are connected, Settings → General → Display Modes lets you choose Dynamic Island Mode (camera or custom position), Notch Mode, or Hide on This Display for each screen. With one screen, this setting is hidden and the global appearance applies; reconnecting restores each display’s saved configuration. All enabled displays show their collapsed islands on startup. Expanding the island, opening Quick Actions, recording, or showing a temporary message affects only that display. Choosing where to show notifications leaves the other islands visible.',
       },
       intel: {
         question: 'Can I use it on an Intel Mac?',

@@ -102,6 +102,7 @@ De downloader vereist `yt-dlp`; `ffmpeg` is optioneel. Office naar PDF converter
 ## Ontworpen om niet in de weg te zitten
 
 - Ondersteunt meerdere schermen, Spaces en gewone schermvullende apps zonder de huidige app te activeren of haar focus over te nemen.
+- Als meerdere schermen zijn aangesloten, kun je onder Instellingen → Algemeen → Schermmodi per scherm de Dynamic Island-modus (camerapositie of eigen positie), notch-modus of verbergen kiezen. Met één scherm is deze instelling verborgen en geldt de algemene weergave; na opnieuw aansluiten worden de opgeslagen scherminstellingen hersteld. Op alle zichtbare schermen blijft het ingeklapte eiland tegelijk zichtbaar. Uitklappen, snelle acties, opnemen en tijdelijke berichten vervangen alleen het eiland op hun eigen scherm; de selectie van meldingsschermen filtert de inhoud zonder het inactieve eiland te verbergen.
 - De verborgen toestand heeft geen permanent transparant venster en geen renderlus; globale gebeurtenissen en geometrie activeren het uitklappen.
 - Gebruikt één systeemmateriaal en een ondoorzichtige achtergrond wanneer Verminder transparantie is ingeschakeld.
 - Vindt een fysieke notch via het veilige systeemgebied; externe schermen zonder notch krijgen een overlay met dezelfde omtrek.

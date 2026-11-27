@@ -56,11 +56,12 @@ final class IslandPlacementController {
     func show(
         initialPlacement: IslandPlacement,
         configuration: ScreenLayoutConfiguration = ScreenLayoutConfiguration(),
+        displayID: CGDirectDisplayID? = nil,
         completion: @escaping (IslandPlacement) -> Void,
         onCancel: @escaping () -> Void
     ) {
         cancel()
-        screens = dependencies.screens()
+        screens = dependencies.screens().filter { displayID == nil || $0.displayID == displayID }
         guard !screens.isEmpty else {
             onCancel()
             return

@@ -8,6 +8,8 @@ O estado oculto não tem uma janela transparente. `PointerEdgeMonitor` instala o
 
 Cada tela tem uma identidade estável combinando `NSScreenNumber` com seu `CGDirectDisplayID`. O layout é ancorado em `screen.frame.maxY`, permitindo coordenadas negativas, telas empilhadas verticalmente e telas externas sem recorte.
 
+Com várias telas conectadas, Ajustes → Geral → Modos de tela permite escolher para cada tela o modo Dynamic Island (posição da câmera ou personalizada), o modo notch ou ocultar. Com uma tela, esse ajuste fica oculto e vale a aparência global; ao reconectar, as configurações salvas de cada tela são restauradas. Todas as telas visíveis mantêm a ilha recolhida ao mesmo tempo. Expandir a ilha, usar ações rápidas, gravar e exibir mensagens temporárias substitui apenas a ilha da própria tela; selecionar telas para notificações filtra o conteúdo sem ocultar a ilha inativa.
+
 ## Janela
 
 A ilha principal mantém um `.borderless + .nonactivatingPanel`:

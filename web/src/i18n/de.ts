@@ -174,7 +174,7 @@ export const de: SiteContent = {
     features: {
       floatingIsland: {
         title: 'Eine schwebende Insel für Ihre Anordnung',
-        description: 'Nutzen Sie die Kameraposition oder wählen Sie eine eigene Position an einem Bildschirmrand. Sie bleibt beim Moduswechsel gespeichert. Horizontale und vertikale Kompaktansichten passen ihre Länge an Statussymbole, KI-Aufgaben, Downloads und Medien an und können weitere Informationen anzeigen. Ordnen Sie die Module unter Einstellungen → Dynamic Island-Layout per Drag-and-drop neu oder stellen Sie die Standardreihenfolge wieder her. Auf derselben Seite können Sie die Priorität kompakter Statusinformationen ändern.',
+        description: 'Nutzen Sie die Kameraposition oder wählen Sie eine eigene Position an einem Bildschirmrand. Sie bleibt beim Moduswechsel gespeichert. Horizontale und vertikale Kompaktansichten passen ihre Länge an Statussymbole, KI-Aufgaben, Downloads und Medien an und können weitere Informationen anzeigen. Ordnen Sie die Module unter Einstellungen → Dynamic Island-Layout per Drag-and-drop neu oder stellen Sie die Standardreihenfolge wieder her. Auf derselben Seite können Sie die Priorität kompakter Statusinformationen ändern. Bei mehreren angeschlossenen Bildschirmen lässt sich unter Einstellungen → Allgemein → Bildschirmmodi für jeden Bildschirm der Dynamic Island-Modus (Kameraposition oder eigene Position), der Notch-Modus oder das Ausblenden wählen. Bei einem Bildschirm ist diese Einstellung verborgen und die globale Darstellung gilt; beim erneuten Anschließen werden die gespeicherten Einstellungen wiederhergestellt. Auf allen eingeblendeten Bildschirmen bleibt die eingeklappte Insel gleichzeitig sichtbar. Aufklappen, Schnellaktionen, Aufnahmen und vorübergehende Meldungen ersetzen nur die Insel auf dem jeweiligen Bildschirm; die Auswahl der Benachrichtigungsbildschirme filtert Inhalte, ohne die inaktive Insel auszublenden.',
         detail: 'Eigene Position · Dauerhafte Statussymbole · Anpassbare Informationen',
       },
       dailyBriefing: {
@@ -660,7 +660,7 @@ export const de: SiteContent = {
       multiDisplay: {
         question: 'Unterstützt zisla mehrere Displays?',
         answer:
-          'Ja – mehrere Displays, Spaces und gewöhnliche Vollbild-Apps, und das Öffnen nimmt nie den Fokus.',
+          'Ja – mehrere Displays, Spaces und gewöhnliche Vollbild-Apps, und das Öffnen nimmt nie den Fokus. Bei mehreren angeschlossenen Bildschirmen lässt sich unter Einstellungen → Allgemein → Bildschirmmodi für jeden Bildschirm der Dynamic Island-Modus (Kameraposition oder eigene Position), der Notch-Modus oder das Ausblenden wählen. Bei einem Bildschirm ist diese Einstellung verborgen und die globale Darstellung gilt; beim erneuten Anschließen werden die gespeicherten Einstellungen wiederhergestellt. Auf allen eingeblendeten Bildschirmen bleibt die eingeklappte Insel gleichzeitig sichtbar. Aufklappen, Schnellaktionen, Aufnahmen und vorübergehende Meldungen ersetzen nur die Insel auf dem jeweiligen Bildschirm; die Auswahl der Benachrichtigungsbildschirme filtert Inhalte, ohne die inaktive Insel auszublenden.',
       },
       intel: {
         question: 'Läuft es auf einem Intel-Mac?',

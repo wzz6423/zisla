@@ -102,6 +102,7 @@ Trình tải cần `yt-dlp`; `ffmpeg` tùy chọn. Office sang PDF cần LibreOf
 ## Thiết kế không gây cản trở
 
 - Hỗ trợ nhiều màn hình, Spaces và ứng dụng toàn màn hình thông thường mà không kích hoạt hay lấy tiêu điểm.
+- Khi kết nối nhiều màn hình, Cài đặt → Chung → Chế độ màn hình cho phép chọn chế độ Dynamic Island (vị trí camera hoặc tùy chỉnh), chế độ phần khuyết hoặc ẩn riêng từng màn hình. Với một màn hình, mục này được ẩn và dùng giao diện chung; kết nối lại sẽ khôi phục cấu hình đã lưu của từng màn hình. Tất cả màn hình đang bật hiển thị đảo đều giữ đảo thu gọn cùng lúc. Việc mở rộng, thao tác nhanh, ghi âm và thông báo tạm thời chỉ thay thế đảo trên màn hình tương ứng; chọn màn hình thông báo chỉ lọc nội dung, không ẩn đảo đang chờ.
 - Khi ẩn không có cửa sổ trong suốt thường trực bắt chuột hoặc vòng khung hình; theo dõi sự kiện toàn cục và kiểm tra hình học kích hoạt mở.
 - Dùng một vật liệu hệ thống; chuyển nền đục khi Reduce Transparency bật.
 - Phát hiện phần khuyết thật từ vùng an toàn hệ thống; màn hình ngoài không có dùng lớp phủ cùng đường viền.

@@ -8,6 +8,8 @@ Der verborgene Zustand hat kein transparentes Fenster. `PointerEdgeMonitor` inst
 
 Jedes Display besitzt eine stabile Kennung aus `NSScreenNumber` und seinem `CGDirectDisplayID`. Das Layout wird an `screen.frame.maxY` verankert und unterstützt deshalb negative Koordinaten, vertikal angeordnete Displays und externe Displays ohne Notch.
 
+Bei mehreren angeschlossenen Bildschirmen lässt sich unter Einstellungen → Allgemein → Bildschirmmodi für jeden Bildschirm der Dynamic Island-Modus (Kameraposition oder eigene Position), der Notch-Modus oder das Ausblenden wählen. Bei einem Bildschirm ist diese Einstellung verborgen und die globale Darstellung gilt; beim erneuten Anschließen werden die gespeicherten Einstellungen wiederhergestellt. Auf allen eingeblendeten Bildschirmen bleibt die eingeklappte Insel gleichzeitig sichtbar. Aufklappen, Schnellaktionen, Aufnahmen und vorübergehende Meldungen ersetzen nur die Insel auf dem jeweiligen Bildschirm; die Auswahl der Benachrichtigungsbildschirme filtert Inhalte, ohne die inaktive Insel auszublenden.
+
 ## Fenster
 
 Die Hauptinsel behält ein einziges `.borderless + .nonactivatingPanel`:

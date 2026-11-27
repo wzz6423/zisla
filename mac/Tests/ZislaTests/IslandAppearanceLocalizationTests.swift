@@ -7,6 +7,7 @@ struct IslandAppearanceLocalizationTests {
     static let keys: Set<String> = [
         "灵动岛展开材质", "灵动岛收起材质", "选择贴边刘海或悬浮药丸", "刘海模式", "灵动岛模式", "灵动岛位置",
         "摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边", "摄像头位置", "其他位置", "调整位置",
+        "显示器模式", "在该屏幕不显示",
         "黑色", "收起时上侧黑色，下侧透明", "音乐动效", "音浪或随音乐节奏呼吸的专辑光晕", "音浪模式", "光晕模式",
         "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。", "Liquid Glass"
     ]
@@ -41,7 +42,7 @@ struct IslandAppearanceLocalizationTests {
         #expect(AppLocalization.string("光晕模式", language: .english) == "Glow Mode")
         #expect(AppLocalization.string("摄像头位置", language: .arabic) != "摄像头位置")
         #expect(AppLanguage.arabic.isRightToLeft)
-        let items = SettingsSearchIndex.items(settings: .default)
+        let items = SettingsSearchIndex.items(settings: .default, displayCount: 1)
         for title in ["灵动岛样式", "灵动岛展开材质", "灵动岛收起材质", "音乐动效"] {
             #expect(items.contains { $0.title == title })
         }

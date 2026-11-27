@@ -8,6 +8,8 @@ Lo stato nascosto non usa una finestra trasparente. `PointerEdgeMonitor` install
 
 Ogni schermo ha un'identità stabile che associa `NSScreenNumber` al relativo `CGDirectDisplayID`. Il layout è ancorato a `screen.frame.maxY`, quindi supporta coordinate negative, schermi sovrapposti verticalmente e schermi esterni senza notch.
 
+Con più schermi collegati, Impostazioni → Generali → Modalità degli schermi permette di scegliere per ciascuno la modalità Dynamic Island (posizione della fotocamera o personalizzata), la modalità notch o di nasconderla. Con un solo schermo questa impostazione è nascosta e si usa l’aspetto globale; ricollegando gli schermi si ripristinano le configurazioni salvate. Tutti gli schermi visibili mantengono l’isola chiusa contemporaneamente. L’espansione, le azioni rapide, la registrazione e i messaggi temporanei sostituiscono solo l’isola del proprio schermo; la selezione degli schermi per le notifiche filtra il contenuto senza nascondere l’isola inattiva.
+
 ## Finestra
 
 L'isola principale mantiene un solo pannello `.borderless + .nonactivatingPanel`:

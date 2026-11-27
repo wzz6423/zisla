@@ -133,6 +133,7 @@ const updatedStrings = (content) => [
   ['faq.items.permissions.answer', content.faq.items.permissions.answer],
   ['faq.items.storage.answer', content.faq.items.storage.answer],
   ['faq.items.network.answer', content.faq.items.network.answer],
+  ['faq.items.multiDisplay.answer', content.faq.items.multiDisplay.answer],
   ...strings(content.changelog.releaseNotes['v0.1.20'], 'changelog.releaseNotes.v0.1.20'),
   ...strings(content.changelog.releaseNotes['v0.1.21'], 'changelog.releaseNotes.v0.1.21'),
   ...strings(content.changelog.releaseNotes['v0.1.22'], 'changelog.releaseNotes.v0.1.22'),
@@ -143,6 +144,25 @@ const updatedStrings = (content) => [
   ...strings(content.help, 'help'),
   ['header.navItems.help', content.header.navItems.help],
 ];
+
+test('per-display modes are authored and rendered in every locale', () => {
+  for (const locale of siteLocales) {
+    const content = site.getSiteContent(locale);
+    const description = authoredCatalogs.get(locale)?.extensions?.features?.floatingIsland?.description;
+    const answer = authoredCatalogs.get(locale)?.faq?.items?.multiDisplay?.answer;
+    assert.equal(description, content.extensions.features.floatingIsland.description, `${locale} feature fallback`);
+    assert.equal(answer, content.faq.items.multiDisplay.answer, `${locale} FAQ fallback`);
+    const faqHTML = renderInMemory(locale).html;
+    assert.ok(faqHTML.includes(escapedText(answer)), `${locale} FAQ is rendered`);
+    if (locale !== 'en') {
+      assert.notEqual(description, english.extensions.features.floatingIsland.description, `${locale} copied English feature`);
+      assert.notEqual(answer, english.faq.items.multiDisplay.answer, `${locale} copied English FAQ`);
+    }
+  }
+  assert.match(english.faq.items.multiDisplay.answer, /Settings → General → Display Modes/);
+  assert.match(english.faq.items.multiDisplay.answer, /Hide on This Display/);
+  assert.match(english.faq.items.multiDisplay.answer, /With one screen.*hidden.*reconnecting restores/);
+});
 
 test('clipboard image text search is authored and rendered in every locale', () => {
   for (const locale of siteLocales) {

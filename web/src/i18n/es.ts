@@ -161,7 +161,7 @@ export const es = createCatalog({
     features: {
       floatingIsland: {
         title: 'Una isla flotante que se adapta',
-        description: 'Usa la posición de la cámara o elige una posición en el borde de la pantalla. La posición propia se conserva al cambiar de modo. Los diseños compactos horizontales y verticales ajustan su longitud a iconos, tareas de IA, descargas y medios, con una opción para mostrar más información. Reordena los módulos arrastrándolos en Ajustes → Diseño de Dynamic Island o restaura el orden predeterminado. En la misma página puedes cambiar la prioridad de la información de estado compacta.',
+        description: 'Usa la posición de la cámara o elige una posición en el borde de la pantalla. La posición propia se conserva al cambiar de modo. Los diseños compactos horizontales y verticales ajustan su longitud a iconos, tareas de IA, descargas y medios, con una opción para mostrar más información. Reordena los módulos arrastrándolos en Ajustes → Diseño de Dynamic Island o restaura el orden predeterminado. En la misma página puedes cambiar la prioridad de la información de estado compacta. Con varias pantallas conectadas, Ajustes → General → Modos de pantalla permite elegir para cada una el modo Dynamic Island (posición de cámara o personalizada), el modo muesca u ocultarla. Con una sola pantalla, este ajuste se oculta y se usa la apariencia global; al volver a conectarlas se recupera la configuración guardada de cada pantalla. Todas las pantallas visibles mantienen su isla contraída al mismo tiempo. La expansión, las acciones rápidas, la grabación y los mensajes temporales sustituyen solo la isla de su propia pantalla; la selección de pantallas para notificaciones filtra el contenido sin ocultar la isla inactiva.',
         detail: 'Posición propia · Iconos persistentes · Información adaptable',
       },
       dailyBriefing: {
@@ -636,7 +636,7 @@ export const es = createCatalog({
       },
       multiDisplay: {
         question: '¿zisla admite varias pantallas?',
-        answer: 'Sí: varias pantallas, Spaces y apps normales a pantalla completa; al expandirse nunca roba el foco.',
+        answer: 'Sí: varias pantallas, Spaces y apps normales a pantalla completa; al expandirse nunca roba el foco. Con varias pantallas conectadas, Ajustes → General → Modos de pantalla permite elegir para cada una el modo Dynamic Island (posición de cámara o personalizada), el modo muesca u ocultarla. Con una sola pantalla, este ajuste se oculta y se usa la apariencia global; al volver a conectarlas se recupera la configuración guardada de cada pantalla. Todas las pantallas visibles mantienen su isla contraída al mismo tiempo. La expansión, las acciones rápidas, la grabación y los mensajes temporales sustituyen solo la isla de su propia pantalla; la selección de pantallas para notificaciones filtra el contenido sin ocultar la isla inactiva.',
       },
       intel: {
         question: '¿Puedo usarlo en un Mac Intel?',

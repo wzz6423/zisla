@@ -43,10 +43,20 @@ struct VoiceRecordingIslandLayoutTests {
         let notices = [aiNotice, voiceNotice]
 
         #expect(PersistentPetNoticePolicy.notices(
+            notices, isVoiceRecording: false, voiceDisplayID: nil, displayID: 1, noticesEnabled: false
+        ).isEmpty, "An idle island must not reserve pet space for another display's notices")
+        #expect(PersistentPetNoticePolicy.notices(
+            notices, isVoiceRecording: true, voiceDisplayID: nil, displayID: 1
+        ).isEmpty)
+
+        #expect(PersistentPetNoticePolicy.notices(
             notices,
             isVoiceRecording: true,
             voiceDisplayID: 2,
             displayID: 1
+        ) == [aiNotice])
+        #expect(PersistentPetNoticePolicy.notices(
+            notices, isVoiceRecording: true, voiceDisplayID: 2, displayID: 2
         ).isEmpty)
         #expect(PersistentPetNoticePolicy.notices(
             notices,

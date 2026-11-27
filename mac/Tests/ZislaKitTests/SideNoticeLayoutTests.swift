@@ -203,6 +203,38 @@ struct SideNoticeLayoutTests {
     }
 
     @Test
+    func suppressionReasonsOnlyHideTheirOwnDisplaysAndLocksHideAllDisplays() {
+        var suppression = SideNoticeSuppression()
+        suppression.isClipboardAssistantVisible = true
+        suppression.clipboardDisplayID = 1
+        #expect(suppression.scoped(to: 1).hidesNotices)
+        #expect(!suppression.scoped(to: 2).hidesNotices)
+        suppression.isIslandExpanded = true
+        suppression.islandDisplayID = 2
+        suppression.isClipboardAssistantVisible = false
+        #expect(!suppression.scoped(to: 1).hidesNotices)
+        #expect(suppression.scoped(to: 2).hidesNotices)
+        suppression.isScreenLocked = true
+        #expect(suppression.scoped(to: 1).hidesNotices && suppression.scoped(to: 2).hidesNotices)
+        suppression = SideNoticeSuppression()
+        suppression.isVoiceRecording = true
+        suppression.voiceDisplayID = 1
+        #expect(suppression.scoped(to: 1).isVoiceRecording && !suppression.scoped(to: 2).isVoiceRecording)
+        suppression.isTransientNoticePresented = true
+        suppression.transientDisplayID = 2
+        #expect(!suppression.scoped(to: 1).isTransientNoticePresented && suppression.scoped(to: 2).isTransientNoticePresented)
+        #expect(suppression.scoped(to: 1).hidesNotices && suppression.scoped(to: 2).hidesNotices)
+        suppression.voiceDisplayID = nil
+        #expect(suppression.scoped(to: 1).isVoiceRecording && suppression.scoped(to: 2).isVoiceRecording)
+        suppression.transientDisplayID = nil
+        #expect(suppression.scoped(to: 1).isTransientNoticePresented && suppression.scoped(to: 2).isTransientNoticePresented)
+        suppression.isIslandExpanded = true
+        suppression.isClipboardAssistantVisible = true
+        #expect(suppression.scoped(to: 1).isIslandExpanded && suppression.scoped(to: 2).isIslandExpanded)
+        #expect(suppression.scoped(to: 1).isClipboardAssistantVisible && suppression.scoped(to: 2).isClipboardAssistantVisible)
+    }
+
+    @Test
     func activeAINoticesCollapseIntoOneCompactWing() {
         let notices = [
             IslandNotice(id: "ai-active-codex-1", title: "Codex", side: .left),

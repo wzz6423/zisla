@@ -90,6 +90,9 @@ final class ClipboardAssistantController: ObservableObject {
     var screenLayoutConfiguration = ScreenLayoutConfiguration() {
         didSet { updateWindowLayout() }
     }
+    var screenSnapshotProvider: @MainActor () -> [ScreenSnapshot] = {
+        NSScreen.screens.compactMap { ScreenSnapshot(screen: $0) }
+    }
     /// Lets the main island pause hover activation while this row occupies its trigger area.
     var onPresentationChanged: ((Bool) -> Void)?
     /// Auto-dismiss setting for newly presented assistant prompts.
@@ -145,6 +148,9 @@ final class ClipboardAssistantController: ObservableObject {
 
     private var window: NSWindow?
     private var presentationPoint = CGPoint.zero
+    var presentationDisplayID: CGDirectDisplayID? {
+        screenSnapshotProvider().first { $0.frame.contains(presentationPoint) }?.displayID
+    }
     var screenAtPoint: @MainActor (CGPoint) -> NSScreen? = { WindowPlacement.screenUnderMouse(point: $0) }
     private var dismissTask: Task<Void, Never>?
     private var presentationGeneration = 0
@@ -424,6 +430,12 @@ final class ClipboardAssistantController: ObservableObject {
                  at point: CGPoint = NSEvent.mouseLocation) -> Int? {
         setMoreActionsPresented(false)
         guard !isScreenshotActive, !isScreenLocked else { return nil }
+        let screens = screenSnapshotProvider()
+        if let screen = screens.first(where: { $0.frame.contains(point) }),
+           ScreenLayoutEngine(configuration: screenLayoutConfiguration)
+               .configuration(for: screen, displayCount: screens.count) == nil {
+            return nil
+        }
         presentationPoint = point
         isDismissing = false
         isExpanded = false
@@ -780,15 +792,19 @@ final class ClipboardAssistantController: ObservableObject {
         let snapshot = ScreenSnapshot(screen: screen) ?? ScreenSnapshot(
             displayID: 0, frame: screen.frame, visibleFrame: screen.frame
         )
-        return rowLayout(for: detection, on: snapshot)
+        guard let configuration = ScreenLayoutEngine(configuration: screenLayoutConfiguration)
+            .configuration(for: snapshot, displayCount: screenSnapshotProvider().count) else { return nil }
+        return rowLayout(for: detection, on: snapshot, configuration: configuration)
     }
 
     func rowLayout(
         for detection: ClipboardAssistantDetection,
         on screen: ScreenSnapshot,
-        locale: Locale = AppLocalization.currentLanguage.locale
+        locale: Locale = AppLocalization.currentLanguage.locale,
+        configuration: ScreenLayoutConfiguration? = nil
     ) -> RowLayout {
-        var configuration = screenLayoutConfiguration
+        var configuration = configuration ?? ScreenLayoutEngine(configuration: screenLayoutConfiguration)
+            .configuration(for: screen, displayCount: screenSnapshotProvider().count) ?? screenLayoutConfiguration
         let initial = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
         let rowHeight = initial.style == .pill
             ? (initial.edge.isVertical ? initial.collapsedFrame.width : initial.collapsedFrame.height)
@@ -879,8 +895,11 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     private func updateWindowLayout() {
-        guard !isDismissing, let detection = presentation.detection,
-              let layout = rowLayout(for: detection) else { return }
+        guard !isDismissing, let detection = presentation.detection else { return }
+        guard let layout = rowLayout(for: detection) else {
+            dismiss(animated: false)
+            return
+        }
         guard let window, window.isVisible else { return }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.2
