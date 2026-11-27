@@ -1228,7 +1228,8 @@ struct SideNoticeLayoutTests {
         let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
         let anchor = ScreenLayoutEngine().layout(for: screen).topology.anchorFrame
         let wingWidth = (frame.width - anchor.width) / 2
-        #expect(wingWidth >= 20 * 3 + 4 * 2 + 6,
+        let minimumWingWidth: CGFloat = 20 * 3 + 4 * 2 + 6
+        #expect(wingWidth >= minimumWingWidth,
                 "Missing identity text cannot let the battery row overlap the physical notch")
         #expect(wingWidth < 80, "An empty name must not reserve a minimum text column")
         #expect(frame == engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
