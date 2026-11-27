@@ -121,7 +121,7 @@ export const fr: SiteContent = {
       agenda: {
         name: 'Agenda et météo',
         caption:
-          'Affiche la météo de votre position et de six lieux choisis au maximum. Consultez, ajoutez ou supprimez des événements et rappels, puis marquez les rappels comme terminés. Les événements avec un lien de réunion affichent un compte à rebours 10 minutes avant le début et permettent de rejoindre en un clic. Créez une note de réunion ou associez et dissociez des notes contextuelles existantes. L’heure de mise à jour de la météo apparaît dans l’en-tête, à gauche du bouton d’actualisation.',
+          'Affiche la météo de votre position et de six lieux choisis au maximum. Consultez, ajoutez ou supprimez des événements et rappels, puis marquez les rappels comme terminés. Les événements avec un lien de réunion affichent un compte à rebours 10 minutes avant le début et permettent de rejoindre en un clic. Créez une note de réunion ou associez et dissociez des notes contextuelles existantes. L’heure de mise à jour de la météo apparaît dans l’en-tête, à gauche du bouton d’actualisation. Si la météo est incomplète, d’autres sources complètent le résultat le plus détaillé ; les données disponibles restent affichées si le reste ne peut pas être obtenu.',
         points: ['Météo et calendrier', 'Compte à rebours de 10 minutes', 'Rejoindre et associer des notes'],
       },
       mail: {
@@ -388,6 +388,20 @@ export const fr: SiteContent = {
         "shortcuts": "Glissement au pointeur. Le geste de secousse se règle séparément ; aucun raccourci fixe requis.",
         "permissions": "Le sélecteur et les signets sécurisés donnent accès aux fichiers choisis. Une capture nécessite Enregistrement de l’écran.",
         "output": "Les originaux restent en place. Références et captures rangées persistent localement ; le PNG va vers la destination choisie. Les ZIP et les résultats d’image réussis reviennent sur l’étagère ; les médias importés rejoignent la bibliothèque du projet d’enregistrement."
+      },
+      "weather": {
+        "title": "Voir la météo la plus complète disponible",
+        "summary": "Consultez la météo de votre position ou de lieux enregistrés et complétez les données manquantes.",
+        "entry": "Îlot → Agenda ; Réglages → Météo.",
+        "steps": [
+          "Activez Météo dans Réglages → Fonctionnalités ; recherchez et enregistrez d’autres lieux dans les réglages météo.",
+          "Ouvrez Agenda ou actualisez la météo. Si des données manquent, d’autres sources complètent le résultat le plus détaillé.",
+          "Si les sources supplémentaires sont indisponibles, conservez les informations disponibles et masquez les mesures manquantes.",
+          "Consultez les liens sous la liste météo pour identifier les sources utilisées ; les alertes officielles sont récupérées séparément."
+        ],
+        "shortcuts": "Utilisez le bouton d’actualisation dans Agenda ; aucun raccourci global fixe.",
+        "permissions": "La position actuelle nécessite l’accès à la localisation ; les lieux ajoutés manuellement n’en ont pas besoin. Météo et alertes utilisent le réseau.",
+        "output": "La météo reste en mémoire et les lieux enregistrés sont conservés localement. Les données partielles restent affichées si elles ne peuvent être complétées ; les prévisions de plus d’une heure sont masquées."
       },
       "meeting": {
         "title": "Rejoindre une réunion et prendre une note",

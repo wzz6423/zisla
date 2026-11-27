@@ -286,8 +286,13 @@ struct WeatherFallbackPresentationTests {
         }
         for phase in 0..<4 {
             if phase == 1 {
+                snapshots[tokyoID]?.supplementalSources = [WeatherSnapshot.SourceAttribution(
+                    name: "MET Norway", url: URL(string: "https://www.met.no/")!
+                )]
+            } else if phase == 2 {
                 snapshots[tokyoID]?.source = "MET Norway"
                 snapshots[tokyoID]?.sourceURL = URL(string: "https://www.met.no/")
+                snapshots[tokyoID]?.supplementalSources = []
             }
             let now = date.addingTimeInterval(phase < 2 ? 0 : phase == 2 ? 3600 : 5400)
             host.rootView = content(at: now)

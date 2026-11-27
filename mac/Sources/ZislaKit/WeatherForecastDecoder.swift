@@ -10,25 +10,28 @@ enum WeatherForecastDecoder {
         locationName: String?
     ) throws -> WeatherSnapshot {
         let decoded = try JSONDecoder().decode(OpenMeteoResponse.self, from: data)
-        guard let daily = decoded.daily,
-              let sunrise = daily.sunrise.first,
-              let sunset = daily.sunset.first,
-              let probability = daily.precipitationProbabilityMax.first,
-              let precipitation = daily.precipitationSum.first,
-              (-100...100).contains(decoded.current.temperature),
-              (0...100).contains(probability),
-              precipitation >= 0,
-              decoded.current.precipitation >= 0
+        let minimum = decoded.daily?.temperatureMin?.first ?? nil
+        let maximum = decoded.daily?.temperatureMax?.first ?? nil
+        let probability = decoded.daily?.precipitationProbabilityMax?.first ?? nil
+        let precipitation = decoded.daily?.precipitationSum?.first ?? nil
+        guard (-100...100).contains(decoded.current.temperature),
+              decoded.current.apparentTemperature.map({ (-100...100).contains($0) }) ?? true,
+              minimum.map({ (-100...100).contains($0) }) ?? true,
+              maximum.map({ (-100...100).contains($0) }) ?? true,
+              probability.map({ (0...100).contains($0) }) ?? true,
+              precipitation.map({ $0 >= 0 }) ?? true,
+              decoded.current.precipitation.map({ $0 >= 0 }) ?? true
         else { throw WeatherServiceError.invalidResponse }
+        if let minimum, let maximum, minimum > maximum { throw WeatherServiceError.invalidResponse }
         return WeatherSnapshot(
             temperature: decoded.current.temperature,
-            temperatureMin: daily.temperatureMin?.first,
-            temperatureMax: daily.temperatureMax?.first,
+            temperatureMin: minimum,
+            temperatureMax: maximum,
             apparentTemperature: decoded.current.apparentTemperature,
-            condition: WeatherCondition(code: decoded.current.weatherCode, isDay: decoded.current.isDay),
+            condition: WeatherCondition(code: decoded.current.weatherCode ?? -1, isDay: decoded.current.isDay),
             currentPrecipitation: decoded.current.precipitation,
-            sunrise: sunrise,
-            sunset: sunset,
+            sunrise: (decoded.daily?.sunrise?.first ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            sunset: (decoded.daily?.sunset?.first ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
             precipitationProbability: probability,
             precipitationSum: precipitation,
             timezone: decoded.timezone,
@@ -57,14 +60,16 @@ enum WeatherForecastDecoder {
               current.weathercode.first == "d" || current.weathercode.first == "n",
               let description = current.weather, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { throw WeatherServiceError.invalidResponse }
-        let forecastJSON = try ChinaWeatherAlertService.assignedJSONObject(named: "fc", in: source)
-        let forecast = try JSONDecoder().decode(ChinaWeatherDaily.self, from: Data(forecastJSON.utf8))
+        // Daily data can be absent or corrupt while the validated current observation remains usable.
+        let forecast = try? JSONDecoder().decode(ChinaWeatherDaily.self, from: Data(
+            ChinaWeatherAlertService.assignedJSONObject(named: "fc", in: source).utf8
+        ))
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
         let day = "\(calendar.component(.month, from: now))/\(calendar.component(.day, from: now))"
-        let daily = forecast.f.first { $0.fi == day }
-        let minimum = daily.flatMap { Double($0.fd) }.flatMap { (-100...100).contains($0) ? $0 : nil }
-        let maximum = daily.flatMap { Double($0.fc) }.flatMap { (-100...100).contains($0) ? $0 : nil }
+        let daily = forecast?.f.first { $0.fi == day }
+        let minimum = daily?.fd.flatMap(Double.init).flatMap { (-100...100).contains($0) ? $0 : nil }
+        let maximum = daily?.fc.flatMap(Double.init).flatMap { (-100...100).contains($0) ? $0 : nil }
         return WeatherSnapshot(
             temperature: temperature,
             temperatureMin: minimum,
@@ -195,8 +200,8 @@ private struct ChinaWeatherCurrent: Decodable {
 
 private struct ChinaWeatherDaily: Decodable {
     struct Day: Decodable {
-        let fc: String
-        let fd: String
+        let fc: String?
+        let fd: String?
         let fi: String
     }
     let f: [Day]

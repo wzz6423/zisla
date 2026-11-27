@@ -29,10 +29,349 @@ struct WeatherFallbackTests {
         )
     }
 
+    @Test
+    func completeSupplementReplacesPartialDomesticForecast() async throws {
+        ForecastURLProtocol.reset([.data(Self.station), .data(Self.china), .data(Self.openMeteo)])
+        let snapshot = try await makeService().fetch(
+            latitude: coordinate.latitude, longitude: coordinate.longitude,
+            locationName: "上海", isoCountryCode: "CN"
+        )
+
+        #expect(snapshot.source == "Open-Meteo")
+        #expect(snapshot.temperature == 28.5)
+        #expect(snapshot.temperatureMin == 24.1 && snapshot.temperatureMax == 33.8)
+        #expect(snapshot.apparentTemperature == 30.2)
+        #expect(snapshot.currentPrecipitation == 0)
+        #expect(snapshot.precipitationProbability == 10 && snapshot.precipitationSum == 0)
+        #expect(snapshot.sunrise == "2026-11-05T05:04" && snapshot.sunset == "2026-11-05T18:56")
+        #expect(snapshot.condition == WeatherCondition(code: 2, isDay: true))
+        #expect(snapshot.supplementalSources.isEmpty, "A replaced forecast must not claim unused sources")
+        #expect(ForecastURLProtocol.requests.map { $0.url?.host } == [
+            "toy1.weather.com.cn", "d1.weather.com.cn", "api.open-meteo.com",
+        ])
+    }
+
+    @Test
+    func complementaryPartialsKeepRicherValuesAndFillMissingTemperatureRange() async throws {
+        var payload = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]
+        var daily = payload["daily"] as! [String: Any]
+        daily.removeValue(forKey: "temperature_2m_min")
+        daily.removeValue(forKey: "temperature_2m_max")
+        payload["daily"] = daily
+        let partial = try JSONSerialization.data(withJSONObject: payload)
+        ForecastURLProtocol.reset([.data(Self.station), .data(Self.china), .data(partial)])
+        let snapshot = try await makeService().fetch(
+            latitude: coordinate.latitude, longitude: coordinate.longitude,
+            locationName: "上海", isoCountryCode: "CN"
+        )
+
+        #expect(snapshot.source == "Open-Meteo")
+        #expect(snapshot.temperature == 28.5 && snapshot.apparentTemperature == 30.2)
+        #expect(snapshot.temperatureMin == 14 && snapshot.temperatureMax == 18)
+        #expect(snapshot.precipitationProbability == 10 && snapshot.precipitationSum == 0)
+        #expect(snapshot.coordinate == coordinate && snapshot.locationName == "上海")
+        #expect(snapshot.supplementalSources == [WeatherSnapshot.SourceAttribution(
+            name: AppLocalization.text("中国天气网（中国气象局）"),
+            url: URL(string: "https://www.weather.com.cn/weather1d/101020100.shtml")!
+        )])
+        #expect(ForecastURLProtocol.requests.count == 3, "A complete merged forecast must stop before MET")
+        #expect(try JSONSerialization.jsonObject(with: partial) as? NSDictionary == payload as NSDictionary,
+                "Fetching must not mutate source data")
+    }
+
+    @Test(arguments: ["absent", "null", "empty", "nullFirstDay"])
+    func partialGlobalForecastSurvivesUnavailableSupplementWithoutInventingMetrics(kind: String) async throws {
+        var payload = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]
+        var current = payload["current"] as! [String: Any]
+        current.removeValue(forKey: "apparent_temperature")
+        current.removeValue(forKey: "precipitation")
+        payload["current"] = current
+        switch kind {
+        case "absent": payload.removeValue(forKey: "daily")
+        case "null": payload["daily"] = NSNull()
+        default:
+            let first: [Any] = kind == "empty" ? [] : [NSNull()]
+            payload["daily"] = [
+                "sunrise": first + (kind == "empty" ? [] : ["2026-11-06T05:04"]),
+                "sunset": first + (kind == "empty" ? [] : ["2026-11-06T18:56"]),
+                "temperature_2m_min": first + (kind == "empty" ? [] : [24.1]),
+                "temperature_2m_max": first + (kind == "empty" ? [] : [33.8]),
+                "precipitation_probability_max": first + (kind == "empty" ? [] : [10]),
+                "precipitation_sum": first + (kind == "empty" ? [] : [0]),
+            ]
+        }
+        ForecastURLProtocol.reset([
+            .data(try JSONSerialization.data(withJSONObject: payload)), .failure(URLError(.timedOut)),
+        ])
+        let snapshot = try await makeService().fetch(latitude: 51, longitude: 0, isoCountryCode: "GB")
+
+        #expect(snapshot.source == "Open-Meteo" && snapshot.temperature == 28.5)
+        #expect(snapshot.apparentTemperature == nil && snapshot.currentPrecipitation == nil)
+        #expect(snapshot.temperatureMin == nil && snapshot.temperatureMax == nil)
+        #expect(snapshot.precipitationProbability == nil && snapshot.precipitationSum == nil)
+        #expect(snapshot.sunrise.isEmpty && snapshot.sunset.isEmpty,
+                "Tomorrow's metrics must not fill missing values for today")
+        #expect(ForecastURLProtocol.requests.count == 2)
+    }
+
+    @Test
+    func cancellingSupplementDoesNotReturnTheEarlierPartialForecast() async {
+        ForecastURLProtocol.reset([
+            .data(Self.station), .data(Self.china), .failure(URLError(.cancelled)),
+        ])
+        do {
+            _ = try await makeService().fetch(
+                latitude: coordinate.latitude, longitude: coordinate.longitude,
+                locationName: "上海", isoCountryCode: "CN"
+            )
+            Issue.record("Supplement cancellation must propagate instead of returning partial weather")
+        } catch {
+            #expect(error is CancellationError)
+            #expect(ForecastURLProtocol.requests.count == 3)
+        }
+    }
+
+    @Test
+    func equallyCompleteSupplementKeepsProviderPriorityWhileFillingMissingRange() async throws {
+        let partial = Data(#"{"timezone":"Asia/Shanghai","current":{"time":"2026-11-05T10:45","temperature_2m":28.5,"apparent_temperature":30.2,"weather_code":2,"is_day":1,"precipitation":0}}"#.utf8)
+        ForecastURLProtocol.reset([.data(Self.station), .data(Self.china), .data(partial), .data(Self.met)])
+        let snapshot = try await makeService().fetch(
+            latitude: coordinate.latitude, longitude: coordinate.longitude,
+            locationName: "上海", isoCountryCode: "CN"
+        )
+
+        #expect(snapshot.source == AppLocalization.text("中国天气网（中国气象局）"))
+        #expect(snapshot.temperature == 16.1 && snapshot.temperatureMin == 14 && snapshot.temperatureMax == 18)
+        #expect(snapshot.condition.symbolName == "cloud.sun.fill")
+        #expect(snapshot.apparentTemperature == 30.2 && snapshot.currentPrecipitation == 0)
+        #expect(snapshot.sunrise.isEmpty && snapshot.sunset.isEmpty)
+        #expect(snapshot.precipitationProbability == nil && snapshot.precipitationSum == nil)
+        #expect(snapshot.supplementalSources.map(\.name) == ["Open-Meteo"],
+                "MET must not appear when it contributes no missing fields")
+        #expect(snapshot.licenseURL?.absoluteString == "https://creativecommons.org/licenses/by/4.0/")
+        #expect(snapshot.timezone == "Asia/Shanghai")
+        #expect(snapshot.fetchedAt == Date(timeIntervalSince1970: 1793874600))
+    }
+
+    @Test(arguments: ["unknown", "absent", "null"])
+    func unknownConditionIsFilledWithoutReplacingValidDetailedForecast(kind: String) async throws {
+        var payload = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]
+        var current = payload["current"] as! [String: Any]
+        switch kind {
+        case "unknown": current["weather_code"] = 999
+        case "null": current["weather_code"] = NSNull()
+        default: current.removeValue(forKey: "weather_code")
+        }
+        payload["current"] = current
+        let partial = try JSONSerialization.data(withJSONObject: payload)
+        ForecastURLProtocol.reset([.data(partial), .data(Self.met)])
+        let snapshot = try await makeService().fetch(latitude: 51, longitude: 0, isoCountryCode: "GB")
+
+        #expect(snapshot.source == "Open-Meteo" && snapshot.temperature == 28.5)
+        #expect(snapshot.condition == WeatherCondition(summary: AppLocalization.text("小阵雨"), symbolName: "cloud.drizzle.fill"))
+        #expect(snapshot.apparentTemperature == 30.2 && snapshot.temperatureMin == 24.1)
+        #expect(snapshot.supplementalSources.map(\.name) == ["MET Norway"])
+        #expect(ForecastURLProtocol.requests.count == 2)
+    }
+
+    @Test(arguments: ["absent", "null", "night", "day"])
+    func openMeteoDaylightAvailabilityKeepsKnownWeather(kind: String) throws {
+        var payload = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]
+        var current = payload["current"] as! [String: Any]
+        switch kind {
+        case "absent": current.removeValue(forKey: "is_day")
+        case "null": current["is_day"] = NSNull()
+        default: current["is_day"] = kind == "night" ? 0 : 1
+        }
+        payload["current"] = current
+        let snapshot = try WeatherForecastDecoder.openMeteo(
+            JSONSerialization.data(withJSONObject: payload), coordinate: coordinate, locationName: "上海"
+        )
+        #expect(snapshot.condition.symbolName == (kind == "night" ? "cloud.moon.fill" : "cloud.sun.fill"))
+        #expect(snapshot.temperature == 28.5 && snapshot.apparentTemperature == 30.2)
+    }
+
+    @Test(arguments: ["absent", "corrupt", "empty", "missingMin", "missingMax"])
+    func chineseCurrentObservationSurvivesMissingDailyForecast(kind: String) async throws {
+        let daily = switch kind {
+        case "absent": ""
+        case "corrupt": "var fc={broken};"
+        case "empty": "var fc={\"f\":[]};"
+        case "missingMin": "var fc={\"f\":[{\"fc\":\"18\",\"fi\":\"11/5\"}]};"
+        default: "var fc={\"f\":[{\"fd\":\"14\",\"fi\":\"11/5\"}]};"
+        }
+        let current = String(decoding: Self.china, as: UTF8.self).components(separatedBy: ";var fc=")[0] + ";"
+        let snapshot = try WeatherForecastDecoder.chinaWeather(
+            Data((current + daily).utf8), stationID: "101020100", coordinate: coordinate,
+            locationName: "上海", now: Date(timeIntervalSince1970: 1793874600)
+        )
+
+        #expect(snapshot.temperature == 16.1)
+        #expect(snapshot.temperatureMin == (kind == "missingMax" ? 14 : nil))
+        #expect(snapshot.temperatureMax == (kind == "missingMin" ? 18 : nil))
+        #expect(snapshot.apparentTemperature == nil && snapshot.currentPrecipitation == nil)
+    }
+
+    @Test(arguments: ["sunrise", "sunset", "temperature_2m_min", "temperature_2m_max", "precipitation_probability_max", "precipitation_sum"], ["absent", "null", "empty", "nullFirstDay"])
+    func missingOpenMeteoDailyFieldPreservesOtherValidMetrics(field: String, kind: String) throws {
+        var payload = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]
+        var daily = payload["daily"] as! [String: Any]
+        switch kind {
+        case "absent": daily.removeValue(forKey: field)
+        case "null": daily[field] = NSNull()
+        case "empty": daily[field] = [] as [Any]
+        default: daily[field] = [NSNull(), (daily[field] as! [Any])[0]]
+        }
+        payload["daily"] = daily
+        let snapshot = try WeatherForecastDecoder.openMeteo(
+            JSONSerialization.data(withJSONObject: payload), coordinate: coordinate, locationName: "上海"
+        )
+
+        #expect(snapshot.temperature == 28.5 && snapshot.apparentTemperature == 30.2)
+        #expect(snapshot.temperatureMin == (field == "temperature_2m_min" ? nil : 24.1))
+        #expect(snapshot.temperatureMax == (field == "temperature_2m_max" ? nil : 33.8))
+        #expect(snapshot.precipitationProbability == (field == "precipitation_probability_max" ? nil : 10))
+        #expect(snapshot.precipitationSum == (field == "precipitation_sum" ? nil : 0))
+        #expect(snapshot.sunrise == (field == "sunrise" ? "" : "2026-11-05T05:04"))
+        #expect(snapshot.sunset == (field == "sunset" ? "" : "2026-11-05T18:56"))
+    }
+
+    @Test(arguments: ["apparent_temperature", "precipitation", "sunrise", "sunset", "temperature_2m_min", "temperature_2m_max", "precipitation_probability_max", "precipitation_sum", "weather_code"])
+    func incompleteGlobalForecastQueriesSupplementForEveryMissingMetric(field: String) async throws {
+        var payload = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]
+        let section = ["apparent_temperature", "precipitation", "weather_code"].contains(field) ? "current" : "daily"
+        var values = payload[section] as! [String: Any]
+        if field == "weather_code" {
+            values[field] = 999
+        } else if ["sunrise", "sunset"].contains(field) {
+            values[field] = ["   "]
+        } else {
+            values.removeValue(forKey: field)
+        }
+        payload[section] = values
+        ForecastURLProtocol.reset([
+            .data(try JSONSerialization.data(withJSONObject: payload)), .failure(URLError(.timedOut)),
+        ])
+        let snapshot = try await makeService().fetch(latitude: 51, longitude: 0, isoCountryCode: "GB")
+
+        #expect(snapshot.source == "Open-Meteo" && snapshot.temperature == 28.5)
+        #expect(ForecastURLProtocol.requests.map { $0.url?.host } == ["api.open-meteo.com", "api.met.no"],
+                "A missing \(field) must trigger a supplemental source")
+        #expect(snapshot.temperatureMin == (field == "temperature_2m_min" ? nil : 24.1))
+        #expect(snapshot.temperatureMax == (field == "temperature_2m_max" ? nil : 33.8))
+        #expect(snapshot.apparentTemperature == (field == "apparent_temperature" ? nil : 30.2))
+        #expect(snapshot.currentPrecipitation == (field == "precipitation" ? nil : 0))
+        #expect(snapshot.sunrise == (field == "sunrise" ? "" : "2026-11-05T05:04"))
+        #expect(snapshot.sunset == (field == "sunset" ? "" : "2026-11-05T18:56"))
+        #expect(snapshot.precipitationProbability == (field == "precipitation_probability_max" ? nil : 10))
+        #expect(snapshot.precipitationSum == (field == "precipitation_sum" ? nil : 0))
+    }
+
+    @Test(arguments: ["apparent_temperature", "precipitation", "sunrise", "sunset", "temperature_2m_min", "temperature_2m_max", "precipitation_probability_max", "precipitation_sum"])
+    func partialSupplementFillsEachMetricWithoutReplacingPreferredObservation(field: String) async throws {
+        let original = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]
+        var current = original["current"] as! [String: Any]
+        current.removeValue(forKey: "apparent_temperature")
+        current.removeValue(forKey: "precipitation")
+        let isCurrent = ["apparent_temperature", "precipitation"].contains(field)
+        let originalValues = original[isCurrent ? "current" : "daily"] as! [String: Any]
+        let value: Any = field == "temperature_2m_min" ? [13.5] : try #require(originalValues[field])
+        var partial: [String: Any] = ["timezone": "Asia/Shanghai", "current": current]
+        if isCurrent {
+            current[field] = value
+            partial["current"] = current
+        } else {
+            partial["daily"] = [field: value]
+        }
+        var chinese = String(decoding: Self.china, as: UTF8.self)
+        if field == "temperature_2m_min" { chinese = chinese.replacingOccurrences(of: "\"14\"", with: "\"999\"") }
+        if field == "temperature_2m_max" { chinese = chinese.replacingOccurrences(of: "\"18\"", with: "\"999\"") }
+        ForecastURLProtocol.reset([
+            .data(Self.station), .data(Data(chinese.utf8)),
+            .data(try JSONSerialization.data(withJSONObject: partial)), .http(503, Data(), [:]),
+        ])
+        let snapshot = try await makeService().fetch(latitude: 31.2, longitude: 121.4, locationName: "上海", isoCountryCode: "CN")
+
+        #expect(snapshot.source == AppLocalization.text("中国天气网（中国气象局）"))
+        #expect(snapshot.temperature == 16.1 && snapshot.condition.symbolName == "cloud.sun.fill")
+        #expect(snapshot.temperatureMin == (field == "temperature_2m_min" ? 13.5 : 14))
+        #expect(snapshot.temperatureMax == (field == "temperature_2m_max" ? 33.8 : 18))
+        #expect(snapshot.apparentTemperature == (field == "apparent_temperature" ? 30.2 : nil))
+        #expect(snapshot.currentPrecipitation == (field == "precipitation" ? 0 : nil))
+        #expect(snapshot.sunrise == (field == "sunrise" ? "2026-11-05T05:04" : ""))
+        #expect(snapshot.sunset == (field == "sunset" ? "2026-11-05T18:56" : ""))
+        #expect(snapshot.precipitationProbability == (field == "precipitation_probability_max" ? 10 : nil))
+        #expect(snapshot.precipitationSum == (field == "precipitation_sum" ? 0 : nil))
+        #expect(snapshot.supplementalSources.map(\.name) == ["Open-Meteo"])
+    }
+
+    @Test(arguments: ["minimum", "maximum"])
+    func incompatibleSupplementalRangeDoesNotProduceInvertedTemperatures(field: String) async throws {
+        var chinese = String(decoding: Self.china, as: UTF8.self)
+        let daily: String
+        if field == "minimum" {
+            chinese = chinese.replacingOccurrences(of: "\"14\"", with: "\"999\"")
+            daily = "\"temperature_2m_min\":[24.1]"
+        } else {
+            chinese = chinese.replacingOccurrences(of: "\"18\"", with: "\"999\"")
+            daily = "\"temperature_2m_max\":[10]"
+        }
+        let partial = Data((#"{"timezone":"Asia/Shanghai","current":{"time":"2026-11-05T10:45","temperature_2m":28.5,"weather_code":2,"is_day":1},"daily":{"# + daily + "}}").utf8)
+        ForecastURLProtocol.reset([
+            .data(Self.station), .data(Data(chinese.utf8)), .data(partial), .http(503, Data(), [:]),
+        ])
+        let snapshot = try await makeService().fetch(latitude: 31.2, longitude: 121.4, locationName: "上海", isoCountryCode: "CN")
+
+        #expect(snapshot.temperature == 16.1)
+        #expect(snapshot.temperatureMin == (field == "minimum" ? nil : 14))
+        #expect(snapshot.temperatureMax == (field == "maximum" ? nil : 18))
+        #expect(snapshot.supplementalSources.isEmpty, "An incompatible range must not claim a contribution")
+    }
+
+    @Test
+    func invertedOpenMeteoRangeCannotReplaceAValidForecast() async throws {
+        let invalid = Data(String(decoding: Self.openMeteo, as: UTF8.self)
+            .replacingOccurrences(of: "\"temperature_2m_max\":[33.8]", with: "\"temperature_2m_max\":[10]").utf8)
+        ForecastURLProtocol.reset([.data(invalid), .data(Self.met)])
+        let snapshot = try await makeService().fetch(latitude: 51, longitude: 0, isoCountryCode: "GB")
+        #expect(snapshot.source == "MET Norway")
+        #expect(snapshot.temperatureMin == nil && snapshot.temperatureMax == nil)
+    }
+
+    @Test(arguments: ["apparent_temperature", "temperature_2m_min", "temperature_2m_max"])
+    func invalidSupplementalTemperaturesRemainInvalid(field: String) async throws {
+        var payload = try JSONSerialization.jsonObject(with: Self.openMeteo) as! [String: Any]
+        let section = field == "apparent_temperature" ? "current" : "daily"
+        var values = payload[section] as! [String: Any]
+        values[field] = section == "current" ? 999 : [999]
+        payload[section] = values
+        ForecastURLProtocol.reset([.data(try JSONSerialization.data(withJSONObject: payload)), .data(Self.met)])
+
+        let snapshot = try await makeService().fetch(latitude: 51, longitude: 0, isoCountryCode: "GB")
+        #expect(snapshot.source == "MET Norway")
+        #expect(snapshot.temperature == 16.2)
+    }
+
+    @Test
+    func failedSupplementAndAlertsKeepUsablePartialForecastAndRecoverOnRefresh() async throws {
+        let service = makeService(alertFails: true)
+        ForecastURLProtocol.reset([.data(Self.station), .data(Self.china), .http(503, Data(), [:]), .data(Data("{}".utf8))])
+        let partial = try await service.fetch(latitude: 31.2, longitude: 121.4, locationName: "上海", isoCountryCode: "CN")
+        #expect(partial.temperature == 16.1 && partial.apparentTemperature == nil)
+        #expect(partial.alertErrorDescription != nil)
+
+        ForecastURLProtocol.reset([.data(Self.station), .data(Self.china), .data(Self.openMeteo)])
+        let recovered = try await service.fetch(latitude: 31.2, longitude: 121.4, locationName: "上海", isoCountryCode: "CN")
+        #expect(recovered.source == "Open-Meteo" && recovered.apparentTemperature == 30.2)
+        #expect(recovered.alertErrorDescription != nil)
+        #expect(partial.temperature == 16.1 && partial.supplementalSources.isEmpty)
+    }
+
     @Test(arguments: ["CN", "cn", "HK", "MO", "TW"])
     func domesticPrimaryReturnsChineseWeatherWithoutFabricatingMissingMetrics(country: String) async throws {
         ForecastURLProtocol.reset([
             .data(Self.station), .data(Self.china),
+            .failure(URLError(.timedOut)), .http(503, Data(), [:]),
         ])
         let snapshot = try await makeService().fetch(
             latitude: coordinate.latitude, longitude: coordinate.longitude,
@@ -46,8 +385,10 @@ struct WeatherFallbackTests {
         #expect(snapshot.condition.summary == WeatherCondition(code: 2, isDay: false).summary)
         #expect(snapshot.condition.symbolName == "cloud.sun.fill")
         #expect(snapshot.sourceURL?.host == "www.weather.com.cn")
-        #expect(ForecastURLProtocol.requests.map { $0.url?.host } == ["toy1.weather.com.cn", "d1.weather.com.cn"])
-        #expect(ForecastURLProtocol.requests.last?.value(forHTTPHeaderField: "Referer") == "https://www.weather.com.cn/")
+        #expect(ForecastURLProtocol.requests.map { $0.url?.host } == [
+            "toy1.weather.com.cn", "d1.weather.com.cn", "api.open-meteo.com", "api.met.no",
+        ])
+        #expect(ForecastURLProtocol.requests[1].value(forHTTPHeaderField: "Referer") == "https://www.weather.com.cn/")
     }
 
     @Test(arguments: ["GB", "JP", "MN", "RU", "VN"])
@@ -99,13 +440,12 @@ struct WeatherFallbackTests {
         #expect(request.value(forHTTPHeaderField: "User-Agent")?.contains("github.com/wzz6423/zisla") == true)
     }
 
-    @Test(arguments: [0, 1, 2, 3])
+    @Test(arguments: [0, 1, 2])
     func invalidPrimaryResponsesFallBack(kind: Int) async throws {
         let bad: Data = switch kind {
         case 0: Data("<html>proxy error</html>".utf8)
         case 1: Data(repeating: 65, count: 1_048_577)
-        case 2: Data(#"{"timezone":"UTC","current":{"time":"2026-11-05T00:00","temperature_2m":999,"apparent_temperature":1,"weather_code":1,"is_day":1},"daily":null}"#.utf8)
-        default: Data(#"{"timezone":"UTC","current":{"time":"2026-11-05T00:00","temperature_2m":1,"apparent_temperature":1,"weather_code":1,"is_day":1},"daily":{"sunrise":[],"sunset":[],"precipitation_probability_max":[],"precipitation_sum":[]}}"#.utf8)
+        default: Data(#"{"timezone":"UTC","current":{"time":"2026-11-05T00:00","temperature_2m":999,"apparent_temperature":1,"weather_code":1,"is_day":1},"daily":null}"#.utf8)
         }
         ForecastURLProtocol.reset([.data(bad), .data(Self.met)])
         let snapshot = try await makeService().fetch(latitude: 51, longitude: 0, isoCountryCode: "GB")

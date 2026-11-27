@@ -86,10 +86,13 @@ struct AgendaModuleView: View {
             weatherPlaceholder(state: state, hasExpiredWeather: !snapshotsByLocationID.isEmpty)
         } else {
             let sources = snapshots.reduce(into: [(name: String, url: URL)]()) { sources, weather in
-                guard let source = weather.source, let sourceURL = weather.sourceURL,
-                      !sources.contains(where: { $0.name == source })
-                else { return }
-                sources.append((source, sourceURL))
+                var attributions = weather.supplementalSources
+                if let name = weather.source, let url = weather.sourceURL {
+                    attributions.insert(WeatherSnapshot.SourceAttribution(name: name, url: url), at: 0)
+                }
+                for attribution in attributions where !sources.contains(where: { $0.name == attribution.name }) {
+                    sources.append((attribution.name, attribution.url))
+                }
             }
             VStack(alignment: .leading, spacing: 8) {
                 WeatherList(snapshots: snapshots, date: date)

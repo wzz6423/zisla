@@ -113,7 +113,7 @@ export const en: SiteContent = {
       agenda: {
         name: 'Agenda and weather',
         caption:
-          'Shows weather for your current location and up to six chosen places. View, add and delete calendar events and reminders, and complete reminders. Events with a meeting link show a countdown from 10 minutes before the start and a one-click join action. Create a meeting note or link and unlink existing context notes. The weather list shows its update time to the left of the refresh button in the header.',
+          'Shows weather for your current location and up to six chosen places. View, add and delete calendar events and reminders, and complete reminders. Events with a meeting link show a countdown from 10 minutes before the start and a one-click join action. Create a meeting note or link and unlink existing context notes. The weather list shows its update time to the left of the refresh button in the header. Incomplete weather is supplemented from other sources using the most complete result; available partial data is retained when the rest cannot be fetched.',
         points: ['Weather and calendar', '10-minute meeting countdown', 'Join meetings and link notes'],
       },
       mail: {
@@ -366,6 +366,20 @@ export const en: SiteContent = {
         "shortcuts": "Drag with the pointer. Configure Shake to Drop in Settings; no fixed keyboard shortcut is required.",
         "permissions": "The file picker and security-scoped bookmarks grant access to selected files. Screen capture needs Screen Recording permission.",
         "output": "Original files stay where they are. Shelf references and stashed screenshots persist locally; an exported PNG uses the chosen destination. ZIP archives and successful image outputs return to the shelf; imported media is added to the recording project library."
+      },
+      "weather": {
+        "title": "View the most complete available weather",
+        "summary": "Check your current or saved locations and fill gaps from additional weather sources.",
+        "entry": "Island → Agenda; Settings → Weather.",
+        "steps": [
+          "Enable Weather in Settings → Features; search for and save additional places in weather settings.",
+          "Open Agenda or refresh weather. If information is missing, additional sources fill gaps using the most complete result.",
+          "If supplementary sources are unavailable, keep the available information and omit missing metrics.",
+          "Use the links below the weather list to check contributing sources; official alerts are fetched independently."
+        ],
+        "shortcuts": "Use the refresh button in Agenda; there is no fixed global shortcut.",
+        "permissions": "The current location needs Location access; manually added places do not. Weather and official alerts use the network.",
+        "output": "Weather is held in memory and saved places stay locally. Available partial data is shown when gaps cannot be filled; forecasts older than one hour are hidden."
       },
       "meeting": {
         "title": "Join a meeting and keep its notes",

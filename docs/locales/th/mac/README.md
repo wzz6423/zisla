@@ -20,7 +20,7 @@ Swift targets, bundle ID, โฟลเดอร์ข้อมูล และ `
 | คลิปบอร์ด | ประวัติค้นได้ กรองภาพ URL ไฟล์ และรายการโปรด; ประวัติและลิงก์แยกกัน ภาพใหม่เข้าคิวอ่านข้อความในเครื่อง ค้นข้อความหาภาพต้นฉบับหรือคลิกขวาอ่าน/คัดลอก ยกเลิกงานอ่านได้ งานเบื้องหลังไม่คัดลอกเอง |
 | ตรวจดู AI | รวมงาน สถานะ โทเคน ฮีตแมป และแจ้งเตือนจาก CLI แอป IDE ที่รองรับ |
 | ดาวน์โหลด | `yt-dlp` วิดีโอ/เสียง; ไม่มี `ffmpeg` ใช้ AVFoundation ห่อแทร็กและ Bilibili API อ่านอย่างเดียวสำรอง |
-| กำหนดการ | อากาศปัจจุบันและที่บันทึกสูงสุดหก ดู/สร้าง/ลบเหตุการณ์และเตือนความจำ/ทำเครื่องหมายเสร็จ เวลาอัปเดตของรายการสภาพอากาศแสดงในส่วนหัว ทางซ้ายของปุ่มรีเฟรช |
+| กำหนดการ | อากาศปัจจุบันและที่บันทึกสูงสุดหก ดู/สร้าง/ลบเหตุการณ์และเตือนความจำ/ทำเครื่องหมายเสร็จ เวลาอัปเดตของรายการสภาพอากาศแสดงในส่วนหัว ทางซ้ายของปุ่มรีเฟรช เมื่อข้อมูลสภาพอากาศไม่ครบ จะตรวจสอบแหล่งอื่นและเติมข้อมูลที่ขาดโดยใช้ผลที่ครบที่สุด หากดึงข้อมูลที่เหลือไม่ได้ จะเก็บข้อมูลที่มีอยู่ไว้ |
 | จดหมาย | บัญชี Mail.app เลือก ดูเข้า อ่านแล้ว ตอบ เขียน ย้ายถังขยะ |
 | โน้ต | Apple Notes แหล่งเดียว ดู แก้ สร้าง ลบ Markdown พร้อมตัวอย่างสดและเขียนกลับ |
 | มิกเซอร์แอป | macOS 14.4+ ปรับ/ปิดเสียงแต่ละแอปและจำค่า ต้องสิทธิ์บันทึกเสียงระบบ |
@@ -231,7 +231,7 @@ Apple Notes แหล่ง Markdown เดียว สร้าง ดู แ�
 - **จอ/เสียง:** ภาพ/บันทึก/preview ขอ Screen Recording เก็บ source เลือก ไมค์กล้องเฉพาะเปิด มิกซ์ macOS 14.4+ System Audio Recording Core Audio taps local
 - **เบราว์เซอร์:** progress สาธารณะ/ไฟล์ชั่วคราว ไม่ history/เนื้อหา
 - **สื่อ:** MediaRemote metadata Core Audio process confirm private framework ไม่ส่ง Mac App Store ตรง ไม่มี metadata ใช้แอปเสียง
-- **เครือข่าย:** Open-Meteo/เตือนจีน public ที่เกี่ยวอื่น WeatherKit อัปเดต `ipinfo.io/country` ครั้งเดียว `CN` Gitee→GitHub อื่นกลับ ไม่มีเริ่ม Gitee Bilibili readonly info/play/CDN ลิงก์ไม่ network โควตาติดต่อ provider แปล/AI edits/transcript โมเดล/CLI speech Apple ตามภาษา ติดตั้ง/อัปเดต dependencies CLI IP และ network ผู้ใช้เลือกมี request
+- **เครือข่าย:** การพยากรณ์ใช้ China Weather, Open-Meteo และ MET Norway ตามภูมิภาค และสอบถามแหล่งอื่นเมื่อข้อมูลไม่ครบ คำเตือนอย่างเป็นทางการดึงแยกจาก China Weather หรือ WeatherKit io/country` ครั้งเดียว `CN` Gitee→GitHub อื่นกลับ ไม่มีเริ่ม Gitee Bilibili readonly info/play/CDN ลิงก์ไม่ network โควตาติดต่อ provider แปล/AI edits/transcript โมเดล/CLI speech Apple ตามภาษา ติดตั้ง/อัปเดต dependencies CLI IP และ network ผู้ใช้เลือกมี request
 - **Automation:** AppleScript/JXA list/view/edit/create/delete Notes ต้องสิทธิ์ ไม่ network เก็บ Notes
 
 ## ทดสอบ
