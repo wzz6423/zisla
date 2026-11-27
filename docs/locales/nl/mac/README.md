@@ -48,7 +48,7 @@ macOS 14 en later zijn ondersteund. macOS 26 gebruikt Liquid Glass; macOS 14/15 
 - **Contextnotities en vergaderingen:** houd de ingestelde toets vast en schud voor een notitie bij pagina, venster of desktop. Afspraken met vergaderlink tonen 10 minuten aftelling, deelnemen en nieuwe/bestaande notities koppelen. Beheer ze op de plank.
 - **Schudden om neer te zetten:** schud tijdens slepen om een bestemming te tonen; apart instelbaar.
 - **Uitvoer en speler:** kies apparaat in het mediagebied, automatische bron/voorkeurspeler, compacte weergave en stopvoorwaarden voor omgevingsgeluiden in Instellingen.
-- **AI-tegoeden en resets:** accounttegoeden, meet- en resetmomenten en waarschuwingen, inclusief beschikbare 5h/7d-vensters en Cursor USD-budgetten. Los van lokale tokengeschiedenis.
+- **AI-tegoeden en resets:** accounttegoeden, meet- en resetmomenten en waarschuwingen, inclusief beschikbare 5h/7d-vensters en Cursor USD-budgetten. Los van lokale tokengeschiedenis. De Gemini- en Claude/GPT-tegoeden van Antigravity hebben afzonderlijke bewaking, weergave en meldingen. Gemini App gebruikt voor chattegoeden een web-Cookie van hetzelfde Google-account; Gemini CLI blijft apart.
 
 ### Toetsvolgorde van Snelle acties
 

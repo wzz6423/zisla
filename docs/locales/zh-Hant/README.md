@@ -53,7 +53,7 @@ zisla 可監控 Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi
 - **混音與播放：** macOS 14.4+ 可逐應用調節音量與靜音；媒體區域可選擇輸出設備，設定可選擇播放器偏好。
 - **桌面與會議：** Dock 和 Command+Tab 視窗預覽、網頁/視窗/桌面位置便簽、會議開始前 10 分鐘倒計時、加入會議及關聯便簽。拖拽檔案時搖動滑鼠可顯示中轉投放入口。
 - **每日簡報：** 8 種模板，預覽、手動或定時 PNG 匯出，選擇統計內容和獨立儲存位置。
-- **AI 賬戶：** 查看支援賬戶的剩餘額度、重置時間、低額度通知和採樣時間；本機 token 歷史可匯出 `.xlsx`。
+- **AI 賬戶：** 查看支援賬戶的剩餘額度、重置時間、低額度通知和採樣時間；本機 token 歷史可匯出 `.xlsx`。 Antigravity 的 Gemini 與 Claude/GPT 額度分別監控、展示和提醒。Gemini App 一般對話額度使用同一 Google 帳號的網站 Cookie 查詢；Gemini CLI 單獨監控。
 - **快捷操作：** 彈窗內 `Command+1` 到 `Command+0` 按動作順序執行；新配置額外預設觸發鍵為 `Command+N`，用於首個動作。已儲存組合和清空狀態在升級時保留。
 
 [用戶幫助](https://wzz6423.github.io/zisla/help.html?lang=zh-Hant#help) 提供剪貼簿、截圖／螢幕錄影、中轉、會議、AI、媒體工具、每日簡報、桌面便箋／視窗預覽與播放／混音九組逐步指南，以及短片段示範。 [macOS 指南](mac/README.md#儲存位置)列出各工具儲存目錄與依賴。

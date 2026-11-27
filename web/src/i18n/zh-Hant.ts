@@ -93,7 +93,7 @@ export const zhHant: SiteContent = {
       aiMonitor: {
         name: 'AI 監控',
         caption:
-          '彙整 AI CLI、桌面版與 IDE 的任務和狀態。可靠數值用量產生 Token 趨勢與貢獻熱度圖，選擇日期可查看依供應商及模型分列的輸入、輸出與總 Token。可在設定查看、匯出全部歷史為 .xlsx，或清空紀錄。顯示真實帳戶剩餘額度、重設時間和低額度提醒，依可用資料呈現 5h/7d 時段與 Cursor 美元預算；不讀取提示詞和回覆內容。各種緊湊靈動島版面也會顯示剩餘額度環。可獨立選擇帳號地區；每日用量記錄與剩餘額度顏色在各版面中保持一致。',
+          '彙整 AI CLI、桌面版與 IDE 的任務和狀態。可靠數值用量產生 Token 趨勢與貢獻熱度圖，選擇日期可查看依供應商及模型分列的輸入、輸出與總 Token。可在設定查看、匯出全部歷史為 .xlsx，或清空紀錄。顯示真實帳戶剩餘額度、重設時間和低額度提醒，依可用資料呈現 5h/7d 時段與 Cursor 美元預算；不讀取提示詞和回覆內容。各種緊湊靈動島版面也會顯示剩餘額度環。可獨立選擇帳號地區；每日用量記錄與剩餘額度顏色在各版面中保持一致。 Antigravity 的 Gemini 與 Claude/GPT 額度分別監控、展示和提醒。Gemini App 一般對話額度使用同一 Google 帳號的網站 Cookie 查詢；Gemini CLI 單獨監控。',
         points: ['跨工具查看 AI 任務', '模型歷史與 .xlsx 匯出', '帳戶額度與重設時間'],
       },
       keyboardSound: {
@@ -380,7 +380,7 @@ export const zhHant: SiteContent = {
         "entry": "設定 → AI；動態島 → AI 監控。",
         "steps": [
           "啟用受支援本機工具，或依 CLI 參考用 zislactl 回報工作。",
-          "在 AI 設定啟用所需供應商的額度監控，僅在要求時填寫憑證。",
+          "啟用所需供應商的額度監控，分別選擇 Antigravity 的 Gemini 與 Claude/GPT 監控和展示。監控 Gemini App 時，在 gemini.google.com/usage 登入同一 Google 帳號，並在網站額度憑證中儲存 Cookie；Gemini CLI 單獨選擇。",
           "查看取樣/重設時間和低額度提醒，瀏覽用量歷史或匯出 .xlsx。"
         ],
         "shortcuts": "使用 AI 監控或設定，沒有固定全域快捷鍵。zislactl 使用文件中的命令列參數。",

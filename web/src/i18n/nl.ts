@@ -96,7 +96,7 @@ export const nl = createCatalog({
       aiMonitor: {
         name: 'AI-monitor',
         caption:
-          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst. Ook compacte eilandweergaven tonen het resterende tegoed in ringen. Kies accountregio’s afzonderlijk; dagelijkse gebruiksgegevens en kleuren voor resterende quota blijven gelijk in alle indelingen.',
+          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst. Ook compacte eilandweergaven tonen het resterende tegoed in ringen. Kies accountregio’s afzonderlijk; dagelijkse gebruiksgegevens en kleuren voor resterende quota blijven gelijk in alle indelingen. De Gemini- en Claude/GPT-tegoeden van Antigravity hebben afzonderlijke bewaking, weergave en meldingen. Gemini App gebruikt voor chattegoeden een web-Cookie van hetzelfde Google-account; Gemini CLI blijft apart.',
         points: ['Taken uit meerdere AI-tools', 'Modelgeschiedenis en .xlsx-export', 'Accountquota en resettijden'],
       },
       keyboardSound: {
@@ -373,7 +373,7 @@ export const nl = createCatalog({
         "entry": "Instellingen → AI; eiland → AI-monitor.",
         "steps": [
           "Schakel een ondersteund lokaal hulpmiddel in of meld een taak met zislactl volgens de CLI-referentie.",
-          "Schakel limietcontrole voor de gewenste aanbieder in en vul alleen gevraagde inloggegevens in.",
+          "Schakel bewaking voor de gewenste aanbieder in en kies bewaking en weergave van Antigravity Gemini en Claude/GPT afzonderlijk. Meld je voor Gemini App met hetzelfde Google-account aan op gemini.google.com/usage en sla de Cookie op onder Webtegoed-inloggegevens; selecteer Gemini CLI apart.",
           "Bekijk meet-/hersteltijd en waarschuwingen; open de geschiedenis of exporteer .xlsx."
         ],
         "shortcuts": "Gebruik monitor of Instellingen; geen vaste globale toets nodig. zislactl gebruikt gedocumenteerde argumenten.",

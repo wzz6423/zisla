@@ -25,6 +25,7 @@
 - ดาวน์โหลด อากาศ และ GitHub ใช้ actor
 - AI hook ตรวจด้วย event ระบบไฟล์ directory แต่ละแหล่งเทียบไฟล์ session/activity ล่าสุดด้วย mtime/ขนาด ใช้ parse cache เดิมถ้าไม่เปลี่ยน
 - auto อ่านเหตุการณ์มีโครงสร้าง marker คงที่และ metadata จำเป็น ไม่อ่านพรอมป์ต์/คำตอบ parser provider ผิดไม่ขวางอื่น
+- โควตาบัญชี AI มาจากการตรวจของผู้ให้บริการแต่ละราย โควตา Gemini และ Claude/GPT ของ Antigravity มีช่วงรีเซ็ตและการแจ้งเตือนแยกกัน โควตาแชตปกติของ Gemini App ใช้ Cookie เว็บที่บันทึกไว้ของบัญชี Google เดียวกัน ส่วน Gemini CLI ใช้ OAuth ในเครื่อง ไม่ประมาณค่าโควตาที่ไม่มีข้อมูล
 - หน่วงยุบใช้ `Task` ยกเลิกได้และ generation token งานเก่าจึงซ่อนเกาะเปิดใหม่ไม่ได้
 - ซ่อนไม่มี `TimelineView` timer 60 Hz หรือส่ง animation ต่อเนื่อง
 

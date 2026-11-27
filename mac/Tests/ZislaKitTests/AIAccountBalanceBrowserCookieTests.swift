@@ -6,6 +6,27 @@ import ZislaCore
 @testable import ZislaKit
 
 struct AIAccountBalanceBrowserCookieTests {
+    @Test func geminiAppImportsOnlyApplicableSessionCookiesFromSelectedBrowserAndCleansSnapshot() throws {
+        let fixture = try BalanceBrowserFixture()
+        defer { fixture.remove() }
+        let database = fixture.support.appendingPathComponent("Firefox/Profiles/active.default/cookies.sqlite")
+        try fixture.sql("""
+        PRAGMA user_version=15;
+        CREATE TABLE moz_cookies(host TEXT, name TEXT, value TEXT, path TEXT, expiry INTEGER, originAttributes TEXT);
+        INSERT INTO moz_cookies VALUES('.google.com', 'SID', 'session', '/', 2000000000, '');
+        INSERT INTO moz_cookies VALUES('.google.com', 'SAPISID', 'api', '/', 2000000000, '');
+        INSERT INTO moz_cookies VALUES('.google.com', 'unrelated', 'private', '/', 2000000000, '');
+        INSERT INTO moz_cookies VALUES('mail.google.com', 'SID', 'other-service', '/', 2000000000, '');
+        INSERT INTO moz_cookies VALUES('.google.com', '__Secure-1PSID', 'wrong-path', '/mail', 2000000000, '');
+        """, database: database)
+        let reader = AIAccountBalanceBrowserCookieReader(temporaryDirectory: fixture.root, now: { Date(timeIntervalSince1970: 1_900_000_000) })
+        let header = try reader.header(from: .init(browser: .firefox, databaseURL: database, keychainAccount: nil), website: .geminiApp)
+        #expect(header == "SAPISID=api; SID=session")
+        #expect(!header.contains("private") && !header.contains("other-service") && !header.contains("wrong-path"))
+        #expect(try FileManager.default.contentsOfDirectory(at: fixture.root, includingPropertiesForKeys: nil)
+            .allSatisfy { !$0.lastPathComponent.hasPrefix("zisla-quota-cookies-") })
+    }
+
     private let now = Date(timeIntervalSince1970: 1_900_000_000)
     private let encrypted = "djEwr0TXaxFe0SiR8p6DfboYwWQKoobkB1hVgQCDAwHe/n3F8cJKBGtZqPn0QwnWdDzsua0awIVzycshuBKP6+5Ywg=="
 

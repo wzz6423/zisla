@@ -25,6 +25,7 @@ Linke und rechte Mitteilungsfenster werden bei Bedarf erstellt und sofort verbor
 - Downloads, Wetter und GitHub-Anfragen verwenden Actors.
 - Von Hooks geschriebener KI-Status wird durch Dateisystemereignisse des Ordners überwacht. Jede KI-Sitzungsquelle vergleicht Änderungszeit und Größe der neuesten lokalen Sitzungs- oder Aktivitätsdatei und verwendet bei unveränderten Daten den Parsing-Cache erneut.
 - Automatische Erkennung liest nur strukturierte Ereignisse, feste Statusmarker und Aktivitätsmetadaten zur Aufgabenstatusbestimmung. Prompts und Antwortinhalte werden nicht gelesen; ein Anbieterparserfehler blockiert andere Anbieter nicht.
+- KI-Kontingente werden für jeden Anbieter getrennt abgefragt. Die Gemini- und Claude/GPT-Kontingente von Antigravity behalten eigene Rücksetzungsfenster und Warnungen. Das normale Chat-Kontingent von Gemini App nutzt das gespeicherte Web-Cookie desselben Google-Kontos; Gemini CLI behält die lokale OAuth-Quelle. Fehlende Kontingente werden nie geschätzt.
 - Einklappverzögerungen nutzen abbrechbare `Task`s und einen Generations-Token, damit eine alte Aufgabe keine bereits wieder geöffnete Insel verbergen kann.
 - Im verborgenen Zustand gibt es weder `TimelineView` noch 60-Hz-Timer oder dauerhaft eingereichte Animationen.
 

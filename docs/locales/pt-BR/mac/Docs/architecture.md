@@ -25,6 +25,7 @@ Os painéis esquerdo e direito de notificação são criados sob demanda e ocult
 - Downloads, clima e requisições GitHub usam actors.
 - O estado de IA escrito pelos hooks é monitorado por eventos do sistema de arquivos do diretório. Cada fonte de sessão compara o horário de modificação e o tamanho do arquivo local de sessão ou atividade mais recente e reutiliza o cache de análise quando nada mudou.
 - A detecção automática lê apenas eventos estruturados, marcadores fixos de estado e metadados de atividade necessários para determinar as tarefas. Não lê prompts nem respostas, e uma falha no analisador de um fornecedor não bloqueia os outros.
+- As cotas de contas de IA são consultadas separadamente em cada provedor. As cotas Gemini e Claude/GPT do Antigravity mantêm suas próprias janelas de redefinição e alertas. A cota de conversa comum do Gemini App usa o Cookie da web salvo da mesma conta Google; o Gemini CLI mantém seu OAuth local. Cotas ausentes nunca são estimadas.
 - Os atrasos de recolhimento usam `Task`s canceláveis e um token de geração para que uma tarefa antiga não oculte uma ilha que já foi reaberta.
 - O estado oculto não tem `TimelineView`, temporizador de 60 Hz nem envio contínuo de animações.
 

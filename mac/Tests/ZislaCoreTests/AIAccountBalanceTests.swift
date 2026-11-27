@@ -3,6 +3,29 @@ import Testing
 @testable import ZislaCore
 
 struct AIAccountBalanceTests {
+    @Test func geminiSourcesKeepIndependentIdentityFiltersAndDefaultUpgradeSelection() throws {
+        let window = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 10)
+        let cli = AIAccountBalance(id: "gemini:cli", providers: [.gemini], status: .available, windows: [window], quotaGroup: "cli")
+        let app = AIAccountBalance(id: "gemini:app", providers: [.gemini], status: .available, windows: [window], quotaGroup: "app")
+        #expect(cli.providerTitle(language: .english) == "Gemini CLI" && app.providerTitle(language: .english) == "Gemini App")
+        #expect(cli.noticeID != app.noticeID)
+        let rows = AIAccountBalanceCatalog.displayedBalances([cli, app], monitoredProviders: [.gemini], displayedProviders: [.gemini],
+                                                             monitoredGeminiSources: [.app], displayedGeminiSources: [.app])
+        #expect(rows == [app])
+        #expect(AIAccountBalanceCatalog.displayedBalances([cli, app], monitoredProviders: [.gemini], displayedProviders: [.gemini],
+                                                          monitoredGeminiSources: [.app], displayedGeminiSources: [.cli]).isEmpty)
+        let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"aiAccountBalanceMonitoredProviders":["gemini"],"aiAccountBalanceDisplayedProviders":["gemini"]}"#.utf8))
+        #expect(legacy.aiAccountBalanceMonitoredProviders == [.gemini])
+        #expect(legacy.aiAccountBalanceMonitoredGeminiSources == [.cli, .app] && legacy.aiAccountBalanceDisplayedGeminiSources == [.cli, .app])
+        var disabled = legacy
+        disabled.aiAccountBalanceMonitoredGeminiSources = []
+        disabled.aiAccountBalanceDisplayedGeminiSources = [.app]
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(disabled))
+        #expect(decoded.aiAccountBalanceMonitoredGeminiSources.isEmpty && decoded.aiAccountBalanceDisplayedGeminiSources == [.app])
+        let unknown = try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"aiAccountBalanceMonitoredGeminiSources":["app","unknown"]}"#.utf8))
+        #expect(unknown.aiAccountBalanceMonitoredGeminiSources == [.app])
+    }
+
     @Test(arguments: [([AIProvider.codex], "Codex"), ([.gpt], "ChatGPT"),
                       ([.codex, .gpt], "Codex"), ([.gpt, .codex], "ChatGPT")], AppLanguage.allCases)
     func sharedAccountKeepsSelectedProviderBrandsAndTwoRealDurationReadings(selection: ([AIProvider], String), language: AppLanguage) {
@@ -231,6 +254,101 @@ struct AIAccountBalanceTests {
         let payload = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any])
         #expect(payload["qoderRegion"] == nil)
         #expect(try JSONDecoder().decode(AIAccountBalance.self, from: JSONSerialization.data(withJSONObject: payload)) == row)
+    }
+
+    @Test func antigravityPoolsHaveIndependentLimitsResetsAndIdentities() throws {
+        let geminiReset = Date(timeIntervalSince1970: 2_000_000_000)
+        let claudeReset = geminiReset.addingTimeInterval(3_600)
+        let sample = AIAccountBalance(id: "antigravity:account", providers: [.antigravity], status: .available, windows: [
+            .init(id: "additional:gemini:five_hour", kind: .fiveHours, remainingPercent: 80,
+                  resetsAt: geminiReset, durationSeconds: 18_000, name: "Gemini"),
+            .init(id: "additional:gemini:weekly", kind: .weekly, remainingPercent: 70, durationSeconds: 604_800, name: "Gemini"),
+            .init(id: "additional:argon:five_hour", kind: .fiveHours, remainingPercent: 60, durationSeconds: 18_000, name: "Gemini 4 Argon"),
+            .init(id: "additional:claude-gpt:five_hour", kind: .fiveHours, remainingPercent: 10,
+                  resetsAt: claudeReset, durationSeconds: 18_000, name: "Claude/GPT"),
+            .init(id: "additional:claude-gpt:weekly", kind: .weekly, remainingPercent: 0, durationSeconds: 604_800, name: "Claude/GPT"),
+            .init(id: "additional:custom:weekly", kind: .weekly, remainingPercent: 50, durationSeconds: 604_800, name: "Future Models"),
+        ], accountName: "fixture@example.test")
+        let rows = AIAccountBalanceCatalog.antigravityBalances(sample)
+        #expect(rows.map(\.quotaGroup) == ["gemini", "claudeGPT", "custom:Future Models"])
+        #expect(Set(rows.map(\.noticeID)).count == 3)
+        let gemini = rows[0], claude = rows[1], custom = rows[2]
+        #expect(gemini.severity == .normal && claude.severity == .exhausted && custom.severity == .normal)
+        #expect(gemini.fiveHourWindow?.resetsAt == geminiReset && claude.fiveHourWindow?.resetsAt == claudeReset)
+        #expect(gemini.windows.count == 3 && gemini.windows.last?.name == "Gemini 4 Argon")
+        #expect(gemini.compactLines(language: .english).first == "5h 80%")
+        #expect(claude.compactLines(language: .english) == ["5h 10%", "7d 0%"])
+        #expect(custom.providerTitle(language: .english) == "Antigravity · Future Models")
+        #expect(rows.allSatisfy { $0.accountName == sample.accountName })
+        for row in rows {
+            #expect(AIAccountBalanceCatalog.antigravityBalances(row) == [row])
+            #expect(try JSONDecoder().decode(AIAccountBalance.self, from: JSONEncoder().encode(row)) == row)
+        }
+    }
+
+    @Test func argonOnlyQuotaKeepsItsFeatureNameAndCannotBecomeCanonicalGeminiAllowance() {
+        let window = AIAccountQuotaWindow(id: "additional:argon:five_hour", kind: .fiveHours,
+                                          remainingPercent: 60, durationSeconds: 18_000, name: "Gemini 4 Argon")
+        let rows = AIAccountBalanceCatalog.antigravityBalances(.init(id: "antigravity", providers: [.antigravity],
+                                                                     status: .available, windows: [window]))
+        #expect(rows[0].quotaGroup == "gemini" && rows[0].windows == [window])
+        #expect(rows[0].fiveHourWindow == nil && rows[0].weeklyWindow == nil)
+        #expect(rows[0].compactLines(language: .english).joined().contains("Gemini 4 Argon"))
+        #expect(rows[1].status == .unavailable && rows[1].windows.isEmpty)
+    }
+
+    @Test func missingAntigravityPoolCannotBorrowOtherQuotaOrStatus() {
+        let sample = AIAccountBalance(id: "antigravity", providers: [.antigravity], status: .available,
+                                      windows: [.init(id: "additional:claude-gpt:weekly", kind: .weekly,
+                                                      remainingPercent: 0, durationSeconds: 604_800, name: "Claude/GPT")])
+        let rows = AIAccountBalanceCatalog.antigravityBalances(sample)
+        #expect(rows.count == 2)
+        #expect(rows[0].quotaGroup == "gemini" && rows[0].status == .unavailable && rows[0].severity == nil)
+        #expect(rows[1].quotaGroup == "claudeGPT" && rows[1].status == .available && rows[1].severity == .exhausted)
+        for status in AIAccountBalanceStatus.allFixtureCases {
+            var failure = sample
+            failure.status = status
+            failure.windows = []
+            let failedRows = AIAccountBalanceCatalog.antigravityBalances(failure)
+            #expect(failedRows.map(\.status) == [status, status])
+            #expect(failedRows.allSatisfy { $0.windows.isEmpty && $0.severity == nil })
+        }
+        let other = AIAccountBalance(id: "gemini", providers: [.gemini], status: .notSignedIn)
+        #expect(AIAccountBalanceCatalog.antigravityBalances(other) == [other])
+        var debug = sample
+        debug.isDebug = true
+        #expect(AIAccountBalanceCatalog.antigravityBalances(debug) == [debug])
+        #expect(debug.matchesAntigravityGroups([]))
+    }
+
+    @Test func antigravityDisplayAndMonitoringSelectionsAreIndependent() {
+        let sample = AIAccountBalance(id: "antigravity", providers: [.antigravity], status: .available, windows: [
+            .init(id: "additional:gemini:weekly", kind: .weekly, remainingPercent: 60, durationSeconds: 604_800, name: "Gemini"),
+            .init(id: "additional:claude-gpt:weekly", kind: .weekly, remainingPercent: 10, durationSeconds: 604_800, name: "Claude/GPT"),
+        ])
+        let rows = AIAccountBalanceCatalog.antigravityBalances(sample)
+        let shown = AIAccountBalanceCatalog.displayedBalances(rows, monitoredProviders: [.antigravity], displayedProviders: [.antigravity],
+                                                              monitoredAntigravityGroups: [.gemini, .claudeGPT], displayedAntigravityGroups: [.gemini])
+        #expect(shown.map(\.quotaGroup) == ["gemini"])
+        #expect(rows[1].matchesAntigravityGroups([.claudeGPT]))
+        #expect(!rows[1].matchesAntigravityGroups([.gemini]))
+        #expect(AIAccountBalanceCatalog.displayedBalances(rows, monitoredProviders: [.antigravity], displayedProviders: [.antigravity],
+                                                          monitoredAntigravityGroups: [.claudeGPT], displayedAntigravityGroups: [.gemini]).isEmpty)
+        #expect(AIAccountBalanceCatalog.displayedBalances(rows, monitoredProviders: [.antigravity], displayedProviders: [.antigravity],
+                                                          displayedAntigravityGroups: []).isEmpty)
+    }
+
+    @Test func antigravitySettingsMigrateDefaultsAndPreserveEmptyOrUnknownSelections() throws {
+        let old = try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"aiAccountBalanceMonitoredProviders":["antigravity"],"aiAccountBalanceDisplayedProviders":["antigravity"]}"#.utf8))
+        #expect(old.aiAccountBalanceMonitoredAntigravityGroups == Set(AIAccountBalanceAntigravityGroup.allCases))
+        #expect(old.aiAccountBalanceDisplayedAntigravityGroups == Set(AIAccountBalanceAntigravityGroup.allCases))
+        let selected = try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"aiAccountBalanceMonitoredAntigravityGroups":["claudeGPT","future","claudeGPT"],"aiAccountBalanceDisplayedAntigravityGroups":[]}"#.utf8))
+        #expect(selected.aiAccountBalanceMonitoredAntigravityGroups == [.claudeGPT])
+        #expect(selected.aiAccountBalanceDisplayedAntigravityGroups.isEmpty)
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(selected)) == selected)
+        let unknown = try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"aiAccountBalanceMonitoredAntigravityGroups":["future"]}"#.utf8))
+        #expect(unknown.aiAccountBalanceMonitoredAntigravityGroups.isEmpty)
+        #expect(unknown.aiAccountBalanceMonitoredProviders.isEmpty)
     }
 }
 

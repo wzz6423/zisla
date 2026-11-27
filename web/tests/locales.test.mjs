@@ -321,6 +321,28 @@ test('image and audio capabilities describe the native operation counts and expo
   }
 });
 
+test('independent Antigravity pools and Gemini App credentials are authored and rendered in every locale', () => {
+  for (const locale of siteLocales) {
+    const authored = authoredCatalogs.get(locale);
+    const content = site.getSiteContent(locale);
+    const caption = authored.showcase.modules.aiMonitor.caption;
+    const step = authored.help.guides.ai.steps[1];
+    for (const term of ['Antigravity', 'Gemini', 'Claude/GPT', 'Gemini App', 'Gemini CLI', 'Cookie']) {
+      assert.ok(caption.includes(term), `${locale}: AI quota description ${term}`);
+    }
+    for (const term of ['Antigravity', 'Claude/GPT', 'Gemini App', 'Gemini CLI', 'gemini.google.com/usage', 'Cookie']) {
+      assert.ok(step.includes(term), `${locale}: AI credential guide ${term}`);
+    }
+    assert.equal(content.showcase.modules.aiMonitor.caption, caption);
+    assert.equal(content.help.guides.ai.steps[1], step);
+    if (locale !== 'en') {
+      assert.notEqual(caption, english.showcase.modules.aiMonitor.caption);
+      assert.notEqual(step, english.help.guides.ai.steps[1]);
+    }
+    assert.ok(renderInMemory(locale, site.changelogEntries, {}, { page: 'help' }).html.includes(escapedText(step)));
+  }
+});
+
 test('current feature descriptions keep meeting, power and application-repair conditions explicit', () => {
   const content = site.getSiteContent('en');
   assert.match(content.showcase.modules.dashboard.caption, /AI work is grouped by application on Home/);

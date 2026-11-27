@@ -201,9 +201,11 @@ enum SettingsSearchIndex {
         }
         entry(.ai, "各供应商额度", anchor: .group("各供应商额度"),
               keywords: ["监控额度", "展示额度", "Qoder 监控地区"] + AIAccountBalanceQoderRegion.allCases.map(\.title)
-                  + AIProvider.allCases.map(AIAccountBalanceCatalog.providerName))
+                  + AIProvider.allCases.map(AIAccountBalanceCatalog.providerName)
+                  + AIAccountBalanceAntigravityGroup.allCases.map(\.title) + AIAccountBalanceGeminiSource.allCases.map(\.title))
         let websites = AIAccountBalanceWebsite.selected(for: settings.aiAccountBalanceMonitoredProviders,
-                                                        qoderRegions: settings.aiAccountBalanceQoderRegions)
+                                                        qoderRegions: settings.aiAccountBalanceQoderRegions,
+                                                        geminiSources: settings.aiAccountBalanceMonitoredGeminiSources)
         if !websites.isEmpty {
             entry(.ai, "网站额度凭据", anchor: .group("网站额度凭据"),
                   keywords: ["粘贴网站 Cookie", "从默认浏览器导入"] + websites.map(\.title))

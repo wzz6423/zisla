@@ -1709,7 +1709,8 @@ struct SettingsView: View {
 
     private var aiAccountBalanceSettings: some View {
         let websites = AIAccountBalanceWebsite.selected(for: settingsStore.settings.aiAccountBalanceMonitoredProviders,
-                                                        qoderRegions: settingsStore.settings.aiAccountBalanceQoderRegions)
+                                                        qoderRegions: settingsStore.settings.aiAccountBalanceQoderRegions,
+                                                        geminiSources: settingsStore.settings.aiAccountBalanceMonitoredGeminiSources)
         return settingsGroup("AI 进度与用量") {
             featureToggle("低额度提醒", detail: "", symbol: "gauge.with.dots.needle.67percent", keyPath: \.aiAccountBalanceNoticeEnabled)
                 .disabled(!model.settingsStore.settings.aiProgressEnabled
@@ -1735,7 +1736,7 @@ struct SettingsView: View {
                 ForEach(AIProvider.allCases, id: \.self) { provider in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 14) {
-                            if provider == .coder {
+                            if provider == .coder || provider == .antigravity || provider == .gemini {
                                 Text(AIAccountBalanceCatalog.providerName(provider))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
@@ -1762,6 +1763,38 @@ struct SettingsView: View {
                                 }
                                 .toggleStyle(.checkbox)
                                 .disabled(!settingsStore.settings.aiAccountBalanceMonitoredProviders.contains(.coder))
+                                .padding(.leading, 16)
+                            }
+                        }
+                        if provider == .antigravity {
+                            ForEach(AIAccountBalanceAntigravityGroup.allCases, id: \.self) { group in
+                                HStack(spacing: 14) {
+                                    AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: .antigravity,
+                                                                   language: model.languageStore.language, antigravityGroup: group)
+                                    Toggle(AppLocalization.text("监控额度"), isOn: Self.antigravityGroupBinding(group, monitored: true,
+                                                                                                            settings: $settingsStore.settings))
+                                        .toggleStyle(.switch).fixedSize()
+                                    Toggle(AppLocalization.text("展示额度"), isOn: Self.antigravityGroupBinding(group, monitored: false,
+                                                                                                            settings: $settingsStore.settings))
+                                        .toggleStyle(.switch).fixedSize()
+                                }
+                                .disabled(!settingsStore.settings.aiAccountBalanceMonitoredProviders.contains(.antigravity))
+                                .padding(.leading, 16)
+                            }
+                        }
+                        if provider == .gemini {
+                            ForEach(AIAccountBalanceGeminiSource.allCases, id: \.self) { source in
+                                HStack(spacing: 14) {
+                                    AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: .gemini,
+                                                                   language: model.languageStore.language, geminiSource: source)
+                                    Toggle(AppLocalization.text("监控额度"), isOn: Self.geminiSourceBinding(source, monitored: true,
+                                                                                                        settings: $settingsStore.settings))
+                                        .toggleStyle(.switch).fixedSize()
+                                    Toggle(AppLocalization.text("展示额度"), isOn: Self.geminiSourceBinding(source, monitored: false,
+                                                                                                        settings: $settingsStore.settings))
+                                        .toggleStyle(.switch).fixedSize()
+                                }
+                                .disabled(!settingsStore.settings.aiAccountBalanceMonitoredProviders.contains(.gemini))
                                 .padding(.leading, 16)
                             }
                         }
@@ -3539,6 +3572,26 @@ struct SettingsView: View {
         Binding(get: { settings.wrappedValue.aiAccountBalanceQoderRegions.contains(region) }, set: { selected in
             if selected { settings.wrappedValue.aiAccountBalanceQoderRegions.insert(region) }
             else { settings.wrappedValue.aiAccountBalanceQoderRegions.remove(region) }
+        })
+    }
+
+    static func antigravityGroupBinding(_ group: AIAccountBalanceAntigravityGroup, monitored: Bool,
+                                        settings: Binding<FeatureSettings>) -> Binding<Bool> {
+        let path: WritableKeyPath<FeatureSettings, Set<AIAccountBalanceAntigravityGroup>> = monitored
+            ? \.aiAccountBalanceMonitoredAntigravityGroups : \.aiAccountBalanceDisplayedAntigravityGroups
+        return Binding(get: { settings.wrappedValue[keyPath: path].contains(group) }, set: { selected in
+            if selected { settings.wrappedValue[keyPath: path].insert(group) }
+            else { settings.wrappedValue[keyPath: path].remove(group) }
+        })
+    }
+
+    static func geminiSourceBinding(_ source: AIAccountBalanceGeminiSource, monitored: Bool,
+                                    settings: Binding<FeatureSettings>) -> Binding<Bool> {
+        let path: WritableKeyPath<FeatureSettings, Set<AIAccountBalanceGeminiSource>> = monitored
+            ? \.aiAccountBalanceMonitoredGeminiSources : \.aiAccountBalanceDisplayedGeminiSources
+        return Binding(get: { settings.wrappedValue[keyPath: path].contains(source) }, set: { selected in
+            if selected { settings.wrappedValue[keyPath: path].insert(source) }
+            else { settings.wrappedValue[keyPath: path].remove(source) }
         })
     }
 

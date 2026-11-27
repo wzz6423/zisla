@@ -25,6 +25,7 @@
 - 下載、天氣和 GitHub 請求使用 actor。
 - hook 寫入的 AI 狀態使用目錄檔案系統事件監聽；各 AI 會話源定期比較最近本地會話或活動檔案的 mtime/size，未變化時復用解析緩存。
 - 自動檢測只讀取判斷任務狀態所需的結構化事件、固定狀態 marker 或活動元資料，不讀取 prompt/answer 正文；任一 Provider 解析失敗不會阻斷其他 Provider。
+- AI 帳號額度來自供應商獨立取樣。Antigravity 的 Gemini 與 Claude/GPT 額度保留各自的重設視窗和低額度提醒。Gemini App 一般對話額度使用同一 Google 帳號儲存的網站 Cookie 查詢；Gemini CLI 保留本機 OAuth 來源。缺失額度不得估算。
 - 折疊延遲使用可取消 `Task` 和 generation token，舊任務不能隱藏重新展開的島。
 - 隱藏態沒有 `TimelineView`、60 Hz Timer 或持續動畫提交。
 

@@ -311,7 +311,7 @@ struct AIAccountBalanceServiceTests {
         #expect(BalanceURLProtocol.requests.count == 1)
     }
 
-    @Test func antigravityAndGeminiDesktopFallbackRespectAccountIsolation() async throws {
+    @Test func antigravityAndGeminiSourcesRespectAccountIsolation() async throws {
         BalanceURLProtocol.configure([:])
         let snapshot = AIAccountAntigravitySnapshot(
             windows: [
@@ -327,15 +327,18 @@ struct AIAccountBalanceServiceTests {
         )
         let service = makeService(credentials: { _, _, _ in nil }, antigravity: { snapshot })
         let rows = try await service.accountBalances(for: [.antigravity, .gemini])
-        let ag = try #require(rows.first { $0.providers == [.antigravity] })
+        let ag = rows.filter { $0.providers == [.antigravity] }
         let gem = try #require(rows.first { $0.providers == [.gemini] })
-        #expect(ag.status == .available && ag.windows.count == 5)
-        #expect(gem.status == .available && gem.windows.count == 3)
-        #expect(gem.fiveHourWindow?.id == "five_hour" && gem.fiveHourWindow?.remainingPercent == 80 && gem.fiveHourWindow?.name == nil)
-        #expect(gem.weeklyWindow?.id == "weekly" && gem.weeklyWindow?.remainingPercent == 45 && gem.weeklyWindow?.name == nil)
-        #expect(gem.windows.last?.name == "Gemini 4 Argon")
-        #expect(gem.compactLines(language: .english).first == "5h 80%")
-        #expect(gem.compactLines(language: .english).last?.hasPrefix("7d 45%") == true)
+        #expect(ag.count == 2 && ag.allSatisfy { $0.status == .available })
+        #expect(ag.map(\.quotaGroup) == ["gemini", "claudeGPT"])
+        #expect(ag.map { $0.windows.count } == [3, 2])
+        #expect(ag[0].fiveHourWindow?.remainingPercent == 80 && ag[1].fiveHourWindow?.remainingPercent == 50)
+        #expect(Set(ag.map(\.id)).count == 2 && Set(ag.map(\.noticeID)).count == 2)
+        #expect(gem.status == .notSignedIn && gem.windows.isEmpty)
+        #expect(gem.quotaGroup == "cli")
+        let app = try #require(rows.first { $0.providers == [.gemini] && $0.quotaGroup == "app" })
+        #expect(app.status == .additionalCredentialsRequired && app.windows.isEmpty)
+        #expect(app.id != gem.id && app.noticeID != gem.noticeID)
 
         // Expired Gemini CLI credentials must fail without falling back to the local Antigravity daemon.
         let expiredCLI = makeService(credentials: { _, _, _ in throw AIAccountBalanceError.credentialsExpired }, antigravity: {
@@ -354,7 +357,7 @@ struct AIAccountBalanceServiceTests {
         )
         let missingGemini = try #require(try await makeService(credentials: { _, _, _ in nil }, antigravity: { nonGeminiOnly })
             .accountBalances(for: [.gemini]).first)
-        #expect(missingGemini.status == .unavailable && missingGemini.windows.isEmpty)
+        #expect(missingGemini.status == .notSignedIn && missingGemini.windows.isEmpty)
     }
 
     @Test func qoderSharedCreditsZcodeStartPlanZedSubscriptionAndGeminiObjectProjectAreFetched() async throws {
@@ -397,6 +400,120 @@ struct AIAccountBalanceServiceTests {
         #expect(retrieveBody.contains("proj-obj-9"))
         let zcodeReq = try #require(BalanceURLProtocol.requests.first { $0.url?.host == "zcode.z.ai" })
         #expect(zcodeReq.value(forHTTPHeaderField: "X-Device-Mid") == "mid-1")
+    }
+
+    @Test func geminiAppAndCLIUseIndependentSourcesAndOnlyQuotaRequestCarriesCookies() async throws {
+        BalanceURLProtocol.configure(geminiAppResponses().merging([
+            "/v1internal:loadCodeAssist": [.json(#"{"cloudaicompanionProject":"cli-project"}"#)],
+            "/v1internal:retrieveUserQuota": [.json(#"{"buckets":[{"modelId":"gemini-pro","remainingFraction":0.7}]}"#)],
+        ], uniquingKeysWith: { _, value in value }))
+        let service = makeService(antigravity: {
+            Issue.record("Gemini App and CLI must not query Antigravity")
+            return nil
+        }, geminiAppCookie: { "SID=app-fixture; unrelated=private" })
+        let rows = try await service.accountBalances(for: [.gemini])
+        #expect(rows.map(\.quotaGroup) == ["cli", "app"])
+        #expect(rows.allSatisfy { $0.status == .available } && Set(rows.map(\.noticeID)).count == 2)
+        #expect(rows[0].windows.first?.remainingPercent == 70)
+        #expect(rows[1].fiveHourWindow?.remainingPercent == 80 && abs((rows[1].weeklyWindow?.remainingPercent ?? 0) - 30) < 0.0001)
+        #expect(rows[1].providerTitle(language: .english) == "Gemini App")
+        let requests = BalanceURLProtocol.requests
+        let quota = try #require(requests.first { $0.url?.path.hasSuffix("executeQuery") == true })
+        #expect(quota.url?.host == "gemini.google.com" && quota.httpMethod == "GET")
+        #expect(quota.value(forHTTPHeaderField: "Cookie") == "SID=app-fixture")
+        #expect(quota.value(forHTTPHeaderField: "Authorization") == nil)
+        let parameters = URLComponents(url: quota.url!, resolvingAgainstBaseURL: false)?.queryItems
+        #expect(parameters?.first { $0.name == "query_signature" }?.value == "2/current+sig=")
+        #expect(URLComponents(url: quota.url!, resolvingAgainstBaseURL: false)?.percentEncodedQuery?
+            .contains("current%2Bsig") == true, "Form query decoding must preserve the signature's literal plus")
+        #expect(parameters?.first { $0.name == "variables" }?.value == "{}")
+        for request in requests where request.url?.path == "/usage" || request.url?.host == "www.gstatic.com" {
+            #expect(request.value(forHTTPHeaderField: "Cookie") == nil && request.value(forHTTPHeaderField: "Authorization") == nil)
+        }
+        #expect(requests.filter { $0.value(forHTTPHeaderField: "Cookie") != nil }.count == 1)
+    }
+
+    @Test func unselectedGeminiSourcesNeverReadTheirCredentialsOrMakeTheirRequests() async throws {
+        for sources: Set<AIAccountBalanceGeminiSource> in [[], [.cli], [.app]] {
+            BalanceURLProtocol.configure(geminiAppResponses())
+            let service = makeService(credentials: { _, _, _ in
+                #expect(sources.contains(.cli), "App-only monitoring must not read CLI credentials")
+                return nil
+            }, antigravity: {
+                Issue.record("No Gemini source can borrow Antigravity credentials")
+                return nil
+            }, geminiAppCookie: {
+                #expect(sources.contains(.app), "CLI-only monitoring must not read website cookies")
+                return "SID=app-fixture"
+            })
+            let rows = try await service.accountBalances(for: [.gemini], qoderRegions: [.global], geminiSources: sources)
+            #expect(Set(rows.compactMap { $0.quotaGroup.flatMap(AIAccountBalanceGeminiSource.init(rawValue:)) }) == sources)
+            #expect(rows.first { $0.quotaGroup == "cli" }?.status == (sources.contains(.cli) ? .notSignedIn : nil))
+            #expect(BalanceURLProtocol.requests.count == (sources.contains(.app) ? 3 : 0))
+        }
+    }
+
+    @Test(arguments: [(403, AIAccountBalanceStatus.credentialsExpired), (429, .rateLimited), (503, .unavailable)])
+    func geminiAppFailuresDoNotReplaceCLIAllowanceOrExposeCookies(scenario: (Int, AIAccountBalanceStatus)) async throws {
+        var responses = geminiAppResponses()
+        responses["/_/BardChatUi/graphql/schemas/GEMINI_WEB_GRAPHQL/executeQuery"] = [.init(status: scenario.0, data: Data("private-body".utf8))]
+        responses["/v1internal:loadCodeAssist"] = [.json(#"{"cloudaicompanionProject":"project"}"#)]
+        responses["/v1internal:retrieveUserQuota"] = [.json(#"{"buckets":[{"modelId":"gemini-pro","remainingFraction":0.8}]}"#)]
+        BalanceURLProtocol.configure(responses)
+        let rows = try await makeService(geminiAppCookie: { "SID=private-cookie" }).accountBalances(for: [.gemini])
+        #expect(rows[0].status == .available && rows[0].windows.first?.remainingPercent == 80)
+        #expect(rows[1].status == scenario.1 && rows[1].windows.isEmpty)
+        #expect(!String(describing: rows).contains("private-cookie") && !String(describing: rows).contains("private-body"))
+    }
+
+    @Test func missingInvalidAndFailedWebsiteMetadataNeverFallBackToCLILogin() async throws {
+        let path = "/bg3/boq-bard-web/islands/assets/UsagePageSurface-current.js"
+        for (failurePath, failure) in [
+            ("/usage", BalanceURLProtocol.Response.json("{}")),
+            (path, .json("id:`2/old=`,metadata:{},name:`OtherQuery`")),
+            (path, .init(url: "https://evil.test/script.js")),
+            (path, .init(error: .timedOut)),
+            ("/_/BardChatUi/graphql/schemas/GEMINI_WEB_GRAPHQL/executeQuery", .json(#"{"data":{"viewer":{"rpcs":{"getUsageInfo":{"pools":[]}}}}}"#)),
+        ] {
+            var responses = geminiAppResponses()
+            responses[failurePath] = [failure]
+            BalanceURLProtocol.configure(responses)
+            let service = makeService(credentials: { _, _, _ in
+                Issue.record("Website failure must not read CLI login")
+                return nil
+            }, geminiAppCookie: { "SID=app-fixture" })
+            let row = try #require(try await service.accountBalances(for: [.gemini], qoderRegions: [.global], geminiSources: [.app]).first)
+            #expect(row.status == (failure.error != nil || failurePath.hasSuffix("executeQuery") ? .unavailable : .invalidResponse))
+            #expect(row.windows.isEmpty && row.quotaGroup == "app")
+        }
+        BalanceURLProtocol.configure([:])
+        for cookie in [nil, "not-a-cookie"] {
+            let row = try #require(try await makeService(geminiAppCookie: { cookie })
+                .accountBalances(for: [.gemini], qoderRegions: [.global], geminiSources: [.app]).first)
+            #expect(row.status == (cookie == nil ? .additionalCredentialsRequired : .credentialsUnavailable))
+            #expect(BalanceURLProtocol.requests.isEmpty)
+        }
+    }
+
+    @Test func geminiAppCancellationStopsMetadataBeforeSendingCookies() async throws {
+        let requested = AsyncStream<Int>.makeStream()
+        BalanceURLProtocol.configure(geminiAppResponses(), held: true, event: { requested.continuation.yield($0) })
+        let service = makeService(geminiAppCookie: { "SID=app-fixture" })
+        let task = Task { try await service.accountBalances(for: [.gemini], qoderRegions: [.global], geminiSources: [.app]) }
+        var iterator = requested.stream.makeAsyncIterator()
+        _ = await iterator.next()
+        task.cancel()
+        BalanceURLProtocol.release()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(BalanceURLProtocol.requests.count == 1)
+        #expect(BalanceURLProtocol.requests[0].value(forHTTPHeaderField: "Cookie") == nil)
+        requested.continuation.finish()
+    }
+
+    private func geminiAppResponses() -> [String: [BalanceURLProtocol.Response]] {
+        ["/usage": [.json(#"{"@messages/assets/UsagePageSurface-current.js":"https://www.gstatic.com/bg3/boq-bard-web/islands/assets/en/UsagePageSurface-messages-any.js"}"#)],
+         "/bg3/boq-bard-web/islands/assets/UsagePageSurface-current.js": [.json("params:{id:`2/current+sig=`,metadata:{},name:`UsagePageQuery`}")],
+         "/_/BardChatUi/graphql/schemas/GEMINI_WEB_GRAPHQL/executeQuery": [.json(#"{"data":{"viewer":{"rpcs":{"getUsageInfo":{"pools":[{"poolType":"GXU_FIVE_HOURLY","percentageUsed":0.2,"gxu":{"windowRefreshesAt":"2030-07-12T01:02:03Z"}},{"poolType":"GXU_WEEKLY","percentageUsed":0.7,"gxu":{"windowRefreshesAt":"2030-07-15T01:02:03Z"}}]}}}}}"#)]]
     }
 
     @Test func grokHeadersAndStatusAndOpenCodeEntitlementAreClassifiedAccurately() async throws {
@@ -470,11 +587,12 @@ struct AIAccountBalanceServiceTests {
     }, debug: @escaping @Sendable () -> [AIAccountBalance]? = { nil },
     muse: @escaping @Sendable () async throws -> Data? = { nil },
     antigravity: @escaping @Sendable () async throws -> AIAccountAntigravitySnapshot? = { nil },
-    openAIProvider: @escaping @Sendable () -> AIProvider? = { nil }) -> AIAccountBalanceService {
+    openAIProvider: @escaping @Sendable () -> AIProvider? = { nil },
+    geminiAppCookie: @escaping @Sendable () throws -> String? = { nil }) -> AIAccountBalanceService {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BalanceURLProtocol.self]
         return .init(credentials: credentials, configuration: configuration, now: { now }, museUsage: muse,
-                     antigravityProbe: antigravity, debugBalances: debug, preferredOpenAIProvider: openAIProvider)
+                     antigravityProbe: antigravity, geminiAppCookie: geminiAppCookie, debugBalances: debug, preferredOpenAIProvider: openAIProvider)
     }
 }
 

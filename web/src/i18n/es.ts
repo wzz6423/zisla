@@ -96,7 +96,7 @@ export const es = createCatalog({
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Reúne tareas y estados de CLI de IA, apps de escritorio e IDE. Los datos numéricos fiables alimentan las tendencias de tokens y el mapa de contribuciones; elige una fecha para ver tokens de entrada, salida y totales por proveedor y modelo. Consulta el historial en Ajustes, expórtalo completo como .xlsx o bórralo. Muestra cuotas reales, fechas de reinicio y avisos de cuota baja, incluidas las ventanas 5h/7d y los presupuestos de Cursor en dólares cuando están disponibles. No lee el texto de prompts ni respuestas. Los diseños compactos también muestran la cuota restante en anillos. Elige las regiones de cada cuenta por separado; los registros diarios y los colores de la cuota restante coinciden en todos los diseños.',
+          'Reúne tareas y estados de CLI de IA, apps de escritorio e IDE. Los datos numéricos fiables alimentan las tendencias de tokens y el mapa de contribuciones; elige una fecha para ver tokens de entrada, salida y totales por proveedor y modelo. Consulta el historial en Ajustes, expórtalo completo como .xlsx o bórralo. Muestra cuotas reales, fechas de reinicio y avisos de cuota baja, incluidas las ventanas 5h/7d y los presupuestos de Cursor en dólares cuando están disponibles. No lee el texto de prompts ni respuestas. Los diseños compactos también muestran la cuota restante en anillos. Elige las regiones de cada cuenta por separado; los registros diarios y los colores de la cuota restante coinciden en todos los diseños. Las cuotas Gemini y Claude/GPT de Antigravity tienen supervisión, visualización y avisos independientes. Las cuotas de conversación de Gemini App usan un Cookie web de la misma cuenta de Google; Gemini CLI se supervisa por separado.',
         points: ['Tareas de varias herramientas de IA', 'Historial por modelo y exportación .xlsx', 'Cuotas y fechas de reinicio'],
       },
       keyboardSound: {
@@ -386,7 +386,7 @@ export const es = createCatalog({
         "entry": "Ajustes → IA; isla → Monitor IA.",
         "steps": [
           "Activa una herramienta local compatible o informa una tarea con zislactl según la referencia CLI.",
-          "Activa el seguimiento de cuota del proveedor deseado y aporta credenciales solo si se solicitan.",
+          "Activa la supervisión del proveedor y elige por separado la supervisión y visualización de Gemini y Claude/GPT en Antigravity. Para Gemini App, inicia sesión con la misma cuenta de Google en gemini.google.com/usage y guarda su Cookie en las credenciales de cuota web; selecciona Gemini CLI por separado.",
           "Consulta muestreo, reinicio y avisos de cuota; revisa el historial o exporta .xlsx."
         ],
         "shortcuts": "Usa el monitor o Ajustes, sin atajo global fijo. zislactl acepta los argumentos documentados.",

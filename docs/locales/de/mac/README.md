@@ -48,7 +48,7 @@ macOS 14 und neuer werden unterstützt. macOS 26 nutzt Liquid Glass; macOS 14/15
 - **Kontextnotizen und Besprechungen:** Halten Sie den Notizkurzbefehl und schütteln Sie den Zeiger, um eine Notiz mit Webseite, Fenster oder Desktop zu verknüpfen. Kalendereinträge mit Besprechungslinks zeigen 10 Minuten vor Beginn einen Countdown; beitreten, eine Notiz erstellen oder eine vorhandene verknüpfen. Kontextnotizen werden in der Ablage verwaltet.
 - **Schütteln zum Ablegen:** Schütteln Sie den Zeiger beim Ziehen von Dateien, um das Ablageziel zu zeigen; die Geste lässt sich unabhängig einstellen.
 - **Audioausgabe und Player-Präferenzen:** Wählen Sie ein Ausgabegerät im Medienbereich. Die Einstellungen wählen automatische Quelle oder bevorzugten Player, kompakte Medienansicht und Stoppbedingungen für Umgebungsgeräusche.
-- **KI-Kontingente und Rücksetzungen:** KI-Überwachung und Einstellungen zeigen unterstützte Kontingente, Stichproben- und Rücksetzungszeiten sowie Niedrigkontingenthinweise, einschließlich verfügbarer 5h/7d-Fenster und Cursor-USD-Budgets. Diese Daten sind vom lokalen Token-Verlauf getrennt.
+- **KI-Kontingente und Rücksetzungen:** KI-Überwachung und Einstellungen zeigen unterstützte Kontingente, Stichproben- und Rücksetzungszeiten sowie Niedrigkontingenthinweise, einschließlich verfügbarer 5h/7d-Fenster und Cursor-USD-Budgets. Diese Daten sind vom lokalen Token-Verlauf getrennt. Die Gemini- und Claude/GPT-Kontingente von Antigravity werden unabhängig überwacht, angezeigt und gemeldet. Gemini App nutzt für Chat-Kontingente ein Web-Cookie desselben Google-Kontos; Gemini CLI bleibt getrennt.
 
 ### Tastenreihenfolge der Schnellaktionen
 

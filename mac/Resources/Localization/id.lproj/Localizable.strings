@@ -3798,3 +3798,7 @@
 "计时结束" = "Waktu selesai";
 "计时器名称" = "Nama pengatur waktu";
 "添加计时器" = "Tambah pengatur waktu";
+"Claude 与 GPT 模型" = "Model Claude dan GPT";
+"Gemini App 使用同一账号的网页版额度，请添加网站额度凭据" = "Gemini App berbagi kuota web akun yang sama. Tambahkan kredensial kuota web.";
+"请在默认浏览器登录 Gemini App 使用的同一 Google 账号" = "Masuk di peramban bawaan dengan akun Google yang sama dengan Gemini App.";
+"Gemini App 网站额度" = "Kuota web Gemini App";

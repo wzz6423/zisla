@@ -48,7 +48,7 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 - **Context notes and meetings:** Hold the configured note shortcut and shake the pointer to attach a note to a webpage, window, or desktop. Calendar events with meeting links show a countdown 10 minutes before starting; join, create a note, or link an existing note. Manage context notes on the shelf.
 - **Shake to drop:** Shake the pointer while dragging files to reveal the drop target; switch this gesture independently in Settings.
 - **Audio output and player preferences:** Choose an output device in the media area. Settings select an automatic source or preferred player, compact media layout, and ambient-sound stop conditions.
-- **AI allowances and resets:** AI monitoring and Settings show supported account allowances, sampling times, reset times, and low-quota notices, including available 5h/7d windows and Cursor USD budgets. These are separate from locally recorded token history.
+- **AI allowances and resets:** AI monitoring and Settings show supported account allowances, sampling times, reset times, and low-quota notices, including available 5h/7d windows and Cursor USD budgets. These are separate from locally recorded token history. Antigravity’s Gemini and Claude/GPT pools have independent monitoring, display and alerts. Gemini App chat allowances use a web Cookie for the same Google account; Gemini CLI remains separate.
 
 ### Quick Actions keyboard order
 

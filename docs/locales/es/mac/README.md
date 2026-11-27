@@ -48,7 +48,7 @@ Se admite macOS 14 y posteriores. macOS 26 usa Liquid Glass; macOS 14/15 recurre
 - **Notas contextuales y reuniones:** Mantén el atajo de nota y agita el puntero para adjuntar una nota a página, ventana o escritorio. Los eventos con enlaces muestran cuenta atrás 10 minutos antes; entra, crea una nota o vincula una existente. Gestiona las notas en la estantería.
 - **Agitar para soltar:** Agita el puntero al arrastrar archivos para revelar el destino; activa el gesto de forma independiente.
 - **Salida de audio y preferencias:** Elige dispositivo en el área multimedia. Ajustes selecciona fuente automática o reproductor preferido, diseño compacto y condiciones de parada del sonido ambiental.
-- **Cuotas y reinicios de IA:** Supervisión y Ajustes muestran cuotas, horas de muestreo y reinicio y avisos de cuota baja, incluidas ventanas 5h/7d y presupuestos Cursor USD disponibles. Son distintos del historial local de tokens.
+- **Cuotas y reinicios de IA:** Supervisión y Ajustes muestran cuotas, horas de muestreo y reinicio y avisos de cuota baja, incluidas ventanas 5h/7d y presupuestos Cursor USD disponibles. Son distintos del historial local de tokens. Las cuotas Gemini y Claude/GPT de Antigravity tienen supervisión, visualización y avisos independientes. Las cuotas de conversación de Gemini App usan un Cookie web de la misma cuenta de Google; Gemini CLI se supervisa por separado.
 
 ### Orden de teclado de acciones rápidas
 

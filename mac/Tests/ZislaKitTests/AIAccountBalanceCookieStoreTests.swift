@@ -4,6 +4,22 @@ import Testing
 @testable import ZislaKit
 
 struct AIAccountBalanceCookieStoreTests {
+    @Test func geminiAppWebsiteFollowsItsSourceSelectionAndFiltersUnrelatedGoogleCookies() throws {
+        #expect(AIAccountBalanceWebsite.selected(for: [.gemini], qoderRegions: [], geminiSources: [.cli]).isEmpty)
+        #expect(AIAccountBalanceWebsite.selected(for: [.gemini], qoderRegions: [], geminiSources: [.app]) == [.geminiApp])
+        #expect(AIAccountBalanceWebsite.selected(for: [], qoderRegions: [], geminiSources: [.app]).isEmpty)
+        let secrets = BalanceMemorySecrets()
+        let store = AIAccountBalanceCookieStore(secrets: secrets)
+        try store.setCookie("SID=session; SAPISID=api; __Secure-1PSID=secure; unrelated=private", for: .geminiApp)
+        #expect(try store.cookie(for: .geminiApp) == "SID=session; SAPISID=api; __Secure-1PSID=secure")
+        let before = secrets.values
+        for invalid in ["SAPISID=api", "other=private", "SID=valid; bad key=private", "SID=valid\r\nHost: evil.test"] {
+            #expect(throws: AIAccountBalanceError.invalidCredentials) { try store.setCookie(invalid, for: .geminiApp) }
+        }
+        #expect(secrets.values == before)
+        #expect(AIAccountBalanceWebsite.geminiApp.dashboard.absoluteString == "https://gemini.google.com/usage")
+    }
+
     @Test(arguments: [Set<AIAccountBalanceQoderRegion>(), [.global], [.china], [.global, .china]])
     func selectedWebsitesFollowEachProviderAndOnlyQoderUsesRegionSelection(regions: Set<AIAccountBalanceQoderRegion>) {
         #expect(AIAccountBalanceWebsite.selected(for: [], qoderRegions: regions).isEmpty)
@@ -57,8 +73,9 @@ struct AIAccountBalanceCookieStoreTests {
         let secrets = BalanceMemorySecrets()
         let store = AIAccountBalanceCookieStore(secrets: secrets)
         for website in AIAccountBalanceWebsite.allCases {
-            try store.setCookie("Cookie: zed.session=fixture; ; c15t=consent; ", for: website)
-            #expect(try store.cookie(for: website) == "zed.session=fixture; c15t=consent")
+            let cookie = website == .geminiApp ? "Cookie: SID=fixture; ; c15t=consent; " : "Cookie: zed.session=fixture; ; c15t=consent; "
+            try store.setCookie(cookie, for: website)
+            #expect(try store.cookie(for: website) == (website == .geminiApp ? "SID=fixture" : "zed.session=fixture; c15t=consent"))
         }
         let before = secrets.values
         for value in ["; ; ", "session=fixture; broken;", "session=fixture; bad key=secret;", "session=fixture; empty=;"] {

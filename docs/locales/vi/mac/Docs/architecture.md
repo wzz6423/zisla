@@ -25,6 +25,7 @@ Bảng thông báo trái/phải tạo khi cần và ẩn ngay khi hết hàng.
 - Tải, thời tiết và yêu cầu GitHub dùng actor.
 - AI hook được theo dõi qua sự kiện hệ thống tệp thư mục. Mỗi nguồn phiên so thời gian sửa/kích thước tệp phiên hoặc hoạt động mới nhất, dùng lại bộ đệm phân tích nếu không đổi.
 - Phát hiện chỉ đọc sự kiện có cấu trúc, dấu trạng thái cố định, siêu dữ liệu cần. Không đọc lời nhắc/đáp án; lỗi parser một nhà cung cấp không chặn khác.
+- Hạn mức tài khoản AI được lấy riêng từ từng nhà cung cấp. Gemini và Claude/GPT của Antigravity có cửa sổ đặt lại và cảnh báo riêng. Hạn mức trò chuyện thông thường của Gemini App dùng Cookie web đã lưu của cùng tài khoản Google; Gemini CLI giữ nguồn OAuth cục bộ. Không ước tính hạn mức khi thiếu dữ liệu.
 - Trễ thu gọn dùng `Task` hủy được và token thế hệ, không cho tác vụ cũ ẩn đảo đã mở lại.
 - Ẩn không `TimelineView`, timer 60 Hz hoặc gửi hoạt ảnh liên tục.
 

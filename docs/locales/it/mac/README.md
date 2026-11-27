@@ -48,7 +48,7 @@ Sono supportati macOS 14 e successivi. macOS 26 usa Liquid Glass; macOS 14/15 us
 - **Note contestuali e riunioni:** tieni il tasto configurato e agita il puntatore per annotare pagina, finestra o desktop. Gli eventi con link riunione mostrano 10 minuti di conto alla rovescia: partecipa, crea o collega una nota. Gestisci le note sullo scaffale.
 - **Agita per rilasciare:** durante il trascinamento mostra una destinazione; l'interruttore nelle impostazioni è indipendente.
 - **Uscita e lettore:** scegli dispositivo nell'area media. Impostazioni: sorgente automatica o lettore preferito, layout compatto e condizioni di arresto dei suoni ambientali.
-- **Quote AI e ripristini:** mostra quote supportate, tempi di campionamento e ripristino e avvisi bassi, con finestre 5h/7d e budget Cursor USD disponibili. Sono separati dalla cronologia locale dei token.
+- **Quote AI e ripristini:** mostra quote supportate, tempi di campionamento e ripristino e avvisi bassi, con finestre 5h/7d e budget Cursor USD disponibili. Sono separati dalla cronologia locale dei token. Le quote Gemini e Claude/GPT di Antigravity hanno monitoraggio, visualizzazione e avvisi indipendenti. Le quote di chat di Gemini App usano un Cookie web dello stesso account Google; Gemini CLI resta separato.
 
 ### Ordine dei tasti delle azioni rapide
 
