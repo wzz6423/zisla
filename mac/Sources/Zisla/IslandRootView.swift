@@ -236,6 +236,10 @@ struct IslandRootView: View {
                                                         AIProgressModuleView(monitor: model.aiMonitor,
                                                                              displayedBalanceProviders: model.settingsStore.settings.aiAccountBalanceDisplayedProviders,
                                                                              monitoredBalanceProviders: model.settingsStore.settings.aiAccountBalanceMonitoredProviders,
+                                                                             monitoredAntigravityGroups: model.settingsStore.settings.aiAccountBalanceMonitoredAntigravityGroups,
+                                                                             displayedAntigravityGroups: model.settingsStore.settings.aiAccountBalanceDisplayedAntigravityGroups,
+                                                                             monitoredGeminiSources: model.settingsStore.settings.aiAccountBalanceMonitoredGeminiSources,
+                                                                             displayedGeminiSources: model.settingsStore.settings.aiAccountBalanceDisplayedGeminiSources,
                                                                              language: model.languageStore.language)
                                                     case .download:
                                                         DownloadModuleView(model: model)

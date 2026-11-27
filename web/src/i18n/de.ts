@@ -94,7 +94,7 @@ export const de: SiteContent = {
       aiMonitor: {
         name: 'KI-Überblick',
         caption:
-          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen. Auch die kompakten Ansichten zeigen verbleibende Kontingente als Ringe. Wählen Sie Kontoregionen unabhängig voneinander; tägliche Nutzungswerte und Farben des verbleibenden Kontingents stimmen in allen Ansichten überein.',
+          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen. Auch die kompakten Ansichten zeigen verbleibende Kontingente als Ringe. Wählen Sie Kontoregionen unabhängig voneinander; tägliche Nutzungswerte und Farben des verbleibenden Kontingents stimmen in allen Ansichten überein. Die Gemini- und Claude/GPT-Kontingente von Antigravity werden unabhängig überwacht, angezeigt und gemeldet. Gemini App nutzt für Chat-Kontingente ein Web-Cookie desselben Google-Kontos; Gemini CLI bleibt getrennt.',
         points: ['Aufgaben aus mehreren KI-Werkzeugen', 'Modellverlauf und .xlsx-Export', 'Kontingente und Rücksetzzeiten'],
       },
       keyboardSound: {
@@ -403,7 +403,7 @@ export const de: SiteContent = {
         "entry": "Einstellungen → KI; Insel → KI-Monitor.",
         "steps": [
           "Aktiviere ein unterstütztes lokales Werkzeug oder melde eine Aufgabe über zislactl gemäß CLI-Referenz.",
-          "Aktiviere Kontingentüberwachung für den Anbieter und trage Zugangsdaten nur bei Aufforderung ein.",
+          "Aktiviere die Kontingentüberwachung des gewünschten Anbieters und wähle Überwachung und Anzeige für Antigravity Gemini und Claude/GPT getrennt. Melde dich für Gemini App mit demselben Google-Konto bei gemini.google.com/usage an und speichere dessen Cookie unter Web-Kontingentzugangsdaten; wähle Gemini CLI separat.",
           "Prüfe Abfrage-/Rücksetzzeit und Warnungen; öffne den Verlauf oder exportiere .xlsx."
         ],
         "shortcuts": "KI-Monitor oder Einstellungen verwenden; kein festes globales Kürzel nötig. zislactl nutzt dokumentierte Argumente.",

@@ -95,7 +95,7 @@ export const fr: SiteContent = {
       aiMonitor: {
         name: 'Suivi IA',
         caption:
-          'Rassemble les tâches et l’état des CLI IA, apps de bureau et IDE. Les données chiffrées fiables alimentent les tendances de tokens et la carte des contributions ; choisissez une date pour voir les tokens d’entrée, de sortie et totaux par fournisseur et modèle. Consultez l’historique dans les réglages, exportez-le entièrement en .xlsx ou effacez-le. Affiche les quotas réels, leur réinitialisation et les alertes de quota faible, dont les fenêtres 5h/7d et les budgets Cursor en dollars lorsqu’ils sont disponibles. Ne lit pas le texte des invites ni des réponses. Les présentations compactes affichent aussi les quotas restants sous forme d’anneaux. Choisissez les régions des comptes indépendamment ; les relevés quotidiens et les couleurs du quota restant concordent dans toutes les présentations.',
+          'Rassemble les tâches et l’état des CLI IA, apps de bureau et IDE. Les données chiffrées fiables alimentent les tendances de tokens et la carte des contributions ; choisissez une date pour voir les tokens d’entrée, de sortie et totaux par fournisseur et modèle. Consultez l’historique dans les réglages, exportez-le entièrement en .xlsx ou effacez-le. Affiche les quotas réels, leur réinitialisation et les alertes de quota faible, dont les fenêtres 5h/7d et les budgets Cursor en dollars lorsqu’ils sont disponibles. Ne lit pas le texte des invites ni des réponses. Les présentations compactes affichent aussi les quotas restants sous forme d’anneaux. Choisissez les régions des comptes indépendamment ; les relevés quotidiens et les couleurs du quota restant concordent dans toutes les présentations. Les quotas Gemini et Claude/GPT d’Antigravity ont un suivi, un affichage et des alertes indépendants. Les quotas de conversation de Gemini App utilisent un Cookie web du même compte Google ; Gemini CLI reste distinct.',
         points: ['Tâches de plusieurs outils IA', 'Historique par modèle et export .xlsx', 'Quotas et dates de réinitialisation'],
       },
       keyboardSound: {
@@ -408,7 +408,7 @@ export const fr: SiteContent = {
         "entry": "Réglages → IA ; îlot → Moniteur IA.",
         "steps": [
           "Activez un outil local compatible ou déclarez une tâche avec zislactl selon la référence CLI.",
-          "Activez le suivi du quota du fournisseur voulu et fournissez des identifiants seulement si demandés.",
+          "Activez le suivi du fournisseur souhaité et choisissez séparément le suivi et l’affichage de Gemini et Claude/GPT dans Antigravity. Pour Gemini App, connectez le même compte Google sur gemini.google.com/usage et enregistrez son Cookie dans les identifiants de quota web ; sélectionnez Gemini CLI séparément.",
           "Consultez prélèvement, réinitialisation et alerte de quota ; affichez l’historique ou exportez en .xlsx."
         ],
         "shortcuts": "Utilisez le moniteur ou Réglages, sans raccourci global fixe. zislactl prend les arguments documentés.",

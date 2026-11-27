@@ -13,10 +13,18 @@ struct AIAccountBalanceSection: View {
     let displayedProviders: Set<AIProvider>
     let monitoredProviders: Set<AIProvider>
     let language: AppLanguage
+    var monitoredAntigravityGroups = Set(AIAccountBalanceAntigravityGroup.allCases)
+    var displayedAntigravityGroups = Set(AIAccountBalanceAntigravityGroup.allCases)
+    var monitoredGeminiSources = Set(AIAccountBalanceGeminiSource.allCases)
+    var displayedGeminiSources = Set(AIAccountBalanceGeminiSource.allCases)
 
     var displayedBalances: [AIAccountBalance] {
         AIAccountBalanceCatalog.displayedBalances(balances, monitoredProviders: monitoredProviders,
-                                                  displayedProviders: displayedProviders)
+                                                  displayedProviders: displayedProviders,
+                                                  monitoredAntigravityGroups: monitoredAntigravityGroups,
+                                                  displayedAntigravityGroups: displayedAntigravityGroups,
+                                                  monitoredGeminiSources: monitoredGeminiSources,
+                                                  displayedGeminiSources: displayedGeminiSources)
     }
 
     var body: some View {
@@ -235,16 +243,23 @@ struct AIAccountBalanceProviderStatus: View {
     let provider: AIProvider
     let language: AppLanguage
     var qoderRegion: AIAccountBalanceQoderRegion?
+    var antigravityGroup: AIAccountBalanceAntigravityGroup?
+    var geminiSource: AIAccountBalanceGeminiSource?
 
     var title: String {
-        qoderRegion.map { AppLocalization.string($0.title, language: language) }
+        if let geminiSource { return geminiSource.title }
+        if let antigravityGroup { return AppLocalization.string(antigravityGroup.title, language: language) }
+        return qoderRegion.map { AppLocalization.string($0.title, language: language) }
             ?? AIAccountBalanceCatalog.providerName(provider)
     }
 
     var status: AIAccountBalanceStatus {
         monitor.accountBalances.first {
             $0.providers.contains(provider) && (qoderRegion == nil || $0.qoderRegion == qoderRegion)
-        }?.status ?? AIAccountBalanceCatalog.placeholder(for: [provider], qoderRegion: qoderRegion).status
+                && (antigravityGroup == nil || $0.quotaGroup == antigravityGroup?.rawValue)
+                && (geminiSource == nil || $0.quotaGroup == geminiSource?.rawValue)
+        }?.status ?? (geminiSource == .app ? .additionalCredentialsRequired
+            : AIAccountBalanceCatalog.placeholder(for: [provider], qoderRegion: qoderRegion).status)
     }
 
     var body: some View {

@@ -48,7 +48,7 @@ macOS 14 dan lebih baru didukung. macOS 26 memakai Liquid Glass; macOS 14/15 mem
 - **Catatan konteks dan rapat:** Tahan pintasan catatan yang diatur lalu goyangkan penunjuk untuk menempelkan catatan ke halaman, jendela, atau desktop. Acara dengan tautan rapat menampilkan hitung mundur 10 menit sebelumnya; bergabung, membuat catatan, atau menautkan catatan lama tersedia. Kelola catatan konteks di rak.
 - **Goyang untuk menjatuhkan:** Goyangkan penunjuk ketika menyeret berkas untuk menampilkan target; gestur memiliki sakelar tersendiri.
 - **Keluaran audio dan preferensi pemutar:** Pilih perangkat keluaran di area media. Pengaturan memilih sumber otomatis/pemutar utama, tata letak ringkas, dan kondisi penghentian suara latar.
-- **Kuota dan reset AI:** Pemantauan AI dan Pengaturan menampilkan kuota akun, waktu sampel/reset, dan peringatan kuota rendah, termasuk jendela 5h/7d yang tersedia dan anggaran Cursor USD. Ini terpisah dari riwayat token lokal.
+- **Kuota dan reset AI:** Pemantauan AI dan Pengaturan menampilkan kuota akun, waktu sampel/reset, dan peringatan kuota rendah, termasuk jendela 5h/7d yang tersedia dan anggaran Cursor USD. Ini terpisah dari riwayat token lokal. Kuota Gemini dan Claude/GPT Antigravity memiliki pemantauan, tampilan, dan peringatan terpisah. Kuota percakapan Gemini App memakai Cookie web dari akun Google yang sama; Gemini CLI tetap terpisah.
 
 ### Urutan papan ketik Tindakan Cepat
 

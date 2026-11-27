@@ -25,6 +25,7 @@ Panel notifikasi kiri/kanan dibuat sesuai kebutuhan dan disembunyikan begitu ant
 - Unduhan, cuaca, dan permintaan GitHub memakai actor.
 - Status AI dari hook dipantau lewat peristiwa sistem berkas direktori. Tiap sumber sesi membandingkan mtime dan ukuran berkas sesi/aktivitas lokal terbaru, lalu menggunakan ulang cache parser jika tidak berubah.
 - Deteksi otomatis hanya membaca peristiwa terstruktur, penanda status tetap, dan metadata yang perlu untuk status tugas. Isi prompt/jawaban tidak dibaca; kegagalan parser satu penyedia tidak memblokir lainnya.
+- Kuota akun AI diperoleh secara terpisah dari setiap penyedia. Kuota Gemini dan Claude/GPT Antigravity memiliki jendela reset dan peringatan sendiri. Kuota percakapan biasa Gemini App memakai Cookie web tersimpan dari akun Google yang sama; Gemini CLI mempertahankan OAuth lokal. Kuota yang tidak tersedia tidak diperkirakan.
 - Penundaan lipat memakai `Task` yang dapat dibatalkan dan token generasi sehingga tugas lama tidak menyembunyikan pulau yang dibuka kembali.
 - Keadaan tersembunyi tidak memiliki `TimelineView`, timer 60 Hz, atau pengiriman animasi terus-menerus.
 

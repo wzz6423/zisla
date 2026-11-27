@@ -8,6 +8,10 @@ struct AIAccountBalanceCookieInput: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if input.website == .geminiApp {
+                AppLocalizedText("请在默认浏览器登录 Gemini App 使用的同一 Google 账号")
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 8) {
                 Link(AppLocalization.text(input.website.title), destination: input.website.dashboard)
                     .frame(width: 100, alignment: .leading)

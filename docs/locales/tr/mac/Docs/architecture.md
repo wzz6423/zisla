@@ -25,6 +25,7 @@ Sol ve sağ bildirim panelleri gerektiğinde oluşturulur ve kuyrukları boşal�
 - İndirmeler, hava durumu ve GitHub istekleri actors kullanır.
 - Kancaların yazdığı yapay zekâ durumu, dizinin dosya sistemi olayları üzerinden izlenir. Her yapay zekâ oturum kaynağı, en son yerel oturum veya etkinlik dosyasının değişiklik zamanını ve boyutunu karşılaştırır. Hiçbir şey değişmediyse ayrıştırma önbelleğini yeniden kullanır.
 - Otomatik algılama yalnızca görev durumunu belirlemek için gereken yapılandırılmış olayları, sabit durum işaretlerini ve etkinlik meta verilerini okur. İstem veya yanıt içeriklerini okumaz; bir sağlayıcının ayrıştırma hatası diğer sağlayıcıları engellemez.
+- Yapay zekâ hesap kotaları her sağlayıcıdan ayrı alınır. Antigravity Gemini ve Claude/GPT kotaları ayrı yenilenme pencerelerini ve uyarılarını korur. Gemini App normal sohbet kotası aynı Google hesabının kayıtlı web Cookie bilgisiyle sorgulanır; Gemini CLI yerel OAuth kaynağını korur. Eksik kotalar tahmin edilmez.
 - Daraltma gecikmeleri iptal edilebilir `Task` nesneleri ve nesil belirteci kullanır; eski bir görev yeniden açılmış adayı gizleyemez.
 - Gizli durumda `TimelineView`, 60 Hz sayaç veya sürekli animasyon gönderimi bulunmaz.
 

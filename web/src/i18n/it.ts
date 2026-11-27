@@ -96,7 +96,7 @@ export const it = createCatalog({
       aiMonitor: {
         name: 'Monitor IA',
         caption:
-          'Raccoglie attività e stato di CLI IA, app desktop e IDE. I dati numerici affidabili alimentano le tendenze dei token e la mappa dei contributi; scegli una data per vedere token di input, output e totali per fornitore e modello. Nelle impostazioni puoi consultare lo storico, esportarlo interamente in .xlsx o cancellarlo. Mostra quote reali, orari di ripristino e avvisi di quota bassa, incluse finestre 5h/7d e budget Cursor in dollari quando disponibili. Non legge il testo di prompt o risposte. Anche i layout compatti mostrano le quote rimanenti con anelli. Scegli le regioni degli account in modo indipendente; i dati giornalieri e i colori della quota rimanente sono coerenti tra i layout.',
+          'Raccoglie attività e stato di CLI IA, app desktop e IDE. I dati numerici affidabili alimentano le tendenze dei token e la mappa dei contributi; scegli una data per vedere token di input, output e totali per fornitore e modello. Nelle impostazioni puoi consultare lo storico, esportarlo interamente in .xlsx o cancellarlo. Mostra quote reali, orari di ripristino e avvisi di quota bassa, incluse finestre 5h/7d e budget Cursor in dollari quando disponibili. Non legge il testo di prompt o risposte. Anche i layout compatti mostrano le quote rimanenti con anelli. Scegli le regioni degli account in modo indipendente; i dati giornalieri e i colori della quota rimanente sono coerenti tra i layout. Le quote Gemini e Claude/GPT di Antigravity hanno monitoraggio, visualizzazione e avvisi indipendenti. Le quote di chat di Gemini App usano un Cookie web dello stesso account Google; Gemini CLI resta separato.',
         points: ['Attività di più strumenti IA', 'Storico dei modelli ed export .xlsx', 'Quote e orari di ripristino'],
       },
       keyboardSound: {
@@ -386,7 +386,7 @@ export const it = createCatalog({
         "entry": "Impostazioni → IA; isola → Monitor IA.",
         "steps": [
           "Abilita uno strumento locale supportato o segnala l’attività con zislactl secondo il riferimento CLI.",
-          "Abilita il controllo quota del fornitore e inserisci credenziali solo quando richiesto.",
+          "Abilita il monitoraggio del fornitore e scegli separatamente monitoraggio e visualizzazione di Gemini e Claude/GPT in Antigravity. Per Gemini App, accedi con lo stesso account Google su gemini.google.com/usage e salva il Cookie nelle credenziali delle quote web; seleziona Gemini CLI separatamente.",
           "Controlla rilevamento, ripristino e avvisi; visualizza la cronologia o esporta .xlsx."
         ],
         "shortcuts": "Usa monitor o Impostazioni, senza scorciatoia globale fissa. zislactl accetta gli argomenti documentati.",

@@ -8,6 +8,10 @@ struct AIProgressModuleView: View {
     @ObservedObject private var monitor: AIStateMonitor
     var displayedBalanceProviders: Set<AIProvider>
     var monitoredBalanceProviders: Set<AIProvider>
+    var monitoredAntigravityGroups: Set<AIAccountBalanceAntigravityGroup>
+    var displayedAntigravityGroups: Set<AIAccountBalanceAntigravityGroup>
+    var monitoredGeminiSources: Set<AIAccountBalanceGeminiSource>
+    var displayedGeminiSources: Set<AIAccountBalanceGeminiSource>
     var language: AppLanguage
     @State private var selectedUsageDate: Date?
 
@@ -17,10 +21,18 @@ struct AIProgressModuleView: View {
 
     init(monitor: AIStateMonitor, displayedBalanceProviders: Set<AIProvider> = Set(AIProvider.allCases),
          monitoredBalanceProviders: Set<AIProvider>,
+         monitoredAntigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
+         displayedAntigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
+         monitoredGeminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases),
+         displayedGeminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases),
          language: AppLanguage = AppLocalization.currentLanguage) {
         _monitor = ObservedObject(wrappedValue: monitor)
         self.displayedBalanceProviders = displayedBalanceProviders
         self.monitoredBalanceProviders = monitoredBalanceProviders
+        self.monitoredAntigravityGroups = monitoredAntigravityGroups
+        self.displayedAntigravityGroups = displayedAntigravityGroups
+        self.monitoredGeminiSources = monitoredGeminiSources
+        self.displayedGeminiSources = displayedGeminiSources
         self.language = language
     }
 
@@ -35,7 +47,10 @@ struct AIProgressModuleView: View {
                 }
                 AIAccountBalanceSection(balances: monitor.accountBalances,
                                         displayedProviders: displayedBalanceProviders, monitoredProviders: monitoredBalanceProviders,
-                                        language: language)
+                                        language: language, monitoredAntigravityGroups: monitoredAntigravityGroups,
+                                        displayedAntigravityGroups: displayedAntigravityGroups,
+                                        monitoredGeminiSources: monitoredGeminiSources,
+                                        displayedGeminiSources: displayedGeminiSources)
             }
             .padding(.trailing, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay) + 1)
             .frame(maxWidth: .infinity, alignment: .topLeading)

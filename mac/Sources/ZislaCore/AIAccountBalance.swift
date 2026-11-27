@@ -26,6 +26,18 @@ public enum AIAccountBalanceQoderRegion: String, CaseIterable, Codable, Sendable
     public var title: String { self == .china ? "中国区" : "国际区" }
 }
 
+public enum AIAccountBalanceAntigravityGroup: String, CaseIterable, Codable, Sendable {
+    case gemini, claudeGPT
+
+    public var title: String { self == .gemini ? "Gemini" : "Claude 与 GPT 模型" }
+}
+
+public enum AIAccountBalanceGeminiSource: String, CaseIterable, Codable, Sendable {
+    case cli, app
+
+    public var title: String { self == .cli ? "Gemini CLI" : "Gemini App" }
+}
+
 public enum AIAccountQuotaSeverity: Int, Codable, Comparable, Sendable {
     case normal, warning, critical, exhausted
 
@@ -156,12 +168,14 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
     public var updatedAt: Date?
     public var accountName: String?
     public var qoderRegion: AIAccountBalanceQoderRegion?
+    public var quotaGroup: String?
     public var detailKey: String?
     public var isDebug: Bool
 
     public init(id: String, providers: [AIProvider], status: AIAccountBalanceStatus,
                 windows: [AIAccountQuotaWindow] = [], updatedAt: Date? = nil,
                 accountName: String? = nil, qoderRegion: AIAccountBalanceQoderRegion? = nil,
+                quotaGroup: String? = nil,
                 detailKey: String? = nil, isDebug: Bool = false) {
         self.id = id
         self.providers = providers
@@ -170,6 +184,7 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
         self.updatedAt = updatedAt
         self.accountName = accountName
         self.qoderRegion = qoderRegion
+        self.quotaGroup = quotaGroup
         self.detailKey = detailKey
         self.isDebug = isDebug
     }
@@ -202,9 +217,29 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
     }
 
     public func providerTitle(language: AppLanguage) -> String {
+        if providers == [.gemini], let source = quotaGroup.flatMap(AIAccountBalanceGeminiSource.init(rawValue:)) {
+            return source.title
+        }
         let brands = providers.allSatisfy { $0 == .codex || $0 == .gpt } ? Array(providers.prefix(1)) : providers
         let title = brands.map { $0 == .gpt ? "ChatGPT" : AIAccountBalanceCatalog.providerName($0) }.joined(separator: " / ")
+        if let quotaGroup, providers.contains(.antigravity) {
+            let groupTitle = AIAccountBalanceAntigravityGroup(rawValue: quotaGroup)
+                .map { AppLocalization.string($0.title, language: language) }
+                ?? (quotaGroup.hasPrefix("custom:") ? String(quotaGroup.dropFirst("custom:".count)) : quotaGroup)
+            return title + " · " + groupTitle
+        }
         return qoderRegion.map { title + " · " + AppLocalization.string($0.title, language: language) } ?? title
+    }
+
+    public func matchesAntigravityGroups(_ groups: Set<AIAccountBalanceAntigravityGroup>) -> Bool {
+        guard providers.contains(.antigravity), !isDebug else { return true }
+        guard !groups.isEmpty else { return false }
+        return quotaGroup.flatMap(AIAccountBalanceAntigravityGroup.init(rawValue:)).map { groups.contains($0) } ?? true
+    }
+
+    public func matchesGeminiSources(_ sources: Set<AIAccountBalanceGeminiSource>) -> Bool {
+        guard providers.contains(.gemini), !isDebug else { return true }
+        return sources.contains(quotaGroup.flatMap(AIAccountBalanceGeminiSource.init(rawValue:)) ?? .cli)
     }
 
     /// Reserves the first of at most two lines for a canonical 5h or rolling window.
@@ -248,9 +283,16 @@ public enum AIAccountBalanceCatalog {
 
     /// Live aliases require both monitoring and display; explicit debug aliases override those selections.
     public static func displayedBalances(_ balances: [AIAccountBalance], monitoredProviders: Set<AIProvider>,
-                                         displayedProviders: Set<AIProvider>) -> [AIAccountBalance] {
+                                         displayedProviders: Set<AIProvider>,
+                                         monitoredAntigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
+                                         displayedAntigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
+                                         monitoredGeminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases),
+                                         displayedGeminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases)) -> [AIAccountBalance] {
         balances.compactMap { balance in
-            guard balance.severity != nil else { return nil }
+            guard balance.severity != nil, balance.matchesAntigravityGroups(monitoredAntigravityGroups),
+                  balance.matchesAntigravityGroups(displayedAntigravityGroups),
+                  balance.matchesGeminiSources(monitoredGeminiSources),
+                  balance.matchesGeminiSources(displayedGeminiSources) else { return nil }
             var row = balance
             row.providers = row.providers.filter {
                 balance.isDebug || (supportsBalanceQuery($0) && monitoredProviders.contains($0) && displayedProviders.contains($0))
@@ -335,4 +377,39 @@ public enum AIAccountBalanceCatalog {
     }
 
     public static var placeholders: [AIAccountBalance] { groups.map { placeholder(for: $0) } }
+
+    /// A single RPC sample contains independent pools; each pool owns its alert and reset windows.
+    public static func antigravityBalances(_ balance: AIAccountBalance) -> [AIAccountBalance] {
+        guard balance.providers.contains(.antigravity), balance.quotaGroup == nil, !balance.isDebug else { return [balance] }
+        var windows: [String: [AIAccountQuotaWindow]] = [:]
+        var customGroups: [String] = []
+        for window in balance.windows {
+            let name = window.name ?? "Quota"
+            let key: String
+            switch name {
+            case "Gemini", "Gemini 4 Argon": key = AIAccountBalanceAntigravityGroup.gemini.rawValue
+            case "Claude/GPT": key = AIAccountBalanceAntigravityGroup.claudeGPT.rawValue
+            default:
+                key = "custom:" + name
+                if windows[key] == nil { customGroups.append(key) }
+            }
+            windows[key, default: []].append(window)
+        }
+        return (AIAccountBalanceAntigravityGroup.allCases.map(\.rawValue) + customGroups).map { key in
+            var row = balance
+            row.id += ":" + key
+            row.quotaGroup = key
+            var canonicalKinds: Set<AIAccountQuotaKind> = []
+            row.windows = (windows[key] ?? []).map { window in
+                guard window.name != "Gemini 4 Argon", window.kind == .fiveHours || window.kind == .weekly,
+                      canonicalKinds.insert(window.kind).inserted else { return window }
+                return AIAccountQuotaWindow(id: window.kind == .fiveHours ? "five_hour" : "weekly", kind: window.kind,
+                                            remainingPercent: window.remainingPercent, remaining: window.remaining,
+                                            limit: window.limit, unit: window.unit, resetsAt: window.resetsAt,
+                                            durationSeconds: window.durationSeconds, unlimited: window.unlimited)
+            }
+            if row.status == .available, row.windows.isEmpty { row.status = .unavailable }
+            return row
+        }
+    }
 }

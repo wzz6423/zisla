@@ -25,6 +25,7 @@ Los paneles izquierdo y derecho se crean a demanda y se ocultan en cuanto sus co
 - Descargas, tiempo y solicitudes GitHub usan actors.
 - El estado IA de hooks se supervisa con eventos del sistema de archivos del directorio. Cada fuente compara mtime y tamaño del último archivo local de sesión o actividad y reutiliza la caché de análisis si no cambió.
 - La detección automática lee solo eventos estructurados, marcadores fijos y metadatos necesarios para determinar tareas. No lee instrucciones ni respuestas y un fallo de un proveedor no bloquea otros.
+- Las cuotas de cuentas de IA se consultan por proveedor. Las cuotas Gemini y Claude/GPT de Antigravity mantienen ventanas de reinicio y avisos propios. La cuota de conversación normal de Gemini App usa el Cookie web guardado de la misma cuenta de Google; Gemini CLI conserva su OAuth local. Nunca se estiman cuotas ausentes.
 - Los retardos de contracción usan `Task` cancelables y un token de generación para que una tarea antigua no oculte una isla ya reabierta.
 - El estado oculto no tiene `TimelineView`, temporizador de 60 Hz ni envío continuo de animación.
 

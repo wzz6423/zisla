@@ -2,16 +2,17 @@ import Foundation
 import ZislaCore
 
 public enum AIAccountBalanceWebsite: String, CaseIterable, Identifiable, Sendable {
-    case qoder, qoderChina, trae, zed
+    case qoder, qoderChina, trae, zed, geminiApp
     public var id: String { rawValue }
-    public var provider: AIProvider { switch self { case .qoder, .qoderChina: .coder; case .trae: .trae; case .zed: .zed } }
-    public var title: String { switch self { case .qoder: "Qoder"; case .qoderChina: "Qoder 中国"; case .trae: "TRAE 中国"; case .zed: "Zed" } }
+    public var provider: AIProvider { switch self { case .qoder, .qoderChina: .coder; case .trae: .trae; case .zed: .zed; case .geminiApp: .gemini } }
+    public var title: String { switch self { case .qoder: "Qoder"; case .qoderChina: "Qoder 中国"; case .trae: "TRAE 中国"; case .zed: "Zed"; case .geminiApp: "Gemini App 网站额度" } }
     public var dashboard: URL {
         switch self {
         case .qoder: URL(string: "https://qoder.com/account/usage")!
         case .qoderChina: URL(string: "https://qoder.com.cn/account/usage")!
         case .trae: URL(string: "https://www.trae.cn/account-setting")!
         case .zed: URL(string: "https://dashboard.zed.dev/")!
+        case .geminiApp: URL(string: "https://gemini.google.com/usage")!
         }
     }
 
@@ -22,20 +23,23 @@ public enum AIAccountBalanceWebsite: String, CaseIterable, Identifiable, Sendabl
         case .trae: [URL(string: "https://api.trae.cn/cloudide/api/v3/common/GetUserToken")!,
                      URL(string: "https://api.trae.cn/trae/api/v2/pay/user_current_entitlement_list")!]
         case .zed: [URL(string: "https://cloud.zed.dev/frontend/billing/usage")!]
+        case .geminiApp: [URL(string: "https://gemini.google.com/_/BardChatUi/graphql/schemas/GEMINI_WEB_GRAPHQL/executeQuery")!]
         }
     }
 
     var cookieDomain: String {
-        switch self { case .qoder: "qoder.com"; case .qoderChina: "qoder.com.cn"; case .trae: "trae.cn"; case .zed: "zed.dev" }
+        switch self { case .qoder: "qoder.com"; case .qoderChina: "qoder.com.cn"; case .trae: "trae.cn"; case .zed: "zed.dev"; case .geminiApp: "google.com" }
     }
 
-    public static func selected(for monitoredProviders: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>) -> [Self] {
+    public static func selected(for monitoredProviders: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>,
+                                geminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases)) -> [Self] {
         allCases.filter { website in
             guard monitoredProviders.contains(website.provider) else { return false }
             return switch website {
             case .qoder: qoderRegions.contains(.global)
             case .qoderChina: qoderRegions.contains(.china)
             case .trae, .zed: true
+            case .geminiApp: geminiSources.contains(.app)
             }
         }
     }
@@ -78,6 +82,15 @@ public struct AIAccountBalanceCookieStore: Sendable {
             guard pairs.contains(where: { $0.0.lowercased() == "zed.session" }) else { throw AIAccountBalanceError.invalidCredentials }
             return pairs.filter { ["zed.session", "c15t", "__cf_bm", "cf_clearance"].contains($0.0.lowercased()) }
                 .map { $0.0 + "=" + $0.1 }.joined(separator: "; ")
+        }
+        if website == .geminiApp {
+            let allowed: Set<String> = ["SID", "HSID", "SSID", "APISID", "SAPISID", "__Secure-1PSID", "__Secure-3PSID",
+                                        "__Secure-1PAPISID", "__Secure-3PAPISID", "__Secure-1PSIDTS", "__Secure-3PSIDTS",
+                                        "__Secure-1PSIDCC", "__Secure-3PSIDCC", "SIDCC", "OSID", "__Secure-OSID"]
+            guard pairs.contains(where: { ["SID", "__Secure-1PSID", "__Secure-3PSID"].contains($0.0) }) else {
+                throw AIAccountBalanceError.invalidCredentials
+            }
+            return pairs.filter { allowed.contains($0.0) }.map { $0.0 + "=" + $0.1 }.joined(separator: "; ")
         }
         return pairs.map { $0.0 + "=" + $0.1 }.joined(separator: "; ")
     }

@@ -53,7 +53,7 @@ Với công cụ không có nguồn hoạt động cục bộ ổn định, `zis
 - **Trộn và phát:** macOS 14.4+ hỗ trợ âm lượng và tắt tiếng theo ứng dụng. Chọn đầu ra ở vùng đa phương tiện, tùy chọn trình phát trong Cài đặt.
 - **Máy tính và họp:** Xem trước cửa sổ Dock/Command+Tab, ghi chú theo trang/cửa sổ/màn hình, đếm ngược họp 10 phút, tham gia và liên kết ghi chú. Lắc con trỏ khi kéo tệp để hiện đích thả trên kệ.
 - **Bản tin hằng ngày:** 8 mẫu, xem trước, xuất PNG thủ công hoặc theo lịch, chỉ số được chọn và thư mục riêng.
-- **Tài khoản AI:** Xem hạn mức hỗ trợ, giờ đặt lại, cảnh báo sắp hết và giờ lấy mẫu; xuất lịch sử token tại máy sang `.xlsx`.
+- **Tài khoản AI:** Xem hạn mức hỗ trợ, giờ đặt lại, cảnh báo sắp hết và giờ lấy mẫu; xuất lịch sử token tại máy sang `.xlsx`. Hạn mức Gemini và Claude/GPT của Antigravity có theo dõi, hiển thị và cảnh báo riêng. Hạn mức trò chuyện Gemini App dùng Cookie web của cùng tài khoản Google; Gemini CLI được theo dõi riêng.
 - **Thao tác Nhanh:** Hành động trong cửa sổ dùng `Command+1` đến `Command+0` theo thứ tự. Phím kích hoạt mặc định bổ sung cho cấu hình mới là `Command+N` để thực hiện hành động đầu tiên. Nâng cấp giữ phím đã lưu và trạng thái xóa phím kích hoạt.
 
 [Trợ giúp người dùng](https://wzz6423.github.io/zisla/help.html?lang=vi#help) có chín hướng dẫn từng bước: bảng nhớ tạm, chụp/ghi, kệ, họp, AI, công cụ đa phương tiện, bản tin hằng ngày, ghi chú máy tính/xem trước cửa sổ và phát/trộn âm. [Hướng dẫn macOS](mac/README.md) liệt kê thư mục lưu và phụ thuộc công cụ.

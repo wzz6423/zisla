@@ -6,6 +6,44 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceNoticeTests {
+    @Test func geminiSourceNoticesAreIndependentAndDisabledSourceClearsItsEpisode() {
+        let queue = SideNoticeQueue()
+        let controller = AIAccountBalanceNoticeController(queue: queue)
+        let cli = AIAccountBalance(id: "gemini:cli", providers: [.gemini], status: .available,
+                                   windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)], quotaGroup: "cli")
+        let app = AIAccountBalance(id: "gemini:app", providers: [.gemini], status: .available,
+                                   windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 0)], quotaGroup: "app")
+        var settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.gemini], aiAccountBalanceDisplayedProviders: [])
+        controller.update(balances: [cli, app], settings: settings, language: .english)
+        #expect(Set((queue.left + queue.right).map(\.id)) == [cli.noticeID, app.noticeID])
+        settings.aiAccountBalanceMonitoredGeminiSources = [.app]
+        controller.update(balances: [cli, app], settings: settings, language: .english)
+        #expect((queue.left + queue.right).map(\.id) == [app.noticeID])
+        #expect((queue.left + queue.right).first?.title.contains("Gemini App") == true)
+    }
+
+    @Test func antigravityPoolAlertsDoNotBorrowSeverityAndDisplayDoesNotDisableMonitoring() throws {
+        let queue = SideNoticeQueue(capacityPerSide: 4), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let sample = AIAccountBalance(id: "antigravity:account", providers: [.antigravity], status: .available, windows: [
+            .init(id: "additional:gemini:weekly", kind: .weekly, remainingPercent: 10, durationSeconds: 604_800, name: "Gemini"),
+            .init(id: "additional:claude-gpt:weekly", kind: .weekly, remainingPercent: 0, durationSeconds: 604_800, name: "Claude/GPT"),
+        ])
+        var rows = AIAccountBalanceCatalog.antigravityBalances(sample)
+        var settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.antigravity], aiAccountBalanceDisplayedProviders: [.antigravity],
+                                       aiAccountBalanceDisplayedAntigravityGroups: [.gemini])
+        controller.update(balances: rows, settings: settings, language: .english)
+        #expect(Set(queue.left.map(\.id)) == Set(rows.map(\.noticeID)))
+        #expect(queue.left.first { $0.id == rows[0].noticeID }?.metadata?["quotaRemainingFraction"] == "0.1")
+        #expect(queue.left.first { $0.id == rows[1].noticeID }?.metadata?["quotaRemainingFraction"] == "0.0")
+        rows[0].windows = [.init(id: "weekly", kind: .weekly, remainingPercent: 70, durationSeconds: 604_800)]
+        controller.update(balances: rows, settings: settings, language: .english)
+        #expect(queue.left.map(\.id) == [rows[1].noticeID], "Gemini recovery must not clear the Claude/GPT exhaustion episode")
+        settings.aiAccountBalanceMonitoredAntigravityGroups = [.gemini]
+        controller.update(balances: rows, settings: settings, language: .english)
+        #expect(queue.left.isEmpty, "Disabling monitoring for Claude/GPT must remove only that pool's notice")
+    }
+
     @Test func defaultProviderSelectionCannotCreateLowOrPinnedBalanceNotices() {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }

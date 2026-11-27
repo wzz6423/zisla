@@ -3798,3 +3798,7 @@
 "计时结束" = "Temporizador finalizado";
 "计时器名称" = "Nombre del temporizador";
 "添加计时器" = "Añadir temporizador";
+"Claude 与 GPT 模型" = "Modelos Claude y GPT";
+"Gemini App 使用同一账号的网页版额度，请添加网站额度凭据" = "Gemini App comparte las cuotas web de la misma cuenta. Añade las credenciales de cuota web.";
+"请在默认浏览器登录 Gemini App 使用的同一 Google 账号" = "Inicia sesión en el navegador predeterminado con la misma cuenta de Google que usa Gemini App.";
+"Gemini App 网站额度" = "Cuota web de Gemini App";

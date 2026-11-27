@@ -25,6 +25,7 @@ Les panneaux de notification gauche et droit sont créés à la demande et masqu
 - Les téléchargements, la météo et les requêtes GitHub utilisent des actors.
 - L'état d'IA écrit par les hooks est surveillé via les événements du système de fichiers des répertoires. Chaque source de session compare la date de modification et la taille du dernier fichier local de session ou d'activité et réutilise le cache d'analyse si rien n'a changé.
 - La détection automatique lit seulement les événements structurés, marqueurs d'état fixes et métadonnées nécessaires pour déterminer l'état des tâches. Elle ne lit pas les invites ni les réponses, et l'échec d'un parseur de fournisseur ne bloque pas les autres.
+- Les quotas des comptes IA sont relevés séparément auprès des fournisseurs. Les quotas Gemini et Claude/GPT d’Antigravity gardent leurs propres périodes de réinitialisation et alertes. Le quota de conversation ordinaire de Gemini App utilise le Cookie web enregistré du même compte Google ; Gemini CLI conserve son OAuth local. Les quotas manquants ne sont jamais estimés.
 - Les délais de repli utilisent des `Task` annulables et un jeton de génération afin qu'une ancienne tâche ne puisse pas masquer un îlot déjà rouvert.
 - L'état masqué n'utilise ni `TimelineView`, ni minuteur à 60 Hz, ni soumission continue d'animations.
 

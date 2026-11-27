@@ -48,7 +48,7 @@ macOS 14 ve sonrası desteklenir. macOS 26 Liquid Glass kullanır; macOS 14/15 y
 - **Bağlam notları ve toplantılar:** Not kısayolunu tutup işaretçiyi sallayarak sayfa/pencere/masaüstüne not bağlayın. Toplantı bağlantılı etkinlikler başlamadan 10 dakika önce geri sayar; katılın, not oluşturun veya mevcut not bağlayın. Notları rafta yönetin.
 - **Sallayarak bırakma:** Dosya sürüklerken işaretçiyi sallayarak hedefi gösterin; bu hareketi ayrı açıp kapatın.
 - **Ses çıkışı ve oynatıcı tercihleri:** Medya alanında aygıt seçin. Ayarlar otomatik kaynak/tercih edilen oynatıcı, kompakt düzen ve ortam sesi durma koşullarını seçer.
-- **Yapay zekâ kotası ve yenilenme:** İzleme ve Ayarlar kota, örnekleme ve yenilenme saatleri ile düşük kota uyarılarını gösterir; mevcut 5h/7d pencereleri ve Cursor USD bütçeleri dahildir. Yerel token geçmişinden ayrıdır.
+- **Yapay zekâ kotası ve yenilenme:** İzleme ve Ayarlar kota, örnekleme ve yenilenme saatleri ile düşük kota uyarılarını gösterir; mevcut 5h/7d pencereleri ve Cursor USD bütçeleri dahildir. Yerel token geçmişinden ayrıdır. Antigravity Gemini ve Claude/GPT kotalarının izleme, gösterim ve uyarıları ayrıdır. Gemini App sohbet kotası aynı Google hesabının web Cookie bilgisiyle sorgulanır; Gemini CLI ayrı izlenir.
 
 ### Hızlı İşlemler klavye sırası
 

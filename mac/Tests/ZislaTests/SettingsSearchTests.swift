@@ -6,6 +6,17 @@ import ZislaKit
 @testable import Zisla
 
 struct SettingsSearchTests {
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func quotaPoolAndGeminiSourceNamesFindTheirControlsInEveryLanguage(language: AppLanguage) {
+        let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.antigravity, .gemini],
+                                       aiAccountBalanceMonitoredGeminiSources: [.cli])
+        let names = AIAccountBalanceAntigravityGroup.allCases.map(\.title) + AIAccountBalanceGeminiSource.allCases.map(\.title)
+        for name in names {
+            let matches = results(AppLocalization.string(name, language: language), settings: settings, locale: language.locale)
+            #expect(matches.contains { $0.section == .ai && $0.anchor == .group("各供应商额度") })
+        }
+    }
+
     @Test(arguments: AppLanguage.allCases, [false, true]) @MainActor
     func aiQuotaSearchNavigatesToAIWithoutDuplicateFeatureSettings(language: AppLanguage, aiEnabled: Bool) throws {
         let settings = FeatureSettings(aiProgressEnabled: aiEnabled,

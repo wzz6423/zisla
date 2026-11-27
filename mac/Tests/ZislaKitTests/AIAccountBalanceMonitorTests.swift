@@ -7,6 +7,59 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceMonitorTests {
+    @Test func geminiSourceChangesDiscardLateResultsAndNeverRefreshDisabledSources() async throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detector = BalanceDetectorGate()
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+        defer { monitor.stop() }
+        let windows = [AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 80)]
+        let cli = AIAccountBalance(id: "gemini:cli", providers: [.gemini], status: .available, windows: windows, quotaGroup: "cli")
+        let app = AIAccountBalance(id: "gemini:app", providers: [.gemini], status: .available, windows: windows, quotaGroup: "app")
+        monitor.configureAccountBalanceProviders([.gemini])
+        monitor.start()
+        try #require(await waitFor { await detector.calls.count == 1 })
+        await detector.release(0, result: .success([cli, app]))
+        try #require(await waitFor { monitor.accountBalances.count == 2 })
+        monitor.refreshAccountBalancesAfterCredentialChange()
+        try #require(await waitFor { await detector.calls.count == 2 })
+        monitor.configureAccountBalanceProviders([.gemini], geminiSources: [.app])
+        #expect(monitor.accountBalances == [app])
+        try #require(await waitFor { await detector.calls.count == 3 })
+        await detector.release(2, result: .success([cli, app]))
+        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+        #expect(monitor.accountBalances == [app])
+        await detector.release(1, result: .success([cli]))
+        try #require(await waitFor { await detector.completed.contains(1) })
+        #expect(monitor.accountBalances == [app], "An obsolete CLI response must not replace the selected App reading")
+        monitor.configureAccountBalanceProviders([.gemini], geminiSources: [])
+        #expect(monitor.accountBalances.isEmpty && !monitor.isRefreshingAccountBalances)
+        #expect(await detector.calls.count == 3)
+    }
+
+    @Test func geminiDetectorFailureKeepsSelectedSourceAndUnrelatedSelectionDoesNotRestartWork() async throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detector = BalanceDetectorGate()
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+        defer { monitor.stop() }
+        monitor.configureAccountBalanceProviders([.zed], geminiSources: [.cli])
+        monitor.start()
+        try #require(await waitFor { await detector.calls.count == 1 })
+        monitor.configureAccountBalanceProviders([.zed], geminiSources: [.app])
+        #expect(await detector.calls.count == 1)
+        await detector.release(0, result: .success([]))
+        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+        monitor.configureAccountBalanceProviders([.gemini], geminiSources: [.app])
+        try #require(await waitFor { await detector.calls.count == 2 })
+        await detector.release(1, result: .failure(URLError(.timedOut)))
+        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+        #expect(monitor.accountBalances.map(\.quotaGroup) == ["app"])
+        #expect(monitor.accountBalances.first?.status == .unavailable)
+    }
+
     #if DEBUG
         @Test(arguments: [Set<AIProvider>(), [.codex]])
         func fixtureProvidersOverrideRealSelectionsWithoutChangingUsageHistory(providers: Set<AIProvider>) async throws {
@@ -325,6 +378,68 @@ struct AIAccountBalanceMonitorTests {
         try #require(await waitFor { await detector.calls.count == 3 })
         await detector.release(2, result: .success([balance(.claude, percent: 70)]))
         try #require(await waitFor { monitor.accountBalances.first?.severity == .normal })
+    }
+
+    @Test func antigravityGroupRemovalFiltersCurrentAndLateReadingsAndStopsEmptySelection() async throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detector = BalanceDetectorGate()
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+        defer { monitor.stop() }
+        let sample = AIAccountBalance(id: "antigravity", providers: [.antigravity], status: .available, windows: [
+            .init(id: "additional:gemini:weekly", kind: .weekly, remainingPercent: 70, durationSeconds: 604_800, name: "Gemini"),
+            .init(id: "additional:claude-gpt:weekly", kind: .weekly, remainingPercent: 0, durationSeconds: 604_800, name: "Claude/GPT"),
+        ])
+        let pools = AIAccountBalanceCatalog.antigravityBalances(sample), other = balance(.zed, percent: 80)
+        monitor.configureAccountBalanceProviders([.antigravity, .zed])
+        monitor.start()
+        try #require(await waitFor { await detector.calls.count == 1 })
+        await detector.release(0, result: .success(pools + [other]))
+        try #require(await waitFor { monitor.accountBalances.count == 3 })
+        monitor.refreshAccountBalancesAfterCredentialChange()
+        try #require(await waitFor { await detector.calls.count == 2 })
+        monitor.configureAccountBalanceProviders([.antigravity, .zed], antigravityGroups: [.gemini])
+        #expect(monitor.accountBalances == [pools[0], other])
+        try #require(await waitFor { await detector.calls.count == 3 })
+        await detector.release(2, result: .success(pools + [other]))
+        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+        #expect(monitor.accountBalances == [pools[0], other], "An RPC response still containing both pools must honor the current selection")
+        await detector.release(1, result: .success(pools + [other]))
+        try #require(await waitFor { await detector.completed.contains(1) })
+        #expect(monitor.accountBalances == [pools[0], other])
+        monitor.configureAccountBalanceProviders([.antigravity, .zed], antigravityGroups: [])
+        #expect(monitor.accountBalances == [other])
+        try #require(await waitFor { await detector.calls.count == 4 })
+        #expect(await detector.calls.last?.providers == [.zed])
+        await detector.release(3, result: .success([other]))
+        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+    }
+
+    @Test func antigravityFailureKeepsSelectedPoolStatusAndUnrelatedWorkIsNotRestarted() async throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detector = BalanceDetectorGate()
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+                                     accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+        defer { monitor.stop() }
+        monitor.configureAccountBalanceProviders([.zed], antigravityGroups: [.gemini])
+        monitor.start()
+        try #require(await waitFor { await detector.calls.count == 1 })
+        monitor.configureAccountBalanceProviders([.zed], antigravityGroups: [.claudeGPT])
+        #expect(await detector.calls.count == 1 && monitor.isRefreshingAccountBalances)
+        await detector.release(0, result: .success([balance(.zed, percent: 80)]))
+        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+        monitor.configureAccountBalanceProviders([.antigravity, .zed], antigravityGroups: [.claudeGPT])
+        try #require(await waitFor { await detector.calls.count == 2 })
+        await detector.release(1, result: .failure(URLError(.timedOut)))
+        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+        let pools = monitor.accountBalances.filter { $0.providers.contains(.antigravity) }
+        #expect(pools.map(\.quotaGroup) == ["claudeGPT"])
+        #expect(pools.first?.status == .unavailable && pools.first?.severity == nil)
+        monitor.configureAccountBalanceProviders([.antigravity], antigravityGroups: [])
+        #expect(monitor.accountBalances.isEmpty && !monitor.isRefreshingAccountBalances)
+        #expect(await detector.calls.count == 2, "Disabling all Antigravity pools must not start a credential or RPC query")
     }
 
     private func balance(_ provider: AIProvider, percent: Double, qoderRegion: AIAccountBalanceQoderRegion? = nil) -> AIAccountBalance {

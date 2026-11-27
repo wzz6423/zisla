@@ -86,6 +86,8 @@ public final class AIStateMonitor: ObservableObject {
     private var accountBalanceObservers: [NSObjectProtocol] = []
     private var accountBalanceProviders: Set<AIProvider> = []
     private var accountBalanceQoderRegions: Set<AIAccountBalanceQoderRegion> = [.global]
+    private var accountBalanceAntigravityGroups = Set(AIAccountBalanceAntigravityGroup.allCases)
+    private var accountBalanceGeminiSources = Set(AIAccountBalanceGeminiSource.allCases)
     private var accountBalanceTask: Task<Void, Never>?
     private var accountBalanceGeneration: UInt64 = 0
     private var lastAccountBalanceRefreshAt = Date.distantPast
@@ -525,19 +527,28 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     /// Invalidates old provider/region work and removes stale selection immediately, before the next query completes.
-    public func configureAccountBalanceProviders(_ providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion> = [.global]) {
+    public func configureAccountBalanceProviders(_ providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion> = [.global],
+                                                antigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
+                                                geminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases)) {
         #if DEBUG
             let fixtures = AIAccountBalanceDebug.balances(environment: debugEnvironment, now: now())
             let providers = fixtures.map { Set($0.flatMap(\.providers)) } ?? providers
             let qoderRegions: Set<AIAccountBalanceQoderRegion> = fixtures == nil ? qoderRegions : [.global]
         #endif
         let providersChanged = accountBalanceProviders != providers
-        guard providersChanged || accountBalanceQoderRegions != qoderRegions else { return }
+        let regionsChanged = accountBalanceQoderRegions != qoderRegions
+        let antigravityChanged = accountBalanceAntigravityGroups != antigravityGroups
+        let geminiChanged = accountBalanceGeminiSources != geminiSources
+        guard providersChanged || regionsChanged || antigravityChanged || geminiChanged else { return }
         accountBalanceProviders = providers
         accountBalanceQoderRegions = qoderRegions
-        guard providersChanged || providers.contains(.coder) else { return }
+        accountBalanceAntigravityGroups = antigravityGroups
+        accountBalanceGeminiSources = geminiSources
+        guard providersChanged || (regionsChanged && providers.contains(.coder))
+            || (antigravityChanged && providers.contains(.antigravity)) || (geminiChanged && providers.contains(.gemini)) else { return }
         cancelAccountBalanceRefresh()
         accountBalances = accountBalances.compactMap { balance in
+            guard balance.matchesAntigravityGroups(antigravityGroups), balance.matchesGeminiSources(geminiSources) else { return nil }
             if balance.providers.contains(.coder) {
                 guard let region = balance.qoderRegion, qoderRegions.contains(region) else { return nil }
             }
@@ -586,30 +597,45 @@ public final class AIStateMonitor: ObservableObject {
     /// Queries only while running, awake, selected, and past the throttle, with one quota task in flight.
     /// Cancellation reaches detached work; only the captured configuration generation may publish ephemeral balances.
     private func scheduleAccountBalanceRefresh() {
-        let providers = accountBalanceQoderRegions.isEmpty ? accountBalanceProviders.subtracting([.coder]) : accountBalanceProviders
+        var providers = accountBalanceQoderRegions.isEmpty ? accountBalanceProviders.subtracting([.coder]) : accountBalanceProviders
+        if accountBalanceAntigravityGroups.isEmpty { providers.remove(.antigravity) }
+        if accountBalanceGeminiSources.isEmpty { providers.remove(.gemini) }
         guard source != nil, !accountBalanceSuspended, !providers.isEmpty,
               let detector = accountBalanceDetector, accountBalanceTask == nil,
               now().timeIntervalSince(lastAccountBalanceRefreshAt) >= usageRefreshInterval else { return }
         lastAccountBalanceRefreshAt = now()
         let generation = accountBalanceGeneration
         let qoderRegions = accountBalanceQoderRegions
+        let antigravityGroups = accountBalanceAntigravityGroups
+        let geminiSources = accountBalanceGeminiSources
         isRefreshingAccountBalances = true
         accountBalanceTask = Task { [weak self] in
             guard !Task.isCancelled else { return }
-            let work = Task.detached(priority: .utility) { try await detector.accountBalances(for: providers, qoderRegions: qoderRegions) }
+            let work = Task.detached(priority: .utility) { [providers] in
+                try await detector.accountBalances(for: providers, qoderRegions: qoderRegions, geminiSources: geminiSources)
+            }
             let result = await withTaskCancellationHandler { await work.result } onCancel: { work.cancel() }
             guard !Task.isCancelled, let self, self.accountBalanceGeneration == generation else { return }
             self.accountBalanceTask = nil
             self.isRefreshingAccountBalances = false
             switch result {
-            case let .success(balances): self.accountBalances = balances
+            case let .success(balances):
+                self.accountBalances = balances.filter { $0.matchesAntigravityGroups(antigravityGroups) && $0.matchesGeminiSources(geminiSources) }
             case .failure:
                 self.accountBalances = AIAccountBalanceCatalog.queryGroups(for: providers, qoderRegions: qoderRegions).map { group in
                     let selected = group.providers.filter { providers.contains($0) }
                     var balance = AIAccountBalanceCatalog.placeholder(for: selected, qoderRegion: group.qoderRegion)
                     if balance.status == .notSignedIn || balance.status == .additionalCredentialsRequired { balance.status = .unavailable }
                     return balance
-                }
+                }.flatMap(AIAccountBalanceCatalog.antigravityBalances).flatMap { balance in
+                    guard balance.providers == [.gemini] else { return [balance] }
+                    return AIAccountBalanceGeminiSource.allCases.filter(geminiSources.contains).map { source in
+                        var row = balance
+                        row.id += ":" + source.rawValue
+                        row.quotaGroup = source.rawValue
+                        return row
+                    }
+                }.filter { $0.matchesAntigravityGroups(antigravityGroups) }
             }
         }
     }

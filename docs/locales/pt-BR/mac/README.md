@@ -48,7 +48,7 @@ O macOS 14 e versões posteriores são compatíveis. O macOS 26 usa Liquid Glass
 - **Notas contextuais e reuniões:** Mantenha pressionado o atalho de nota configurado e agite o ponteiro para anexar uma nota a uma página, janela ou à área de trabalho. Eventos de calendário com links de reunião mostram uma contagem regressiva 10 minutos antes do início; entre na reunião, crie uma nota ou vincule uma nota existente. Gerencie as notas contextuais na prateleira.
 - **Agitar para soltar:** Agite o ponteiro enquanto arrasta arquivos para mostrar o destino de soltura; ajuste esse gesto independentemente em Ajustes.
 - **Saída de áudio e preferências do player:** Escolha um dispositivo de saída na área de mídia. Ajustes permite selecionar uma fonte automática ou um player preferido, o layout compacto de mídia e as condições de parada dos sons ambientes.
-- **Cotas e redefinições de IA:** Monitoramento de IA e Ajustes mostram as cotas de contas compatíveis, os horários de amostragem e redefinição e os avisos de cota baixa, incluindo janelas 5h/7d disponíveis e orçamentos Cursor em USD. Essas informações são separadas do histórico de tokens registrado localmente.
+- **Cotas e redefinições de IA:** Monitoramento de IA e Ajustes mostram as cotas de contas compatíveis, os horários de amostragem e redefinição e os avisos de cota baixa, incluindo janelas 5h/7d disponíveis e orçamentos Cursor em USD. Essas informações são separadas do histórico de tokens registrado localmente. As cotas Gemini e Claude/GPT do Antigravity têm monitoramento, exibição e alertas independentes. As cotas de conversa do Gemini App usam um Cookie da web da mesma conta Google; o Gemini CLI continua separado.
 
 ### Ordem de teclado de ações rápidas
 

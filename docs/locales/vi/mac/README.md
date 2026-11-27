@@ -48,7 +48,7 @@ Hỗ trợ macOS 14 trở lên. macOS 26 dùng Liquid Glass; 14/15 dùng vật l
 - **Ghi chú theo ngữ cảnh/họp:** Giữ phím ghi chú và lắc để gắn trang/cửa sổ/màn hình. Sự kiện có liên kết đếm 10 phút trước; tham gia, tạo hoặc nối ghi chú. Quản lý ở kệ.
 - **Lắc để thả:** Lắc con trỏ khi kéo tệp để hiện vùng thả; cử chỉ này có công tắc riêng trong Cài đặt.
 - **Đầu ra âm thanh và tùy chọn trình phát:** Chọn thiết bị đầu ra trong vùng đa phương tiện. Cài đặt cho phép chọn nguồn tự động hoặc trình phát ưu tiên, bố cục gọn và điều kiện dừng âm thanh môi trường.
-- **Hạn mức và đặt lại AI:** Theo dõi AI và Cài đặt hiển thị hạn mức tài khoản được hỗ trợ, thời gian lấy mẫu, thời gian đặt lại và cảnh báo sắp hết, gồm các cửa sổ 5h/7d có sẵn và ngân sách Cursor bằng USD. Dữ liệu này tách biệt với lịch sử token được ghi tại máy.
+- **Hạn mức và đặt lại AI:** Theo dõi AI và Cài đặt hiển thị hạn mức tài khoản được hỗ trợ, thời gian lấy mẫu, thời gian đặt lại và cảnh báo sắp hết, gồm các cửa sổ 5h/7d có sẵn và ngân sách Cursor bằng USD. Dữ liệu này tách biệt với lịch sử token được ghi tại máy. Hạn mức Gemini và Claude/GPT của Antigravity có theo dõi, hiển thị và cảnh báo riêng. Hạn mức trò chuyện Gemini App dùng Cookie web của cùng tài khoản Google; Gemini CLI được theo dõi riêng.
 
 ### Thứ tự phím Thao tác Nhanh
 
