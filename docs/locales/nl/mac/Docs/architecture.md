@@ -8,6 +8,8 @@ In de verborgen toestand is er geen transparant venster. `PointerEdgeMonitor` in
 
 Elk scherm krijgt een stabiele identiteit door `NSScreenNumber` aan zijn `CGDirectDisplayID` te koppelen. Het ontwerp is verankerd aan `screen.frame.maxY` en ondersteunt negatieve coördinaten, verticaal gestapelde schermen en externe schermen zonder notch.
 
+Als meerdere schermen zijn aangesloten, kun je onder Instellingen → Algemeen → Schermmodi per scherm de Dynamic Island-modus (camerapositie of eigen positie), notch-modus of verbergen kiezen. Met één scherm is deze instelling verborgen en geldt de algemene weergave; na opnieuw aansluiten worden de opgeslagen scherminstellingen hersteld.
+
 ## Venster
 
 Het hoofdeiland heeft één `.borderless + .nonactivatingPanel`:

@@ -21,6 +21,51 @@ public enum IslandPlacementMode: String, Codable, CaseIterable, Sendable {
     case custom
 }
 
+public enum IslandDisplayMode: String, Codable, CaseIterable, Sendable {
+    case notch
+    case pill
+    case hidden
+
+    public var layoutStyle: IslandLayoutStyle? {
+        switch self {
+        case .notch: .notch
+        case .pill: .pill
+        case .hidden: nil
+        }
+    }
+}
+
+public struct IslandDisplaySettings: Codable, Equatable, Sendable {
+    public var mode: IslandDisplayMode
+    public var placement: IslandPlacement {
+        didSet {
+            if placement.mode == .custom { lastCustomPlacement = placement }
+        }
+    }
+    public private(set) var lastCustomPlacement: IslandPlacement?
+
+    public init(mode: IslandDisplayMode = .notch, placement: IslandPlacement = IslandPlacement(),
+                lastCustomPlacement: IslandPlacement? = nil) {
+        self.mode = mode
+        self.placement = placement
+        self.lastCustomPlacement = placement.mode == .custom ? placement : lastCustomPlacement
+    }
+
+    public func placement(for mode: IslandPlacementMode) -> IslandPlacement? {
+        mode == .camera ? IslandPlacement() : lastCustomPlacement
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            mode: (try? container.decode(IslandDisplayMode.self, forKey: .mode)) ?? .notch,
+            placement: (try? container.decode(IslandPlacement.self, forKey: .placement)) ?? IslandPlacement(),
+            lastCustomPlacement: (try? container.decode(IslandPlacement.self, forKey: .lastCustomPlacement))
+                .flatMap { $0.mode == .custom ? $0 : nil }
+        )
+    }
+}
+
 public struct IslandPlacement: Codable, Equatable, Sendable {
     public var mode: IslandPlacementMode
     public var edge: IslandEdge

@@ -38,6 +38,7 @@ macOS 14 ve sonrası desteklenir. macOS 26 Liquid Glass kullanır; macOS 14/15 y
 - **Güncellemeler:** Seçilen Release veya Preview kanalı genel çıkış ülkesini her çalışmada bir kez çözer. `CN` önce imzalı Gitee appcast'ini, sonra bir kez GitHub'ı dener; diğerleri GitHub sonra bir kez Gitee. Sorgu yoksa Gitee önceliği korunur. Sparkle indirir, doğrular, kurar ve yeniden başlatır. Kanal değişimi otomatik ve elle denetimi etkiler.
 - **Görünüm ve etkileşim:** Ayarlar sistem/açık/koyu görünümü seçer. Ada saydam veya buzlu yüzey, sabit genişleme, çoklu ekran, Spaces ve çentiksiz harici ekran sunar.
 - **Varsayılanlar:** Yeni kurulumlarda modüller açıktır. Her özellik, daraltılmış gösterge, yan bildirim, menü ölçümü ve güncelleme davranışı ayrıdır; mevcut kurulumlar ayarlarını korur.
+- Birden çok ekran bağlıyken Ayarlar → Genel → Ekran Modları bölümünde her ekran için Dynamic Island modu (kamera veya özel konum), çentik modu ya da gizleme seçilebilir. Tek ekranda bu ayar gizlenir ve genel görünüm kullanılır; yeniden bağlanınca her ekranın kayıtlı yapılandırması geri yüklenir.
 
 ### Bağımsız araçlar ve iş akışları
 

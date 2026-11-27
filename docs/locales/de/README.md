@@ -102,6 +102,7 @@ Der Downloader benötigt `yt-dlp`; `ffmpeg` ist optional. Office-zu-PDF-Konverti
 ## Für ungestörtes Arbeiten gestaltet
 
 - Unterstützt mehrere Displays, Spaces und gewöhnliche Vollbild-Apps, ohne die aktuelle App zu aktivieren oder ihr den Fokus zu nehmen.
+- Bei mehreren angeschlossenen Bildschirmen lässt sich unter Einstellungen → Allgemein → Bildschirmmodi für jeden Bildschirm der Dynamic Island-Modus (Kameraposition oder eigene Position), der Notch-Modus oder das Ausblenden wählen. Bei einem Bildschirm ist diese Einstellung verborgen und die globale Darstellung gilt; beim erneuten Anschließen werden die gespeicherten Einstellungen wiederhergestellt.
 - Im verborgenen Zustand gibt es keine dauerhafte transparente Auslösefensterfläche und keine Bildschleife; globale Ereignisüberwachung und Geometrieprüfungen lösen das Aufklappen aus.
 - Nutzt ein Systemmaterial und wechselt bei aktivierter Transparenzreduzierung zu einem undurchsichtigen Hintergrund.
 - Erkennt eine physische Notch anhand des sicheren Systembereichs; externe Displays ohne Notch erhalten ein Overlay mit demselben Umriss.

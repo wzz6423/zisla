@@ -443,7 +443,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             layoutStyle: model.settingsStore.settings.islandLayoutStyle,
             placement: model.settingsStore.settings.islandPlacement,
             pillSize: CGSize(width: model.settingsStore.settings.islandPillWidth, height: model.settingsStore.settings.islandPillHeight),
-            edgeInset: model.settingsStore.settings.islandEdgeInset
+            edgeInset: model.settingsStore.settings.islandEdgeInset,
+            displaySettings: model.settingsStore.settings.islandDisplaySettings
         ))
         let persistentPetRootView = { (layout: ScreenOverlayLayout) in
             AppLanguageEnvironment(languageStore: model.languageStore, content: CollapsedPetView(
@@ -471,7 +472,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     compactBarFrame: SideNoticeLayoutEngine().compactBarFrame(
                         for: layout,
                         notices: notices,
-                        settings: model.settingsStore.settings,
+                        settings: model.settingsStore.settings.islandSettings(for: layout),
                         browserDownloadCount: model.settingsStore.settings.showsBrowserDownloadProgress
                             ? model.browserDownloads.snapshots.count : 0
                     ),
@@ -526,8 +527,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             model.islandScreenLayout = layout
             if let displayID = layout?.displayID { self?.noticePresenter?.publishCompactLayout(on: displayID) }
         }
-        model.onChooseIslandPlacement = { [weak self, weak coordinator] in
+        coordinator.onPinnedChanged = { pinned in model.isPinned = pinned }
+        model.onChooseIslandPlacement = { [weak self, weak coordinator] displayID in
             guard let self else { return }
+            let target = displayID.flatMap { id in
+                NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)).first { $0.displayID == id }
+            }
+            if displayID != nil, target == nil { return }
+            let displaySettings = target.map { model.settingsStore.settings.islandDisplaySettings(for: $0.persistentID) }
             let selector = self.islandPlacementController ?? IslandPlacementController()
             guard !selector.isSelecting else { return }
             self.islandPlacementController = selector
@@ -535,10 +542,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             coordinator?.setHoverActivationSuspended(true)
             self.noticePresenter?.setPlacementSelectionActive(true)
             selector.show(
-                initialPlacement: model.settingsStore.settings.islandPlacement,
+                initialPlacement: displaySettings?.placement ?? model.settingsStore.settings.islandPlacement,
                 configuration: model.settingsStore.settings.islandScreenConfiguration,
+                displayID: displayID,
                 completion: { [weak self, weak coordinator] placement in
-                    model.settingsStore.settings.islandPlacement = placement
+                    if let target, var displaySettings {
+                        displaySettings.placement = placement
+                        model.settingsStore.settings.islandDisplaySettings[target.persistentID] = displaySettings
+                    } else {
+                        model.settingsStore.settings.islandPlacement = placement
+                    }
                     coordinator?.setHoverActivationSuspended(false)
                     self?.noticePresenter?.setPlacementSelectionActive(false)
                 },
@@ -735,6 +748,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
+            }
+            .store(in: &cancellables)
+
         model.$systemMonitorHeadphoneTransient
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
@@ -781,7 +800,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         layoutStyle: configuration.layoutStyle,
                         placement: configuration.placement,
                         pillSize: configuration.pillSize,
-                        edgeInset: configuration.edgeInset
+                        edgeInset: configuration.edgeInset,
+                        displaySettings: configuration.displaySettings
                     )
                 }
             }
@@ -917,9 +937,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             isTeleprompterPresented: model.isTeleprompterPresented,
                             dashboardCardCount: model.dashboardCardCount,
                             includesPet: model.settingsStore.settings.petEnabled,
-                            layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+                            layoutStyle: model.islandScreenLayout?.style ?? model.settingsStore.settings.islandLayoutStyle,
                             contentTopInset: IslandRootView.contentTopInset(
-                                layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+                                layoutStyle: model.islandScreenLayout?.style ?? model.settingsStore.settings.islandLayoutStyle,
                                 screenLayout: model.islandScreenLayout
                             )
                         ).panelSize
@@ -1185,9 +1205,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 return Self.expandedPanelSize(
                     module: module, isMirrorPresented: mirror,
                     isTeleprompterPresented: teleprompter, dashboardCardCount: cardCount,
-                    includesPet: settings.petEnabled, layoutStyle: settings.islandLayoutStyle,
+                    includesPet: settings.petEnabled, layoutStyle: layout?.style ?? settings.islandLayoutStyle,
                     contentTopInset: IslandRootView.contentTopInset(
-                        layoutStyle: settings.islandLayoutStyle, screenLayout: layout
+                        layoutStyle: layout?.style ?? settings.islandLayoutStyle, screenLayout: layout
                     )
                 ).panelSize
             }
@@ -1400,7 +1420,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             IslandStatusIcon.Reading(metric: metric,
                                      text: SystemMonitorCombinedMenuBarPresentation.value(metric, snapshot: AppModel.shared.systemMonitor.snapshot))
         }
-        let icons = IslandStatusIconRouting.update(destination: settings.effectiveStatusIconDestination,
+        let displayIDs = NSScreen.screens.compactMap { ScreenSnapshot(screen: $0)?.persistentID }
+        let destination = settings.supportsStatusIconsInIsland(on: displayIDs) ? settings.statusIconDestination : .menuBar
+        let icons = IslandStatusIconRouting.update(destination: destination,
                                                    application: statusItem, metrics: metrics, stacked: mergedMonitorStatusItem, readings: readings,
                                                    combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle,
                                                    islandAppIconEnabled: settings.islandAppIconEnabled)

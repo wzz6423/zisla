@@ -7,6 +7,7 @@ import SwiftUI
 
 @MainActor
 final class SideNoticeDisplayState: ObservableObject {
+    @Published var islandLayoutStyle: IslandLayoutStyle?
     @Published var islandEdge: IslandEdge = .top
     @Published var placementMode: IslandPlacementMode = .camera
     @Published var compactWingsEnabled = true
@@ -230,6 +231,16 @@ struct CompactStatusBarView: View {
 
     private var height: CGFloat { displayState.compactWingHeight }
 
+    private var settings: FeatureSettings {
+        var settings = settingsStore.settings
+        if let style = displayState.islandLayoutStyle {
+            settings.islandLayoutStyle = style
+            settings.islandPlacement.mode = displayState.placementMode
+            settings.islandPlacement.edge = displayState.islandEdge
+        }
+        return settings
+    }
+
     var body: some View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0,
                                 paused: pausesCompactTimeline)) { context in
@@ -263,7 +274,7 @@ struct CompactStatusBarView: View {
         let progressPriority = compactProgressPriority(for: information)
         let pillCornerRadius: CGFloat? = information.map { $0.rowCount > 1 } == true
             ? VoiceRecordingIslandGeometry.bottomCornerRadius : nil
-        let shape = CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle,
+        let shape = CompactIslandShape(layoutStyle: settings.islandLayoutStyle,
                                        pillCornerRadius: pillCornerRadius)
         return ZStack {
             if let information {
@@ -285,7 +296,7 @@ struct CompactStatusBarView: View {
 
                 } else {
                     compactStatusContent
-                        .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill
+                        .padding(.horizontal, settings.islandLayoutStyle == .pill
                             && !(selectedCompactStatusPriority == .transient
                                 && (transientNotice?.style == .headphone
                                     || transientNotice.map(AIAccountBalance.isLowBalanceNotice) == true)) ? 10 : 0)
@@ -311,7 +322,7 @@ struct CompactStatusBarView: View {
                 CollapsedProgressGlow(
                     progress: progress,
                     tint: compactProgressTint(for: progressPriority),
-                    layoutStyle: settingsStore.settings.islandLayoutStyle,
+                    layoutStyle: settings.islandLayoutStyle,
                     pillCornerRadius: pillCornerRadius,
                     usesBottomTrack: true,
                     animatesProgress: progressPriority != .media
@@ -357,7 +368,7 @@ struct CompactStatusBarView: View {
         guard resultSweep.current == nil else { return nil }
         return FloatingIslandInformationLayout(
             notices: displayState.compactStatusHidden ? [] : presentationNotices,
-            icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
+            icons: displayState.statusIcons, settings: settings, item: media.snapshot, at: date
         )
     }
 
@@ -397,7 +408,7 @@ struct CompactStatusBarView: View {
     }
 
     private var usesCustomPill: Bool {
-        settingsStore.settings.islandLayoutStyle == .pill && displayState.placementMode == .custom
+        settings.islandLayoutStyle == .pill && displayState.placementMode == .custom
     }
 
     private var showsCustomLyrics: Bool {
@@ -412,7 +423,7 @@ struct CompactStatusBarView: View {
     private func customStatusContent(at date: Date, animatesLogo: Bool) -> some View {
         let sizing = SideNoticeLayoutEngine().compactBarSizing(
             for: presentationNotices,
-            settings: settingsStore.settings,
+            settings: settings,
             browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
                 ? browserDownloads.snapshots.count : 0
         )
@@ -431,7 +442,7 @@ struct CompactStatusBarView: View {
             let thickness = resultSweep.current == nil ? height
                 : max(CGFloat(settingsStore.settings.islandPillHeight), CompactPillStatusPresentation.minimumThickness)
             let text = CompactPillStatusContent.displayText(
-                for: presentation, settings: settingsStore.settings, item: media.snapshot, at: date
+                for: presentation, settings: settings, item: media.snapshot, at: date
             )
             let length = presentation.length(
                 thickness: thickness, edge: displayState.islandEdge, text: text, item: media.snapshot
@@ -464,7 +475,9 @@ struct CompactStatusBarView: View {
     }
 
     private var presentationNotices: [IslandNotice] {
-        let notices = resultSweep.presentationNotices(from: queue.left + queue.right)
+        let notices = resultSweep.presentationNotices(from: queue.left + queue.right).filter {
+            $0.id != AIAccountBalanceNoticeController.pinnedID || settings.supportsStatusIconsInIsland
+        }
         return displayState.hidesVoiceProcessingIndicator
             ? notices.filter { !$0.id.hasPrefix("voice-processing-") } : notices
     }
@@ -507,7 +520,7 @@ struct CompactStatusBarView: View {
 
     var recordingOperationNotice: IslandNotice? {
         SideNoticeLayoutEngine.screenRecordingOperationNotice(for: presentationNotices,
-                                                              settings: settingsStore.settings)
+                                                              settings: settings)
     }
 
     private var focusCountdownNotice: IslandNotice? {
@@ -553,7 +566,7 @@ struct CompactStatusBarView: View {
     var selectedCompactStatusPriority: CompactStatusPriority? {
         SideNoticeLayoutEngine.selectedCompactStatusPriority(
             for: presentationNotices,
-            settings: settingsStore.settings,
+            settings: settings,
             systemMonitorAvailable: displayState.systemMonitorAvailable
         )
     }

@@ -797,6 +797,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var supportsStatusIconsInIsland: Bool {
         islandLayoutStyle == .pill && islandPlacement.mode == .custom
     }
+    public func supportsStatusIconsInIsland(on displayIDs: [String]) -> Bool {
+        guard displayIDs.count > 1 else { return supportsStatusIconsInIsland }
+        return displayIDs.contains { id in
+            let settings = islandDisplaySettings(for: id)
+            return settings.mode == .pill && settings.placement.mode == .custom
+        }
+    }
     public var effectiveStatusIconDestination: StatusIconDestination {
         supportsStatusIconsInIsland ? statusIconDestination : .menuBar
     }
@@ -916,6 +923,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaVisualizationStyle: MediaVisualizationStyle
     public var islandShowMoreInformation: Bool
     public var islandLayoutStyle: IslandLayoutStyle
+    public var islandDisplaySettings: [String: IslandDisplaySettings]
     public var islandPlacement: IslandPlacement {
         didSet {
             if islandPlacement.mode == .custom {
@@ -926,6 +934,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public private(set) var lastCustomIslandPlacement: IslandPlacement?
     public func islandPlacement(for mode: IslandPlacementMode) -> IslandPlacement? {
         mode == .camera ? IslandPlacement() : lastCustomIslandPlacement
+    }
+    public func islandDisplaySettings(for persistentID: String) -> IslandDisplaySettings {
+        islandDisplaySettings[persistentID] ?? IslandDisplaySettings(
+            mode: islandLayoutStyle == .pill ? .pill : .notch,
+            placement: islandPlacement, lastCustomPlacement: lastCustomIslandPlacement
+        )
     }
     public private(set) var islandPillWidth: Double
     public private(set) var islandPillHeight: Double
@@ -1087,6 +1101,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaVisualizationStyle: MediaVisualizationStyle = .waveform,
         islandShowMoreInformation: Bool = true,
         islandLayoutStyle: IslandLayoutStyle = .notch,
+        islandDisplaySettings: [String: IslandDisplaySettings] = [:],
         islandPlacement: IslandPlacement = IslandPlacement(),
         islandPillWidth: Double = 180,
         islandPillHeight: Double = 32,
@@ -1244,6 +1259,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mediaVisualizationStyle = mediaVisualizationStyle
         self.islandShowMoreInformation = islandShowMoreInformation
         self.islandLayoutStyle = islandLayoutStyle
+        self.islandDisplaySettings = islandDisplaySettings
         self.islandPlacement = islandPlacement
         self.lastCustomIslandPlacement = islandPlacement.mode == .custom ? islandPlacement : nil
         self.islandPillWidth = 80
@@ -1418,6 +1434,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mediaVisualizationStyle
         case islandShowMoreInformation
         case islandLayoutStyle
+        case islandDisplaySettings
         case islandPlacement
         case lastCustomIslandPlacement
         case islandPillWidth
@@ -1794,6 +1811,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             ?? defaults.islandShowMoreInformation
         islandLayoutStyle = try container.decodeIfPresent(IslandLayoutStyle.self, forKey: .islandLayoutStyle)
             ?? defaults.islandLayoutStyle
+        islandDisplaySettings = (try? container.decode([String: IslandDisplaySettings].self, forKey: .islandDisplaySettings)) ?? [:]
         islandPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .islandPlacement)
             ?? defaults.islandPlacement
         if islandPlacement.mode == .custom {

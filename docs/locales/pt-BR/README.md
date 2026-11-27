@@ -102,6 +102,7 @@ O downloader exige `yt-dlp`; `ffmpeg` é opcional. Office para PDF exige LibreOf
 ## Projetado para não atrapalhar
 
 - Admite várias telas, Spaces e aplicações comuns em tela cheia sem ativar nem tirar o foco da aplicação atual.
+- Com várias telas conectadas, Ajustes → Geral → Modos de tela permite escolher para cada tela o modo Dynamic Island (posição da câmera ou personalizada), o modo notch ou ocultar. Com uma tela, esse ajuste fica oculto e vale a aparência global; ao reconectar, as configurações salvas de cada tela são restauradas.
 - Oculto, não mantém janela transparente permanente de ativação nem ciclo de quadros; eventos globais e geometria disparam expansão.
 - Usa um material do sistema e fundo opaco quando Reduzir Transparência está ativo.
 - Detecta recorte físico pela área segura; telas externas sem recorte usam sobreposição de mesmo contorno.

@@ -30,12 +30,12 @@ struct SettingsSearchItem: Identifiable, Equatable {
 
 enum SettingsSearchIndex {
     static func results(for query: String, settings: FeatureSettings, locale: Locale,
-                        displayCount: Int = NSScreen.screens.count) -> [SettingsSearchItem] {
+                        displayCount: Int = NSScreen.screens.count, displayIDs: [String]? = nil) -> [SettingsSearchItem] {
         let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !terms.isEmpty else { return [] }
         let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]
 
-        let matches = items(settings: settings, displayCount: displayCount).filter { item in
+        let matches = items(settings: settings, displayCount: displayCount, displayIDs: displayIDs).filter { item in
             let keys = [item.title, item.section.title] + item.keywords
             let text = keys.flatMap {
                 [$0, AppLocalization.string($0, locale: locale)]
@@ -59,8 +59,11 @@ enum SettingsSearchIndex {
     }
 
     /// Aliases stay attached to typed destinations so localized searches retain row targets and feature visibility.
-    static func items(settings: FeatureSettings, displayCount: Int = NSScreen.screens.count) -> [SettingsSearchItem] {
+    static func items(settings: FeatureSettings, displayCount: Int = NSScreen.screens.count,
+                      displayIDs: [String]? = nil) -> [SettingsSearchItem] {
         var items: [SettingsSearchItem] = []
+        let supportsCustomIsland = displayIDs.map { settings.supportsStatusIconsInIsland(on: $0) }
+            ?? settings.supportsStatusIconsInIsland
 
         func rows(_ section: SettingsSection, _ titles: [String]) {
             items += titles.map {
@@ -72,9 +75,13 @@ enum SettingsSearchIndex {
             items.append(SettingsSearchItem(section: section, title: title, anchor: anchor, keywords: keywords))
         }
 
-        rows(.general, ["界面语言", "界面外观", "灵动岛样式", "灵动岛展开材质", "灵动岛收起材质"])
-        if settings.islandLayoutStyle == .pill {
-            rows(.general, ["灵动岛位置"])
+        rows(.general, ["界面语言", "界面外观", "灵动岛展开材质", "灵动岛收起材质"])
+        if displayCount > 1 {
+            entry(.general, "显示器模式", anchor: .group("显示器模式"),
+                  keywords: ["灵动岛样式", "灵动岛位置", "灵动岛模式", "刘海模式", "在该屏幕不显示", "摄像头位置", "其他位置", "调整位置"])
+        } else {
+            rows(.general, ["灵动岛样式"])
+            if settings.islandLayoutStyle == .pill { rows(.general, ["灵动岛位置"]) }
         }
         entry(.general, "登录时启动", anchor: .row("登录时启动"), keywords: ["开机或登录后自动在后台运行", "需要系统批准"])
 
@@ -139,7 +146,7 @@ enum SettingsSearchIndex {
         if settings.userCareEnabled {
             entry(.notifications, "关怀提醒间隔", anchor: .row("关怀提醒间隔"), keywords: ["用户关怀", "小时", "分钟", "秒"])
         }
-        if settings.supportsStatusIconsInIsland {
+        if supportsCustomIsland {
             rows(.info, ["显示应用标识"])
             entry(.info, "展示更多信息", anchor: .row("展示更多信息"),
                   keywords: ["同时展示监控、AI、音乐与状态提示，详细音乐另起一行"])
@@ -196,7 +203,7 @@ enum SettingsSearchIndex {
         rows(.recording, ["恢复默认快捷键"])
 
         rows(.ai, ["低额度提醒", "收起态额度样式", "AI 任务结果扫光"])
-        if settings.supportsStatusIconsInIsland {
+        if supportsCustomIsland {
             entry(.ai, "常驻额度信息", anchor: .row("常驻额度信息"), keywords: ["其他位置常驻额度"])
         }
         entry(.ai, "各供应商额度", anchor: .group("各供应商额度"),

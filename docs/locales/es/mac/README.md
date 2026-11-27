@@ -38,6 +38,7 @@ Se admite macOS 14 y posteriores. macOS 26 usa Liquid Glass; macOS 14/15 recurre
 - **Actualizaciones:** El canal Release o Preview resuelve una vez por ejecución el código de país de salida pública. `CN` consulta primero el appcast firmado de Gitee y reintenta GitHub una vez; otros códigos consultan GitHub y reintentan Gitee una vez. Si la consulta no está disponible, Gitee sigue primero. Sparkle descarga, verifica, instala y reinicia. Cambiar canal afecta comprobaciones automáticas y manuales.
 - **Apariencia e interacción:** Ajustes sigue el sistema o usa tema claro u oscuro. La isla admite superficies transparentes o esmeriladas, expansión fijada, varios monitores, Spaces y pantallas externas sin muesca.
 - **Valores predeterminados:** Las instalaciones nuevas habilitan los módulos. Cada función, indicador contraído, aviso lateral, métrica de menú y comportamiento de actualización se ajusta independientemente; las instalaciones anteriores conservan su configuración.
+- Con varias pantallas conectadas, Ajustes → General → Modos de pantalla permite elegir para cada una el modo Dynamic Island (posición de cámara o personalizada), el modo muesca u ocultarla. Con una sola pantalla, este ajuste se oculta y se usa la apariencia global; al volver a conectarlas se recupera la configuración guardada de cada pantalla.
 
 ### Herramientas independientes y flujos
 

@@ -898,7 +898,7 @@ struct StatusIconDestinationIntegrationTests {
             .deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
         #expect(source.components(separatedBy: "status-icon-destination-selection").count == 2)
-        #expect(source.contains("settingsStore.settings.effectiveStatusIconDestination"))
+        #expect(source.contains("settingsStore.settings.statusIconDestination"))
         let row = try NSRegularExpression(pattern: #"settingRow\(symbol:\s*"menubar\.rectangle",\s*title:\s*"([^"]+)",\s*detail:\s*""\)\s*\{\s*IslandOutlinedPicker\([\s\S]*?selectionID:\s*"status-icon-destination-selection""#)
         let matches = row.matches(in: source, range: NSRange(source.startIndex..., in: source))
         #expect(matches.count == 1)
@@ -956,7 +956,7 @@ struct StatusIconDestinationIntegrationTests {
         let destination = try #require(workflow.range(of: "title: \"机器监控状态显示位置\""))
         let monitorOptions = try #require(workflow.range(of: "if model.settingsStore.settings.systemMonitorEnabled {"))
         #expect(destination.lowerBound < monitorOptions.lowerBound)
-        let conditionalRow = try NSRegularExpression(pattern: #"if settingsStore\.settings\.supportsStatusIconsInIsland\s*\{\s*rowDivider\s*settingRow\(symbol: "menubar\.rectangle", title: "机器监控状态显示位置", detail: ""\)\s*\{[\s\S]*?\n                \}\n                if model\.settingsStore\.settings\.systemMonitorEnabled"#)
+        let conditionalRow = try NSRegularExpression(pattern: #"if supportsCustomIsland\s*\{\s*rowDivider\s*settingRow\(symbol: "menubar\.rectangle", title: "机器监控状态显示位置", detail: ""\)\s*\{[\s\S]*?\n                \}\n                if model\.settingsStore\.settings\.systemMonitorEnabled"#)
         #expect(conditionalRow.numberOfMatches(in: workflow, range: NSRange(workflow.startIndex..., in: workflow)) == 1,
                 "The destination row and its divider must be absent when only the menu bar is supported")
     }

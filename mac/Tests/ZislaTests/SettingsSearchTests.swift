@@ -6,6 +6,33 @@ import ZislaKit
 @testable import Zisla
 
 struct SettingsSearchTests {
+    @Test
+    func customIslandControlsFollowConnectedDisplaysRatherThanTheGlobalMode() {
+        let settings = FeatureSettings(islandDisplaySettings: [
+            "external": IslandDisplaySettings(mode: .pill, placement: IslandPlacement(mode: .custom)),
+        ])
+        let titles: Set<String> = ["显示应用标识", "展示更多信息", "机器监控状态显示位置", "常驻额度信息"]
+        let connected = SettingsSearchIndex.items(settings: settings, displayCount: 2, displayIDs: ["built-in", "external"])
+        #expect(titles.isSubset(of: Set(connected.map(\.title))))
+        let disconnected = SettingsSearchIndex.items(settings: settings, displayCount: 2, displayIDs: ["built-in", "another"])
+        #expect(titles.isDisjoint(with: Set(disconnected.map(\.title))))
+        #expect(SettingsView.compactStatusPriorities(settings: settings, hasSystemMonitorIcons: true,
+                                                     displayIDs: ["built-in", "external"]).contains(.systemMonitor))
+        #expect(!SettingsView.compactStatusPriorities(settings: settings, hasSystemMonitorIcons: true,
+                                                      displayIDs: ["built-in", "another"]).contains(.systemMonitor))
+    }
+    @Test(arguments: AppLanguage.allCases, [0, 1, 2, 3])
+    func displayModeSearchOnlyAppearsWhileMultipleDisplaysAreConnected(language: AppLanguage, displayCount: Int) {
+        let settings = FeatureSettings.default
+        let items = SettingsSearchIndex.items(settings: settings, displayCount: displayCount)
+        #expect(items.contains { $0.title == "显示器模式" } == (displayCount > 1))
+        for key in ["显示器模式", "在该屏幕不显示"] {
+            let matches = SettingsSearchIndex.results(for: AppLocalization.string(key, language: language),
+                                                      settings: settings, locale: language.locale, displayCount: displayCount)
+            #expect(matches.contains { $0.section == .general && $0.anchor == .group("显示器模式") } == (displayCount > 1))
+        }
+        #expect(settings == .default)
+    }
     @Test(arguments: AppLanguage.allCases, [false, true]) @MainActor
     func aiQuotaSearchNavigatesToAIWithoutDuplicateFeatureSettings(language: AppLanguage, aiEnabled: Bool) throws {
         let settings = FeatureSettings(aiProgressEnabled: aiEnabled,
@@ -321,7 +348,7 @@ struct SettingsSearchTests {
         #expect(results("界面语言", locale: .init(identifier: "en")).map(\.title) == ["界面语言"])
         #expect(results("general", locale: .init(identifier: "fr")).allSatisfy { $0.section == .general })
         #expect(Set(results("general", locale: .init(identifier: "fr")).map(\.title))
-            == ["界面语言", "界面外观", "灵动岛样式", "灵动岛展开材质", "灵动岛收起材质", "登录时启动"])
+            == ["界面语言", "界面外观", "显示器模式", "灵动岛展开材质", "灵动岛收起材质", "登录时启动"])
     }
 
     @Test(arguments: AppLanguage.allCases)
@@ -444,7 +471,7 @@ struct SettingsSearchTests {
         var settings = Self.enabledSettings
         settings.islandLayoutStyle = .pill
         let items = SettingsSearchIndex.items(settings: settings, displayCount: 2)
-        #expect(items.contains { $0.title == "灵动岛位置" })
+        #expect(items.contains { $0.title == "显示器模式" && $0.keywords.contains("灵动岛位置") })
         #expect(!items.contains { $0.title == "药丸宽度" })
         #expect(!items.contains { $0.title == "药丸高度" })
         #expect(results("药丸宽度", settings: settings).isEmpty)

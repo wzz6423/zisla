@@ -161,7 +161,7 @@ export const ptBR = createCatalog({
     features: {
       floatingIsland: {
         title: 'Uma ilha flutuante que se adapta',
-        description: 'Use a posição da câmera ou escolha uma posição na borda da tela. A posição personalizada é lembrada ao trocar de modo. Layouts compactos horizontais e verticais ajustam o comprimento a ícones, tarefas de IA, downloads e mídia, com uma opção para exibir mais informações. Reordene os módulos arrastando em Ajustes → Layout da Dynamic Island ou restaure a ordem padrão. Na mesma página, você pode definir a prioridade das informações de status compactas.',
+        description: 'Use a posição da câmera ou escolha uma posição na borda da tela. A posição personalizada é lembrada ao trocar de modo. Layouts compactos horizontais e verticais ajustam o comprimento a ícones, tarefas de IA, downloads e mídia, com uma opção para exibir mais informações. Reordene os módulos arrastando em Ajustes → Layout da Dynamic Island ou restaure a ordem padrão. Na mesma página, você pode definir a prioridade das informações de status compactas. Com várias telas conectadas, Ajustes → Geral → Modos de tela permite escolher para cada tela o modo Dynamic Island (posição da câmera ou personalizada), o modo notch ou ocultar. Com uma tela, esse ajuste fica oculto e vale a aparência global; ao reconectar, as configurações salvas de cada tela são restauradas.',
         detail: 'Posição personalizada · Ícones persistentes · Informações adaptáveis',
       },
       dailyBriefing: {
@@ -622,7 +622,7 @@ export const ptBR = createCatalog({
       },
       multiDisplay: {
         question: 'O zisla funciona com vários monitores?',
-        answer: 'Sim: vários monitores, Spaces e apps em tela cheia; expandir nunca rouba o foco.',
+        answer: 'Sim: vários monitores, Spaces e apps em tela cheia; expandir nunca rouba o foco. Com várias telas conectadas, Ajustes → Geral → Modos de tela permite escolher para cada tela o modo Dynamic Island (posição da câmera ou personalizada), o modo notch ou ocultar. Com uma tela, esse ajuste fica oculto e vale a aparência global; ao reconectar, as configurações salvas de cada tela são restauradas.',
       },
       intel: {
         question: 'Posso usar em um Mac Intel?',

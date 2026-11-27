@@ -6,6 +6,30 @@ import Testing
 
 struct FeatureSettingsStoreTests {
     @Test @MainActor
+    func displayModesAndPositionsSurviveRelaunchAndResetIndependently() throws {
+        let suite = "Zisla.DisplayModes.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        store.settings.islandDisplaySettings = [
+            "built-in": IslandDisplaySettings(mode: .hidden),
+            "external": IslandDisplaySettings(mode: .pill, placement: IslandPlacement(mode: .custom, edge: .left, offset: 0.3)),
+        ]
+        store.settings.mediaEnabled = false
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings == store.settings)
+        restored.settings.islandDisplaySettings["external"]?.placement = IslandPlacement()
+        restored.flushPendingChanges()
+        let reopened = FeatureSettingsStore(defaults: defaults)
+        #expect(reopened.settings.islandDisplaySettings["external"]?.placement(for: .custom)?.offset == 0.3)
+        #expect(reopened.settings.islandDisplaySettings["built-in"]?.mode == .hidden)
+        #expect(!reopened.settings.mediaEnabled)
+        reopened.reset()
+        reopened.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.islandDisplaySettings.isEmpty)
+    }
+    @Test @MainActor
     func moduleOrderPersistsAndRestoringDefaultPreservesOtherChoices() throws {
         let suiteName = "Zisla.ModuleOrder.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))

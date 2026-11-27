@@ -102,6 +102,7 @@ Le téléchargeur nécessite `yt-dlp` ; `ffmpeg` est facultatif. La conversion O
 ## Conçu pour rester discret
 
 - Prend en charge plusieurs écrans, Spaces et les applications plein écran ordinaires sans activer l'application ni détourner le focus de l'application actuelle.
+- Lorsque plusieurs écrans sont connectés, Réglages → Général → Modes des écrans permet de choisir pour chaque écran le mode Dynamic Island (position de la caméra ou personnalisée), le mode encoche ou le masquage. Avec un seul écran, ce réglage est masqué et l’apparence globale s’applique ; la reconnexion rétablit la configuration de chaque écran.
 - L'état masqué n'a aucune fenêtre transparente permanente de zone de déclenchement et n'exécute aucune boucle de rendu ; la surveillance globale des événements et les vérifications géométriques déclenchent le déploiement.
 - Utilise un seul matériau système et passe à un fond opaque lorsque Réduire la transparence est activé.
 - Détecte une encoche physique à partir de la zone de sécurité du système ; les écrans externes sans encoche utilisent une superposition de même contour.

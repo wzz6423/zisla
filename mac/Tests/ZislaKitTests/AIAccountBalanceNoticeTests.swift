@@ -6,6 +6,31 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceNoticeTests {
+    @Test
+    func persistentQuotaUsesAConnectedCustomIslandAndDisappearsWhenItIsHidden() throws {
+        let queue = SideNoticeQueue()
+        let controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        controller.screenSnapshotProvider = { [
+            ScreenSnapshot(displayID: 1, frame: .zero, visibleFrame: .zero, persistentID: "built-in"),
+            ScreenSnapshot(displayID: 2, frame: .zero, visibleFrame: .zero, persistentID: "external"),
+        ] }
+        var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true,
+                                       aiAccountBalanceMonitoredProviders: [.codex], aiAccountBalanceDisplayedProviders: [.codex],
+                                       islandDisplaySettings: ["external": IslandDisplaySettings(mode: .pill, placement: IslandPlacement(mode: .custom))])
+        let balance = AIAccountBalance(id: "synthetic", providers: [.codex], status: .available,
+                                       windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 70)])
+        var second = balance
+        second.id = "second"
+        controller.update(balances: [balance, second], settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
+        #expect(queue.left.contains { $0.id == AIAccountBalanceNoticeController.pinnedID })
+        let firstID = queue.left.first?.metadata?["quotaAccountID"]
+        controller.updatePinned(at: Date(timeIntervalSince1970: 1_000))
+        #expect(queue.left.first?.metadata?["quotaAccountID"] != firstID)
+        settings.islandDisplaySettings["external"]?.mode = .hidden
+        controller.update(balances: [balance], settings: settings, language: .english)
+        #expect(!queue.left.contains { $0.id == AIAccountBalanceNoticeController.pinnedID })
+    }
     @Test func defaultProviderSelectionCannotCreateLowOrPinnedBalanceNotices() {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }

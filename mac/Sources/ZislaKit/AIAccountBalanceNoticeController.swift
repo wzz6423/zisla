@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ZislaCore
 
@@ -15,6 +16,9 @@ public final class AIAccountBalanceNoticeController {
     private var pinnedAccountID: String?
     private var pinnedReadingStart: Date?
     private var pinnedReadingLines: [String] = []
+    internal var screenSnapshotProvider: @MainActor () -> [ScreenSnapshot] = {
+        NSScreen.screens.compactMap { ScreenSnapshot(screen: $0) }
+    }
 
     public init(queue: SideNoticeQueue, now: @escaping @Sendable () -> Date = Date.init,
                 sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
@@ -83,7 +87,11 @@ public final class AIAccountBalanceNoticeController {
 
     /// Persistent quota requires custom placement and both monitoring and display selection for an alias.
     private var pinnedBalances: [AIAccountBalance] {
-        guard settings.aiProgressEnabled, settings.sideNoticesEnabled, settings.islandPlacement.mode == .custom,
+        let screens = screenSnapshotProvider()
+        let hasCustomPlacement = screens.count > 1 && !settings.islandDisplaySettings.isEmpty
+            ? settings.supportsStatusIconsInIsland(on: screens.map(\.persistentID))
+            : settings.islandPlacement.mode == .custom
+        guard settings.aiProgressEnabled, settings.sideNoticesEnabled, hasCustomPlacement,
               settings.aiAccountBalancePinnedInCustomIsland else { return [] }
         return AIAccountBalanceCatalog.displayedBalances(balances,
                                                          monitoredProviders: settings.aiAccountBalanceMonitoredProviders,

@@ -521,8 +521,9 @@ final class AppModel: ObservableObject {
     @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
     @Published var islandScreenLayout: ScreenOverlayLayout?
     @Published var islandHasSystemMonitorIcons = false
-    var onChooseIslandPlacement: (() -> Void)?
+    var onChooseIslandPlacement: ((CGDirectDisplayID?) -> Void)?
     var islandEdge: IslandEdge {
+        if let islandScreenLayout { return islandScreenLayout.edge }
         guard settingsStore.settings.islandLayoutStyle == .pill else { return .top }
         let placement = settingsStore.settings.islandPlacement
         return placement.mode == .camera ? .top : placement.edge

@@ -147,7 +147,8 @@ struct SettingsView: View {
 
     private var settingsSearchResults: [SettingsSearchItem] {
         SettingsSearchIndex.results(for: input.settingsQuery, settings: settingsStore.settings, locale: locale,
-                                    displayCount: activityNoticeDisplays.count)
+                                    displayCount: activityNoticeDisplays.count,
+                                    displayIDs: activityNoticeDisplays.map(\.persistentID))
     }
 
     private var searchResultsContent: some View {
@@ -548,11 +549,11 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .disabled(!settingsStore.settings.mediaEnabled)
                 }
-                if settingsStore.settings.supportsStatusIconsInIsland {
+                if supportsCustomIsland {
                     rowDivider
                     settingRow(symbol: "menubar.rectangle", title: "机器监控状态显示位置", detail: "") {
                         IslandOutlinedPicker(
-                            selection: Binding(get: { settingsStore.settings.effectiveStatusIconDestination },
+                            selection: Binding(get: { settingsStore.settings.statusIconDestination },
                                                set: { settingsStore.settings.statusIconDestination = $0 }),
                             options: Array(StatusIconDestination.allCases),
                             title: { $0.menuTitle },
@@ -1513,7 +1514,7 @@ struct SettingsView: View {
                 }
             }
 
-            if settingsStore.settings.supportsStatusIconsInIsland {
+            if supportsCustomIsland {
                 settingsGroup("灵动岛模式") {
                     featureToggle("显示应用标识", detail: "", symbol: "app.badge", keyPath: \.islandAppIconEnabled)
                     rowDivider
@@ -1527,7 +1528,8 @@ struct SettingsView: View {
             }
             settingsGroup("收起态展示优先级") {
                 let priorities = Self.compactStatusPriorities(settings: settingsStore.settings,
-                                                              hasSystemMonitorIcons: model.islandHasSystemMonitorIcons)
+                                                              hasSystemMonitorIcons: model.islandHasSystemMonitorIcons,
+                                                              displayIDs: activityNoticeDisplays.map(\.persistentID))
                 ForEach(Array(priorities.enumerated()), id: \.element) { index, priority in
                     if index > 0 { rowDivider }
                     reorderSettingRow(
@@ -1724,7 +1726,7 @@ struct SettingsView: View {
                 }
                 .labelsHidden().pickerStyle(.menu).keepsIntrinsicWidth()
             }
-            if settingsStore.settings.supportsStatusIconsInIsland {
+            if supportsCustomIsland {
                 rowDivider
                 featureToggle("常驻额度信息", detail: "", symbol: "pin", keyPath: \.aiAccountBalancePinnedInCustomIsland)
                     .disabled(!model.settingsStore.settings.aiProgressEnabled
@@ -2459,13 +2461,19 @@ struct SettingsView: View {
         Self.activityNoticeDisplays(on: activityNoticeScreens, locale: locale)
     }
 
+    private var supportsCustomIsland: Bool {
+        settingsStore.settings.supportsStatusIconsInIsland(on: activityNoticeDisplays.map(\.persistentID))
+    }
+
     static func activityNoticeDisplays(on screens: [NSScreen], locale: Locale) -> [ActivityNoticeDisplay] {
         let displays = screens.enumerated().compactMap { index, screen -> ActivityNoticeDisplay? in
             let key = NSDeviceDescriptionKey("NSScreenNumber")
             guard let number = screen.deviceDescription[key] as? NSNumber else { return nil }
             let name = screen.localizedName.isEmpty
                 ? AppLocalization.format("显示器 %ld", locale: locale, [index + 1]) : screen.localizedName
-            return ActivityNoticeDisplay(id: number.uint32Value, name: name)
+            let snapshot = ScreenSnapshot(screen: screen)
+            return ActivityNoticeDisplay(id: number.uint32Value, name: name,
+                                         persistentID: snapshot?.persistentID ?? String(number.uint32Value))
         }
         return displays.count > 1 ? displays : []
     }
@@ -2494,6 +2502,67 @@ struct SettingsView: View {
                     selected == connectedDisplayIDs ? [] : selected
             }
         )
+    }
+
+    private func islandDisplayBinding(for display: ActivityNoticeDisplay) -> Binding<IslandDisplaySettings> {
+        Binding(
+            get: { settingsStore.settings.islandDisplaySettings(for: display.persistentID) },
+            set: { settingsStore.settings.islandDisplaySettings[display.persistentID] = $0 }
+        )
+    }
+
+    private var islandDisplaySettingsContent: some View {
+        settingsGroup("显示器模式") {
+            ForEach(activityNoticeDisplays) { display in
+                let binding = islandDisplayBinding(for: display)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Text(display.name)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(2)
+                        Spacer(minLength: 8)
+                        Picker(AppLocalization.string("显示器模式", locale: locale), selection: binding.mode) {
+                            AppLocalizedText("灵动岛模式").tag(IslandDisplayMode.pill)
+                            AppLocalizedText("刘海模式").tag(IslandDisplayMode.notch)
+                            AppLocalizedText("在该屏幕不显示").tag(IslandDisplayMode.hidden)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .accessibilityLabel(display.name)
+                    }
+                    if binding.wrappedValue.mode == .pill {
+                        HStack(spacing: 8) {
+                            AppLocalizedText("灵动岛位置")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Spacer(minLength: 8)
+                            Picker(AppLocalization.string("灵动岛位置", locale: locale), selection: Binding(
+                                get: { binding.wrappedValue.placement.mode },
+                                set: { mode in
+                                    if let placement = binding.wrappedValue.placement(for: mode) {
+                                        binding.wrappedValue.placement = placement
+                                    } else {
+                                        model.onChooseIslandPlacement?(display.id)
+                                    }
+                                }
+                            )) {
+                                AppLocalizedText("摄像头位置").tag(IslandPlacementMode.camera)
+                                AppLocalizedText("其他位置").tag(IslandPlacementMode.custom)
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .accessibilityLabel(Text(display.name) + Text(" ") + Text(AppLocalization.string("灵动岛位置", locale: locale)))
+                            if binding.wrappedValue.placement.mode == .custom {
+                                Button(AppLocalization.text("调整位置")) { model.onChooseIslandPlacement?(display.id) }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 8)
+                if display.id != activityNoticeDisplays.last?.id { rowDivider }
+            }
+        }
     }
 
     enum ScreenshotHotkeyAction: Equatable {
@@ -2762,43 +2831,45 @@ struct SettingsView: View {
             }
 
             settingsGroup("灵动岛样式") {
-                settingRow(symbol: "capsule", title: "灵动岛样式", detail: "选择贴边刘海或悬浮药丸") {
-                    Picker("", selection: Binding(
-                        get: { settingsStore.settings.islandLayoutStyle },
-                        set: { settingsStore.settings.islandLayoutStyle = $0 }
-                    )) {
-                        AppLocalizedText("刘海模式").tag(IslandLayoutStyle.notch)
-                        AppLocalizedText("灵动岛模式").tag(IslandLayoutStyle.pill)
+                if activityNoticeDisplays.isEmpty {
+                    settingRow(symbol: "capsule", title: "灵动岛样式", detail: "选择贴边刘海或悬浮药丸") {
+                        Picker("", selection: Binding(
+                            get: { settingsStore.settings.islandLayoutStyle },
+                            set: { settingsStore.settings.islandLayoutStyle = $0 }
+                        )) {
+                            AppLocalizedText("刘海模式").tag(IslandLayoutStyle.notch)
+                            AppLocalizedText("灵动岛模式").tag(IslandLayoutStyle.pill)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                }
-                if settingsStore.settings.islandLayoutStyle == .pill {
-                    rowDivider
-                    settingRow(symbol: "viewfinder", title: "灵动岛位置", detail: "摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边") {
-                        HStack(spacing: 8) {
-                            Picker("", selection: Binding(
-                                get: { settingsStore.settings.islandPlacement.mode },
-                                set: { mode in
-                                    if let placement = settingsStore.settings.islandPlacement(for: mode) {
-                                        settingsStore.settings.islandPlacement = placement
-                                    } else {
-                                        model.onChooseIslandPlacement?()
+                    if settingsStore.settings.islandLayoutStyle == .pill {
+                        rowDivider
+                        settingRow(symbol: "viewfinder", title: "灵动岛位置", detail: "摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边") {
+                            HStack(spacing: 8) {
+                                Picker("", selection: Binding(
+                                    get: { settingsStore.settings.islandPlacement.mode },
+                                    set: { mode in
+                                        if let placement = settingsStore.settings.islandPlacement(for: mode) {
+                                            settingsStore.settings.islandPlacement = placement
+                                        } else {
+                                            model.onChooseIslandPlacement?(nil)
+                                        }
                                     }
+                                )) {
+                                    AppLocalizedText("摄像头位置").tag(IslandPlacementMode.camera)
+                                    AppLocalizedText("其他位置").tag(IslandPlacementMode.custom)
                                 }
-                            )) {
-                                AppLocalizedText("摄像头位置").tag(IslandPlacementMode.camera)
-                                AppLocalizedText("其他位置").tag(IslandPlacementMode.custom)
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            if settingsStore.settings.islandPlacement.mode == .custom {
-                                Button(AppLocalization.text("调整位置")) { model.onChooseIslandPlacement?() }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                if settingsStore.settings.islandPlacement.mode == .custom {
+                                    Button(AppLocalization.text("调整位置")) { model.onChooseIslandPlacement?(nil) }
+                                }
                             }
                         }
                     }
+                    rowDivider
                 }
-                rowDivider
                 settingRow(
                     symbol: "rectangle.on.rectangle.angled",
                     title: "灵动岛展开材质",
@@ -2825,6 +2896,9 @@ struct SettingsView: View {
                         )
                     )
                 }
+            }
+            if !activityNoticeDisplays.isEmpty {
+                islandDisplaySettingsContent
             }
         }
     }
@@ -4057,10 +4131,13 @@ struct SettingsView: View {
         return selected.count == 1 && selected.contains(accountName)
     }
 
-    static func compactStatusPriorities(settings: FeatureSettings, hasSystemMonitorIcons: Bool) -> [CompactStatusPriority] {
-        settings.compactStatusPriority.filter {
+    nonisolated static func compactStatusPriorities(settings: FeatureSettings, hasSystemMonitorIcons: Bool,
+                                                    displayIDs: [String]? = nil) -> [CompactStatusPriority] {
+        let supportsCustomIsland = displayIDs.map { settings.supportsStatusIconsInIsland(on: $0) }
+            ?? settings.supportsStatusIconsInIsland
+        return settings.compactStatusPriority.filter {
             $0 != .systemMonitor || (hasSystemMonitorIcons && settings.systemMonitorEnabled
-                && settings.effectiveStatusIconDestination == .island)
+                && supportsCustomIsland && settings.statusIconDestination == .island)
         }
     }
 
@@ -4418,6 +4495,7 @@ private struct PetImportSource: Identifiable {
 struct ActivityNoticeDisplay: Identifiable {
     let id: UInt32
     let name: String
+    let persistentID: String
 }
 
 /// Search engine options for the clipboard assistant's text search action.

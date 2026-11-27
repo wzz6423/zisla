@@ -31,6 +31,7 @@ public final class OverlayCoordinator: NSObject {
     public var onCollapsedSizeChanged: (@MainActor (CGSize) -> Void)?
     public var onActiveDisplayHasPhysicalNotchChanged: (@MainActor (Bool) -> Void)?
     public var onActiveLayoutChanged: (@MainActor (ScreenOverlayLayout?) -> Void)?
+    public var onPinnedChanged: (@MainActor (Bool) -> Void)?
     public var collapsedControlContainsPoint: (@MainActor (CGPoint) -> Bool)?
     public private(set) var persistentPanelDisplayIDs: Set<CGDirectDisplayID> = []
 
@@ -299,21 +300,31 @@ public final class OverlayCoordinator: NSObject {
             lastPhysicalNotchSnapshots = lastPhysicalNotchSnapshots.filter { connectedIDs.contains($0.key) }
             compactStatusByDisplayID = compactStatusByDisplayID.filter { connectedIDs.contains($0.key) }
         }
-        layouts = resolvedSnapshots.map(layout(for:))
-        guard !layouts.isEmpty else {
+        layouts = resolvedSnapshots.compactMap(layout(for:))
+        let activeDisplayIsHidden = activeDisplayID.map { id in
+            connectedIDs.contains(id) && !layouts.contains { $0.displayID == id }
+        } == true
+        if layouts.isEmpty || activeDisplayIsHidden {
             let wasExpanded = reducer.state.visibility == .expanded
                 || reducer.state.visibility == .pinned
             transientWindows.removeAll()
             cancelScheduledCollapse()
             cancelPendingPanelCollapse()
+            cancelPointerRevalidation()
+            endPointerEntryGrace()
             panel?.orderOut(nil)
             presentedDisplayID = nil
             reducer = IslandPresentationReducer()
+            if isPinned {
+                isPinned = false
+                panel?.isPinned = false
+                onPinnedChanged?(false)
+            }
             activeDisplayID = nil
             isPointerInside = false
             hidePersistentPanels()
             if wasExpanded { onVisibilityChanged?(false) }
-            return
+            if layouts.isEmpty { return }
         }
 
         if let activeDisplayID,
@@ -341,11 +352,13 @@ public final class OverlayCoordinator: NSObject {
         layoutStyle: IslandLayoutStyle,
         placement: IslandPlacement,
         pillSize: CGSize? = nil,
-        edgeInset: CGFloat? = nil
+        edgeInset: CGFloat? = nil,
+        displaySettings: [String: IslandDisplaySettings] = [:]
     ) {
         var configuration = layoutEngine.configuration
         configuration.layoutStyle = layoutStyle
         configuration.placement = placement
+        configuration.displaySettings = displaySettings
         if let pillSize { configuration.pillSize = pillSize }
         if let edgeInset { configuration.edgeInset = edgeInset }
         guard configuration != layoutEngine.configuration else { return }
@@ -490,6 +503,13 @@ public final class OverlayCoordinator: NSObject {
 
     public func setPinned(_ pinned: Bool) {
         guard !pinned || (!isScreenLocked && !isVoiceRecording) else { return }
+        if pinned {
+            ensureActiveDisplay()
+            guard activeLayout != nil else {
+                onPinnedChanged?(false)
+                return
+            }
+        }
         isPinned = pinned
         if pinned {
             stopsAfterTransientReveal = false
@@ -516,6 +536,9 @@ public final class OverlayCoordinator: NSObject {
             start()
             stopsAfterTransientReveal = true
         }
+        refreshScreensIfNeeded()
+        guard !layouts.isEmpty else { return }
+        if lastSnapshots.contains(where: { contains(point, in: $0.frame) }), preferredLayout(at: point) == nil { return }
         selectActiveDisplay(at: point)
         ensureActiveDisplay()
         // Only a reveal that starts away from the island needs the grace; when the pointer already
@@ -889,6 +912,10 @@ public final class OverlayCoordinator: NSObject {
             switch effect {
             case .show:
                 guard !isScreenLocked else { continue }
+                guard activeLayout != nil else {
+                    reducer = IslandPresentationReducer()
+                    continue
+                }
                 cancelPendingPanelCollapse()
                 presentCurrentLayout()
                 onVisibilityChanged?(true)
@@ -1061,15 +1088,16 @@ public final class OverlayCoordinator: NSObject {
         return resolved
     }
 
-    private func layout(for snapshot: ScreenSnapshot) -> ScreenOverlayLayout {
-        guard let override = compactStatusByDisplayID[snapshot.displayID] else {
-            return layoutEngine.layout(for: snapshot)
+    private func layout(for snapshot: ScreenSnapshot) -> ScreenOverlayLayout? {
+        guard var configuration = layoutEngine.configuration(for: snapshot, displayCount: lastSnapshots.count) else {
+            return nil
         }
-        var configuration = layoutEngine.configuration
-        configuration.expandsForDetailedStatus = override.expandsForDetailedStatus
-        configuration.compactStatusLength = override.compactStatusLength
-        configuration.compactStatusSideWidth = override.compactStatusSideWidth
-        configuration.statusIconSize = override.statusIconSize
+        if let override = compactStatusByDisplayID[snapshot.displayID] {
+            configuration.expandsForDetailedStatus = override.expandsForDetailedStatus
+            configuration.compactStatusLength = override.compactStatusLength
+            configuration.compactStatusSideWidth = override.compactStatusSideWidth
+            configuration.statusIconSize = override.statusIconSize
+        }
         return ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
     }
 

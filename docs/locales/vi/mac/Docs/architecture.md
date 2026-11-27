@@ -8,6 +8,8 @@ Trạng thái ẩn không có cửa sổ trong suốt. `PointerEdgeMonitor` cài
 
 Mỗi màn có định danh ổn định ghép `NSScreenNumber` với `CGDirectDisplayID`. Bố cục neo ở `screen.frame.maxY` nên hỗ trợ tọa độ âm, màn xếp dọc và màn ngoài không khuyết.
 
+Khi kết nối nhiều màn hình, Cài đặt → Chung → Chế độ màn hình cho phép chọn chế độ Dynamic Island (vị trí camera hoặc tùy chỉnh), chế độ phần khuyết hoặc ẩn riêng từng màn hình. Với một màn hình, mục này được ẩn và dùng giao diện chung; kết nối lại sẽ khôi phục cấu hình đã lưu của từng màn hình.
+
 ## Cửa sổ
 
 Đảo chính giữ một `.borderless + .nonactivatingPanel`:

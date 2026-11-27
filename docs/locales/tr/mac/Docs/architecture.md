@@ -8,6 +8,8 @@ Gizli durumda saydam pencere bulunmaz. `PointerEdgeMonitor`, fare hareketleri ve
 
 Her ekran, `NSScreenNumber` ile `CGDirectDisplayID` eşleştirilerek kararlı bir kimlik alır. Düzen `screen.frame.maxY` noktasına bağlıdır; böylece negatif koordinatlar, dikey dizilmiş ekranlar ve çentiksiz harici ekranlar desteklenir.
 
+Birden çok ekran bağlıyken Ayarlar → Genel → Ekran Modları bölümünde her ekran için Dynamic Island modu (kamera veya özel konum), çentik modu ya da gizleme seçilebilir. Tek ekranda bu ayar gizlenir ve genel görünüm kullanılır; yeniden bağlanınca her ekranın kayıtlı yapılandırması geri yüklenir.
+
 ## Pencere
 
 Ana ada tek bir `.borderless + .nonactivatingPanel` kullanır:

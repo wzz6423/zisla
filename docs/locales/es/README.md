@@ -102,6 +102,7 @@ El descargador requiere `yt-dlp`; `ffmpeg` es opcional. La conversión Office a 
 ## Diseñado para no interrumpir
 
 - Admite varias pantallas, Spaces y aplicaciones normales a pantalla completa sin activar ni quitar el foco a la aplicación actual.
+- Con varias pantallas conectadas, Ajustes → General → Modos de pantalla permite elegir para cada una el modo Dynamic Island (posición de cámara o personalizada), el modo muesca u ocultarla. Con una sola pantalla, este ajuste se oculta y se usa la apariencia global; al volver a conectarlas se recupera la configuración guardada de cada pantalla.
 - El estado oculto no tiene una ventana transparente permanente de activación ni ejecuta un bucle de fotogramas; los eventos globales y comprobaciones geométricas disparan la expansión.
 - Usa un solo material del sistema y pasa a un fondo opaco cuando se activa Reducir transparencia.
 - Detecta la muesca física a partir del área segura del sistema; las pantallas externas sin muesca usan una superposición con el mismo contorno.

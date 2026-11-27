@@ -6,6 +6,37 @@ import ZislaKit
 
 @MainActor
 struct IslandPlacementControllerTests {
+    @Test
+    func choosingOneDisplaysPositionKeepsTheDraftOnThatScreen() throws {
+        let fixture = Fixture()
+        let external = ScreenSnapshot(displayID: 2,
+                                      frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
+                                      visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056))
+        fixture.screens.append(external)
+        fixture.show(displayID: external.displayID)
+        #expect(fixture.controller.windowCount == 1)
+        #expect(fixture.controller.selectedDisplayID == external.displayID)
+        let frame = try #require(fixture.controller.previewFrame)
+        #expect(fixture.controller.beginDragging(at: CGPoint(x: frame.midX, y: frame.midY)))
+        fixture.controller.drag(to: CGPoint(x: Fixture.screen.frame.midX, y: Fixture.screen.frame.midY))
+        #expect(fixture.controller.selectedDisplayID == external.displayID)
+        #expect(external.frame.contains(try #require(fixture.controller.previewFrame)))
+        #expect(fixture.committed.isEmpty)
+        fixture.controller.confirm()
+        #expect(fixture.committed.count == 1 && fixture.controller.windowCount == 0 && fixture.observer == nil)
+    }
+
+    @Test
+    func missingOrDisconnectedTargetCancelsWithoutSaving() {
+        let fixture = Fixture()
+        fixture.show(displayID: 99)
+        #expect(fixture.cancelled == 1 && fixture.presented.isEmpty && fixture.committed.isEmpty)
+        fixture.show(displayID: Fixture.screen.displayID)
+        fixture.screens = []
+        fixture.observer?()
+        #expect(fixture.cancelled == 2 && fixture.committed.isEmpty)
+        #expect(fixture.controller.windowCount == 0 && fixture.observer == nil)
+    }
     @Test(arguments: IslandEdge.allCases)
     func draggingClampsThePreviewBeforeMouseRelease(edge: IslandEdge) throws {
         let fixture = Fixture()
@@ -337,8 +368,10 @@ struct IslandPlacementControllerTests {
         ))
 
         func show(initial: IslandPlacement = IslandPlacement(),
-                  configuration: ScreenLayoutConfiguration = ScreenLayoutConfiguration()) {
+                  configuration: ScreenLayoutConfiguration = ScreenLayoutConfiguration(),
+                  displayID: CGDirectDisplayID? = nil) {
             controller.show(initialPlacement: initial, configuration: configuration,
+                            displayID: displayID,
                             completion: { [unowned self] in committed.append($0) },
                             onCancel: { [unowned self] in cancelled += 1 })
         }

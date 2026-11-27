@@ -102,6 +102,7 @@ The downloader requires `yt-dlp`; `ffmpeg` is optional. Office-to-PDF conversion
 ## Designed to stay out of the way
 
 - Supports multiple displays, Spaces, and ordinary full-screen apps without activating or taking focus from the current app.
+- When multiple displays are connected, Settings → General → Display Modes lets you choose Dynamic Island Mode (camera or custom position), Notch Mode, or Hide on This Display for each screen. With one screen, this setting is hidden and the global appearance applies; reconnecting restores each display’s saved configuration.
 - The hidden state has no permanent transparent hit-area window and runs no frame loop; global event monitoring and geometry checks trigger expansion.
 - Uses one system material and switches to an opaque background when Reduce Transparency is enabled.
 - Detects a physical notch from the system safe area; external displays without one use an overlay with the same outline.
