@@ -202,4 +202,23 @@ struct OnboardingPermissionCoordinatorTests {
         for read in oldReads { read(.denied) }
         #expect(status(.camera, coordinator) == .granted)
     }
+
+    @Test func requestingLocationKeepsPendingFilePermissionResults() {
+        let fake = FakeOnboardingPermissions()
+        let coordinator = fake.coordinator()
+        defer { coordinator.close() }
+        fake.delayReads = true
+        coordinator.refresh()
+        let refreshReads = fake.delayedReads
+        fake.delayReads = false
+        #expect(coordinator.request(.location))
+        fake.completions[0](.success(.granted))
+
+        for (id, read) in zip(OnboardingPermissionID.allCases, refreshReads) {
+            read(id == .location ? .denied : .granted)
+        }
+        #expect(status(.location, coordinator) == .granted)
+        #expect(status(.files, coordinator) == .granted)
+        #expect(status(.fullDiskAccess, coordinator) == .granted)
+    }
 }

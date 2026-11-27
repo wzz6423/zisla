@@ -2,6 +2,7 @@
 "NSAudioCaptureUsageDescription" = "zisla はメディアの再生中、アプリ音量の調整時、または画面収録でシステム音声を有効にしたときにシステム音声を読み取り、波形の表示、音量調整、再生音の録音に使用します。";
 "NSCameraUsageDescription" = "zisla はミラーを開いたとき、または画面収録でカメラの重ね合わせを有効にしたときだけカメラを使用します。";
 "NSRemindersFullAccessUsageDescription" = "zislaは、日付付きリマインダーを読み取り、カレンダーイベントと一緒に表示します。";
+"NSLocationUsageDescription" = "zisla は、地域の天気、地名、近くの Wi-Fi ネットワークを表示するために位置情報へのアクセスを必要とします。";
 "NSLocationWhenInUseUsageDescription" = "zisla は、地域の天気、地名、近くの Wi-Fi ネットワークを表示するために位置情報へのアクセスを必要とします。";
 "NSMicrophoneUsageDescription" = "zisla は音声入力を開始したとき、または画面収録でマイクを有効にしたときだけ録音します。";
 "NSSpeechRecognitionUsageDescription" = "zisla は自分で録音した音声をテキストに変換し、画面収録の字幕を生成するときはこの Mac で文字起こしします。";

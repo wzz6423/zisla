@@ -2,6 +2,7 @@
 "NSAudioCaptureUsageDescription" = "zisla đọc âm thanh hệ thống khi phát nội dung, khi bạn điều chỉnh âm lượng ứng dụng hoặc bật âm thanh hệ thống cho bản ghi màn hình, để hiển thị dạng sóng, điều chỉnh âm lượng hoặc ghi âm thanh đang phát.";
 "NSCameraUsageDescription" = "zisla chỉ sử dụng camera khi bạn mở gương hoặc bật lớp phủ camera để ghi màn hình.";
 "NSRemindersFullAccessUsageDescription" = "zisla đọc các lời nhắc có ngày để hiển thị chúng cùng với sự kiện lịch.";
+"NSLocationUsageDescription" = "zisla cần quyền truy cập vị trí để hiển thị thời tiết địa phương, tên địa điểm và các mạng Wi-Fi ở gần.";
 "NSLocationWhenInUseUsageDescription" = "zisla cần quyền truy cập vị trí để hiển thị thời tiết địa phương, tên địa điểm và các mạng Wi-Fi ở gần.";
 "NSMicrophoneUsageDescription" = "zisla chỉ ghi âm khi bạn bắt đầu nhập bằng giọng nói hoặc bật micrô để ghi màn hình.";
 "NSSpeechRecognitionUsageDescription" = "zisla chuyển lời nói bạn chủ động ghi thành văn bản và chép lời cục bộ khi bạn tạo phụ đề cho bản ghi màn hình.";

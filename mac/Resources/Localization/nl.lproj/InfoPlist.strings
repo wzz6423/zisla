@@ -2,6 +2,7 @@
 "NSAudioCaptureUsageDescription" = "zisla leest systeemaudio tijdens het afspelen van media, wanneer je het volume van een app aanpast of systeemaudio voor schermopnamen inschakelt, om een golfvorm te tonen, het volume aan te passen of afspeelgeluid op te nemen.";
 "NSCameraUsageDescription" = "zisla gebruikt de camera alleen wanneer je de spiegel opent of de camera-overlay voor schermopname inschakelt.";
 "NSRemindersFullAccessUsageDescription" = "zisla leest gedateerde herinneringen om ze samen met agenda-evenementen te tonen.";
+"NSLocationUsageDescription" = "zisla heeft locatietoegang nodig om het lokale weer, plaatsnamen en wifinetwerken in de buurt te tonen.";
 "NSLocationWhenInUseUsageDescription" = "zisla heeft locatietoegang nodig om het lokale weer, plaatsnamen en wifinetwerken in de buurt te tonen.";
 "NSMicrophoneUsageDescription" = "zisla neemt alleen audio op wanneer je spraakinvoer start of de microfoon voor schermopname inschakelt.";
 "NSSpeechRecognitionUsageDescription" = "zisla zet spraak die je bewust opneemt om in tekst en transcribeert lokaal wanneer je ondertitels voor een schermopname maakt.";

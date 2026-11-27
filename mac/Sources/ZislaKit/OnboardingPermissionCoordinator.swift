@@ -112,7 +112,7 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
     public private(set) var isClosed = false
     private let dependencies: Dependencies
     private var generation = UUID()
-    private var refreshGeneration = UUID()
+    private var refreshTokens: [OnboardingPermissionID: UUID] = [:]
 
     public convenience init() {
         let system = OnboardingSystemPermissions()
@@ -131,12 +131,11 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
     /// Call when presenting the flow and whenever the application returns to the foreground.
     public func refresh() {
         guard !isClosed else { return }
-        refreshGeneration = UUID()
-        let token = refreshGeneration
+        let token = UUID()
         for id in OnboardingPermissionID.allCases where id != requesting {
+            refreshTokens[id] = token
             dependencies.read(id) { [weak self] status in
-                guard let self, !self.isClosed, self.refreshGeneration == token,
-                      self.requesting != id else { return }
+                guard let self, self.refreshTokens[id] == token else { return }
                 self.update(id, status: status)
             }
         }
@@ -147,7 +146,7 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
         guard !isClosed, requesting == nil,
               let item = permissions.first(where: { $0.id == id }),
               item.status == .notDetermined || item.status == .unavailable else { return false }
-        refreshGeneration = UUID()
+        refreshTokens[id] = nil
         generation = UUID()
         let token = generation
         let previousStatus = item.status
@@ -182,7 +181,6 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
     public func cancelCurrentRequest() {
         PermissionSettingsAssistant.shared.cancelPreparation()
         generation = UUID()
-        refreshGeneration = UUID()
         let id = requesting
         requesting = nil
         dependencies.cancel()
@@ -196,7 +194,7 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
         PermissionSettingsAssistant.shared.cancelPreparation()
         isClosed = true
         generation = UUID()
-        refreshGeneration = UUID()
+        refreshTokens.removeAll()
         let id = requesting
         requesting = nil
         dependencies.cancel()
@@ -218,16 +216,25 @@ public final class OnboardingPermissionCoordinator: ObservableObject {
 final class OnboardingSystemPermissions: NSObject,
     @preconcurrency CLLocationManagerDelegate, @preconcurrency CBCentralManagerDelegate {
     private let manualStatus: @Sendable (OnboardingPermissionID) -> OnboardingPermissionStatus
+    private let makeLocationManager: () -> CLLocationManager
+    private let locationServicesEnabled: () -> Bool
     private var locationManager: CLLocationManager?
+    private var locationRead: (manager: CLLocationManager, completion: OnboardingPermissionCoordinator.Completion)?
     private var bluetoothManager: CBCentralManager?
     private var pending: OnboardingPermissionCoordinator.RequestCompletion?
     private var timeout: Task<Void, Never>?
     private var host: NSWindow?
 
-    init(manualStatus: @escaping @Sendable (OnboardingPermissionID) -> OnboardingPermissionStatus = {
-        SystemPermissionStatusReader().read($0)
-    }) {
+    init(
+        manualStatus: @escaping @Sendable (OnboardingPermissionID) -> OnboardingPermissionStatus = {
+            SystemPermissionStatusReader().read($0)
+        },
+        makeLocationManager: @escaping () -> CLLocationManager = { CLLocationManager() },
+        locationServicesEnabled: @escaping () -> Bool = CLLocationManager.locationServicesEnabled
+    ) {
         self.manualStatus = manualStatus
+        self.makeLocationManager = makeLocationManager
+        self.locationServicesEnabled = locationServicesEnabled
         super.init()
     }
 
@@ -261,8 +268,10 @@ final class OnboardingSystemPermissions: NSObject,
             @unknown default: completion(.unavailable)
             }
         case .location:
-            completion(CLLocationManager.locationServicesEnabled()
-                ? Self.locationStatus(CLLocationManager().authorizationStatus) : .unavailable)
+            // Core Location delivers its initial decision after the delegate is installed.
+            let manager = makeLocationManager()
+            locationRead = (manager, completion)
+            manager.delegate = self
         case .notifications:
             UNUserNotificationCenter.current().getNotificationSettings { settings in
                 let status: OnboardingPermissionStatus
@@ -336,7 +345,7 @@ final class OnboardingSystemPermissions: NSObject,
                 } catch { self?.finish(.failure(error), matching: token) }
             }
         case .location:
-            let manager = CLLocationManager()
+            let manager = makeLocationManager()
             locationManager = manager
             manager.delegate = self
             manager.requestWhenInUseAuthorization()
@@ -371,9 +380,14 @@ final class OnboardingSystemPermissions: NSObject,
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard manager === locationManager else { return }
         let status = Self.locationStatus(manager.authorizationStatus)
-        if status != .notDetermined { finish(.success(status)) }
+        if let read = locationRead, manager === read.manager {
+            locationRead = nil
+            manager.delegate = nil
+            read.completion(status == .denied && !locationServicesEnabled() ? .unavailable : status)
+        } else if manager === locationManager, status != .notDetermined {
+            finish(.success(status))
+        }
     }
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
