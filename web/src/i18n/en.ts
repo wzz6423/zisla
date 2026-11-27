@@ -95,7 +95,7 @@ export const en: SiteContent = {
       aiMonitor: {
         name: 'AI monitor',
         caption:
-          'Aggregates AI tasks and status from CLIs, desktop apps and IDEs. Numeric usage powers token trends and a contribution heatmap; select a date for input, output and total tokens by provider and model. View, export all history as .xlsx or clear it in Settings. Check real account allowances, reset times and low-quota notices, including 5h/7d windows and Cursor USD budgets when available. Prompt and reply text is not read. Remaining-quota rings also appear across compact island layouts. Choose account regions independently; daily usage records and remaining-quota colours stay consistent across layouts.',
+          'Aggregates AI tasks and status from CLIs, desktop apps and IDEs. Numeric usage powers token trends and a contribution heatmap; select a date for input, output and total tokens by provider and model. View, export all history as .xlsx or clear it in Settings. Check real account allowances, reset times and low-quota notices, including 5h/7d windows and Cursor USD budgets when available. Prompt and reply text is not read. Remaining-quota rings also appear across compact island layouts. Choose account regions independently; daily usage records and remaining-quota colours stay consistent across layouts. Antigravity’s Gemini and Claude/GPT pools have independent monitoring, display and alerts. Gemini App chat allowances use a web Cookie for the same Google account; Gemini CLI remains separate.',
         points: ['Tasks across AI tools', 'Model history and .xlsx export', 'Account allowances and reset times'],
       },
       keyboardSound: {
@@ -113,7 +113,7 @@ export const en: SiteContent = {
       agenda: {
         name: 'Agenda and weather',
         caption:
-          'Shows weather for your current location and up to six chosen places. View, add and delete calendar events and reminders, and complete reminders. Events with a meeting link show a countdown from 10 minutes before the start and a one-click join action. Create a meeting note or link and unlink existing context notes.',
+          'Shows weather for your current location and up to six chosen places. View, add and delete calendar events and reminders, and complete reminders. Events with a meeting link show a countdown from 10 minutes before the start and a one-click join action. Create a meeting note or link and unlink existing context notes. The weather list shows its update time to the left of the refresh button in the header.',
         points: ['Weather and calendar', '10-minute meeting countdown', 'Join meetings and link notes'],
       },
       mail: {
@@ -136,7 +136,7 @@ export const en: SiteContent = {
       toolbox: {
         name: 'Utilities',
         caption:
-          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning that blocks keys including F1-F12, a teleprompter, a mirror and the Trash, all on one page. Pause, resume or reset the Pomodoro timer and follow its progress in compact horizontal and vertical layouts. Start junk cleanup from Utilities using your system cleanup settings, and follow progress and results in the island.',
+          'Focus countdown, keep the display awake, screen cleaning, keyboard cleaning that blocks keys including F1-F12, a teleprompter, a mirror and the Trash, all on one page. Pause, resume or reset the Pomodoro timer and follow its progress in compact horizontal and vertical layouts. Start junk cleanup from Utilities using your system cleanup settings, and follow progress and results in the island. Timer names apply only to the current session and return to the default when it ends or is canceled.',
         points: ['Focus countdown', 'Blocks F1-F12 while cleaning', 'Teleprompter and mirror'],
       },
       system: {
@@ -386,7 +386,7 @@ export const en: SiteContent = {
         "entry": "Settings → AI; island → AI monitor.",
         "steps": [
           "Enable a supported local tool, or send a task with zislactl using the CLI reference.",
-          "In AI settings, enable allowance monitoring for the desired provider and supply credentials only where requested.",
+          "Enable monitoring for the desired provider. Set Antigravity Gemini and Claude/GPT monitoring and display separately. For Gemini App, sign in to the same Google account at gemini.google.com/usage and save its Cookie under Website quota credentials; select Gemini CLI separately.",
           "Read the sampling/reset time and low-quota notice; view usage history or export it as .xlsx."
         ],
         "shortcuts": "Use the AI monitor or Settings; no fixed global shortcut is required. zislactl accepts the documented command-line options.",

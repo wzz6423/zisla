@@ -120,6 +120,8 @@ struct IndependentCountdownTests {
         #expect(paused.map(\.detail) == ["00:00:10", "00:00:30"])
         #expect(paused.allSatisfy { $0.metadata?["timerPhase"] == "paused" })
         #expect(service.countdownNotices(for: .left, limit: 0).isEmpty)
+        service.start()
+        #expect(service.name == "Writing")
     }
 
     @Test
@@ -183,9 +185,11 @@ struct IndependentCountdownTests {
         fixture.date += 20
         service.toggleCountdownGroup(members)
         #expect(service.phase == .running && service.displayClock == "00:50")
+        #expect(service.name == "A")
         #expect(service.countdowns.filter { $0.id != later }.allSatisfy { $0.displayClock == "00:50" })
         service.cancelCountdownGroup(members)
         #expect(service.phase == .idle && service.countdowns.map(\.id) == [later])
+        #expect(service.name.isEmpty && service.countdowns.first?.name == "Other")
         #expect(fixture.notifications.isEmpty && fixture.sounds == 0)
     }
 
@@ -230,14 +234,68 @@ struct IndependentCountdownTests {
     }
 
     @Test
-    func pomodoroNameIsRestoredWhileIndependentTimersStaySessionScoped() throws {
+    func newServicesIgnoreNamesFromPreviousSessionsAndKeepSavedDurations() throws {
         let fixture = try Fixture()
         defer { fixture.close() }
+        fixture.defaults.set("Previous session", forKey: "zisla.pomodoro.name")
+        #expect(fixture.service.name.isEmpty)
         fixture.service.setName("  Writing  ")
+        fixture.service.setFocusDuration(100)
+        fixture.service.setRestDuration(40)
         fixture.service.addCountdown(name: "Tea")
         let restored = PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults)
         defer { restored.stop() }
-        #expect(restored.name == "Writing" && restored.countdowns.isEmpty)
+        #expect(restored.name.isEmpty && restored.countdowns.isEmpty)
+        #expect(restored.focusDuration == 100 && restored.restDuration == 40)
+        #expect(fixture.service.name == "Writing")
+    }
+
+    @Test(arguments: [false, true])
+    func finishedPomodoroClearsItsNameBeforeTheNextSession(notificationsMuted: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let service = fixture.service
+        service.notificationsMuted = notificationsMuted
+        service.setFocusDuration(10)
+        service.setRestDuration(5)
+        let other = service.addCountdown(name: "Tea", duration: 100)
+        service.toggleCountdown(id: other)
+        for mode in [PomodoroMode.focus, .rest] {
+            service.setName("Writing")
+            service.start()
+            fixture.date += service.engine.duration(for: mode)
+            service.tick()
+            #expect(service.name.isEmpty && service.phase == .idle)
+            #expect(service.focusCountdownNotice(for: .left).title
+                == AppLocalization.string(mode.next.title, language: .english))
+            #expect(service.countdowns.first?.name == "Tea")
+        }
+        service.start()
+        #expect(service.name.isEmpty && service.focusCountdownNotice(for: .left).title == "Focus")
+        #expect(fixture.notifications.count == (notificationsMuted ? 0 : 2))
+        #expect(fixture.sounds == fixture.notifications.count)
+    }
+
+    @Test(arguments: ["reset", "group", "stop"], [PomodoroPhase.idle, .running, .paused])
+    func canceledPomodoroClearsItsNameAndKeepsTheNextSessionUnnamed(action: String, phase: PomodoroPhase) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let service = fixture.service
+        service.setName("Writing")
+        if phase != .idle { service.start() }
+        if phase == .paused {
+            service.pause()
+            #expect(service.name == "Writing")
+        }
+        switch action {
+        case "reset": service.reset()
+        case "group": service.cancelCountdownGroup(["pomodoro"])
+        default: service.stop()
+        }
+        #expect(service.name.isEmpty && service.phase == .idle)
+        service.start()
+        #expect(service.focusCountdownNotice(for: .left).title == "Focus")
+        #expect(fixture.notifications.isEmpty && fixture.sounds == 0)
     }
 
     @MainActor

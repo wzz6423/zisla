@@ -94,7 +94,7 @@ export const de: SiteContent = {
       aiMonitor: {
         name: 'KI-Überblick',
         caption:
-          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen. Auch die kompakten Ansichten zeigen verbleibende Kontingente als Ringe. Wählen Sie Kontoregionen unabhängig voneinander; tägliche Nutzungswerte und Farben des verbleibenden Kontingents stimmen in allen Ansichten überein.',
+          'Bündelt Aufgaben und Status aus KI-CLIs, Desktop-Apps und IDEs. Verlässliche Zahlen liefern Token-Verläufe und eine Beitrags-Heatmap; wählen Sie ein Datum für Eingabe-, Ausgabe- und Gesamttokens nach Anbieter und Modell. In den Einstellungen können Sie den Verlauf ansehen, vollständig als .xlsx exportieren oder löschen. Zeigt echte Kontingente, Rücksetzzeiten und Warnungen bei wenig Restkontingent, einschließlich 5h/7d-Fenstern und Cursor-Budgets in US-Dollar, soweit verfügbar. Prompt- und Antworttexte werden nicht gelesen. Auch die kompakten Ansichten zeigen verbleibende Kontingente als Ringe. Wählen Sie Kontoregionen unabhängig voneinander; tägliche Nutzungswerte und Farben des verbleibenden Kontingents stimmen in allen Ansichten überein. Die Gemini- und Claude/GPT-Kontingente von Antigravity werden unabhängig überwacht, angezeigt und gemeldet. Gemini App nutzt für Chat-Kontingente ein Web-Cookie desselben Google-Kontos; Gemini CLI bleibt getrennt.',
         points: ['Aufgaben aus mehreren KI-Werkzeugen', 'Modellverlauf und .xlsx-Export', 'Kontingente und Rücksetzzeiten'],
       },
       keyboardSound: {
@@ -120,7 +120,7 @@ export const de: SiteContent = {
       agenda: {
         name: 'Termine und Wetter',
         caption:
-          'Zeigt das Wetter am aktuellen Standort und an bis zu sechs gewählten Orten. Kalenderereignisse und Erinnerungen lassen sich ansehen, hinzufügen, löschen und abschließen. Ereignisse mit einem Besprechungslink zeigen ab 10 Minuten vor Beginn einen Countdown und erlauben den Beitritt per Klick. Erstellen Sie eine Besprechungsnotiz oder verknüpfen und lösen Sie vorhandene ortsbezogene Notizen.',
+          'Zeigt das Wetter am aktuellen Standort und an bis zu sechs gewählten Orten. Kalenderereignisse und Erinnerungen lassen sich ansehen, hinzufügen, löschen und abschließen. Ereignisse mit einem Besprechungslink zeigen ab 10 Minuten vor Beginn einen Countdown und erlauben den Beitritt per Klick. Erstellen Sie eine Besprechungsnotiz oder verknüpfen und lösen Sie vorhandene ortsbezogene Notizen. Die Aktualisierungszeit der Wetterliste steht in der Kopfzeile links neben der Schaltfläche zum Aktualisieren.',
         points: ['Wetter und Kalender', 'Countdown 10 Minuten vorher', 'Beitreten und Notizen verknüpfen'],
       },
       mail: {
@@ -143,7 +143,7 @@ export const de: SiteContent = {
       toolbox: {
         name: 'Kleine Werkzeuge',
         caption:
-          'Fokustimer, Bildschirm wach halten, Bildschirmreinigung, Tastaturreinigung mit Sperre auch für F1-F12, Teleprompter, Spiegel und Papierkorb auf einer Seite. Den Pomodoro können Sie auch in der horizontalen und vertikalen Kompaktansicht pausieren, fortsetzen oder zurücksetzen und den Fortschritt verfolgen. Starten Sie die Bereinigung unnötiger Dateien in den Dienstprogrammen mit Ihren Systemeinstellungen und verfolgen Sie Fortschritt und Ergebnisse in der Insel.',
+          'Fokustimer, Bildschirm wach halten, Bildschirmreinigung, Tastaturreinigung mit Sperre auch für F1-F12, Teleprompter, Spiegel und Papierkorb auf einer Seite. Den Pomodoro können Sie auch in der horizontalen und vertikalen Kompaktansicht pausieren, fortsetzen oder zurücksetzen und den Fortschritt verfolgen. Starten Sie die Bereinigung unnötiger Dateien in den Dienstprogrammen mit Ihren Systemeinstellungen und verfolgen Sie Fortschritt und Ergebnisse in der Insel. Der Timername gilt nur für die aktuelle Sitzung und wird nach deren Ende oder Abbruch auf den Standardnamen zurückgesetzt.',
         points: [
           'Fokus-Timer',
           'Blockiert F1-F12 beim Reinigen',
@@ -403,7 +403,7 @@ export const de: SiteContent = {
         "entry": "Einstellungen → KI; Insel → KI-Monitor.",
         "steps": [
           "Aktiviere ein unterstütztes lokales Werkzeug oder melde eine Aufgabe über zislactl gemäß CLI-Referenz.",
-          "Aktiviere Kontingentüberwachung für den Anbieter und trage Zugangsdaten nur bei Aufforderung ein.",
+          "Aktiviere die Kontingentüberwachung des gewünschten Anbieters und wähle Überwachung und Anzeige für Antigravity Gemini und Claude/GPT getrennt. Melde dich für Gemini App mit demselben Google-Konto bei gemini.google.com/usage an und speichere dessen Cookie unter Web-Kontingentzugangsdaten; wähle Gemini CLI separat.",
           "Prüfe Abfrage-/Rücksetzzeit und Warnungen; öffne den Verlauf oder exportiere .xlsx."
         ],
         "shortcuts": "KI-Monitor oder Einstellungen verwenden; kein festes globales Kürzel nötig. zislactl nutzt dokumentierte Argumente.",

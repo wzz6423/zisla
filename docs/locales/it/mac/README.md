@@ -20,11 +20,11 @@ Sono supportati macOS 14 e successivi. macOS 26 usa Liquid Glass; macOS 14/15 us
 | Appunti | Cronologia locale ricercabile, filtri per immagini, URL e file e preferiti; cronologia e rilevamento link hanno interruttori indipendenti. Le nuove immagini entrano nella coda locale di riconoscimento: cerca il testo per ritrovare l'originale oppure fai clic destro per riconoscerlo o copiarlo. La riconoscizione in corso può essere annullata; quella in background non copia automaticamente il testo. |
 | Monitoraggio AI | Riunisce attività, stato, tendenze token, mappe dei contributi e notifiche laterali da CLI, app desktop e IDE supportati. |
 | Download | Usa `yt-dlp` per video e audio; senza `ffmpeg`, AVFoundation combina le tracce compatibili ed è disponibile un percorso Bilibili di sola lettura. |
-| Agenda | Meteo della posizione corrente e di fino a sei località salvate; consulta, crea ed elimina eventi e promemoria e segna questi ultimi come completati. |
+| Agenda | Meteo della posizione corrente e di fino a sei località salvate; consulta, crea ed elimina eventi e promemoria e segna questi ultimi come completati. L’ora di aggiornamento del meteo appare nell’intestazione, a sinistra del pulsante di aggiornamento. |
 | Posta | Legge account Mail.app selezionati: posta in arrivo, stato di lettura, risposte, composizione e spostamento nel cestino. |
 | Note | Usa Note di Apple come unica fonte per consultare, modificare, creare ed eliminare note Markdown, con anteprima e scrittura automatica delle modifiche. |
 | Mixer volume applicazioni | Su macOS 14.4+, modifica volume e silenziamento di ogni app in riproduzione e ne ricorda il volume; richiede Registrazione audio di sistema. |
-| Utilità | Timer Pomodoro con un singolo suono e notifica locale alla fine, modalità attiva, prevenzione dello stop per inattività, pulizia schermo/tastiera, suggeritore, specchio fotocamera e svuotamento del cestino con conferma. |
+| Utilità | Timer Pomodoro con un singolo suono e notifica locale alla fine, modalità attiva, prevenzione dello stop per inattività, pulizia schermo/tastiera, suggeritore, specchio fotocamera e svuotamento del cestino con conferma. Il nome del timer vale solo per la sessione corrente e torna a quello predefinito quando termina o viene annullata. |
 | Sistema | CPU, GPU, memoria, disco, rete, temperatura e ventole; libera memoria e analizza cache, registri e dati temporanei eliminabili in sicurezza, oltre alla salute della batteria e ai livelli degli accessori. |
 
 ### Funzioni tra moduli
@@ -49,7 +49,7 @@ Sono supportati macOS 14 e successivi. macOS 26 usa Liquid Glass; macOS 14/15 us
 - **Note contestuali e riunioni:** tieni il tasto configurato e agita il puntatore per annotare pagina, finestra o desktop. Gli eventi con link riunione mostrano 10 minuti di conto alla rovescia: partecipa, crea o collega una nota. Gestisci le note sullo scaffale.
 - **Agita per rilasciare:** durante il trascinamento mostra una destinazione; l'interruttore nelle impostazioni è indipendente.
 - **Uscita e lettore:** scegli dispositivo nell'area media. Impostazioni: sorgente automatica o lettore preferito, layout compatto e condizioni di arresto dei suoni ambientali.
-- **Quote AI e ripristini:** mostra quote supportate, tempi di campionamento e ripristino e avvisi bassi, con finestre 5h/7d e budget Cursor USD disponibili. Sono separati dalla cronologia locale dei token.
+- **Quote AI e ripristini:** mostra quote supportate, tempi di campionamento e ripristino e avvisi bassi, con finestre 5h/7d e budget Cursor USD disponibili. Sono separati dalla cronologia locale dei token. Le quote Gemini e Claude/GPT di Antigravity hanno monitoraggio, visualizzazione e avvisi indipendenti. Le quote di chat di Gemini App usano un Cookie web dello stesso account Google; Gemini CLI resta separato.
 
 ### Ordine dei tasti delle azioni rapide
 

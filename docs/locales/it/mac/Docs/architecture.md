@@ -27,6 +27,7 @@ I pannelli di notifica sinistro e destro vengono creati quando servono e nascost
 - Download, meteo e richieste GitHub usano actor.
 - Lo stato AI scritto dagli hook viene osservato tramite eventi del filesystem sulla directory. Ogni fonte di sessioni AI confronta data di modifica e dimensione dell'ultimo file locale di sessione o attività e riutilizza la cache di parsing se nulla cambia.
 - Il rilevamento automatico legge solo eventi strutturati, marcatori fissi e metadati necessari a determinare lo stato delle attività. Non legge prompt o risposte; un errore del parser di un provider non blocca gli altri.
+- Le quote degli account AI sono rilevate separatamente dai fornitori. Le quote Gemini e Claude/GPT di Antigravity mantengono periodi di ripristino e avvisi propri. La quota di chat ordinaria di Gemini App usa il Cookie web salvato dello stesso account Google; Gemini CLI mantiene la fonte OAuth locale. Le quote mancanti non vengono stimate.
 - Il ritardo di chiusura usa `Task` annullabili e un token di generazione, così una vecchia operazione non può nascondere un'isola già riaperta.
 - Lo stato nascosto non usa `TimelineView`, timer a 60 Hz o invii continui di animazioni.
 

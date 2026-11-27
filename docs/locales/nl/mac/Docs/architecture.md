@@ -27,6 +27,7 @@ Linker- en rechtermeldingspanelen worden op aanvraag gemaakt en verdwijnen zodra
 - Downloads, weer en GitHub-verzoeken gebruiken actors.
 - AI-status die hooks schrijven wordt via bestandssysteemgebeurtenissen op de map gevolgd. Elke AI-sessiebron vergelijkt wijzigingstijd en grootte van het nieuwste lokale sessie- of activiteitsbestand en gebruikt de parsercache opnieuw als niets veranderde.
 - Automatische detectie leest alleen gestructureerde gebeurtenissen, vaste statusmarkeringen en activiteitsmetadata die nodig zijn om de taakstatus te bepalen. Prompt- en antwoordteksten worden niet gelezen; een parserfout bij één provider blokkeert andere providers niet.
+- AI-accounttegoeden worden per aanbieder gemeten. De Gemini- en Claude/GPT-tegoeden van Antigravity behouden eigen resetvensters en meldingen. Het gewone chattegoed van Gemini App gebruikt de opgeslagen web-Cookie van hetzelfde Google-account; Gemini CLI behoudt de lokale OAuth-bron. Ontbrekende tegoeden worden nooit geschat.
 - Vertraagd inklappen gebruikt annuleerbare `Task`s en een generatietoken, zodat een oude taak een opnieuw geopend eiland niet verbergt.
 - De verborgen toestand heeft geen `TimelineView`, 60 Hz-timer of voortdurende aanlevering van animaties.
 

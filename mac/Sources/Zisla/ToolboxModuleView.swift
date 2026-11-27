@@ -392,6 +392,9 @@ struct ToolboxTimerCard: View {
         .overlay { shape.strokeBorder(Color.strokeCard, lineWidth: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("toolbox.timer.\(identifier)")
+        .onReceive(service.$name) { _ in
+            if timerID == nil { isEditingName = false }
+        }
     }
 
     @ViewBuilder

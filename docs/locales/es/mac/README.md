@@ -20,11 +20,11 @@ Se admite macOS 14 y posteriores. macOS 26 usa Liquid Glass; macOS 14/15 recurre
 | Portapapeles | Guarda historial local buscable, filtra imágenes, URL y archivos y marca favoritos; historial y detección de enlaces son independientes. Las nuevas imágenes se ponen en cola para reconocimiento de texto en el dispositivo; busca su texto para encontrar la imagen original o haz clic derecho para reconocerlo o copiarlo. Puedes cancelar el reconocimiento en curso; el reconocimiento de fondo no copia texto automáticamente. |
 | Supervisión de IA | Agrupa tareas, estados, tendencias de tokens, mapas de calor de contribuciones y avisos de CLI, aplicaciones e IDE compatibles. |
 | Descargas | Usa `yt-dlp` para vídeo y audio; sin `ffmpeg`, AVFoundation empaqueta pistas compatibles y existe una alternativa de Bilibili de solo lectura. |
-| Agenda | Muestra tiempo actual y hasta seis ubicaciones guardadas; consulta, crea y elimina eventos y recordatorios y marca los recordatorios como completados. |
+| Agenda | Muestra tiempo actual y hasta seis ubicaciones guardadas; consulta, crea y elimina eventos y recordatorios y marca los recordatorios como completados. La hora de actualización de la lista del tiempo aparece en la cabecera, a la izquierda del botón de actualizar. |
 | Correo | Lee cuentas de Mail.app seleccionadas para ver entradas, marcar leído, responder, redactar y mover mensajes a la papelera. |
 | Notas | Usa Notas de Apple como única fuente para consultar, editar, crear y eliminar Markdown con vista previa en directo y escritura automática. |
 | Mezclador de volumen de aplicaciones | En macOS 14.4+, ajusta volumen y silencio de cada aplicación en reproducción y recuerda su volumen; requiere grabación de audio del sistema. |
-| Utilidades | Pomodoro con un aviso sonoro y notificación local al finalizar, mantener despierto, prevenir reposo por inactividad, limpiar pantalla y teclado, teleprompter, espejo de cámara y vaciado confirmado de papelera. |
+| Utilidades | Pomodoro con un aviso sonoro y notificación local al finalizar, mantener despierto, prevenir reposo por inactividad, limpiar pantalla y teclado, teleprompter, espejo de cámara y vaciado confirmado de papelera. El nombre del temporizador solo se aplica a la sesión actual y vuelve al predeterminado cuando termina o se cancela. |
 | Sistema | CPU, GPU, memoria, disco, red, temperatura y ventiladores; libera memoria y analiza cachés, registros y temporales seguros de eliminar; incluye salud de batería y niveles de accesorios. |
 
 ### Funciones entre módulos
@@ -49,7 +49,7 @@ Se admite macOS 14 y posteriores. macOS 26 usa Liquid Glass; macOS 14/15 recurre
 - **Notas contextuales y reuniones:** Mantén el atajo de nota y agita el puntero para adjuntar una nota a página, ventana o escritorio. Los eventos con enlaces muestran cuenta atrás 10 minutos antes; entra, crea una nota o vincula una existente. Gestiona las notas en la estantería.
 - **Agitar para soltar:** Agita el puntero al arrastrar archivos para revelar el destino; activa el gesto de forma independiente.
 - **Salida de audio y preferencias:** Elige dispositivo en el área multimedia. Ajustes selecciona fuente automática o reproductor preferido, diseño compacto y condiciones de parada del sonido ambiental.
-- **Cuotas y reinicios de IA:** Supervisión y Ajustes muestran cuotas, horas de muestreo y reinicio y avisos de cuota baja, incluidas ventanas 5h/7d y presupuestos Cursor USD disponibles. Son distintos del historial local de tokens.
+- **Cuotas y reinicios de IA:** Supervisión y Ajustes muestran cuotas, horas de muestreo y reinicio y avisos de cuota baja, incluidas ventanas 5h/7d y presupuestos Cursor USD disponibles. Son distintos del historial local de tokens. Las cuotas Gemini y Claude/GPT de Antigravity tienen supervisión, visualización y avisos independientes. Las cuotas de conversación de Gemini App usan un Cookie web de la misma cuenta de Google; Gemini CLI se supervisa por separado.
 
 ### Orden de teclado de acciones rápidas
 

@@ -899,6 +899,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var aiAccountBalanceMonitoredProviders: Set<AIProvider>
     public var aiAccountBalanceDisplayedProviders: Set<AIProvider>
     public var aiAccountBalanceQoderRegions: Set<AIAccountBalanceQoderRegion>
+    public var aiAccountBalanceMonitoredAntigravityGroups: Set<AIAccountBalanceAntigravityGroup>
+    public var aiAccountBalanceDisplayedAntigravityGroups: Set<AIAccountBalanceAntigravityGroup>
+    public var aiAccountBalanceMonitoredGeminiSources: Set<AIAccountBalanceGeminiSource>
+    public var aiAccountBalanceDisplayedGeminiSources: Set<AIAccountBalanceGeminiSource>
     public var compactStatusPriority: [CompactStatusPriority]
     public var moduleOrder: [IslandModuleOrder]
     /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.).
@@ -1084,6 +1088,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         aiAccountBalanceMonitoredProviders: Set<AIProvider> = [],
         aiAccountBalanceDisplayedProviders: Set<AIProvider> = [],
         aiAccountBalanceQoderRegions: Set<AIAccountBalanceQoderRegion> = [.global],
+        aiAccountBalanceMonitoredAntigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
+        aiAccountBalanceDisplayedAntigravityGroups: Set<AIAccountBalanceAntigravityGroup> = Set(AIAccountBalanceAntigravityGroup.allCases),
+        aiAccountBalanceMonitoredGeminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases),
+        aiAccountBalanceDisplayedGeminiSources: Set<AIAccountBalanceGeminiSource> = Set(AIAccountBalanceGeminiSource.allCases),
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
         moduleOrder: [IslandModuleOrder] = IslandModuleOrder.defaultOrder,
         notificationsMuted: Bool = false,
@@ -1242,6 +1250,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.aiAccountBalanceMonitoredProviders = aiAccountBalanceMonitoredProviders
         self.aiAccountBalanceDisplayedProviders = aiAccountBalanceDisplayedProviders
         self.aiAccountBalanceQoderRegions = aiAccountBalanceQoderRegions
+        self.aiAccountBalanceMonitoredAntigravityGroups = aiAccountBalanceMonitoredAntigravityGroups
+        self.aiAccountBalanceDisplayedAntigravityGroups = aiAccountBalanceDisplayedAntigravityGroups
+        self.aiAccountBalanceMonitoredGeminiSources = aiAccountBalanceMonitoredGeminiSources
+        self.aiAccountBalanceDisplayedGeminiSources = aiAccountBalanceDisplayedGeminiSources
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
         self.moduleOrder = IslandModuleOrder.normalized(moduleOrder)
         self.notificationsMuted = notificationsMuted
@@ -1417,6 +1429,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case aiAccountBalanceNoticeEnabled, aiAccountBalanceCompactStyle, aiAccountBalancePinnedInCustomIsland
         case aiAccountBalanceMonitoredProviders, aiAccountBalanceDisplayedProviders
         case aiAccountBalanceQoderRegions
+        case aiAccountBalanceMonitoredAntigravityGroups, aiAccountBalanceDisplayedAntigravityGroups
+        case aiAccountBalanceMonitoredGeminiSources, aiAccountBalanceDisplayedGeminiSources
         case compactStatusPriority
         case moduleOrder
         case notificationsMuted
@@ -1755,6 +1769,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             .map { Set($0.compactMap(AIProvider.init(rawValue:))) } ?? defaults.aiAccountBalanceMonitoredProviders
         aiAccountBalanceDisplayedProviders = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceDisplayedProviders)
             .map { Set($0.compactMap(AIProvider.init(rawValue:))) } ?? defaults.aiAccountBalanceDisplayedProviders
+        aiAccountBalanceMonitoredAntigravityGroups = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceMonitoredAntigravityGroups)
+            .map { Set($0.compactMap(AIAccountBalanceAntigravityGroup.init(rawValue:))) } ?? defaults.aiAccountBalanceMonitoredAntigravityGroups
+        aiAccountBalanceDisplayedAntigravityGroups = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceDisplayedAntigravityGroups)
+            .map { Set($0.compactMap(AIAccountBalanceAntigravityGroup.init(rawValue:))) } ?? defaults.aiAccountBalanceDisplayedAntigravityGroups
+        aiAccountBalanceMonitoredGeminiSources = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceMonitoredGeminiSources)
+            .map { Set($0.compactMap(AIAccountBalanceGeminiSource.init(rawValue:))) } ?? defaults.aiAccountBalanceMonitoredGeminiSources
+        aiAccountBalanceDisplayedGeminiSources = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceDisplayedGeminiSources)
+            .map { Set($0.compactMap(AIAccountBalanceGeminiSource.init(rawValue:))) } ?? defaults.aiAccountBalanceDisplayedGeminiSources
         if let regions = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceQoderRegions) {
             aiAccountBalanceQoderRegions = Set(regions.compactMap(AIAccountBalanceQoderRegion.init(rawValue:)))
         } else if let region = try decoder.container(keyedBy: LegacyCodingKeys.self)

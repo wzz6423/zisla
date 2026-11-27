@@ -41,7 +41,7 @@ Kararlı bir yerel etkinlik kaynağı olmayan araçlarda `zislactl`, betiklerin,
 | Alan | Dahil edilen araçlar |
 | --- | --- |
 | İndirmeler ve belgeler | `yt-dlp` ile video ve ses indirme; yerel PDF birleştirme, bölme, döndürme, kırpma, dönüştürme, görüntü oluşturma, metin dışa aktarma, filigran, sayfa numarası, şifreleme, kilit açma ve meta veri düzenleme. |
-| Odaklanma ve sunum | Oturum bittiğinde bir sesli uyarı ve yerel bildirim veren Pomodoro sayacı, uyanık tutma, boşta uykuya geçmeyi önleme, ekran ve klavye temizliği, teleprompter ve kamera aynası. |
+| Odaklanma ve sunum | Oturum bittiğinde bir sesli uyarı ve yerel bildirim veren Pomodoro sayacı, uyanık tutma, boşta uykuya geçmeyi önleme, ekran ve klavye temizliği, teleprompter ve kamera aynası. Zamanlayıcı adı yalnızca geçerli oturum için kullanılır ve oturum bittiğinde veya iptal edildiğinde varsayılan ada döner. |
 | Sistem ve pil | CPU, GPU, bellek, disk, ağ, fan ve pil bilgileri; güvenle kaldırılabilen önbellekleri ve günlükleri temizleme. |
 | Sesli giriş | Kayıt ve yazıya dökme için genel kısayollar, isteğe bağlı yerel veya uzak transkript düzenleme ve yerel ses geçmişi. |
 
@@ -53,7 +53,7 @@ Adada 12 modül vardır: Ana Sayfa, Aktarım, Pano, Yapay Zekâ İzleme, Klavye 
 - **Karıştırma ve oynatma:** macOS 14.4+ uygulama başına ses düzeyi ve sessize alma sunar. Ses çıkışını medya alanından, oynatıcı tercihlerini Ayarlar'dan seçin.
 - **Masaüstü ve toplantılar:** Dock ve Command+Tab pencere önizlemeleri, web sayfası/pencere/masaüstü bağlam notları, 10 dakikalık toplantı geri sayımı, toplantıya katılma ve bağlı notlar. Raf bırakma hedefini göstermek için dosya sürüklerken işaretçiyi sallayın.
 - **Günlük özet:** 8 şablon, önizleme, elle veya zamanlanmış PNG dışa aktarma, seçilen ölçümler ve bağımsız kayıt klasörü.
-- **Yapay zekâ hesapları:** Desteklenen hesapların kotalarını, yenilenme zamanlarını, düşük kota bildirimlerini ve örnekleme zamanlarını görün; yerel token geçmişini `.xlsx` olarak dışa aktarın.
+- **Yapay zekâ hesapları:** Desteklenen hesapların kotalarını, yenilenme zamanlarını, düşük kota bildirimlerini ve örnekleme zamanlarını görün; yerel token geçmişini `.xlsx` olarak dışa aktarın. Antigravity Gemini ve Claude/GPT kotalarının izleme, gösterim ve uyarıları ayrıdır. Gemini App sohbet kotası aynı Google hesabının web Cookie bilgisiyle sorgulanır; Gemini CLI ayrı izlenir.
 - **Hızlı İşlemler:** Açılır penceredeki işlemler sırasıyla `Command+1` ile `Command+0` kullanır. Yeni yapılandırmalarda ilk işlem için ek varsayılan tetikleyici `Command+N`'dir. Yükseltmeler kayıtlı kısayolları ve temizlenmiş tetikleyicileri korur.
 
 [Kullanıcı yardımı](https://wzz6423.github.io/zisla/help.html?lang=tr#help) dokuz adım adım kılavuz sunar: pano, yakalama, raf, toplantılar, yapay zekâ, medya araçları, günlük özetler, masaüstü notları/pencere önizlemeleri ve oynatma/karıştırma. [macOS kılavuzu](mac/README.md) araçların kayıt klasörlerini ve bağımlılıklarını listeler.

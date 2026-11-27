@@ -20,11 +20,11 @@ macOS 14 ve sonrası desteklenir. macOS 26 Liquid Glass kullanır; macOS 14/15 y
 | Pano | Aranabilir yerel geçmiş tutar, görüntü/URL/dosya filtreleri ve favoriler sunar; geçmiş ve bağlantı algılama ayrıdır. Yeni geçmiş görüntüleri cihazda metin tanımaya alınır; metinle özgün görüntüyü bulun veya sağ tıklayarak tanıyın ya da kopyalayın. Devam eden tanıma iptal edilebilir; arka plan tanıma metni otomatik kopyalamaz. |
 | Yapay Zekâ İzleme | Desteklenen CLI, masaüstü uygulaması ve IDE'lerden görevleri, durumları, token eğilimlerini, katkı haritalarını ve yan bildirimleri toplar. |
 | İndirmeler | Video ve ses için `yt-dlp`; `ffmpeg` yoksa AVFoundation uyumlu kanalları paketler ve Bilibili salt okunur alternatif sunar. |
-| Ajanda | Geçerli konum ve en fazla altı kayıtlı yer için hava durumu; etkinlik ve anımsatıcıları görüntüleme, oluşturma, silme ve anımsatıcı tamamlama. |
+| Ajanda | Geçerli konum ve en fazla altı kayıtlı yer için hava durumu; etkinlik ve anımsatıcıları görüntüleme, oluşturma, silme ve anımsatıcı tamamlama. Hava durumu listesinin güncelleme zamanı, başlık satırında yenileme düğmesinin solunda görünür. |
 | Posta | Seçilen Mail.app hesaplarının gelen kutularını okur; okundu işareti, yanıt, yeni posta ve çöp kutusuna taşıma sunar. |
 | Notlar | Markdown notlarını görüntüleme, düzenleme, oluşturma ve silmede tek kaynak Apple Notlar'dır; canlı önizleme ve otomatik yazma sunar. |
 | Uygulama ses düzeyi karıştırıcısı | macOS 14.4+ üzerinde ses üreten her uygulamanın düzeyini ve sessizliğini ayarlayıp hatırlar; Sistem Sesi Kaydı izni gerekir. |
-| Araçlar | Oturum sonunda bir sesli uyarı ve yerel bildirim veren Pomodoro, uyanık tutma, boşta uyku önleme, ekran/klavye temizliği, teleprompter, kamera aynası ve onaylı çöp boşaltma. |
+| Araçlar | Oturum sonunda bir sesli uyarı ve yerel bildirim veren Pomodoro, uyanık tutma, boşta uyku önleme, ekran/klavye temizliği, teleprompter, kamera aynası ve onaylı çöp boşaltma. Zamanlayıcı adı yalnızca geçerli oturum için kullanılır ve oturum bittiğinde veya iptal edildiğinde varsayılan ada döner. |
 | Sistem | CPU, GPU, bellek, disk, ağ, sıcaklık ve fan; belleği boşaltma, güvenli önbellek/günlük/geçici veri tarama, pil sağlığı ve aksesuar düzeyleri. |
 
 ### Modüller arası işlevler
@@ -49,7 +49,7 @@ macOS 14 ve sonrası desteklenir. macOS 26 Liquid Glass kullanır; macOS 14/15 y
 - **Bağlam notları ve toplantılar:** Not kısayolunu tutup işaretçiyi sallayarak sayfa/pencere/masaüstüne not bağlayın. Toplantı bağlantılı etkinlikler başlamadan 10 dakika önce geri sayar; katılın, not oluşturun veya mevcut not bağlayın. Notları rafta yönetin.
 - **Sallayarak bırakma:** Dosya sürüklerken işaretçiyi sallayarak hedefi gösterin; bu hareketi ayrı açıp kapatın.
 - **Ses çıkışı ve oynatıcı tercihleri:** Medya alanında aygıt seçin. Ayarlar otomatik kaynak/tercih edilen oynatıcı, kompakt düzen ve ortam sesi durma koşullarını seçer.
-- **Yapay zekâ kotası ve yenilenme:** İzleme ve Ayarlar kota, örnekleme ve yenilenme saatleri ile düşük kota uyarılarını gösterir; mevcut 5h/7d pencereleri ve Cursor USD bütçeleri dahildir. Yerel token geçmişinden ayrıdır.
+- **Yapay zekâ kotası ve yenilenme:** İzleme ve Ayarlar kota, örnekleme ve yenilenme saatleri ile düşük kota uyarılarını gösterir; mevcut 5h/7d pencereleri ve Cursor USD bütçeleri dahildir. Yerel token geçmişinden ayrıdır. Antigravity Gemini ve Claude/GPT kotalarının izleme, gösterim ve uyarıları ayrıdır. Gemini App sohbet kotası aynı Google hesabının web Cookie bilgisiyle sorgulanır; Gemini CLI ayrı izlenir.
 
 ### Hızlı İşlemler klavye sırası
 

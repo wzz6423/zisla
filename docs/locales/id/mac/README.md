@@ -20,11 +20,11 @@ macOS 14 dan lebih baru didukung. macOS 26 memakai Liquid Glass; macOS 14/15 mem
 | Papan Klip | Riwayat lokal yang dapat dicari, filter gambar/URL/berkas, dan favorit; riwayat serta deteksi tautan memiliki sakelar terpisah. Gambar baru masuk antrean pengenalan teks di perangkat; cari teks untuk menemukan gambar asal, atau klik kanan untuk mengenali/menyalin teks. Pengenalan yang berjalan dapat dibatalkan; pengenalan latar tidak menyalin teks otomatis. |
 | Pemantauan AI | Menggabungkan tugas aktif, status, tren token, peta panas kontribusi, dan pemberitahuan samping dari CLI, aplikasi desktop, serta IDE yang didukung. |
 | Unduhan | Memakai `yt-dlp` untuk video dan audio; tanpa `ffmpeg`, AVFoundation membungkus trek yang kompatibel, dan tersedia alternatif Bilibili hanya-baca. |
-| Jadwal | Cuaca lokasi saat ini dan hingga enam lokasi tersimpan; melihat, membuat, menghapus acara/pengingat, dan menandai pengingat selesai. |
+| Jadwal | Cuaca lokasi saat ini dan hingga enam lokasi tersimpan; melihat, membuat, menghapus acara/pengingat, dan menandai pengingat selesai. Waktu pembaruan daftar cuaca muncul di bagian atas, di sebelah kiri tombol muat ulang. |
 | Surel | Membaca akun Mail.app terpilih untuk melihat kotak masuk, menandai dibaca, membalas, menulis, dan memindahkan pesan ke sampah. |
 | Catatan | Apple Notes sebagai satu-satunya sumber data untuk melihat, menyunting, membuat, dan menghapus catatan Markdown, dengan pratinjau langsung serta penyimpanan otomatis. |
 | Mixer Volume Aplikasi | macOS 14.4+ mengatur dan membisukan setiap aplikasi yang memutar audio serta mengingat volumenya; memerlukan izin Rekaman Audio Sistem. |
-| Utilitas | Timer Pomodoro dengan satu bunyi dan notifikasi lokal saat sesi selesai, mode tetap terjaga, pencegah tidur saat menganggur, pembersihan layar/papan ketik, teleprompter, cermin kamera, dan pengosongan sampah dengan konfirmasi. |
+| Utilitas | Timer Pomodoro dengan satu bunyi dan notifikasi lokal saat sesi selesai, mode tetap terjaga, pencegah tidur saat menganggur, pembersihan layar/papan ketik, teleprompter, cermin kamera, dan pengosongan sampah dengan konfirmasi. Nama pengatur waktu hanya berlaku untuk sesi saat ini dan kembali ke nama bawaan saat sesi berakhir atau dibatalkan. |
 | Sistem | CPU, GPU, memori, disk, jaringan, suhu, dan kipas; pelepasan memori dan pemindaian cache/log/data sementara yang aman dihapus; kesehatan baterai dan daya aksesori. |
 
 ### Kemampuan lintas modul
@@ -49,7 +49,7 @@ macOS 14 dan lebih baru didukung. macOS 26 memakai Liquid Glass; macOS 14/15 mem
 - **Catatan konteks dan rapat:** Tahan pintasan catatan yang diatur lalu goyangkan penunjuk untuk menempelkan catatan ke halaman, jendela, atau desktop. Acara dengan tautan rapat menampilkan hitung mundur 10 menit sebelumnya; bergabung, membuat catatan, atau menautkan catatan lama tersedia. Kelola catatan konteks di rak.
 - **Goyang untuk menjatuhkan:** Goyangkan penunjuk ketika menyeret berkas untuk menampilkan target; gestur memiliki sakelar tersendiri.
 - **Keluaran audio dan preferensi pemutar:** Pilih perangkat keluaran di area media. Pengaturan memilih sumber otomatis/pemutar utama, tata letak ringkas, dan kondisi penghentian suara latar.
-- **Kuota dan reset AI:** Pemantauan AI dan Pengaturan menampilkan kuota akun, waktu sampel/reset, dan peringatan kuota rendah, termasuk jendela 5h/7d yang tersedia dan anggaran Cursor USD. Ini terpisah dari riwayat token lokal.
+- **Kuota dan reset AI:** Pemantauan AI dan Pengaturan menampilkan kuota akun, waktu sampel/reset, dan peringatan kuota rendah, termasuk jendela 5h/7d yang tersedia dan anggaran Cursor USD. Ini terpisah dari riwayat token lokal. Kuota Gemini dan Claude/GPT Antigravity memiliki pemantauan, tampilan, dan peringatan terpisah. Kuota percakapan Gemini App memakai Cookie web dari akun Google yang sama; Gemini CLI tetap terpisah.
 
 ### Urutan papan ketik Tindakan Cepat
 

@@ -41,7 +41,7 @@ Para herramientas sin una fuente local estable, `zislactl` permite a scripts, CI
 | Área | Herramientas incluidas |
 | --- | --- |
 | Descargas y documentos | Descargas de vídeo y audio mediante `yt-dlp`; combinación, división, rotación, recorte, conversión, renderizado, exportación de texto, marcas de agua, números de página, cifrado, desbloqueo y edición de metadatos PDF en local. |
-| Concentración y presentación | Temporizador Pomodoro con un aviso sonoro y una notificación local al acabar una sesión, modo de mantener despierto, prevención del reposo por inactividad, limpieza de pantalla y teclado, teleprompter y espejo de cámara. |
+| Concentración y presentación | Temporizador Pomodoro con un aviso sonoro y una notificación local al acabar una sesión, modo de mantener despierto, prevención del reposo por inactividad, limpieza de pantalla y teclado, teleprompter y espejo de cámara. El nombre del temporizador solo se aplica a la sesión actual y vuelve al predeterminado cuando termina o se cancela. |
 | Sistema y batería | Información de CPU, GPU, memoria, disco, red, ventilador y batería, además de limpieza de cachés y registros que se pueden eliminar de forma segura. |
 | Entrada de voz | Atajos globales de grabación y transcripción, organización opcional de transcripciones en local o a distancia e historial de voz local. |
 
@@ -53,7 +53,7 @@ La isla tiene 12 módulos: Inicio, Transferencia, Portapapeles, Supervisión de 
 - **Mezcla y reproducción:** macOS 14.4+ permite ajustar volumen y silencio por aplicación. Elige la salida de audio en el área multimedia y las preferencias del reproductor en Ajustes.
 - **Escritorio y reuniones:** Vistas previas de ventanas del Dock y Command+Tab, notas contextuales de páginas/ventanas/escritorio, cuenta atrás de reuniones de 10 minutos, acceso a reuniones y notas vinculadas. Agita el puntero al arrastrar archivos para mostrar el destino de la estantería.
 - **Resumen diario:** 8 plantillas, vista previa, exportación PNG manual o programada, métricas seleccionadas y carpeta de guardado independiente.
-- **Cuentas de IA:** Consulta cuotas disponibles de cuentas compatibles, horas de reinicio, avisos de cuota baja y horas de muestreo; exporta el historial local de tokens como `.xlsx`.
+- **Cuentas de IA:** Consulta cuotas disponibles de cuentas compatibles, horas de reinicio, avisos de cuota baja y horas de muestreo; exporta el historial local de tokens como `.xlsx`. Las cuotas Gemini y Claude/GPT de Antigravity tienen supervisión, visualización y avisos independientes. Las cuotas de conversación de Gemini App usan un Cookie web de la misma cuenta de Google; Gemini CLI se supervisa por separado.
 - **Acciones rápidas:** Las acciones del aviso usan `Command+1` a `Command+0` en orden. El activador adicional predeterminado para configuraciones nuevas es `Command+N` para la primera acción. Las actualizaciones conservan atajos guardados y activadores borrados.
 
 La [ayuda para usuarios](https://wzz6423.github.io/zisla/help.html?lang=es#help) ofrece nueve guías paso a paso: portapapeles, captura, estantería, reuniones, IA, herramientas multimedia, resúmenes diarios, notas de escritorio/vistas previas de ventanas y reproducción/mezcla. La [guía de macOS](mac/README.md) enumera las carpetas de guardado y dependencias de las herramientas.

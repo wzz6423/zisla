@@ -27,6 +27,7 @@ Left and right notification panels are created on demand and are hidden as soon 
 - Downloads, weather, and GitHub requests use actors.
 - AI state written by hooks is monitored through directory filesystem events. Each AI session source compares the latest local session or activity file by mtime and size and reuses the parse cache when nothing changed.
 - Automatic detection reads only structured events, fixed status markers, and activity metadata needed to determine task state. It does not read prompt or answer bodies, and a provider parser failure does not block other providers.
+- AI account allowances are separate provider samples. Antigravity’s Gemini and Claude/GPT pools keep independent reset windows and low-quota notices. Gemini App ordinary-chat allowance uses the same Google account’s saved web Cookie; Gemini CLI keeps its local OAuth source. Missing quotas are never estimated.
 - Collapse delays use cancellable `Task`s and a generation token so an old task cannot hide an island that has already reopened.
 - The hidden state has no `TimelineView`, 60 Hz timer, or continuous animation submission.
 

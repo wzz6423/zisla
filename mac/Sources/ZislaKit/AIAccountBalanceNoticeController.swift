@@ -41,6 +41,8 @@ public final class AIAccountBalanceNoticeController {
         self.settings = settings
         self.language = language
         let monitored = balances.compactMap { balance -> AIAccountBalance? in
+            guard balance.matchesAntigravityGroups(settings.aiAccountBalanceMonitoredAntigravityGroups),
+                  balance.matchesGeminiSources(settings.aiAccountBalanceMonitoredGeminiSources) else { return nil }
             var row = balance
             row.providers = row.providers.filter {
                 balance.isDebug || (AIAccountBalanceCatalog.supportsBalanceQuery($0)
@@ -95,7 +97,11 @@ public final class AIAccountBalanceNoticeController {
               settings.aiAccountBalancePinnedInCustomIsland else { return [] }
         return AIAccountBalanceCatalog.displayedBalances(balances,
                                                          monitoredProviders: settings.aiAccountBalanceMonitoredProviders,
-                                                         displayedProviders: settings.aiAccountBalanceDisplayedProviders).sorted { $0.id < $1.id }
+                                                         displayedProviders: settings.aiAccountBalanceDisplayedProviders,
+                                                         monitoredAntigravityGroups: settings.aiAccountBalanceMonitoredAntigravityGroups,
+                                                         displayedAntigravityGroups: settings.aiAccountBalanceDisplayedAntigravityGroups,
+                                                         monitoredGeminiSources: settings.aiAccountBalanceMonitoredGeminiSources,
+                                                         displayedGeminiSources: settings.aiAccountBalanceDisplayedGeminiSources).sorted { $0.id < $1.id }
     }
 
     /// Polling retains the current account's reading; a changed summary gets time to reach its new tail.

@@ -668,7 +668,11 @@ final class AppModel: ObservableObject {
             let settings = self.settingsStore.settings
             return AIAccountBalanceCatalog.displayedBalances(self.aiMonitor.accountBalances,
                                                              monitoredProviders: settings.aiAccountBalanceMonitoredProviders,
-                                                             displayedProviders: settings.aiAccountBalanceDisplayedProviders)
+                                                             displayedProviders: settings.aiAccountBalanceDisplayedProviders,
+                                                             monitoredAntigravityGroups: settings.aiAccountBalanceMonitoredAntigravityGroups,
+                                                             displayedAntigravityGroups: settings.aiAccountBalanceDisplayedAntigravityGroups,
+                                                             monitoredGeminiSources: settings.aiAccountBalanceMonitoredGeminiSources,
+                                                             displayedGeminiSources: settings.aiAccountBalanceDisplayedGeminiSources)
         },
         typing: { [unowned self] date in
             guard self.settingsStore.settings.keyboardTypingStatsEnabled,
@@ -3551,7 +3555,9 @@ final class AppModel: ObservableObject {
         clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
         if settings.aiProgressEnabled {
             aiMonitor.configureAccountBalanceProviders(settings.aiAccountBalanceMonitoredProviders,
-                                                       qoderRegions: settings.aiAccountBalanceQoderRegions)
+                                                       qoderRegions: settings.aiAccountBalanceQoderRegions,
+                                                       antigravityGroups: settings.aiAccountBalanceMonitoredAntigravityGroups,
+                                                       geminiSources: settings.aiAccountBalanceMonitoredGeminiSources)
             aiMonitor.start()
             if selectedModule == .aiMonitor {
                 aiMonitor.loadUsageHistory()

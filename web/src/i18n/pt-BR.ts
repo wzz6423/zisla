@@ -96,7 +96,7 @@ export const ptBR = createCatalog({
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Reúne tarefas e estados de CLIs de IA, apps de desktop e IDEs. Dados numéricos confiáveis geram tendências de tokens e o mapa de contribuições; escolha uma data para ver tokens de entrada, saída e totais por provedor e modelo. Consulte o histórico nos Ajustes, exporte tudo em .xlsx ou apague. Mostra cotas reais, horários de redefinição e alertas de cota baixa, incluindo janelas 5h/7d e orçamentos do Cursor em dólares quando disponíveis. Não lê o texto dos prompts nem das respostas. Os layouts compactos também mostram a cota restante em anéis. Escolha as regiões das contas de forma independente; os registros diários e as cores da cota restante são consistentes em todos os layouts.',
+          'Reúne tarefas e estados de CLIs de IA, apps de desktop e IDEs. Dados numéricos confiáveis geram tendências de tokens e o mapa de contribuições; escolha uma data para ver tokens de entrada, saída e totais por provedor e modelo. Consulte o histórico nos Ajustes, exporte tudo em .xlsx ou apague. Mostra cotas reais, horários de redefinição e alertas de cota baixa, incluindo janelas 5h/7d e orçamentos do Cursor em dólares quando disponíveis. Não lê o texto dos prompts nem das respostas. Os layouts compactos também mostram a cota restante em anéis. Escolha as regiões das contas de forma independente; os registros diários e as cores da cota restante são consistentes em todos os layouts. As cotas Gemini e Claude/GPT do Antigravity têm monitoramento, exibição e alertas independentes. As cotas de conversa do Gemini App usam um Cookie da web da mesma conta Google; o Gemini CLI continua separado.',
         points: ['Tarefas de várias ferramentas de IA', 'Histórico por modelo e exportação .xlsx', 'Cotas e horários de redefinição'],
       },
       keyboardSound: {
@@ -114,7 +114,7 @@ export const ptBR = createCatalog({
       agenda: {
         name: 'Agenda e clima',
         caption:
-          'Mostra o tempo da sua localização e de até seis lugares escolhidos. Consulte, adicione ou exclua eventos e lembretes e marque os lembretes como concluídos. Eventos com link de reunião exibem uma contagem regressiva 10 minutos antes do início e permitem entrar com um clique. Crie uma nota de reunião ou vincule e desvincule notas contextuais existentes.',
+          'Mostra o tempo da sua localização e de até seis lugares escolhidos. Consulte, adicione ou exclua eventos e lembretes e marque os lembretes como concluídos. Eventos com link de reunião exibem uma contagem regressiva 10 minutos antes do início e permitem entrar com um clique. Crie uma nota de reunião ou vincule e desvincule notas contextuais existentes. O horário de atualização da lista do tempo aparece no cabeçalho, à esquerda do botão de atualizar.',
         points: ['Tempo e calendário', 'Contagem regressiva de 10 minutos', 'Entrar e vincular notas'],
       },
       mail: {
@@ -137,7 +137,7 @@ export const ptBR = createCatalog({
       toolbox: {
         name: 'Utilitários',
         caption:
-          'Temporizador de foco, manter a tela ligada, limpeza de tela e de teclado que também bloqueia F1-F12, teleprompter, espelho e Lixo na mesma página. Pause, continue ou reinicie o Pomodoro e acompanhe o progresso nas visualizações compactas horizontal e vertical. Inicie a limpeza de arquivos desnecessários nos utilitários com suas configurações de limpeza do sistema e acompanhe o progresso e os resultados na ilha.',
+          'Temporizador de foco, manter a tela ligada, limpeza de tela e de teclado que também bloqueia F1-F12, teleprompter, espelho e Lixo na mesma página. Pause, continue ou reinicie o Pomodoro e acompanhe o progresso nas visualizações compactas horizontal e vertical. Inicie a limpeza de arquivos desnecessários nos utilitários com suas configurações de limpeza do sistema e acompanhe o progresso e os resultados na ilha. O nome do temporizador vale apenas para a sessão atual e volta ao padrão quando ela termina ou é cancelada.',
         points: ['Temporizador de foco', 'Bloqueia F1-F12 durante a limpeza', 'Teleprompter e espelho'],
       },
       system: {
@@ -386,7 +386,7 @@ export const ptBR = createCatalog({
         "entry": "Ajustes → IA; ilha → Monitor de IA.",
         "steps": [
           "Ative uma ferramenta local compatível ou informe a tarefa com zislactl conforme a referência CLI.",
-          "Ative o monitoramento de cota do provedor desejado e forneça credenciais só quando solicitadas.",
+          "Ative o monitoramento do provedor desejado e escolha separadamente o monitoramento e a exibição de Gemini e Claude/GPT no Antigravity. Para o Gemini App, entre com a mesma conta Google em gemini.google.com/usage e salve seu Cookie nas credenciais de cota da web; selecione o Gemini CLI separadamente.",
           "Confira coleta, redefinição e aviso de cota; veja o histórico ou exporte .xlsx."
         ],
         "shortcuts": "Use o monitor ou Ajustes; não há atalho global fixo. zislactl aceita os argumentos documentados.",

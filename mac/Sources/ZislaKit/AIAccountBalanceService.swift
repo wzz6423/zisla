@@ -3,6 +3,15 @@ import ZislaCore
 
 public protocol AIAccountBalanceDetecting: Sendable {
     func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>) async throws -> [AIAccountBalance]
+    func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>,
+                         geminiSources: Set<AIAccountBalanceGeminiSource>) async throws -> [AIAccountBalance]
+}
+
+public extension AIAccountBalanceDetecting {
+    func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>,
+                         geminiSources: Set<AIAccountBalanceGeminiSource>) async throws -> [AIAccountBalance] {
+        try await accountBalances(for: providers, qoderRegions: qoderRegions).filter { $0.matchesGeminiSources(geminiSources) }
+    }
 }
 
 public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecked Sendable {
@@ -13,6 +22,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
     private let now: @Sendable () -> Date
     private let museUsage: @Sendable () async throws -> Data?
     private let antigravityProbe: @Sendable () async throws -> AIAccountAntigravitySnapshot?
+    private let geminiAppCookie: @Sendable () throws -> String?
     private let debugBalances: @Sendable () -> [AIAccountBalance]?
     private let preferredOpenAIProvider: @Sendable () -> AIProvider?
 
@@ -40,6 +50,8 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
             return output.standardOutput
         }, antigravityProbe: {
             try await antigravity.probe()
+        }, geminiAppCookie: {
+            try AIAccountBalanceCookieStore().cookie(for: .geminiApp)
         }, debugBalances: {
             #if DEBUG
                 return AIAccountBalanceDebug.balances(environment: environment, now: now())
@@ -54,12 +66,14 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
          configuration: URLSessionConfiguration = .ephemeral, now: @escaping @Sendable () -> Date = Date.init,
          museUsage: @escaping @Sendable () async throws -> Data? = { nil },
          antigravityProbe: @escaping @Sendable () async throws -> AIAccountAntigravitySnapshot? = { nil },
+         geminiAppCookie: @escaping @Sendable () throws -> String? = { nil },
          debugBalances: @escaping @Sendable () -> [AIAccountBalance]? = { nil },
          preferredOpenAIProvider: @escaping @Sendable () -> AIProvider? = { AIMascotLibrary.installedOpenAIApplication()?.provider }) {
         self.credentials = credentials
         self.now = now
         self.museUsage = museUsage
         self.antigravityProbe = antigravityProbe
+        self.geminiAppCookie = geminiAppCookie
         self.debugBalances = debugBalances
         self.preferredOpenAIProvider = preferredOpenAIProvider
         configuration.httpShouldSetCookies = false
@@ -75,18 +89,30 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
     /// Queries each selected shared account once with at most three groups in flight and stable result ordering.
     /// Unselected groups never read credentials; provider failures become rows while cancellation propagates.
     public func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion> = [.global]) async throws -> [AIAccountBalance] {
+        try await accountBalances(for: providers, qoderRegions: qoderRegions, geminiSources: Set(AIAccountBalanceGeminiSource.allCases))
+    }
+
+    public func accountBalances(for providers: Set<AIProvider>, qoderRegions: Set<AIAccountBalanceQoderRegion>,
+                                geminiSources: Set<AIAccountBalanceGeminiSource>) async throws -> [AIAccountBalance] {
         try Task.checkCancellation()
         if let fixtures = debugBalances() {
             return fixtures
         }
-        let groups = AIAccountBalanceCatalog.queryGroups(for: providers, qoderRegions: qoderRegions)
+        let groups = AIAccountBalanceCatalog.queryGroups(for: providers, qoderRegions: qoderRegions).flatMap { group in
+            if group.providers == [.gemini] {
+                return AIAccountBalanceGeminiSource.allCases.filter(geminiSources.contains).map {
+                    (providers: group.providers, qoderRegion: group.qoderRegion, geminiSource: Optional($0))
+                }
+            }
+            return [(providers: group.providers, qoderRegion: group.qoderRegion, geminiSource: Optional<AIAccountBalanceGeminiSource>.none)]
+        }
         return try await withThrowingTaskGroup(of: (Int, AIAccountBalance).self) { group in
             var next = 0, results: [Int: AIAccountBalance] = [:]
             for _ in 0..<min(3, groups.count) {
                 let index = next
                 next += 1
                 group.addTask { (index, try await self.refresh(groups[index].providers, selected: providers,
-                                                               qoderRegion: groups[index].qoderRegion)) }
+                                                               qoderRegion: groups[index].qoderRegion, geminiSource: groups[index].geminiSource)) }
             }
             while let (index, balance) = try await group.next() {
                 results[index] = balance
@@ -94,19 +120,28 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
                     let index = next
                     next += 1
                     group.addTask { (index, try await self.refresh(groups[index].providers, selected: providers,
-                                                                   qoderRegion: groups[index].qoderRegion)) }
+                                                                   qoderRegion: groups[index].qoderRegion, geminiSource: groups[index].geminiSource)) }
                 }
             }
             try Task.checkCancellation()
-            return groups.indices.compactMap { results[$0] }
+            return groups.indices.compactMap { results[$0] }.flatMap(AIAccountBalanceCatalog.antigravityBalances)
         }
     }
 
     /// Publishes a complete validated reading or a sanitized status, never partial windows or raw error text.
     /// A cancelled query must escape the provider failure path instead of appearing as an unavailable balance.
-    private func refresh(_ group: [AIProvider], selected: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion?) async throws -> AIAccountBalance {
+    private func refresh(_ group: [AIProvider], selected: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion?,
+                         geminiSource: AIAccountBalanceGeminiSource?) async throws -> AIAccountBalance {
         let provider = group[0]
         var row = AIAccountBalanceCatalog.placeholder(for: group.filter { selected.contains($0) }, qoderRegion: qoderRegion)
+        if let geminiSource {
+            row.quotaGroup = geminiSource.rawValue
+            row.id += ":" + geminiSource.rawValue
+            if geminiSource == .app {
+                row.status = .additionalCredentialsRequired
+                row.detailKey = "Gemini App 使用同一账号的网页版额度，请添加网站额度凭据"
+            }
+        }
         if provider == .codex, row.providers.count > 1, preferredOpenAIProvider() == .gpt {
             row.providers = [.gpt, .codex]
         }
@@ -114,7 +149,13 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         let time = now()
         do {
             try Task.checkCancellation()
-            if provider == .muse {
+            if geminiSource == .app {
+                guard let cookie = try geminiAppCookie() else { return row }
+                let token = try AIAccountBalanceCookieStore.normalizedCookie(cookie, website: .geminiApp)
+                let credential = AIAccountBalanceCredential(token: token)
+                row.id = "gemini:app:" + credential.identity(provider: .gemini)
+                row.windows = try await fetchGeminiApp(credential: credential)
+            } else if provider == .muse {
                 guard let data = try await museUsage() else { return row }
                 row.windows = try AIAccountBalanceParser.parse(data, provider: provider, now: time)
             } else if provider == .antigravity {
@@ -126,17 +167,9 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
                 row.windows = snapshot.windows
             } else {
                 if let credential = try credentials(provider, time, qoderRegion ?? .global) {
-                    row.id = provider.rawValue + ":" + credential.identity(provider: provider)
+                    row.id = provider.rawValue + (geminiSource.map { ":" + $0.rawValue } ?? "") + ":" + credential.identity(provider: provider)
                     row.accountName = credential.accountName
                     row.windows = try await fetch(provider, credential: credential, now: time)
-                } else if provider == .gemini, let snapshot = try await antigravityProbe() {
-                    let geminiWindows = Self.canonicalizeGeminiDesktopWindows(snapshot.windows)
-                    guard !geminiWindows.isEmpty, geminiWindows.allSatisfy(\.isValid) else { throw AIAccountBalanceError.noQuota }
-                    if let accountID = snapshot.accountID {
-                        row.id = provider.rawValue + ":" + DesktopAIStorage.identity([provider.rawValue, "", accountID])
-                    }
-                    row.accountName = snapshot.accountName
-                    row.windows = geminiWindows
                 } else {
                     return row
                 }
@@ -154,6 +187,19 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
             row.windows = []
             return row
         }
+    }
+
+    private func fetchGeminiApp(credential: AIAccountBalanceCredential) async throws -> [AIAccountQuotaWindow] {
+        let page = try await request("https://gemini.google.com/usage", headers: ["User-Agent": Self.browserUserAgent])
+        let scriptURL = try AIAccountGeminiAppQuotaParser.usageScriptURL(page)
+        let script = try await request(scriptURL.absoluteString)
+        let signature = try AIAccountGeminiAppQuotaParser.querySignature(script)
+        var endpoint = URLComponents(string: "https://gemini.google.com/_/BardChatUi/graphql/schemas/GEMINI_WEB_GRAPHQL/executeQuery")!
+        endpoint.queryItems = [URLQueryItem(name: "query_signature", value: signature), URLQueryItem(name: "variables", value: "{}")]
+        endpoint.percentEncodedQuery = endpoint.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        let data = try await request(endpoint.url!.absoluteString, credential: credential, cookie: true,
+                                     headers: ["User-Agent": Self.browserUserAgent, "Referer": "https://gemini.google.com/usage"])
+        return try AIAccountGeminiAppQuotaParser.parse(data)
     }
 
     /// Uses fixed provider endpoints and the chosen realm; website authentication never falls back to native login.
@@ -371,46 +417,6 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         return token.split(separator: ".", omittingEmptySubsequences: false).count == 3 ? token : nil
     }
 
-    /// Promotes the primary Gemini group's 5h/7d windows to canonical IDs so Gemini cards and compact bars use the concentric ring.
-    private static func canonicalizeGeminiDesktopWindows(_ windows: [AIAccountQuotaWindow]) -> [AIAccountQuotaWindow] {
-        var sawFiveHour = false
-        var sawWeekly = false
-        return windows.compactMap { window -> AIAccountQuotaWindow? in
-            guard let lower = window.name?.lowercased(), lower.contains("gemini") else { return nil }
-            if lower == "gemini", window.nameKey == nil {
-                if window.kind == .fiveHours, !sawFiveHour {
-                    sawFiveHour = true
-                    return AIAccountQuotaWindow(
-                        id: "five_hour",
-                        kind: window.kind,
-                        remainingPercent: window.remainingPercent,
-                        remaining: window.remaining,
-                        limit: window.limit,
-                        unit: window.unit,
-                        resetsAt: window.resetsAt,
-                        durationSeconds: window.durationSeconds,
-                        unlimited: window.unlimited
-                    )
-                }
-                if window.kind == .weekly, !sawWeekly {
-                    sawWeekly = true
-                    return AIAccountQuotaWindow(
-                        id: "weekly",
-                        kind: window.kind,
-                        remainingPercent: window.remainingPercent,
-                        remaining: window.remaining,
-                        limit: window.limit,
-                        unit: window.unit,
-                        resetsAt: window.resetsAt,
-                        durationSeconds: window.durationSeconds,
-                        unlimited: window.unlimited
-                    )
-                }
-            }
-            return window
-        }
-    }
-
     private static func geminiProjectID(from root: [String: Any]) -> String? {
         for container in [root, root["response"] as? [String: Any]].compactMap({ $0 }) {
             for key in ["cloudaicompanionProject", "projectId", "project"] {
@@ -427,20 +433,22 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
 
     /// Sends credentials only to an internal fixed endpoint with a 15-second timeout and a 1 MiB streaming limit.
     /// The session blocks redirects, and an unexpected response URL or status invalidates the entire reading.
-    private func request(_ endpoint: String, credential: AIAccountBalanceCredential, cookie: Bool = false,
+    private func request(_ endpoint: String, credential: AIAccountBalanceCredential? = nil, cookie: Bool = false,
                          headers: [String: String] = [:], body: [String: Any]? = nil, rawBody: Data? = nil) async throws -> Data {
         try await requestWithResponse(endpoint, credential: credential, cookie: cookie, headers: headers, body: body, rawBody: rawBody).data
     }
 
-    private func requestWithResponse(_ endpoint: String, credential: AIAccountBalanceCredential, cookie: Bool = false,
+    private func requestWithResponse(_ endpoint: String, credential: AIAccountBalanceCredential? = nil, cookie: Bool = false,
                                      headers: [String: String] = [:], body: [String: Any]? = nil, rawBody: Data? = nil,
                                      allowErrorBodyStatuses: Set<Int> = []) async throws -> (data: Data, response: HTTPURLResponse) {
         try Task.checkCancellation()
         var request = URLRequest(url: URL(string: endpoint)!)
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(cookie ? credential.token : "Bearer " + credential.token, forHTTPHeaderField: cookie ? "Cookie" : "Authorization")
-        for (key, value) in credential.headers.merging(headers, uniquingKeysWith: { _, new in new }) {
+        if let credential {
+            request.setValue(cookie ? credential.token : "Bearer " + credential.token, forHTTPHeaderField: cookie ? "Cookie" : "Authorization")
+        }
+        for (key, value) in (credential?.headers ?? [:]).merging(headers, uniquingKeysWith: { _, new in new }) {
             request.setValue(value, forHTTPHeaderField: key)
         }
         if let body {

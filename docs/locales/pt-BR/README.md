@@ -41,7 +41,7 @@ Para ferramentas sem fonte local estável, `zislactl` permite que scripts, CI e 
 | Área | Ferramentas incluídas |
 | --- | --- |
 | Downloads e documentos | Downloads de vídeo e áudio por `yt-dlp`; mesclar, dividir, girar, recortar, converter, renderizar, exportar texto, marcas d'água, números de página, criptografia, desbloqueio e edição de metadados PDF localmente. |
-| Foco e apresentação | Pomodoro com um alerta sonoro e notificação local ao final da sessão, manter acordado, impedir repouso por inatividade, limpeza de tela e teclado, teleprompter e espelho de câmera. |
+| Foco e apresentação | Pomodoro com um alerta sonoro e notificação local ao final da sessão, manter acordado, impedir repouso por inatividade, limpeza de tela e teclado, teleprompter e espelho de câmera. O nome do temporizador vale apenas para a sessão atual e volta ao padrão quando ela termina ou é cancelada. |
 | Sistema e bateria | CPU, GPU, memória, disco, rede, ventoinha e bateria, além de limpeza de caches e logs que podem ser removidos com segurança. |
 | Entrada de voz | Atalhos globais para gravação e transcrição, organização opcional local ou remota e histórico de voz local. |
 
@@ -53,7 +53,7 @@ A ilha tem 12 módulos: Início, Transferência, Área de transferência, Monito
 - **Mixagem e reprodução:** macOS 14.4+ permite volume e silêncio por aplicação. Escolha saída no espaço de mídia e preferências do player em Ajustes.
 - **Área de trabalho e reuniões:** Prévia de janelas do Dock e Command+Tab, notas contextuais de páginas/janelas/área de trabalho, contagem regressiva de 10 minutos, entrada e notas vinculadas. Agite o ponteiro ao arrastar arquivos para mostrar o destino da prateleira.
 - **Resumo diário:** 8 modelos, prévia, exportação PNG manual ou agendada, métricas escolhidas e pasta independente.
-- **Contas de IA:** Veja cotas de contas compatíveis, horários de redefinição, avisos de cota baixa e horários de amostragem; exporte histórico local de tokens em `.xlsx`.
+- **Contas de IA:** Veja cotas de contas compatíveis, horários de redefinição, avisos de cota baixa e horários de amostragem; exporte histórico local de tokens em `.xlsx`. As cotas Gemini e Claude/GPT do Antigravity têm monitoramento, exibição e alertas independentes. As cotas de conversa do Gemini App usam um Cookie da web da mesma conta Google; o Gemini CLI continua separado.
 - **Ações rápidas:** Ações do aviso usam `Command+1` até `Command+0` em ordem. O gatilho adicional padrão para configurações novas é `Command+N` para a primeira ação. Atualizações preservam atalhos salvos e gatilhos apagados.
 
 A [ajuda ao usuário](https://wzz6423.github.io/zisla/help.html?lang=pt-BR#help) oferece nove guias passo a passo: área de transferência, captura, prateleira, reuniões, IA, ferramentas de mídia, resumos diários, notas da área de trabalho/prévias de janelas e reprodução/mixagem. O [guia macOS](mac/README.md) lista pastas e dependências.

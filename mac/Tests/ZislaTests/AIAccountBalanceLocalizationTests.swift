@@ -5,7 +5,8 @@ import ZislaCore
 @testable import Zisla
 
 struct AIAccountBalanceLocalizationTests {
-    static let keys = ["%@ 积分", "%@ 重置", "Codex 账户额度", "Qoder 中国", "Qoder 监控地区", "TRAE 中国", "不限额度", "中国区",
+    static let keys = ["%@ 积分", "%@ 重置", "Claude 与 GPT 模型", "Codex 账户额度", "Gemini App 使用同一账号的网页版额度，请添加网站额度凭据",
+                       "Gemini App 网站额度", "请在默认浏览器登录 Gemini App 使用的同一 Google 账号", "Qoder 中国", "Qoder 监控地区", "TRAE 中国", "不限额度", "中国区",
                        "仅查询所选地区，已保存的其他地区凭据会保留", "仅编辑预测额度，模型余额需要网站登录凭据", "代码补全", "低额度提醒",
                        "供应商未提供已验证的本地额度查询接口", "常驻额度信息", "其他位置常驻额度", "剩余额度不高于 20% 时提醒，耗尽后也会提醒", "可用预算", "可用额度", "各供应商额度",
                        "团队额度", "国际区", "完整样式最多显示两行真实额度", "展示额度", "打开账户页，在开发者工具的 Network 中复制额度请求的 Cookie 请求头",

@@ -41,7 +41,7 @@ Bei Werkzeugen ohne stabile lokale Aktivitätsquelle können Skripte, CI und Wer
 | Bereich | Enthaltene Werkzeuge |
 | --- | --- |
 | Downloads und Dokumente | Video- und Audiodownloads mit `yt-dlp`; lokale PDF-Zusammenführung, Aufteilung, Drehung, Zuschnitt, Konvertierung, Darstellung, Textexport, Wasserzeichen, Seitenzahlen, Verschlüsselung, Entsperrung und Metadatenbearbeitung. |
-| Konzentration und Präsentation | Pomodoro-Timer mit einem Signalton und einer lokalen Mitteilung bei Sitzungsende, Wachhaltemodus, Verhinderung des Ruhezustands bei Inaktivität, Bildschirm- und Tastaturreinigung, Teleprompter und Kameraspiegel. |
+| Konzentration und Präsentation | Pomodoro-Timer mit einem Signalton und einer lokalen Mitteilung bei Sitzungsende, Wachhaltemodus, Verhinderung des Ruhezustands bei Inaktivität, Bildschirm- und Tastaturreinigung, Teleprompter und Kameraspiegel. Der Timername gilt nur für die aktuelle Sitzung und wird nach deren Ende oder Abbruch auf den Standardnamen zurückgesetzt. |
 | System und Batterie | Informationen zu CPU, GPU, Arbeitsspeicher, Datenträger, Netzwerk, Lüfter und Batterie sowie Bereinigung sicher entfernbarer Caches und Protokolle. |
 | Spracheingabe | Globale Kurzbefehle zum Aufnehmen und Transkribieren, optionale lokale oder entfernte Aufbereitung von Transkripten und lokaler Sprachverlauf. |
 
@@ -53,7 +53,7 @@ Die Insel hat 12 Module: Startseite, Übergabe, Zwischenablage, KI-Überwachung,
 - **Mischen und Wiedergabe:** macOS 14.4+ unterstützt Lautstärke und Stummschaltung pro App. Wählen Sie die Audioausgabe im Medienbereich und Player-Präferenzen in den Einstellungen.
 - **Desktop und Besprechungen:** Fenstervorschauen im Dock und mit Command+Tab, Kontextnotizen für Webseiten/Fenster/Desktop, ein 10-minütiger Besprechungs-Countdown, Beitritt und verknüpfte Notizen. Schütteln Sie den Zeiger beim Ziehen von Dateien, um das Ablageziel einzublenden.
 - **Tagesbericht:** 8 Vorlagen, Vorschau, manueller oder geplanter PNG-Export, ausgewählte Messwerte und eigener Speicherordner.
-- **KI-Konten:** Zeigt verfügbare Kontingente unterstützter Konten, Zurücksetzungszeiten, Hinweise bei geringem Kontingent und Stichprobenzeiten; exportiert den lokalen Token-Verlauf als `.xlsx`.
+- **KI-Konten:** Zeigt verfügbare Kontingente unterstützter Konten, Zurücksetzungszeiten, Hinweise bei geringem Kontingent und Stichprobenzeiten; exportiert den lokalen Token-Verlauf als `.xlsx`. Die Gemini- und Claude/GPT-Kontingente von Antigravity werden unabhängig überwacht, angezeigt und gemeldet. Gemini App nutzt für Chat-Kontingente ein Web-Cookie desselben Google-Kontos; Gemini CLI bleibt getrennt.
 - **Schnellaktionen:** Popup-Aktionen verwenden `Command+1` bis `Command+0` in ihrer Reihenfolge. Der zusätzliche Standardauslöser für neue Konfigurationen ist `Command+N` für die erste Aktion. Aktualisierungen behalten gespeicherte Kurzbefehle und gelöschte Auslöser bei.
 
 Die [Benutzerhilfe](https://wzz6423.github.io/zisla/help.html?lang=de#help) bietet neun Schrittanleitungen: Zwischenablage, Aufnahme, Ablage, Besprechungen, KI, Medienwerkzeuge, Tagesberichte, Desktop-Notizen/Fenstervorschauen und Wiedergabe/Mixing. Der [macOS-Leitfaden](mac/README.md) nennt Speicherordner und Abhängigkeiten der Werkzeuge.

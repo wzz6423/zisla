@@ -41,7 +41,7 @@ Untuk alat tanpa sumber aktivitas lokal yang stabil, `zislactl` memungkinkan skr
 | Bidang | Alat yang tersedia |
 | --- | --- |
 | Unduhan dan dokumen | Unduhan video dan audio melalui `yt-dlp`; penggabungan, pemisahan, rotasi, pemotongan, konversi, rendering, ekspor teks, tanda air, nomor halaman, enkripsi, pembukaan kunci, dan penyuntingan metadata PDF secara lokal. |
-| Fokus dan presentasi | Timer Pomodoro dengan satu bunyi dan notifikasi lokal ketika sesi berakhir, mode tetap terjaga, pencegah tidur saat menganggur, pembersihan layar dan papan ketik, teleprompter, dan cermin kamera. |
+| Fokus dan presentasi | Timer Pomodoro dengan satu bunyi dan notifikasi lokal ketika sesi berakhir, mode tetap terjaga, pencegah tidur saat menganggur, pembersihan layar dan papan ketik, teleprompter, dan cermin kamera. Nama pengatur waktu hanya berlaku untuk sesi saat ini dan kembali ke nama bawaan saat sesi berakhir atau dibatalkan. |
 | Sistem dan baterai | Informasi CPU, GPU, memori, disk, jaringan, kipas, dan baterai, serta pembersihan cache dan log yang aman dihapus. |
 | Masukan suara | Pintasan global untuk merekam dan mentranskripsikan, pengolahan transkrip lokal atau jarak jauh opsional, dan riwayat suara lokal. |
 
@@ -53,7 +53,7 @@ Pulau memiliki 12 modul: Beranda, Serah Terima, Papan Klip, Pemantauan AI, Suara
 - **Mixing dan pemutaran:** macOS 14.4+ mendukung volume dan bisu per aplikasi. Pilih keluaran audio di area media dan preferensi pemutar di Pengaturan.
 - **Desktop dan rapat:** Pratinjau jendela Dock dan Command+Tab, catatan konteks halaman/jendela/desktop, hitung mundur rapat 10 menit, bergabung, dan catatan terkait. Goyangkan penunjuk saat menyeret berkas untuk menampilkan target jatuh di rak.
 - **Ringkasan harian:** 8 templat, pratinjau, ekspor PNG manual atau terjadwal, metrik pilihan, dan folder simpan terpisah.
-- **Akun AI:** Lihat kuota akun yang didukung, waktu reset, pemberitahuan kuota rendah, dan waktu pengambilan sampel; ekspor riwayat token lokal sebagai `.xlsx`.
+- **Akun AI:** Lihat kuota akun yang didukung, waktu reset, pemberitahuan kuota rendah, dan waktu pengambilan sampel; ekspor riwayat token lokal sebagai `.xlsx`. Kuota Gemini dan Claude/GPT Antigravity memiliki pemantauan, tampilan, dan peringatan terpisah. Kuota percakapan Gemini App memakai Cookie web dari akun Google yang sama; Gemini CLI tetap terpisah.
 - **Tindakan Cepat:** Tindakan popup memakai `Command+1` sampai `Command+0` secara berurutan. Pemicu tambahan default untuk konfigurasi baru adalah `Command+N` bagi tindakan pertama. Peningkatan mempertahankan pintasan tersimpan dan pemicu yang dikosongkan.
 
 [Bantuan pengguna](https://wzz6423.github.io/zisla/help.html?lang=id#help) menyediakan sembilan panduan langkah demi langkah: papan klip, tangkapan, rak, rapat, AI, alat media, ringkasan harian, catatan desktop/pratinjau jendela, serta pemutaran/mixing. [Panduan macOS](mac/README.md) mencantumkan folder simpan dan dependensi alat.

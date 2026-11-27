@@ -41,7 +41,7 @@ Pour les outils sans source d'activité locale stable, `zislactl` permet aux scr
 | Domaine | Outils inclus |
 | --- | --- |
 | Téléchargements et documents | Téléchargement de vidéos et de fichiers audio avec `yt-dlp` ; fusion, division, rotation, recadrage, conversion, rendu, export de texte, filigranes, numéros de page, chiffrement, déverrouillage et modification des métadonnées PDF en local. |
-| Concentration et présentation | Minuteur Pomodoro avec une alerte sonore et une notification locale à la fin d'une session, mode de maintien en éveil, prévention de la veille après inactivité, nettoyage de l'écran et du clavier, prompteur et miroir de caméra. |
+| Concentration et présentation | Minuteur Pomodoro avec une alerte sonore et une notification locale à la fin d'une session, mode de maintien en éveil, prévention de la veille après inactivité, nettoyage de l'écran et du clavier, prompteur et miroir de caméra. Le nom du minuteur ne vaut que pour la session en cours et revient au nom par défaut à la fin ou après annulation. |
 | Système et batterie | Informations sur le CPU, le GPU, la mémoire, le disque, le réseau, les ventilateurs et la batterie, ainsi que nettoyage des caches et journaux pouvant être supprimés sans risque. |
 | Saisie vocale | Raccourcis globaux d'enregistrement et de transcription, organisation facultative des transcriptions en local ou à distance et historique vocal local. |
 
@@ -53,7 +53,7 @@ L'îlot comporte 12 modules : Accueil, Transfert, Presse-papiers, Surveillance d
 - **Mixage et lecture :** macOS 14.4+ permet le réglage du volume et la mise en sourdine par application. Choisissez la sortie audio dans la zone multimédia et les préférences du lecteur dans les réglages.
 - **Bureau et réunions :** Aperçus de fenêtres du Dock et de Command+Tab, notes contextuelles de page web/fenêtre/bureau, compte à rebours de réunion de 10 minutes, accès aux réunions et notes associées. Secouez le pointeur en faisant glisser des fichiers pour afficher la zone de dépôt de l'étagère.
 - **Bulletin quotidien :** 8 modèles, aperçu, export PNG manuel ou programmé, choix des indicateurs et dossier d'enregistrement indépendant.
-- **Comptes d'IA :** Consultez les quotas disponibles des comptes pris en charge, les heures de réinitialisation, les alertes de quota faible et les heures d'échantillonnage ; exportez l'historique local des tokens au format `.xlsx`.
+- **Comptes d'IA :** Consultez les quotas disponibles des comptes pris en charge, les heures de réinitialisation, les alertes de quota faible et les heures d'échantillonnage ; exportez l'historique local des tokens au format `.xlsx`. Les quotas Gemini et Claude/GPT d’Antigravity ont un suivi, un affichage et des alertes indépendants. Les quotas de conversation de Gemini App utilisent un Cookie web du même compte Google ; Gemini CLI reste distinct.
 - **Actions rapides :** Les actions de la fenêtre utilisent `Command+1` à `Command+0` dans l'ordre. Le déclencheur supplémentaire par défaut des nouvelles configurations est `Command+N` pour la première action. Les mises à niveau conservent les raccourcis enregistrés et les déclencheurs effacés.
 
 [L'aide utilisateur](https://wzz6423.github.io/zisla/help.html?lang=fr#help) fournit neuf guides pas à pas : presse-papiers, capture, étagère, réunions, IA, outils multimédias, bulletins quotidiens, notes de bureau/aperçus des fenêtres et lecture/mixage. Le [guide macOS](mac/README.md) indique les dossiers d'enregistrement des outils et leurs dépendances.

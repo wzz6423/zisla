@@ -20,11 +20,11 @@ macOS 14 en later zijn ondersteund. macOS 26 gebruikt Liquid Glass; macOS 14/15 
 | Klembord | Doorzoekbare lokale geschiedenis, filters voor afbeelding, URL en bestand en favorieten; geschiedenis en linkdetectie hebben aparte schakelaars. Nieuwe afbeeldingen krijgen lokale tekstherkenning: vind het origineel via tekst of klik rechts voor herkennen/kopiëren. Lopende herkenning is annuleerbaar; achtergrondherkenning kopieert niet automatisch. |
 | AI-monitor | Verzamelt taken, status, tokentrends, bijdragekaarten en zijmeldingen uit ondersteunde CLI's, desktopapps en IDE's. |
 | Downloads | `yt-dlp` voor video/audio; zonder `ffmpeg` verpakt AVFoundation compatibele sporen en is een alleen-lezen Bilibili-alternatief beschikbaar. |
-| Agenda | Weer voor huidige en maximaal zes opgeslagen locaties; afspraken en herinneringen bekijken, maken, verwijderen en herinneringen voltooien. |
+| Agenda | Weer voor huidige en maximaal zes opgeslagen locaties; afspraken en herinneringen bekijken, maken, verwijderen en herinneringen voltooien. Het tijdstip van de weerupdate staat in de kop, links van de vernieuwknop. |
 | Mail | Geselecteerde Mail.app-accounts voor inbox, gelezen markeren, antwoorden, schrijven en naar prullenmand verplaatsen. |
 | Notities | Apple Notities is de enige bron voor Markdown-notities bekijken, bewerken, maken en verwijderen, met voorvertoning en automatisch terugschrijven. |
 | Appvolumemixer | Volume en dempen per spelende app op macOS 14.4+, met onthouden volume; vereist Systeemaudio-opname. |
-| Hulpprogramma's | Pomodoro met één signaal en lokale melding, wakker houden, inactieve sluimerstand voorkomen, scherm/toetsenbordreiniging, teleprompter, cameraspiegel en bevestigd legen van prullenmand. |
+| Hulpprogramma's | Pomodoro met één signaal en lokale melding, wakker houden, inactieve sluimerstand voorkomen, scherm/toetsenbordreiniging, teleprompter, cameraspiegel en bevestigd legen van prullenmand. De timernaam geldt alleen voor de huidige sessie en keert terug naar de standaardnaam na afloop of annulering. |
 | Systeem | CPU, GPU, geheugen, schijf, netwerk, temperatuur, ventilatoren, geheugen vrijmaken en veilige caches/logs/tijdelijke gegevens scannen; batterijgezondheid en accessoireniveaus. |
 
 ### Functies over modules heen
@@ -49,7 +49,7 @@ macOS 14 en later zijn ondersteund. macOS 26 gebruikt Liquid Glass; macOS 14/15 
 - **Contextnotities en vergaderingen:** houd de ingestelde toets vast en schud voor een notitie bij pagina, venster of desktop. Afspraken met vergaderlink tonen 10 minuten aftelling, deelnemen en nieuwe/bestaande notities koppelen. Beheer ze op de plank.
 - **Schudden om neer te zetten:** schud tijdens slepen om een bestemming te tonen; apart instelbaar.
 - **Uitvoer en speler:** kies apparaat in het mediagebied, automatische bron/voorkeurspeler, compacte weergave en stopvoorwaarden voor omgevingsgeluiden in Instellingen.
-- **AI-tegoeden en resets:** accounttegoeden, meet- en resetmomenten en waarschuwingen, inclusief beschikbare 5h/7d-vensters en Cursor USD-budgetten. Los van lokale tokengeschiedenis.
+- **AI-tegoeden en resets:** accounttegoeden, meet- en resetmomenten en waarschuwingen, inclusief beschikbare 5h/7d-vensters en Cursor USD-budgetten. Los van lokale tokengeschiedenis. De Gemini- en Claude/GPT-tegoeden van Antigravity hebben afzonderlijke bewaking, weergave en meldingen. Gemini App gebruikt voor chattegoeden een web-Cookie van hetzelfde Google-account; Gemini CLI blijft apart.
 
 ### Toetsvolgorde van Snelle acties
 

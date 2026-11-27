@@ -20,11 +20,11 @@ Hỗ trợ macOS 14 trở lên. macOS 26 dùng Liquid Glass; 14/15 dùng vật l
 | Bảng nhớ tạm | Lịch sử tại máy có tìm kiếm, lọc ảnh/URL/tệp và yêu thích; lịch sử/liên kết độc lập. Ảnh mới xếp hàng nhận chữ tại máy, tìm chữ tìm ảnh gốc hoặc nhấp phải nhận/sao chép. Có thể hủy nhận diện đang chạy; nền không tự sao chép chữ. |
 | Theo dõi AI | Tổng hợp tác vụ, trạng thái, xu hướng token, bản đồ đóng góp và thông báo từ CLI, ứng dụng, IDE hỗ trợ. |
 | Tải xuống | `yt-dlp` cho video/âm thanh; thiếu `ffmpeg` dùng AVFoundation đóng gói rãnh tương thích và Bilibili chỉ đọc dự phòng. |
-| Lịch trình | Thời tiết hiện tại và tối đa sáu nơi lưu; xem/tạo/xóa sự kiện và lời nhắc, đánh dấu hoàn thành. |
+| Lịch trình | Thời tiết hiện tại và tối đa sáu nơi lưu; xem/tạo/xóa sự kiện và lời nhắc, đánh dấu hoàn thành. Thời gian cập nhật danh sách thời tiết nằm trên hàng tiêu đề, bên trái nút làm mới. |
 | Thư | Đọc các tài khoản Mail.app được chọn để xem hộp thư đến, đánh dấu đã đọc, trả lời, soạn thư và chuyển thư vào thùng rác. |
 | Ghi chú | Dùng Apple Notes làm nguồn dữ liệu duy nhất để xem, sửa, tạo và xóa ghi chú Markdown, với bản xem trước trực tiếp và tự động ghi thay đổi trở lại. |
 | Trộn âm lượng ứng dụng | Trên macOS 14.4+, chỉnh âm lượng hoặc tắt tiếng từng ứng dụng đang phát và ghi nhớ mức âm lượng; cần quyền ghi âm thanh hệ thống. |
-| Tiện ích | Pomodoro một âm và thông báo khi hết phiên, giữ thức, ngăn ngủ nhàn rỗi, vệ sinh màn hình/bàn phím, nhắc chữ, gương camera, dọn thùng rác có xác nhận. |
+| Tiện ích | Pomodoro một âm và thông báo khi hết phiên, giữ thức, ngăn ngủ nhàn rỗi, vệ sinh màn hình/bàn phím, nhắc chữ, gương camera, dọn thùng rác có xác nhận. Tên bộ hẹn giờ chỉ áp dụng cho phiên hiện tại và trở về tên mặc định khi phiên kết thúc hoặc bị hủy. |
 | Hệ thống | CPU, GPU, bộ nhớ, đĩa, mạng, nhiệt độ, quạt; giải phóng bộ nhớ, quét bộ đệm/nhật ký/tạm an toàn; sức khỏe pin và phụ kiện. |
 
 ### Khả năng liên mô-đun
@@ -49,7 +49,7 @@ Hỗ trợ macOS 14 trở lên. macOS 26 dùng Liquid Glass; 14/15 dùng vật l
 - **Ghi chú theo ngữ cảnh/họp:** Giữ phím ghi chú và lắc để gắn trang/cửa sổ/màn hình. Sự kiện có liên kết đếm 10 phút trước; tham gia, tạo hoặc nối ghi chú. Quản lý ở kệ.
 - **Lắc để thả:** Lắc con trỏ khi kéo tệp để hiện vùng thả; cử chỉ này có công tắc riêng trong Cài đặt.
 - **Đầu ra âm thanh và tùy chọn trình phát:** Chọn thiết bị đầu ra trong vùng đa phương tiện. Cài đặt cho phép chọn nguồn tự động hoặc trình phát ưu tiên, bố cục gọn và điều kiện dừng âm thanh môi trường.
-- **Hạn mức và đặt lại AI:** Theo dõi AI và Cài đặt hiển thị hạn mức tài khoản được hỗ trợ, thời gian lấy mẫu, thời gian đặt lại và cảnh báo sắp hết, gồm các cửa sổ 5h/7d có sẵn và ngân sách Cursor bằng USD. Dữ liệu này tách biệt với lịch sử token được ghi tại máy.
+- **Hạn mức và đặt lại AI:** Theo dõi AI và Cài đặt hiển thị hạn mức tài khoản được hỗ trợ, thời gian lấy mẫu, thời gian đặt lại và cảnh báo sắp hết, gồm các cửa sổ 5h/7d có sẵn và ngân sách Cursor bằng USD. Dữ liệu này tách biệt với lịch sử token được ghi tại máy. Hạn mức Gemini và Claude/GPT của Antigravity có theo dõi, hiển thị và cảnh báo riêng. Hạn mức trò chuyện Gemini App dùng Cookie web của cùng tài khoản Google; Gemini CLI được theo dõi riêng.
 
 ### Thứ tự phím Thao tác Nhanh
 

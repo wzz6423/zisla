@@ -20,11 +20,11 @@ macOS 14 und neuer werden unterstützt. macOS 26 nutzt Liquid Glass; macOS 14/15
 | Zwischenablage | Speichert einen durchsuchbaren lokalen Verlauf, filtert nach Bild, URL und Datei und markiert Favoriten; Verlauf und Linkerkennung haben unabhängige Schalter. Neue Verlaufsbilder werden zur Texterkennung auf dem Gerät eingereiht; suchen Sie ihren Text, um das Originalbild zu finden, oder klicken Sie mit der rechten Maustaste auf ein Bild, um seinen Text zu erkennen oder zu kopieren. Laufende Erkennung lässt sich abbrechen; Hintergrund-Erkennung kopiert Text nicht automatisch. |
 | KI-Überwachung | Bündelt aktive Aufgaben, Status, Token-Trends, Beitrags-Heatmaps und seitliche Hinweise unterstützter CLIs, Desktop-Apps und IDEs. |
 | Downloads | Nutzt `yt-dlp` für Video und Audio; ohne `ffmpeg` verpackt AVFoundation kompatible Spuren, und ein schreibgeschützter Bilibili-Ausweichweg steht bereit. |
-| Terminplan | Zeigt Wetter am aktuellen Standort und bis zu sechs gespeicherten Orten; Kalenderereignisse und Erinnerungen ansehen, erstellen und löschen sowie Erinnerungen abschließen. |
+| Terminplan | Zeigt Wetter am aktuellen Standort und bis zu sechs gespeicherten Orten; Kalenderereignisse und Erinnerungen ansehen, erstellen und löschen sowie Erinnerungen abschließen. Die Aktualisierungszeit der Wetterliste steht in der Kopfzeile links neben der Schaltfläche zum Aktualisieren. |
 | E-Mail | Liest ausgewählte Mail.app-Konten, zeigt Posteingänge, markiert Nachrichten als gelesen, beantwortet und verfasst E-Mails und verschiebt sie in den Papierkorb. |
 | Notizen | Nutzt ausschließlich Apple Notizen als Datenquelle für Anzeige, Bearbeitung, Erstellung und Löschung von Markdown-Notizen mit Live-Vorschau und automatischem Zurückschreiben. |
 | Anwendungslautstärkemixer | Unter macOS 14.4+ Lautstärke jeder wiedergebenden App einstellen, stummschalten und merken; benötigt Systemaudioaufnahmeberechtigung. |
-| Werkzeuge | Pomodoro-Timer mit einem Signalton und einer lokalen Mitteilung bei Sitzungsende, Wachhaltemodus, Verhinderung von Inaktivitätsruhe, Bildschirm- und Tastaturreinigung, Teleprompter, Kameraspiegel und bestätigtes Leeren des Papierkorbs. |
+| Werkzeuge | Pomodoro-Timer mit einem Signalton und einer lokalen Mitteilung bei Sitzungsende, Wachhaltemodus, Verhinderung von Inaktivitätsruhe, Bildschirm- und Tastaturreinigung, Teleprompter, Kameraspiegel und bestätigtes Leeren des Papierkorbs. Der Timername gilt nur für die aktuelle Sitzung und wird nach deren Ende oder Abbruch auf den Standardnamen zurückgesetzt. |
 | System | Zeigt CPU, GPU, Speicher, Datenträger, Netzwerk, Temperatur und Lüfterstatus; gibt Speicher frei und prüft sicher entfernbaren Cache, Protokolle und temporäre Daten; enthält Batteriezustand und Zubehörladestände. |
 
 ### Modulübergreifende Funktionen
@@ -49,7 +49,7 @@ macOS 14 und neuer werden unterstützt. macOS 26 nutzt Liquid Glass; macOS 14/15
 - **Kontextnotizen und Besprechungen:** Halten Sie den Notizkurzbefehl und schütteln Sie den Zeiger, um eine Notiz mit Webseite, Fenster oder Desktop zu verknüpfen. Kalendereinträge mit Besprechungslinks zeigen 10 Minuten vor Beginn einen Countdown; beitreten, eine Notiz erstellen oder eine vorhandene verknüpfen. Kontextnotizen werden in der Ablage verwaltet.
 - **Schütteln zum Ablegen:** Schütteln Sie den Zeiger beim Ziehen von Dateien, um das Ablageziel zu zeigen; die Geste lässt sich unabhängig einstellen.
 - **Audioausgabe und Player-Präferenzen:** Wählen Sie ein Ausgabegerät im Medienbereich. Die Einstellungen wählen automatische Quelle oder bevorzugten Player, kompakte Medienansicht und Stoppbedingungen für Umgebungsgeräusche.
-- **KI-Kontingente und Rücksetzungen:** KI-Überwachung und Einstellungen zeigen unterstützte Kontingente, Stichproben- und Rücksetzungszeiten sowie Niedrigkontingenthinweise, einschließlich verfügbarer 5h/7d-Fenster und Cursor-USD-Budgets. Diese Daten sind vom lokalen Token-Verlauf getrennt.
+- **KI-Kontingente und Rücksetzungen:** KI-Überwachung und Einstellungen zeigen unterstützte Kontingente, Stichproben- und Rücksetzungszeiten sowie Niedrigkontingenthinweise, einschließlich verfügbarer 5h/7d-Fenster und Cursor-USD-Budgets. Diese Daten sind vom lokalen Token-Verlauf getrennt. Die Gemini- und Claude/GPT-Kontingente von Antigravity werden unabhängig überwacht, angezeigt und gemeldet. Gemini App nutzt für Chat-Kontingente ein Web-Cookie desselben Google-Kontos; Gemini CLI bleibt getrennt.
 
 ### Tastenreihenfolge der Schnellaktionen
 

@@ -96,7 +96,7 @@ export const nl = createCatalog({
       aiMonitor: {
         name: 'AI-monitor',
         caption:
-          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst. Ook compacte eilandweergaven tonen het resterende tegoed in ringen. Kies accountregio’s afzonderlijk; dagelijkse gebruiksgegevens en kleuren voor resterende quota blijven gelijk in alle indelingen.',
+          'Bundelt taken en status van AI-CLI’s, desktopapps en IDE’s. Betrouwbare cijfers vormen tokentrends en een bijdrageheatmap; kies een datum voor invoer-, uitvoer- en totaaltokens per aanbieder en model. Bekijk de geschiedenis in Instellingen, exporteer alles als .xlsx of wis het. Toont echte accountquota, resettijden en waarschuwingen bij weinig quota, waaronder 5h/7d-periodes en Cursor-budgetten in dollars wanneer beschikbaar. Leest geen prompt- of antwoordtekst. Ook compacte eilandweergaven tonen het resterende tegoed in ringen. Kies accountregio’s afzonderlijk; dagelijkse gebruiksgegevens en kleuren voor resterende quota blijven gelijk in alle indelingen. De Gemini- en Claude/GPT-tegoeden van Antigravity hebben afzonderlijke bewaking, weergave en meldingen. Gemini App gebruikt voor chattegoeden een web-Cookie van hetzelfde Google-account; Gemini CLI blijft apart.',
         points: ['Taken uit meerdere AI-tools', 'Modelgeschiedenis en .xlsx-export', 'Accountquota en resettijden'],
       },
       keyboardSound: {
@@ -114,7 +114,7 @@ export const nl = createCatalog({
       agenda: {
         name: 'Agenda en weer',
         caption:
-          'Toont het weer op je locatie en op maximaal zes gekozen plaatsen. Bekijk, voeg toe of verwijder agenda-items en herinneringen en markeer herinneringen als voltooid. Items met een vergaderlink tellen vanaf 10 minuten voor de start af en laten je met één klik deelnemen. Maak een vergadernotitie of koppel en ontkoppel bestaande contextnotities.',
+          'Toont het weer op je locatie en op maximaal zes gekozen plaatsen. Bekijk, voeg toe of verwijder agenda-items en herinneringen en markeer herinneringen als voltooid. Items met een vergaderlink tellen vanaf 10 minuten voor de start af en laten je met één klik deelnemen. Maak een vergadernotitie of koppel en ontkoppel bestaande contextnotities. Het tijdstip van de weerupdate staat in de kop, links van de vernieuwknop.',
         points: ['Weer en agenda', 'Aftellen vanaf 10 minuten vooraf', 'Deelnemen en notities koppelen'],
       },
       mail: {
@@ -137,7 +137,7 @@ export const nl = createCatalog({
       toolbox: {
         name: 'Hulpprogramma’s',
         caption:
-          'Focustimer, scherm wakker houden, schermreiniging, toetsenbordreiniging die ook F1-F12 blokkeert, teleprompter, spiegel en prullenmand op één pagina. Pauzeer, hervat of reset de Pomodoro en volg de voortgang in compacte horizontale en verticale weergaven. Start het opruimen van onnodige bestanden vanuit de hulpprogramma’s met je instellingen voor systeemopruiming en volg de voortgang en resultaten in het eiland.',
+          'Focustimer, scherm wakker houden, schermreiniging, toetsenbordreiniging die ook F1-F12 blokkeert, teleprompter, spiegel en prullenmand op één pagina. Pauzeer, hervat of reset de Pomodoro en volg de voortgang in compacte horizontale en verticale weergaven. Start het opruimen van onnodige bestanden vanuit de hulpprogramma’s met je instellingen voor systeemopruiming en volg de voortgang en resultaten in het eiland. De timernaam geldt alleen voor de huidige sessie en keert terug naar de standaardnaam na afloop of annulering.',
         points: ['Focusafteller', 'Blokkeert F1-F12 tijdens reinigen', 'Teleprompter en spiegel'],
       },
       system: {
@@ -373,7 +373,7 @@ export const nl = createCatalog({
         "entry": "Instellingen → AI; eiland → AI-monitor.",
         "steps": [
           "Schakel een ondersteund lokaal hulpmiddel in of meld een taak met zislactl volgens de CLI-referentie.",
-          "Schakel limietcontrole voor de gewenste aanbieder in en vul alleen gevraagde inloggegevens in.",
+          "Schakel bewaking voor de gewenste aanbieder in en kies bewaking en weergave van Antigravity Gemini en Claude/GPT afzonderlijk. Meld je voor Gemini App met hetzelfde Google-account aan op gemini.google.com/usage en sla de Cookie op onder Webtegoed-inloggegevens; selecteer Gemini CLI apart.",
           "Bekijk meet-/hersteltijd en waarschuwingen; open de geschiedenis of exporteer .xlsx."
         ],
         "shortcuts": "Gebruik monitor of Instellingen; geen vaste globale toets nodig. zislactl gebruikt gedocumenteerde argumenten.",

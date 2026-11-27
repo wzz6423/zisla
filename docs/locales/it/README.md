@@ -41,7 +41,7 @@ Per gli strumenti senza una fonte locale stabile, `zislactl` consente a script, 
 | Area | Strumenti inclusi |
 | --- | --- |
 | Download e documenti | Download di video e audio tramite `yt-dlp`; unione, divisione, rotazione, ritaglio, conversione e rendering dei PDF locali, esportazione del testo, filigrane, numeri di pagina, cifratura, sblocco e modifica dei metadati. |
-| Concentrazione e presentazioni | Timer Pomodoro con un singolo avviso sonoro e una notifica locale a fine sessione, modalità che mantiene il Mac attivo, prevenzione dello stop per inattività, pulizia di schermo e tastiera, suggeritore e specchio della fotocamera. |
+| Concentrazione e presentazioni | Timer Pomodoro con un singolo avviso sonoro e una notifica locale a fine sessione, modalità che mantiene il Mac attivo, prevenzione dello stop per inattività, pulizia di schermo e tastiera, suggeritore e specchio della fotocamera. Il nome del timer vale solo per la sessione corrente e torna a quello predefinito quando termina o viene annullata. |
 | Sistema e batteria | Informazioni su CPU, GPU, memoria, disco, rete, ventole e batteria, oltre alla pulizia di cache e registri eliminabili in sicurezza. |
 | Input vocale | Scorciatoie globali per registrazione e trascrizione, organizzazione facoltativa delle trascrizioni tramite modelli locali o remoti e cronologia vocale locale. |
 
@@ -53,7 +53,7 @@ L'isola contiene 12 moduli: Home, Trasferimento, Appunti, Monitoraggio AI, Suoni
 - **Mixer e riproduzione:** macOS 14.4+ supporta volume e silenziamento per app. Scegli l'uscita audio nell'area media e le preferenze del lettore nelle impostazioni.
 - **Desktop e riunioni:** anteprime delle finestre nel Dock e con Command+Tab, note contestuali per pagine web, finestre e desktop, conto alla rovescia di 10 minuti per le riunioni, accesso e note collegate. Agita il puntatore mentre trascini file per mostrare la destinazione dello scaffale.
 - **Riepilogo giornaliero:** 8 modelli, anteprima, esportazione PNG manuale o programmata, statistiche selezionate e cartella di salvataggio indipendente.
-- **Account AI:** consulta quote disponibili, orari di ripristino, avvisi di quota bassa e tempi di campionamento supportati; esporta la cronologia locale dei token in `.xlsx`.
+- **Account AI:** consulta quote disponibili, orari di ripristino, avvisi di quota bassa e tempi di campionamento supportati; esporta la cronologia locale dei token in `.xlsx`. Le quote Gemini e Claude/GPT di Antigravity hanno monitoraggio, visualizzazione e avvisi indipendenti. Le quote di chat di Gemini App usano un Cookie web dello stesso account Google; Gemini CLI resta separato.
 - **Azioni rapide:** nel popup, `Command+1` fino a `Command+0` seguono l'ordine delle azioni. Per le nuove configurazioni, il comando aggiuntivo predefinito `Command+N` esegue la prima azione. Gli aggiornamenti conservano scorciatoie salvate e comandi rimossi.
 
 La [guida utente](https://wzz6423.github.io/zisla/help.html?lang=it#help) offre nove guide passo dopo passo: appunti, cattura, scaffale, riunioni, AI, strumenti media, riepiloghi giornalieri, note del desktop/anteprime delle finestre e riproduzione/mixer. La [guida macOS](mac/README.md#posizioni-di-salvataggio) elenca cartelle di output e dipendenze.

@@ -41,7 +41,7 @@ For tools without a stable local activity source, `zislactl` lets scripts, CI, a
 | Area | Included tools |
 | --- | --- |
 | Downloads and documents | Video and audio downloads through `yt-dlp`; local PDF merge, split, rotate, crop, conversion, rendering, text export, watermarks, page numbers, encryption, unlock, and metadata editing. |
-| Focus and presentation | Pomodoro timer with one audible alert and a local notification when a session ends, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, and camera mirror. |
+| Focus and presentation | Pomodoro timer with one audible alert and a local notification when a session ends, keep-awake mode, idle-sleep prevention, screen and keyboard cleaning, teleprompter, and camera mirror. Timer names apply only to the current session and return to the default when it ends or is canceled. |
 | System and battery | CPU, GPU, memory, disk, network, fan, and battery information, plus cleanup of caches and logs that are safe to remove. |
 | Voice input | Global shortcuts for recording and transcription, optional local or remote transcript organization, and local voice history. |
 
@@ -53,7 +53,7 @@ The island has 12 modules: Home, Handoff, Clipboard, AI monitoring, Keyboard sou
 - **Mixing and playback:** macOS 14.4+ supports per-app volume and mute. Choose audio output in the media area and player preferences in Settings.
 - **Desktop and meetings:** Dock and Command+Tab window previews, webpage/window/desktop context notes, a 10-minute meeting countdown, joining and linked notes. Shake while dragging files to reveal the shelf drop target.
 - **Daily briefing:** 8 templates, preview, manual or scheduled PNG export, selected metrics, and an independent save folder.
-- **AI accounts:** View supported account allowances, reset times, low-quota notices, and sampling times; export local token history as `.xlsx`.
+- **AI accounts:** View supported account allowances, reset times, low-quota notices, and sampling times; export local token history as `.xlsx`. Antigravity’s Gemini and Claude/GPT pools have independent monitoring, display and alerts. Gemini App chat allowances use a web Cookie for the same Google account; Gemini CLI remains separate.
 - **Quick Actions:** Popup actions use `Command+1` through `Command+0` in order. The additional default trigger for new configurations is `Command+N` for the first action. Upgrades retain saved shortcuts and cleared triggers.
 
 [User help](https://wzz6423.github.io/zisla/help.html?lang=en#help) provides nine step-by-step guides: clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/window previews, and playback/mixing. The [macOS guide](mac/README.md#save-locations) lists tool save folders and dependencies.

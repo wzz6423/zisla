@@ -96,7 +96,7 @@ export const es = createCatalog({
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Reúne tareas y estados de CLI de IA, apps de escritorio e IDE. Los datos numéricos fiables alimentan las tendencias de tokens y el mapa de contribuciones; elige una fecha para ver tokens de entrada, salida y totales por proveedor y modelo. Consulta el historial en Ajustes, expórtalo completo como .xlsx o bórralo. Muestra cuotas reales, fechas de reinicio y avisos de cuota baja, incluidas las ventanas 5h/7d y los presupuestos de Cursor en dólares cuando están disponibles. No lee el texto de prompts ni respuestas. Los diseños compactos también muestran la cuota restante en anillos. Elige las regiones de cada cuenta por separado; los registros diarios y los colores de la cuota restante coinciden en todos los diseños.',
+          'Reúne tareas y estados de CLI de IA, apps de escritorio e IDE. Los datos numéricos fiables alimentan las tendencias de tokens y el mapa de contribuciones; elige una fecha para ver tokens de entrada, salida y totales por proveedor y modelo. Consulta el historial en Ajustes, expórtalo completo como .xlsx o bórralo. Muestra cuotas reales, fechas de reinicio y avisos de cuota baja, incluidas las ventanas 5h/7d y los presupuestos de Cursor en dólares cuando están disponibles. No lee el texto de prompts ni respuestas. Los diseños compactos también muestran la cuota restante en anillos. Elige las regiones de cada cuenta por separado; los registros diarios y los colores de la cuota restante coinciden en todos los diseños. Las cuotas Gemini y Claude/GPT de Antigravity tienen supervisión, visualización y avisos independientes. Las cuotas de conversación de Gemini App usan un Cookie web de la misma cuenta de Google; Gemini CLI se supervisa por separado.',
         points: ['Tareas de varias herramientas de IA', 'Historial por modelo y exportación .xlsx', 'Cuotas y fechas de reinicio'],
       },
       keyboardSound: {
@@ -114,7 +114,7 @@ export const es = createCatalog({
       agenda: {
         name: 'Agenda y tiempo',
         caption:
-          'Muestra el tiempo de tu ubicación y hasta seis lugares elegidos. Consulta, añade o elimina eventos y recordatorios y marca estos como completados. Los eventos con enlace de reunión muestran una cuenta atrás 10 minutos antes de empezar y permiten unirse con un clic. Crea una nota de reunión o vincula y desvincula notas contextuales existentes.',
+          'Muestra el tiempo de tu ubicación y hasta seis lugares elegidos. Consulta, añade o elimina eventos y recordatorios y marca estos como completados. Los eventos con enlace de reunión muestran una cuenta atrás 10 minutos antes de empezar y permiten unirse con un clic. Crea una nota de reunión o vincula y desvincula notas contextuales existentes. La hora de actualización de la lista del tiempo aparece en la cabecera, a la izquierda del botón de actualizar.',
         points: ['Tiempo y calendario', 'Cuenta atrás de 10 minutos', 'Unirse y vincular notas'],
       },
       mail: {
@@ -137,7 +137,7 @@ export const es = createCatalog({
       toolbox: {
         name: 'Utilidades',
         caption:
-          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado que bloquea también F1-F12, teleprónter, espejo y Papelera en una página. Pausa, reanuda o reinicia el Pomodoro y sigue su progreso en las vistas compactas horizontal y vertical. Inicia la limpieza de archivos innecesarios desde las utilidades con tus ajustes de limpieza del sistema y sigue el progreso y los resultados en la isla.',
+          'Temporizador de concentración, mantener la pantalla activa, limpieza de pantalla y teclado que bloquea también F1-F12, teleprónter, espejo y Papelera en una página. Pausa, reanuda o reinicia el Pomodoro y sigue su progreso en las vistas compactas horizontal y vertical. Inicia la limpieza de archivos innecesarios desde las utilidades con tus ajustes de limpieza del sistema y sigue el progreso y los resultados en la isla. El nombre del temporizador solo se aplica a la sesión actual y vuelve al predeterminado cuando termina o se cancela.',
         points: ['Temporizador de concentración', 'Bloquea F1-F12 durante la limpieza', 'Teleprompter y espejo'],
       },
       system: {
@@ -386,7 +386,7 @@ export const es = createCatalog({
         "entry": "Ajustes → IA; isla → Monitor IA.",
         "steps": [
           "Activa una herramienta local compatible o informa una tarea con zislactl según la referencia CLI.",
-          "Activa el seguimiento de cuota del proveedor deseado y aporta credenciales solo si se solicitan.",
+          "Activa la supervisión del proveedor y elige por separado la supervisión y visualización de Gemini y Claude/GPT en Antigravity. Para Gemini App, inicia sesión con la misma cuenta de Google en gemini.google.com/usage y guarda su Cookie en las credenciales de cuota web; selecciona Gemini CLI por separado.",
           "Consulta muestreo, reinicio y avisos de cuota; revisa el historial o exporta .xlsx."
         ],
         "shortcuts": "Usa el monitor o Ajustes, sin atajo global fijo. zislactl acepta los argumentos documentados.",
