@@ -41,7 +41,7 @@ Voor gereedschap zonder stabiele lokale activiteitsbron kunnen scripts, CI en ho
 | Gebied | Inbegrepen gereedschap |
 | --- | --- |
 | Downloads en documenten | Video en audio downloaden via `yt-dlp`; lokaal PDF's samenvoegen, splitsen, draaien, bijsnijden, converteren en renderen, tekst exporteren, watermerken, paginanummers, versleuteling, ontgrendeling en metadata bewerken. |
-| Focus en presenteren | Pomodoro met één geluidssignaal en een lokale melding aan het einde van een sessie, wakker houden, inactieve sluimerstand voorkomen, scherm- en toetsenbordreiniging, teleprompter en cameraspiegel. De timernaam geldt alleen voor de huidige sessie en keert terug naar de standaardnaam na afloop of annulering. |
+| Focus en presenteren | Pomodoro met één geluidssignaal en een lokale melding aan het einde van een sessie, wakker houden, inactieve sluimerstand voorkomen, scherm- en toetsenbordreiniging, teleprompter en cameraspiegel. De timernaam geldt alleen voor de huidige sessie en keert terug naar de standaardnaam na afloop of annulering. Op het ingeklapte eiland geeft een zon aan dat het scherm aan blijft. Een laptop geeft aan dat de Mac bij inactiviteit niet in de sluimerstand gaat. |
 | Systeem en batterij | CPU-, GPU-, geheugen-, schijf-, netwerk-, ventilator- en batterijgegevens en het opruimen van veilig verwijderbare caches en logs. |
 | Spraakinvoer | Globale sneltoetsen voor opnemen en transcriberen, optionele lokale of externe verwerking van transcripties en lokale spraakgeschiedenis. |
 

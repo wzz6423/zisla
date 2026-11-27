@@ -41,7 +41,7 @@ Para ferramentas sem fonte local estável, `zislactl` permite que scripts, CI e 
 | Área | Ferramentas incluídas |
 | --- | --- |
 | Downloads e documentos | Downloads de vídeo e áudio por `yt-dlp`; mesclar, dividir, girar, recortar, converter, renderizar, exportar texto, marcas d'água, números de página, criptografia, desbloqueio e edição de metadados PDF localmente. |
-| Foco e apresentação | Pomodoro com um alerta sonoro e notificação local ao final da sessão, manter acordado, impedir repouso por inatividade, limpeza de tela e teclado, teleprompter e espelho de câmera. O nome do temporizador vale apenas para a sessão atual e volta ao padrão quando ela termina ou é cancelada. |
+| Foco e apresentação | Pomodoro com um alerta sonoro e notificação local ao final da sessão, manter acordado, impedir repouso por inatividade, limpeza de tela e teclado, teleprompter e espelho de câmera. O nome do temporizador vale apenas para a sessão atual e volta ao padrão quando ela termina ou é cancelada. Na ilha recolhida, o sol indica que a tela continua ligada e o notebook indica que o repouso por inatividade está bloqueado. |
 | Sistema e bateria | CPU, GPU, memória, disco, rede, ventoinha e bateria, além de limpeza de caches e logs que podem ser removidos com segurança. |
 | Entrada de voz | Atalhos globais para gravação e transcrição, organização opcional local ou remota e histórico de voz local. |
 

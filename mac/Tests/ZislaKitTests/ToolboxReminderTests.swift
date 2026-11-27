@@ -1,4 +1,5 @@
 import Testing
+import ZislaCore
 @testable import ZislaKit
 
 struct ToolboxReminderTests {
@@ -32,28 +33,29 @@ struct ToolboxReminderTests {
         #expect(content == ToolboxReminderContent(title: "休息 04:59", compactTitle: "04:59"))
     }
 
-    @Test
-    func idleToolboxOnlyShowsActivePowerStates() {
-        let onlySystem = ToolboxReminder.content(
-            isScreenCleaning: false,
-            isKeyboardCleaning: false,
-            pomodoroMode: .focus,
-            pomodoroPhase: .idle,
-            pomodoroClock: "25:00",
-            keepDisplayAwake: false,
-            preventIdleSystemSleep: true
-        )
-        let inactive = ToolboxReminder.content(
+    @Test(arguments: [false, true], [false, true])
+    func idleToolboxOnlyShowsActivePowerStates(display: Bool, system: Bool) throws {
+        let content = ToolboxReminder.content(
             isScreenCleaning: false,
             isKeyboardCleaning: false,
             pomodoroMode: .focus,
             pomodoroPhase: .paused,
             pomodoroClock: "24:00",
-            keepDisplayAwake: false,
-            preventIdleSystemSleep: false
+            keepDisplayAwake: display,
+            preventIdleSystemSleep: system
         )
 
-        #expect(onlySystem == ToolboxReminderContent(title: "防止休眠", compactTitle: "防休眠"))
-        #expect(inactive == nil)
+        guard display || system else {
+            #expect(content == nil)
+            return
+        }
+        let reminder = try #require(content)
+        for side in [NoticeSide.left, .right] {
+            let notice = reminder.notice(for: side)
+            #expect(notice.id == "toolbox-reminder-\(side.rawValue)" && notice.side == side)
+            #expect(notice.detail == (display ? "亮屏" : "防休眠"))
+            #expect(notice.symbolName == (display ? "sun.max.fill" : "laptopcomputer"))
+            #expect(notice.metadata?[ToolboxReminder.secondarySymbolKey] == (display && system ? "laptopcomputer" : nil))
+        }
     }
 }

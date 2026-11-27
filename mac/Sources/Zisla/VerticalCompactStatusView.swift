@@ -272,7 +272,7 @@ struct CompactPillStatusContent: View {
         } else if let image = MediaArtworkImageCache.image(from: presentation.notice.artworkData) {
             Image(nsImage: image).resizable().scaledToFit().frame(width: size, height: size)
         } else {
-            Image(systemName: presentation.notice.symbolName ?? defaultSymbol)
+            CompactNoticeSymbol(notice: presentation.notice, fallback: defaultSymbol)
                 .font(.system(size: size * 0.64, weight: .semibold))
                 .frame(width: size, height: size)
         }

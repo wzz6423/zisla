@@ -24,7 +24,7 @@ Hỗ trợ macOS 14 trở lên. macOS 26 dùng Liquid Glass; 14/15 dùng vật l
 | Thư | Đọc các tài khoản Mail.app được chọn để xem hộp thư đến, đánh dấu đã đọc, trả lời, soạn thư và chuyển thư vào thùng rác. |
 | Ghi chú | Dùng Apple Notes làm nguồn dữ liệu duy nhất để xem, sửa, tạo và xóa ghi chú Markdown, với bản xem trước trực tiếp và tự động ghi thay đổi trở lại. |
 | Trộn âm lượng ứng dụng | Trên macOS 14.4+, chỉnh âm lượng hoặc tắt tiếng từng ứng dụng đang phát và ghi nhớ mức âm lượng; cần quyền ghi âm thanh hệ thống. |
-| Tiện ích | Pomodoro một âm và thông báo khi hết phiên, giữ thức, ngăn ngủ nhàn rỗi, vệ sinh màn hình/bàn phím, nhắc chữ, gương camera, dọn thùng rác có xác nhận. Tên bộ hẹn giờ chỉ áp dụng cho phiên hiện tại và trở về tên mặc định khi phiên kết thúc hoặc bị hủy. |
+| Tiện ích | Pomodoro một âm và thông báo khi hết phiên, giữ thức, ngăn ngủ nhàn rỗi, vệ sinh màn hình/bàn phím, nhắc chữ, gương camera, dọn thùng rác có xác nhận. Tên bộ hẹn giờ chỉ áp dụng cho phiên hiện tại và trở về tên mặc định khi phiên kết thúc hoặc bị hủy. Khi đảo thu gọn, biểu tượng mặt trời cho biết màn hình được giữ sáng, còn biểu tượng máy tính xách tay cho biết máy được ngăn chuyển sang chế độ ngủ khi không sử dụng. |
 | Hệ thống | CPU, GPU, bộ nhớ, đĩa, mạng, nhiệt độ, quạt; giải phóng bộ nhớ, quét bộ đệm/nhật ký/tạm an toàn; sức khỏe pin và phụ kiện. |
 
 ### Khả năng liên mô-đun

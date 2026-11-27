@@ -24,7 +24,7 @@ macOS 14 en later zijn ondersteund. macOS 26 gebruikt Liquid Glass; macOS 14/15 
 | Mail | Geselecteerde Mail.app-accounts voor inbox, gelezen markeren, antwoorden, schrijven en naar prullenmand verplaatsen. |
 | Notities | Apple Notities is de enige bron voor Markdown-notities bekijken, bewerken, maken en verwijderen, met voorvertoning en automatisch terugschrijven. |
 | Appvolumemixer | Volume en dempen per spelende app op macOS 14.4+, met onthouden volume; vereist Systeemaudio-opname. |
-| Hulpprogramma's | Pomodoro met één signaal en lokale melding, wakker houden, inactieve sluimerstand voorkomen, scherm/toetsenbordreiniging, teleprompter, cameraspiegel en bevestigd legen van prullenmand. De timernaam geldt alleen voor de huidige sessie en keert terug naar de standaardnaam na afloop of annulering. |
+| Hulpprogramma's | Pomodoro met één signaal en lokale melding, wakker houden, inactieve sluimerstand voorkomen, scherm/toetsenbordreiniging, teleprompter, cameraspiegel en bevestigd legen van prullenmand. De timernaam geldt alleen voor de huidige sessie en keert terug naar de standaardnaam na afloop of annulering. Op het ingeklapte eiland geeft een zon aan dat het scherm aan blijft. Een laptop geeft aan dat de Mac bij inactiviteit niet in de sluimerstand gaat. |
 | Systeem | CPU, GPU, geheugen, schijf, netwerk, temperatuur, ventilatoren, geheugen vrijmaken en veilige caches/logs/tijdelijke gegevens scannen; batterijgezondheid en accessoireniveaus. |
 
 ### Functies over modules heen

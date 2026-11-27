@@ -24,7 +24,7 @@ Sono supportati macOS 14 e successivi. macOS 26 usa Liquid Glass; macOS 14/15 us
 | Posta | Legge account Mail.app selezionati: posta in arrivo, stato di lettura, risposte, composizione e spostamento nel cestino. |
 | Note | Usa Note di Apple come unica fonte per consultare, modificare, creare ed eliminare note Markdown, con anteprima e scrittura automatica delle modifiche. |
 | Mixer volume applicazioni | Su macOS 14.4+, modifica volume e silenziamento di ogni app in riproduzione e ne ricorda il volume; richiede Registrazione audio di sistema. |
-| Utilità | Timer Pomodoro con un singolo suono e notifica locale alla fine, modalità attiva, prevenzione dello stop per inattività, pulizia schermo/tastiera, suggeritore, specchio fotocamera e svuotamento del cestino con conferma. Il nome del timer vale solo per la sessione corrente e torna a quello predefinito quando termina o viene annullata. |
+| Utilità | Timer Pomodoro con un singolo suono e notifica locale alla fine, modalità attiva, prevenzione dello stop per inattività, pulizia schermo/tastiera, suggeritore, specchio fotocamera e svuotamento del cestino con conferma. Il nome del timer vale solo per la sessione corrente e torna a quello predefinito quando termina o viene annullata. Quando l’isola è compressa, il sole indica che lo schermo resta acceso e il portatile indica che la sospensione per inattività è bloccata. |
 | Sistema | CPU, GPU, memoria, disco, rete, temperatura e ventole; libera memoria e analizza cache, registri e dati temporanei eliminabili in sicurezza, oltre alla salute della batteria e ai livelli degli accessori. |
 
 ### Funzioni tra moduli

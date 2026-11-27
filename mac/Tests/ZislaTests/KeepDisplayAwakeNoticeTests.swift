@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import IOKit.pwr_mgt
+import SwiftUI
 import Testing
 import ZislaCore
 
@@ -11,6 +12,56 @@ import ZislaCore
 struct KeepDisplayAwakeNoticeTests {
     private let enableError = "无法开启合盖亮屏，请检查管理员授权后重试。"
     private let restoreError = "无法恢复休眠设置，请重试关闭保持亮屏。"
+
+    @Test(arguments: [nil, IslandEdge.top, .left])
+    func collapsedPowerIconsDistinguishSingleAndCombinedStates(edge: IslandEdge?) throws {
+        func foreground(_ view: some View) throws -> IndexSet {
+            let renderer = ImageRenderer(content: view.background(.black))
+            renderer.scale = 2
+            let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+            var pixels = IndexSet()
+            for y in 0..<bitmap.pixelsHigh {
+                for x in 0..<bitmap.pixelsWide where (bitmap.colorAt(x: x, y: y)?.redComponent ?? 0) > 0.5 {
+                    pixels.insert(y * bitmap.pixelsWide + x)
+                }
+            }
+            #expect(!pixels.isEmpty, "The collapsed icon must have visible pixels")
+            return pixels
+        }
+
+        func iconPixels(_ notice: IslandNotice) throws -> IndexSet {
+            if let edge {
+                let presentation = CompactPillStatusPresentation(priority: .toolboxReminder, notice: notice, text: "")
+                let length = presentation.length(thickness: 32, edge: edge)
+                let pill = CompactPillStatusContent(presentation: presentation, text: "", edge: edge,
+                                                    visualizationStyle: .waveform, item: nil, date: .distantPast)
+                return try foreground(pill.frame(width: edge.isVertical ? 32 : length, height: edge.isVertical ? length : 32))
+            }
+            let queue = SideNoticeQueue()
+            queue.enqueue(notice, expiresAfter: nil)
+            return try foreground(SideNoticeRootView(queue: queue, displayState: SideNoticeDisplayState(), side: .left))
+        }
+
+        var icons = Set<IndexSet>()
+        for (display, system) in [(true, false), (false, true), (true, true)] {
+            let reminder = try #require(ToolboxReminder.content(
+                isScreenCleaning: false, isKeyboardCleaning: false, pomodoroMode: .focus,
+                pomodoroPhase: .idle, pomodoroClock: "25:00", keepDisplayAwake: display, preventIdleSystemSleep: system
+            ))
+            let notice = reminder.notice(for: .left)
+            let pixels = try iconPixels(notice)
+            icons.insert(pixels)
+            if display && system {
+                var changedSun = notice
+                changedSun.symbolName = "xmark"
+                #expect(try iconPixels(changedSun) != pixels, "The combined icon must draw the sun")
+                var changedLaptop = notice
+                changedLaptop.metadata?[ToolboxReminder.secondarySymbolKey] = "xmark"
+                #expect(try iconPixels(changedLaptop) != pixels, "The combined icon must draw the laptop")
+            }
+        }
+        #expect(icons.count == 3, "The sun, laptop and pair must remain distinguishable in the same icon slot")
+    }
 
     @Test(arguments: [false, true])
     func authorizationOrAssertionFailureReachesTheNoticeWithoutAToolboxView(assertionFails: Bool) async {
