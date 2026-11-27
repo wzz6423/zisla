@@ -177,7 +177,7 @@ export const documentationLink = (id: DocumentationId, locale: SiteLocale): { ur
   };
 };
 
-export const guideIds = ['clipboard', 'capture', 'shelf', 'meeting', 'ai', 'media-tools', 'daily-briefing', 'desktop', 'playback'] as const;
+export const guideIds = ['clipboard', 'capture', 'shelf', 'weather', 'meeting', 'ai', 'media-tools', 'daily-briefing', 'desktop', 'playback'] as const;
 export type GuideId = (typeof guideIds)[number];
 export const workflowIds = ['copy-next', 'drop-output', 'meeting-note'] as const;
 export type WorkflowId = (typeof workflowIds)[number];

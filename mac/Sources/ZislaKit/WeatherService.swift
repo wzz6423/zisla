@@ -2,6 +2,16 @@ import Foundation
 import ZislaCore
 
 public struct WeatherSnapshot: Equatable, Sendable {
+    public struct SourceAttribution: Equatable, Sendable {
+        public let name: String
+        public let url: URL
+
+        public init(name: String, url: URL) {
+            self.name = name
+            self.url = url
+        }
+    }
+
     public var temperature: Double
     public var temperatureMin: Double?
     public var temperatureMax: Double?
@@ -23,6 +33,7 @@ public struct WeatherSnapshot: Equatable, Sendable {
     public var source: String?
     public var sourceURL: URL?
     public var licenseURL: URL?
+    public var supplementalSources: [SourceAttribution] = []
 
     public var expiresAt: Date { fetchedAt.addingTimeInterval(3600) }
 
@@ -66,6 +77,46 @@ public struct WeatherSnapshot: Equatable, Sendable {
         self.source = source
         self.sourceURL = sourceURL
         self.licenseURL = licenseURL
+    }
+
+    fileprivate var completeness: Int {
+        [
+            temperatureMin != nil, temperatureMax != nil, apparentTemperature != nil,
+            currentPrecipitation != nil, !sunrise.isEmpty, !sunset.isEmpty,
+            precipitationProbability != nil, precipitationSum != nil,
+            condition.isKnown,
+        ].filter { $0 }.count
+    }
+
+    static func mergedForecasts(_ forecasts: [Self]) -> Self? {
+        // Stable sorting preserves regional provider priority when field counts tie.
+        let ranked = forecasts.sorted { $0.completeness > $1.completeness }
+        guard let preferred = ranked.first else { return nil }
+        return ranked.dropFirst().reduce(preferred) { $0.supplemented(by: $1) }
+    }
+
+    private func supplemented(by supplement: Self) -> Self {
+        var merged = self
+        merged.temperatureMin = merged.temperatureMin ?? supplement.temperatureMin
+        merged.temperatureMax = merged.temperatureMax ?? supplement.temperatureMax
+        if let minimum = merged.temperatureMin, let maximum = merged.temperatureMax, minimum > maximum {
+            merged.temperatureMin = temperatureMin
+            merged.temperatureMax = temperatureMax
+        }
+        merged.apparentTemperature = merged.apparentTemperature ?? supplement.apparentTemperature
+        merged.currentPrecipitation = merged.currentPrecipitation ?? supplement.currentPrecipitation
+        merged.precipitationProbability = merged.precipitationProbability ?? supplement.precipitationProbability
+        merged.precipitationSum = merged.precipitationSum ?? supplement.precipitationSum
+        if merged.sunrise.isEmpty { merged.sunrise = supplement.sunrise }
+        if merged.sunset.isEmpty { merged.sunset = supplement.sunset }
+        if !merged.condition.isKnown { merged.condition = supplement.condition }
+        if merged != self {
+            if let name = supplement.source, let url = supplement.sourceURL {
+                merged.supplementalSources.append(SourceAttribution(name: name, url: url))
+            }
+            merged.licenseURL = merged.licenseURL ?? supplement.licenseURL
+        }
+        return merged
     }
 }
 
@@ -135,15 +186,18 @@ public actor WeatherService {
         }
         let providers: [WeatherForecastSource] = ["CN", "HK", "MO", "TW"].contains(country?.uppercased() ?? "")
             ? [.chinaWeather, .openMeteo, .metNorway] : [.openMeteo, .metNorway]
+        var responses: [WeatherSnapshot] = []
         var forecast: WeatherSnapshot?
         var lastError: Error = WeatherServiceError.invalidResponse
         for provider in providers {
             try Task.checkCancellation()
             do {
-                forecast = try await fetchForecast(
+                let candidate = try await fetchForecast(
                     provider, latitude: latitude, longitude: longitude, locationName: locationName
                 )
-                break
+                responses.append(candidate)
+                forecast = WeatherSnapshot.mergedForecasts(responses)
+                if forecast?.completeness == 9 { break }
             } catch {
                 try Self.rethrowCancellation(error)
                 lastError = error is DecodingError ? WeatherServiceError.invalidResponse : error

@@ -20,7 +20,7 @@ Hỗ trợ macOS 14 trở lên. macOS 26 dùng Liquid Glass; 14/15 dùng vật l
 | Bảng nhớ tạm | Lịch sử tại máy có tìm kiếm, lọc ảnh/URL/tệp và yêu thích; lịch sử/liên kết độc lập. Ảnh mới xếp hàng nhận chữ tại máy, tìm chữ tìm ảnh gốc hoặc nhấp phải nhận/sao chép. Có thể hủy nhận diện đang chạy; nền không tự sao chép chữ. |
 | Theo dõi AI | Tổng hợp tác vụ, trạng thái, xu hướng token, bản đồ đóng góp và thông báo từ CLI, ứng dụng, IDE hỗ trợ. |
 | Tải xuống | `yt-dlp` cho video/âm thanh; thiếu `ffmpeg` dùng AVFoundation đóng gói rãnh tương thích và Bilibili chỉ đọc dự phòng. |
-| Lịch trình | Thời tiết hiện tại và tối đa sáu nơi lưu; xem/tạo/xóa sự kiện và lời nhắc, đánh dấu hoàn thành. Thời gian cập nhật danh sách thời tiết nằm trên hàng tiêu đề, bên trái nút làm mới. |
+| Lịch trình | Thời tiết hiện tại và tối đa sáu nơi lưu; xem/tạo/xóa sự kiện và lời nhắc, đánh dấu hoàn thành. Thời gian cập nhật danh sách thời tiết nằm trên hàng tiêu đề, bên trái nút làm mới. Khi thông tin thời tiết chưa đầy đủ, các nguồn khác bổ sung cho kết quả đầy đủ nhất; dữ liệu hiện có được giữ lại nếu không lấy được phần còn thiếu. |
 | Thư | Đọc các tài khoản Mail.app được chọn để xem hộp thư đến, đánh dấu đã đọc, trả lời, soạn thư và chuyển thư vào thùng rác. |
 | Ghi chú | Dùng Apple Notes làm nguồn dữ liệu duy nhất để xem, sửa, tạo và xóa ghi chú Markdown, với bản xem trước trực tiếp và tự động ghi thay đổi trở lại. |
 | Trộn âm lượng ứng dụng | Trên macOS 14.4+, chỉnh âm lượng hoặc tắt tiếng từng ứng dụng đang phát và ghi nhớ mức âm lượng; cần quyền ghi âm thanh hệ thống. |
@@ -231,7 +231,7 @@ Mô-đun Ghi chú không giữ bản sao cục bộ thứ hai; Apple Notes là h
 - **Màn hình/âm:** Ảnh/ghi/xem cần Screen Recording; nguồn chọn lưu tại máy, micrô/camera chỉ khi bật. Trộn macOS 14.4+ System Audio Recording và Core Audio tap.
 - **Trình duyệt:** Chỉ tiến độ/tạm công khai, không lịch sử/nội dung.
 - **Đa phương tiện:** MediaRemote cung cấp siêu dữ liệu và trạng thái đầu ra tiến trình Core Audio xác nhận việc phát. MediaRemote là framework riêng, nên bản hiện tại không phù hợp gửi trực tiếp lên Mac App Store; khi thiếu siêu dữ liệu, ứng dụng dùng nguồn âm thanh đang hoạt động.
-- **Mạng:** Open-Meteo/cảnh báo Trung Quốc công khai khi phù hợp, ưu tiên WeatherKit khác. `ipinfo.io/country` một lần: `CN` Gitee→GitHub, khác ngược, lỗi Gitee. Bilibili thông tin/URL/CDN chỉ đọc; nhận liên kết không mạng. Hạn mức bật đến nhà cung cấp; dịch/sửa AI/clean transcript đến mô hình/CLI. Speech Apple theo hệ thống/ngôn ngữ. Cài/cập nhật phụ thuộc/CLI, IP và thao tác mạng chọn cũng yêu cầu.
+- **Mạng:** Dự báo truy vấn China Weather, Open-Meteo và MET Norway theo khu vực và hỏi thêm nguồn khác khi dữ liệu chưa đầy đủ. Cảnh báo chính thức được lấy riêng từ China Weather hoặc WeatherKit. `ipinfo.io/country` một lần: `CN` Gitee→GitHub, khác ngược, lỗi Gitee. Bilibili thông tin/URL/CDN chỉ đọc; nhận liên kết không mạng. Hạn mức bật đến nhà cung cấp; dịch/sửa AI/clean transcript đến mô hình/CLI. Speech Apple theo hệ thống/ngôn ngữ. Cài/cập nhật phụ thuộc/CLI, IP và thao tác mạng chọn cũng yêu cầu.
 - **Tự động hóa:** AppleScript/JXA liệt kê, xem, sửa, tạo và xóa Apple Notes. Cần quyền tự động hóa, không dùng mạng và giữ dữ liệu trong Apple Notes.
 
 ## Kiểm thử
