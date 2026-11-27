@@ -249,7 +249,7 @@ export const ptBR = createCatalog({
       },
       pet: {
         title: 'Mascote da ilha',
-        description: 'Escolha no catálogo ampliado de animais e personagens ou importe uma imagem, animação ou vídeo compatível com um nome próprio. Posicione o mascote em um lado da ilha e remova os importados nos Ajustes. Animações de até 30 segundos e arquivos de até 100 MB.',
+        description: 'Escolha no catálogo ampliado de animais e personagens ou importe uma imagem, animação ou vídeo compatível com um nome próprio. Posicione o mascote em um lado da ilha e remova os importados nos Ajustes. Animações de até 30 segundos e arquivos de até 100 MB. Ao expandir a ilha em uma tela, os mascotes das outras telas permanecem no lugar.',
         detail: 'Catálogo ampliado · Importar imagens e vídeos · Remover mascotes personalizados',
       },
       lockScreen: {

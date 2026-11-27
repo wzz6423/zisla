@@ -37,7 +37,7 @@ struct CompactPomodoroControlsTests {
         var expanded = false
         coordinator.onVisibilityChanged = {
             expanded = $0
-            base.presenter.setIslandExpanded($0)
+            base.presenter.setExpandedIslandDisplayID($0 ? base.screen.displayID : nil)
         }
         base.presenter.setScreenLocked(false)
         let host = try #require(NSApplication.shared.windows.compactMap {
@@ -195,7 +195,7 @@ struct CompactPomodoroControlsTests {
         var expanded = false
         coordinator.onVisibilityChanged = {
             expanded = $0
-            presenter.setIslandExpanded($0)
+            presenter.setExpandedIslandDisplayID($0 ? fixture.screen.displayID : nil)
         }
         presenter.setScreenLocked(false)
         let renderedHost = try #require(NSApplication.shared.windows.compactMap {

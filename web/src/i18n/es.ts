@@ -249,7 +249,7 @@ export const es = createCatalog({
       },
       pet: {
         title: 'Mascota de la isla',
-        description: 'Elige del catálogo ampliado de animales y personajes o importa una imagen, animación o vídeo compatible con un nombre propio. Coloca la mascota a un lado de la isla y elimina las importadas en Ajustes. Las animaciones admiten hasta 30 segundos y los archivos hasta 100 MB.',
+        description: 'Elige del catálogo ampliado de animales y personajes o importa una imagen, animación o vídeo compatible con un nombre propio. Coloca la mascota a un lado de la isla y elimina las importadas en Ajustes. Las animaciones admiten hasta 30 segundos y los archivos hasta 100 MB. Al desplegar la isla en una pantalla, las mascotas de las demás pantallas permanecen en su sitio.',
         detail: 'Catálogo ampliado · Importar imágenes y vídeos · Eliminar mascotas propias',
       },
       lockScreen: {

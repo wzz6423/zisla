@@ -503,7 +503,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     self?.islandClipboardHandoffTask = nil
                 }
             }
-            self?.noticePresenter?.setIslandExpanded(visible)
+            self?.noticePresenter?.setExpandedIslandDisplayID(visible ? model.islandScreenLayout?.displayID : nil)
             if visible {
                 self?.flushVoiceRecordingPanelRestore()
                 model.clipboardAssistant.dismiss(animated: false)
@@ -524,6 +524,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         coordinator.onActiveLayoutChanged = { [weak self] layout in
             model.islandScreenLayout = layout
+            if model.isIslandVisible { self?.noticePresenter?.setExpandedIslandDisplayID(layout?.displayID) }
             if let displayID = layout?.displayID { self?.noticePresenter?.publishCompactLayout(on: displayID) }
         }
         model.onChooseIslandPlacement = { [weak self, weak coordinator] in
@@ -664,6 +665,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
+        if model.isIslandVisible { noticePresenter?.setExpandedIslandDisplayID(coordinator.activeDisplayID) }
         noticePresenter?.onJoinMeeting = { model.joinMeetingNotice($0) }
         coordinator.collapsedControlContainsPoint = { [weak self] point in
             self?.noticePresenter?.containsCompactPomodoroControl(at: point) == true
