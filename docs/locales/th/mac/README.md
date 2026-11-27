@@ -231,7 +231,7 @@ Apple Notes แหล่ง Markdown เดียว สร้าง ดู แ�
 - **จอ/เสียง:** ภาพ/บันทึก/preview ขอ Screen Recording เก็บ source เลือก ไมค์กล้องเฉพาะเปิด มิกซ์ macOS 14.4+ System Audio Recording Core Audio taps local
 - **เบราว์เซอร์:** progress สาธารณะ/ไฟล์ชั่วคราว ไม่ history/เนื้อหา
 - **สื่อ:** MediaRemote metadata Core Audio process confirm private framework ไม่ส่ง Mac App Store ตรง ไม่มี metadata ใช้แอปเสียง
-- **เครือข่าย:** การพยากรณ์ใช้ China Weather, Open-Meteo และ MET Norway ตามภูมิภาค และสอบถามแหล่งอื่นเมื่อข้อมูลไม่ครบ คำเตือนอย่างเป็นทางการดึงแยกจาก China Weather หรือ WeatherKit io/country` ครั้งเดียว `CN` Gitee→GitHub อื่นกลับ ไม่มีเริ่ม Gitee Bilibili readonly info/play/CDN ลิงก์ไม่ network โควตาติดต่อ provider แปล/AI edits/transcript โมเดล/CLI speech Apple ตามภาษา ติดตั้ง/อัปเดต dependencies CLI IP และ network ผู้ใช้เลือกมี request
+- **เครือข่าย:** การพยากรณ์ใช้ China Weather, Open-Meteo และ MET Norway ตามภูมิภาค และสอบถามแหล่งอื่นเมื่อข้อมูลไม่ครบ คำเตือนอย่างเป็นทางการดึงแยกจาก China Weather หรือ WeatherKit อัปเดต `ipinfo.io/country` ครั้งเดียว `CN` Gitee→GitHub อื่นกลับ ไม่มีเริ่ม Gitee Bilibili readonly info/play/CDN ลิงก์ไม่ network โควตาติดต่อ provider แปล/AI edits/transcript โมเดล/CLI speech Apple ตามภาษา ติดตั้ง/อัปเดต dependencies CLI IP และ network ผู้ใช้เลือกมี request
 - **Automation:** AppleScript/JXA list/view/edit/create/delete Notes ต้องสิทธิ์ ไม่ network เก็บ Notes
 
 ## ทดสอบ
