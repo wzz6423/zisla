@@ -249,8 +249,8 @@ struct IslandPillAnimationTests {
         #expect(source.contains("showsCompactTransientNotice && customTransientPresentation == nil"))
         #expect(source.contains(".position(x: frame.midX, y: frame.midY)"),
                 "A custom transient message must be placed inside the current pill instead of its former transcript row")
-        #expect(app.contains("setTransientNoticePresented(message != nil, message: message)"),
-                "Changing the transient text must resize the animation anchor while the message remains visible")
+        #expect(app.contains("setTransientNoticePresented(message != nil, message: message, on: displayID)"),
+                "Changing the transient text must resize the animation anchor on its display")
     }
 
     private func equal(_ lhs: CGRect, _ rhs: CGRect) -> Bool {

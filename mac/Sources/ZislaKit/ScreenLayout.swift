@@ -503,7 +503,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
             physicalOcclusionFrame: occlusion,
             placementBounds: bounds,
             placementMode: configuration.placement.mode,
-            placement: configuration.placement
+            placement: isCamera ? IslandPlacement() : configuration.placement
         )
     }
 
