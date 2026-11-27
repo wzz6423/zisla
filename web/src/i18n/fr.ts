@@ -268,7 +268,7 @@ export const fr: SiteContent = {
       pet: {
         title: 'Mascotte de l’île',
         description:
-          'Choisissez dans le catalogue enrichi d’animaux et de personnages, ou importez une image, une animation ou une vidéo compatible et nommez votre compagnon. Placez-le d’un côté de l’île et supprimez les compagnons importés dans les réglages. Animations de 30 secondes maximum, fichiers de 100 MB maximum.',
+          'Choisissez dans le catalogue enrichi d’animaux et de personnages, ou importez une image, une animation ou une vidéo compatible et nommez votre compagnon. Placez-le d’un côté de l’île et supprimez les compagnons importés dans les réglages. Animations de 30 secondes maximum, fichiers de 100 MB maximum. Quand vous déployez l’îlot sur un écran, les compagnons des autres écrans restent en place.',
         detail: 'Catalogue enrichi · Import d’images et vidéos · Suppression des compagnons personnalisés',
       },
       lockScreen: {

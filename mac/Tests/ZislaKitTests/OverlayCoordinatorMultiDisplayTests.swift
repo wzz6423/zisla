@@ -457,6 +457,47 @@ struct OverlayCoordinatorMultiDisplayTests {
     }
 
     @Test
+    func expandingAndSwitchingDisplaysLeavesOtherPetsInPlace() throws {
+        let screens = [Self.builtInScreen, Self.externalScreen]
+        var views: [CGDirectDisplayID: NSView] = [:]
+        var updated: [CGDirectDisplayID] = []
+        let coordinator = OverlayCoordinator(
+            contentView: NSView(),
+            persistentContentViewProvider: { layout in
+                let view = NSView()
+                views[layout.displayID] = view
+                return view
+            },
+            persistentPanelFrameProvider: { CollapsedPetLayout.frame(for: $0) },
+            persistentContentViewUpdater: { _, layout in updated.append(layout.displayID) }
+        )
+        coordinator.screenSnapshotProvider = { screens }
+        coordinator.start()
+        defer { coordinator.stop() }
+        let first = try #require(views[screens[0].displayID]?.window)
+        let second = try #require(views[screens[1].displayID]?.window)
+        let firstFrame = first.frame
+        let secondFrame = second.frame
+        let triggers = coordinator.layouts.map { CGPoint(x: $0.triggerFrame.midX, y: $0.triggerFrame.midY) }
+
+        coordinator.handlePointer(at: triggers[0])
+        #expect(!first.isVisible && second.isVisible)
+        #expect(second.frame == secondFrame)
+        #expect(updated.isEmpty)
+
+        coordinator.handlePointer(at: triggers[1])
+        #expect(first.isVisible && !second.isVisible)
+        #expect(first.frame == firstFrame)
+        #expect(updated == [screens[0].displayID])
+
+        updated.removeAll()
+        coordinator.collapseImmediately()
+        #expect(first.isVisible && second.isVisible)
+        #expect(first.frame == firstFrame && second.frame == secondFrame)
+        #expect(updated == [screens[1].displayID])
+    }
+
+    @Test
     func spaceChangeReassertsPersistentPanelsEvenAfterFirstExpandCollapse() throws {
         var frameRequests = 0
         var petViews: [CGDirectDisplayID: NSView] = [:]

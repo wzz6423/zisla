@@ -248,7 +248,7 @@ export const en: SiteContent = {
       pet: {
         title: 'Island pet',
         description:
-          'Choose from the expanded built-in animal and character catalogue, or import a supported image, animated image or video as a named pet. Place it on either side of the island and remove imported pets in Settings. Imports support animations up to 30 seconds and files up to 100 MB.',
+          'Choose from the expanded built-in animal and character catalogue, or import a supported image, animated image or video as a named pet. Place it on either side of the island and remove imported pets in Settings. Imports support animations up to 30 seconds and files up to 100 MB. When you expand the island on one display, pets on the other displays stay in place.',
         detail: 'Expanded catalogue · Image and video import · Remove custom pets',
       },
       lockScreen: {

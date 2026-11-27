@@ -263,7 +263,7 @@ export const de: SiteContent = {
       pet: {
         title: 'Maskottchen in der Island',
         description:
-          'Wählen Sie aus dem erweiterten Tier- und Figurenkatalog oder importieren Sie ein unterstütztes Bild, eine Animation oder ein Video mit eigenem Namen. Platzieren Sie das Tier auf einer Seite der Insel und entfernen Sie importierte Tiere in den Einstellungen. Animationen dürfen höchstens 30 Sekunden, Dateien höchstens 100 MB umfassen.',
+          'Wählen Sie aus dem erweiterten Tier- und Figurenkatalog oder importieren Sie ein unterstütztes Bild, eine Animation oder ein Video mit eigenem Namen. Platzieren Sie das Tier auf einer Seite der Insel und entfernen Sie importierte Tiere in den Einstellungen. Animationen dürfen höchstens 30 Sekunden, Dateien höchstens 100 MB umfassen. Wenn Sie die Insel auf einem Bildschirm ausklappen, bleiben die Haustiere auf den anderen Bildschirmen an ihrem Platz.',
         detail: 'Erweiterter Katalog · Bilder und Videos importieren · Eigene Tiere entfernen',
       },
       lockScreen: {

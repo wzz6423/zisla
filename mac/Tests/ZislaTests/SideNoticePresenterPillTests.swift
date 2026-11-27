@@ -625,6 +625,48 @@ struct SideNoticePresenterPillTests {
         fixture.close()
     }
 
+    @Test(arguments: IslandLayoutStyle.allCases)
+    func expansionKeepsTheCompactPetAnchorOnTheOtherDisplay(style: IslandLayoutStyle) throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.screen = Self.notchedScreen
+        let other = ScreenSnapshot(displayID: 8,
+                                   frame: fixture.screen.frame.offsetBy(dx: 2000, dy: -160),
+                                   visibleFrame: fixture.screen.visibleFrame.offsetBy(dx: 2000, dy: -160))
+        fixture.additionalScreens = [other]
+        fixture.reducesMotion = true
+        fixture.settings.settings.islandLayoutStyle = style
+        fixture.queue.enqueue(IslandNotice(id: "ai-active-fixture", title: "Codex"), expiresAfter: nil)
+        fixture.presenter.setScreenLocked(false)
+        let panels = NSApp.windows.filter {
+            let host = $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
+            return host?.rootView.content.settingsStore === fixture.settings
+        }
+        let first = try #require(panels.first { fixture.screen.frame.contains($0.frame) })
+        let second = try #require(panels.first { other.frame.contains($0.frame) })
+        let secondFrame = second.frame
+        #expect(first.isVisible && second.isVisible)
+
+        var publishedDisplays: [CGDirectDisplayID] = []
+        fixture.presenter.onCompactLayoutChanged = { id, _, _, _, _ in publishedDisplays.append(id) }
+        fixture.presenter.setExpandedIslandDisplayID(fixture.screen.displayID)
+        #expect(!first.isVisible && second.isVisible)
+        #expect(second.frame == secondFrame)
+        #expect(!publishedDisplays.contains(other.displayID))
+
+        fixture.presenter.setClipboardAssistantVisible(true)
+        #expect(!first.isVisible && !second.isVisible)
+        fixture.presenter.setClipboardAssistantVisible(false)
+        #expect(!first.isVisible && second.isVisible)
+
+        fixture.presenter.setExpandedIslandDisplayID(other.displayID)
+        #expect(first.isVisible && !second.isVisible)
+        publishedDisplays.removeAll()
+        fixture.presenter.setExpandedIslandDisplayID(nil)
+        #expect(first.isVisible && second.isVisible)
+        #expect(!publishedDisplays.contains(fixture.screen.displayID))
+    }
+
     @Test(arguments: IslandEdge.allCases)
     func publishingLayoutDuringAScreenSwitchSettlesOnTheSameLivePill(edge: IslandEdge) throws {
         let fixture = try Fixture(edge: edge)
@@ -1369,6 +1411,7 @@ struct SideNoticePresenterPillTests {
         let date = Date(timeIntervalSince1970: 100)
         var reducesMotion = false
         let resizeClock = ResizeClock()
+        var additionalScreens: [ScreenSnapshot] = []
         var screen = ScreenSnapshot(displayID: 7,
                                     frame: CGRect(x: -1800, y: -240, width: 1800, height: 1100),
                                     visibleFrame: CGRect(x: -1800, y: -240, width: 1800, height: 1076))
@@ -1377,7 +1420,7 @@ struct SideNoticePresenterPillTests {
                                                  browserDownloads: downloads, settingsStore: settings, languageStore: language,
                                                  isScreenLocked: true, now: { [unowned self] in date }, reduceMotion: { [unowned self] in reducesMotion },
                                                  waitForCompactResize: { [resizeClock] in try await resizeClock.wait(for: $0) },
-                                                 screenSnapshotProvider: { [unowned self] in [screen] })
+                                                 screenSnapshotProvider: { [unowned self] in [screen] + additionalScreens })
 
         init(edge: IslandEdge) throws {
             defaults = try #require(UserDefaults(suiteName: suiteName))

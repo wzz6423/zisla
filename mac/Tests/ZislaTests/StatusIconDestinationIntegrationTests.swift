@@ -1619,8 +1619,8 @@ struct StatusIconDestinationIntegrationTests {
         #expect(fixture.presenter.compactConfiguration(for: [], at: .now) == idle)
         fixture.presenter.setScreenshotActive(true)
         fixture.presenter.setScreenshotActive(false)
-        fixture.presenter.setIslandExpanded(true)
-        fixture.presenter.setIslandExpanded(false)
+        fixture.presenter.setExpandedIslandDisplayID(fixture.screen.displayID)
+        fixture.presenter.setExpandedIslandDisplayID(nil)
         #expect(fixture.presenter.compactConfiguration(for: [], at: .now) == idle)
         fixture.settings.settings.statusIconDestination = .menuBar
         #expect(fixture.presenter.compactConfiguration(for: [], at: .now).statusIconSize == nil)
