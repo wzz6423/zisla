@@ -232,7 +232,7 @@ export const it = createCatalog({
       browserDownloads: {
         title: 'Progresso dei download del browser',
         description:
-          'Rileva i download di Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera e Arc, mostrando origine e progresso in tempo reale in alto. L’avanzamento mostra il vero nome del file di destinazione quando il browser lo fornisce.',
+          'Rileva i download di Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera e Arc, mostrando origine e progresso in tempo reale in alto. L’avanzamento mostra il vero nome del file di destinazione quando il browser lo fornisce. La sola presenza di un file .crdownload nella cartella temporanea di sistema non fa comparire una scheda di download.',
         detail: '8 browser · Rilevamento origine · Avviso di completamento',
       },
       copyAssistant: {
@@ -637,7 +637,7 @@ export const it = createCatalog({
       },
       multiDisplay: {
         question: 'zisla supporta più schermi?',
-        answer: 'Sì: più schermi, Spaces e app normali a tutto schermo; l’espansione non ruba mai il focus. Con più schermi collegati, Impostazioni → Generali → Modalità degli schermi permette di scegliere per ciascuno la modalità Dynamic Island (posizione della fotocamera o personalizzata), la modalità notch o di nasconderla. Con un solo schermo questa impostazione è nascosta e si usa l’aspetto globale; ricollegando gli schermi si ripristinano le configurazioni salvate. Tutti gli schermi visibili mantengono l’isola chiusa contemporaneamente. L’espansione, le azioni rapide, la registrazione e i messaggi temporanei sostituiscono solo l’isola del proprio schermo; la selezione degli schermi per le notifiche filtra il contenuto senza nascondere l’isola inattiva.',
+        answer: 'Sì: più schermi, Spaces e app normali a tutto schermo; l’espansione non ruba mai il focus. Con il browser a tutto schermo, porta il puntatore sull’isola per espanderla nello stesso spazio. Con più schermi collegati, Impostazioni → Generali → Modalità degli schermi permette di scegliere per ciascuno la modalità Dynamic Island (posizione della fotocamera o personalizzata), la modalità notch o di nasconderla. Con un solo schermo questa impostazione è nascosta e si usa l’aspetto globale; ricollegando gli schermi si ripristinano le configurazioni salvate. Tutti gli schermi visibili mantengono l’isola chiusa contemporaneamente. L’espansione, le azioni rapide, la registrazione e i messaggi temporanei sostituiscono solo l’isola del proprio schermo; la selezione degli schermi per le notifiche filtra il contenuto senza nascondere l’isola inattiva.',
       },
       intel: {
         question: 'Posso usarlo su un Mac Intel?',

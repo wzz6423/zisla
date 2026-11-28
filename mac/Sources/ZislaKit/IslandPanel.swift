@@ -29,6 +29,8 @@ public final class IslandPanel: NSPanel {
     internal var panelFrameApplier: (IslandPanel, CGRect) -> Void = { panel, frame in
         panel.setFrame(frame, display: true)
     }
+    internal var panelIsOnActiveSpace: (IslandPanel) -> Bool = { $0.isOnActiveSpace }
+    var isPresentedOnActiveSpace: Bool { isVisible && panelIsOnActiveSpace(self) }
     public var allowsKeyWindow = false
     public weak var pageNavigationShortcutView: NSView?
     /// Records that the transparent style's native glass surface is on screen. The active-appearance
@@ -169,23 +171,20 @@ public final class IslandPanel: NSPanel {
         case show
         /// Visible on the same display at a different frame: move it, then re-assert ordering.
         case reposition
-        /// Visible on another display: detach from the old display's Space before moving and ordering in.
+        /// Ordered on another display or Space: detach before positioning and ordering in.
         case reattach
     }
 
-    /// A visible panel at the target frame must still be re-fronted, never skipped: when another app
-    /// opens a full-screen Space, WindowServer drops this window from that Space's ordering even with
-    /// `canJoinAllSpaces`, and `orderFrontRegardless()` is the only thing that rejoins it. Moving a
-    /// visible panel to a different display detaches it first so macOS attaches it cleanly to the
-    /// destination display's active Space under "Displays have separate Spaces".
+    /// Window ordering and active-Space membership can diverge when another app enters full screen.
+    /// Detaching lets WindowServer place the panel on the destination Space even at the same frame.
     static func presentationPlan(
         isVisible: Bool,
         currentFrame: CGRect,
         targetFrame: CGRect,
-        crossesDisplay: Bool = false
+        needsReattachment: Bool = false
     ) -> PresentationPlan {
         guard isVisible else { return .show }
-        if crossesDisplay { return .reattach }
+        if needsReattachment { return .reattach }
         return currentFrame == targetFrame ? .refront : .reposition
     }
 
@@ -201,7 +200,7 @@ public final class IslandPanel: NSPanel {
             isVisible: isVisible,
             currentFrame: self.frame,
             targetFrame: frame,
-            crossesDisplay: crossesDisplay
+            needsReattachment: crossesDisplay || !isPresentedOnActiveSpace
         )
         // Supersedes any in-flight dismiss fade so its completion cannot order this panel back out.
         transitionGeneration &+= 1

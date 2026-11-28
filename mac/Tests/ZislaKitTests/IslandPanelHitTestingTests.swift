@@ -187,7 +187,7 @@ struct IslandPanelHitTestingTests {
                 isVisible: true,
                 currentFrame: CGRect(x: 40, y: 600, width: 420, height: 180),
                 targetFrame: CGRect(x: 2_000, y: 900, width: 420, height: 180),
-                crossesDisplay: true
+                needsReattachment: true
             ) == .reattach
         )
         #expect(
@@ -195,7 +195,7 @@ struct IslandPanelHitTestingTests {
                 isVisible: false,
                 currentFrame: CGRect(x: 40, y: 600, width: 420, height: 180),
                 targetFrame: CGRect(x: 2_000, y: 900, width: 420, height: 180),
-                crossesDisplay: true
+                needsReattachment: true
             ) == .show
         )
     }

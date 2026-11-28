@@ -158,6 +158,10 @@ public final class OverlayCoordinator: NSObject {
                 self.refreshScreensIfNeeded()
                 let point = self.pointerLocationProvider()
                 self.handlePointer(at: point, interaction: .moved)
+                // WindowServer can finish the Space transition after the hover has already expanded.
+                if let panel = self.panel, !panel.ignoresMouseEvents, !panel.isPresentedOnActiveSpace {
+                    self.presentCurrentLayout()
+                }
             }
         }
         timer.tolerance = 0.1
@@ -1128,6 +1132,7 @@ public final class OverlayCoordinator: NSObject {
 
     private func presentCurrentLayout(persistentPanelUpdate: PersistentPanelUpdate = .visibility) {
         guard !isScreenLocked,
+              !isScreenshotCaptureInProgress,
               !isScreenshotActive,
               let layout = layout(for: activeDisplayID),
               !suppressesHover(on: layout.displayID)

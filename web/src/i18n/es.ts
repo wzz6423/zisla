@@ -232,7 +232,7 @@ export const es = createCatalog({
       browserDownloads: {
         title: 'Progreso de descargas del navegador',
         description:
-          'Detecta descargas de Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera y Arc, y muestra su origen y progreso en vivo arriba. El progreso muestra el nombre real del archivo de destino cuando el navegador lo facilita.',
+          'Detecta descargas de Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera y Arc, y muestra su origen y progreso en vivo arriba. El progreso muestra el nombre real del archivo de destino cuando el navegador lo facilita. Un archivo .crdownload en la carpeta temporal del sistema no basta para que aparezca una tarjeta de descarga.',
         detail: '8 navegadores · Detección de origen · Aviso de finalización',
       },
       copyAssistant: {
@@ -637,7 +637,7 @@ export const es = createCatalog({
       },
       multiDisplay: {
         question: '¿zisla admite varias pantallas?',
-        answer: 'Sí: varias pantallas, Spaces y apps normales a pantalla completa; al expandirse nunca roba el foco. Con varias pantallas conectadas, Ajustes → General → Modos de pantalla permite elegir para cada una el modo Dynamic Island (posición de cámara o personalizada), el modo muesca u ocultarla. Con una sola pantalla, este ajuste se oculta y se usa la apariencia global; al volver a conectarlas se recupera la configuración guardada de cada pantalla. Todas las pantallas visibles mantienen su isla contraída al mismo tiempo. La expansión, las acciones rápidas, la grabación y los mensajes temporales sustituyen solo la isla de su propia pantalla; la selección de pantallas para notificaciones filtra el contenido sin ocultar la isla inactiva.',
+        answer: 'Sí: varias pantallas, Spaces y apps normales a pantalla completa; al expandirse nunca roba el foco. Con el navegador a pantalla completa, pasa el puntero sobre la isla para expandirla en el mismo espacio. Con varias pantallas conectadas, Ajustes → General → Modos de pantalla permite elegir para cada una el modo Dynamic Island (posición de cámara o personalizada), el modo muesca u ocultarla. Con una sola pantalla, este ajuste se oculta y se usa la apariencia global; al volver a conectarlas se recupera la configuración guardada de cada pantalla. Todas las pantallas visibles mantienen su isla contraída al mismo tiempo. La expansión, las acciones rápidas, la grabación y los mensajes temporales sustituyen solo la isla de su propia pantalla; la selección de pantallas para notificaciones filtra el contenido sin ocultar la isla inactiva.',
       },
       intel: {
         question: '¿Puedo usarlo en un Mac Intel?',

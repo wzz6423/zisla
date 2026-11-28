@@ -183,6 +183,127 @@ struct AirDropBatchParserTests {
 struct BrowserDownloadMonitorLifecycleTests {
     @Test
     @MainActor
+    func systemTemporaryFilesDoNotBecomeBrowserDownloads() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let scratch = root.appendingPathComponent("Temporary", isDirectory: true)
+        let chosen = root.appendingPathComponent("Temporary Downloads", isDirectory: true)
+        for directory in [scratch, chosen] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(
+            directories: [scratch], eventPaths: [root], excludedEventPaths: [scratch], fileNameResolver: { _ in [:] }
+        )
+        let completed = XCTestExpectation(description: "Observed a download in the chosen folder")
+        var transfers: [BrowserCompletedTransfer] = []
+        var displayedNames = Set<String>()
+        let observation = monitor.$snapshots.sink { displayedNames.formUnion($0.map(\.fileName)) }
+        monitor.onCompletedTransfer = { transfer in
+            transfers.append(transfer)
+            if transfer.fileName == "report.pdf" { completed.fulfill() }
+        }
+        monitor.start()
+        defer {
+            monitor.stop()
+            observation.cancel()
+        }
+
+        let unrelated = scratch.appendingPathComponent("Unconfirmed 999.crdownload")
+        try Data("fixture".utf8).write(to: unrelated)
+        let temporary = chosen.appendingPathComponent("report.pdf.crdownload")
+        try Data("download".utf8).write(to: temporary)
+        try FileManager.default.moveItem(at: temporary, to: temporary.deletingPathExtension())
+        #expect(await XCTWaiter.fulfillment(of: [completed], timeout: 3) == .completed)
+        #expect(!displayedNames.contains("Unconfirmed 999"))
+        #expect(transfers.map(\.fileName) == ["report.pdf"])
+        #expect(try Data(contentsOf: unrelated) == Data("fixture".utf8))
+
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = unrelated
+        progress.completedUnitCount = 40
+        let published = XCTestExpectation(description: "Public progress is independent of excluded file events")
+        let publication = monitor.$snapshots.filter { $0.first?.fraction == 0.4 }.prefix(1).sink { _ in published.fulfill() }
+        progress.publish()
+        defer { progress.unpublish() }
+        #expect(await XCTWaiter.fulfillment(of: [published], timeout: 3) == .completed)
+        #expect(monitor.snapshot?.fileName == "Unconfirmed 999")
+        withExtendedLifetime(publication) {}
+    }
+
+    @Test
+    @MainActor
+    func metadataChangesDoNotReviveAnAbandonedDownload() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let abandoned = root.appendingPathComponent("Unconfirmed 999.crdownload")
+        try Data("old".utf8).write(to: abandoned)
+        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [root], fileNameResolver: { _ in [:] })
+        var displayedNames = Set<String>()
+        let observation = monitor.$snapshots.sink { displayedNames.formUnion($0.map(\.fileName)) }
+        let completed = XCTestExpectation(description: "The monitor processed a later file event")
+        monitor.onCompletedTransfer = { _ in completed.fulfill() }
+        monitor.start()
+        defer {
+            monitor.stop()
+            observation.cancel()
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: abandoned.path)
+        let temporary = root.appendingPathComponent("current.pdf.crdownload")
+        try Data("new".utf8).write(to: temporary)
+        try FileManager.default.moveItem(at: temporary, to: temporary.deletingPathExtension())
+        #expect(await XCTWaiter.fulfillment(of: [completed], timeout: 3) == .completed)
+        #expect(!displayedNames.contains("Unconfirmed 999"))
+        let resumed = XCTestExpectation(description: "Writing more data resumes the same download")
+        let resumedObservation = monitor.$snapshots.filter {
+            $0.contains { $0.fileName == "Unconfirmed 999" && !$0.isFinished }
+        }.prefix(1).sink { _ in resumed.fulfill() }
+        try Data("resumed".utf8).write(to: abandoned)
+        #expect(await XCTWaiter.fulfillment(of: [resumed], timeout: 3) == .completed)
+        withExtendedLifetime(resumedObservation) {}
+    }
+
+    @Test(arguments: [false, true])
+    @MainActor
+    func replacingATemporaryPathRetiresTheOriginalDownload(originalCompleted: Bool) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [], fileNameResolver: { _ in [:] })
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = root.appendingPathComponent("Unconfirmed 999.crdownload")
+        let replacement = root.appendingPathComponent("replacement")
+        try Data("original".utf8).write(to: temporary)
+        try Data("replacement".utf8).write(to: replacement)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        monitor.handleFileEvent(at: temporary, fileID: identity.inode, renamed: false)
+        #expect(monitor.snapshot?.fileName == "Unconfirmed 999")
+
+        let final = root.appendingPathComponent("report.pdf")
+        if originalCompleted {
+            try FileManager.default.moveItem(at: temporary, to: final)
+        } else {
+            try FileManager.default.removeItem(at: temporary)
+        }
+        try FileManager.default.moveItem(at: replacement, to: temporary)
+        let firstPoll = Date()
+        monitor.poll(at: firstPoll)
+        monitor.poll(at: firstPoll.addingTimeInterval(1))
+        #expect(originalCompleted ? monitor.snapshot?.isFinished == true : monitor.snapshot == nil)
+        #expect(transfers.map(\.fileName) == (originalCompleted ? ["report.pdf"] : []))
+        #expect(try Data(contentsOf: temporary) == Data("replacement".utf8))
+    }
+
+    @Test
+    @MainActor
     func renamedChromeDownloadOutsideDefaultFolderOffersItsActualFolderOnce() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
@@ -693,13 +814,13 @@ struct BrowserDownloadMonitorLifecycleTests {
 
     @Test
     @MainActor
-    func unknownProgressFinishesWhenFinalRenameEventIsMissing() async throws {
+    func unknownProgressFinishesWhenFinalRenameEventIsMissing() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
         try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02, fileNameResolver: { _ in [:] })
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -716,10 +837,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         #expect(monitor.snapshot?.progressText == "…")
         try FileManager.default.moveItem(at: temporary, to: completed)
 
-        let deadline = ContinuousClock.now + .seconds(1)
-        while transfers.isEmpty && ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
-        }
+        monitor.poll(at: Date())
         #expect(transfers.count == 1)
         #expect(transfers.first?.fileName == "image.jpeg")
         #expect(monitor.snapshot?.isFinished == true)
@@ -727,7 +845,7 @@ struct BrowserDownloadMonitorLifecycleTests {
 
     @Test(arguments: [false, true])
     @MainActor
-    func missingTemporaryFileHidesStaleProgressAndKeepsLateCompletion(_ movedToChosenFolder: Bool) async throws {
+    func missingTemporaryFileHidesStaleProgressAndKeepsLateCompletion(_ movedToChosenFolder: Bool) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
         let chosen = root.appendingPathComponent("Chosen", isDirectory: true)
@@ -735,7 +853,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02, fileNameResolver: { _ in [:] })
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -755,10 +873,10 @@ struct BrowserDownloadMonitorLifecycleTests {
             try FileManager.default.removeItem(at: temporary)
         }
 
-        let deadline = ContinuousClock.now + .seconds(2)
-        while monitor.snapshot != nil && ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
-        }
+        let firstPoll = Date()
+        monitor.poll(at: firstPoll)
+        #expect(monitor.snapshot?.isFinished == false)
+        monitor.poll(at: firstPoll.addingTimeInterval(1))
         #expect(monitor.snapshot == nil)
         #expect(transfers.isEmpty)
 
