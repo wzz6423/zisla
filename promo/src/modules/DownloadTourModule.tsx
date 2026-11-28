@@ -33,7 +33,7 @@ export const DownloadTourModule = ({frame}: {frame: number}) => {
       </div>
       <div className="flex items-center gap-[12px]" style={{fontSize: 17}}><Folder size={20} color={color.cyan} />Downloads<div className="flex-1" /><div data-download-action style={{padding: '10px 20px', borderRadius: 8, background: color.blue}}>{state.phase === 'downloading' ? 'Cancel download' : 'Download'}</div></div>
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-[16px]" style={{padding: 20, borderRadius: 10, background: white(.04)}}>
-        <div className="flex items-center gap-[10px]" style={{fontSize: 20, color: done ? color.green : color.label}}>{done ? <Check size={23} /> : state.phase === 'downloading' ? <LoaderCircle size={22} /> : <Download size={22} />}{done ? 'Interview.m4a saved' : state.phase === 'downloading' ? 'Interview · Downloading audio' : 'Choose source formats, then download'}</div>
+        <div className="flex items-center gap-[10px]" style={{fontSize: 20, color: done ? color.green : color.label}}>{done ? <Check size={23} /> : state.phase === 'downloading' ? <LoaderCircle size={22} style={{transform: `rotate(${frame * 10}deg)`}} /> : <Download size={22} />}{done ? 'Interview.m4a saved' : state.phase === 'downloading' ? 'Interview · Downloading audio' : 'Choose source formats, then download'}</div>
         <ProgressTrack value={state.progress} tint={done ? color.green : color.blue} width="100%" height={5} />
         <div className="flex justify-between" style={{fontSize: 15, color: color.secondary}}><span>{done ? 'Open in Finder' : `${Math.round(state.progress * 100)}%`}</span><span>{done ? 'Downloads / Interview.m4a' : 'Video or audio · Selected source quality'}</span></div>
       </div>

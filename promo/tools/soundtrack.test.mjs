@@ -13,7 +13,7 @@ const run = (args, env = process.env) => spawnSync(process.execPath, [script, ..
 
 test('soundtrack variants identify separate original works and share the fixed film duration', () => {
   assert.deepEqual(Object.keys(soundtracks), ['funk', 'cinematic']);
-  assert.equal(TOTAL_FRAMES / FPS, 160);
+  assert.equal(TOTAL_FRAMES / FPS, 120);
   assert.equal(soundtracks.funk.title, 'Funkorama');
   assert.equal(soundtracks.cinematic.title, 'The Miracle of Flight');
   assert.notEqual(soundtracks.funk.audio, soundtracks.cinematic.audio);
@@ -63,9 +63,9 @@ test('continuous audio edits pass literal paths and only their own attribution t
       const args = JSON.parse(readFileSync(log, 'utf8'));
       assert.equal(args[args.indexOf('-i') + 1], source);
       assert.equal(args.at(-1), output);
-      assert.equal(args[args.indexOf('-t') + 1], '160');
-      assert.equal(args[args.indexOf('-map_metadata') + 1], '-1');
-      assert.equal(args[args.indexOf('-af') + 1], 'volume=-2dB,afade=t=in:st=0:d=0.4:curve=hsin,afade=t=out:st=155.8:d=3.8:curve=hsin');
+      assert.equal(args[args.indexOf('-t') + 1], '120');
+      assert.equal(args.indexOf('-map_metadata') > -1 ? args[args.indexOf('-map_metadata') + 1] : '', '-1');
+      assert.equal(args[args.indexOf('-af') + 1], 'volume=-2dB,afade=t=in:st=0:d=0.4:curve=hsin,afade=t=out:st=115.8:d=3.8:curve=hsin');
       assert.doesNotMatch(args.join(' '), /aloop|concat|amix/);
       assert.ok(args.includes(`artist=${soundtracks[variant].artist}`));
       assert.ok(args.includes(`copyright=${soundtracks[variant].attribution}`));

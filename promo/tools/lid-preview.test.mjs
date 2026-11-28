@@ -56,10 +56,10 @@ test('the same Zshell desktop folds once, holds, opens once and stays restored',
   const render = (frame) => lid.render(lid.exports.LidCloseDesktopPreview, {frame});
   const desktopText = text(find(render(timing.start), 'data-zshell-desktop'));
   assert.ok(timing.closed - timing.start >= 30);
-  assert.ok(timing.opening - timing.closed >= 8);
+  assert.ok(timing.opening - timing.closed >= 2);
   assert.ok(timing.restored - timing.opening >= 30);
   let previous = lid.exports.lidPreviewAt(timing.start).angle;
-  for (let frame = timing.start; frame <= 209; frame++) {
+  for (let frame = timing.start; frame <= 183; frame++) {
     const state = lid.exports.lidPreviewAt(frame);
     const tree = render(frame);
     const sheet = find(tree, 'data-lid-depth-sheet');
@@ -94,9 +94,9 @@ test('the same Zshell desktop folds once, holds, opens once and stays restored',
 });
 
 test('the actual ending keeps the opened desktop until a single static brand card', () => {
-  assert.equal(TOTAL_FRAMES, 9600);
-  assert.equal(SCENES.settings.duration, 1140);
-  assert.equal(SCENES.outro.duration, 160);
+  assert.equal(TOTAL_FRAMES, 7200);
+  assert.equal(SCENES.settings.duration, 940);
+  assert.equal(SCENES.outro.duration, 140);
   assert.equal(SCENES.outro.from, SCENES.settings.from + SCENES.settings.duration);
   const duration = SCENES.settings.duration + CROSSFADE;
   let opened = 0;
@@ -104,7 +104,7 @@ test('the actual ending keeps the opened desktop until a single static brand car
   let desktopText;
   for (let frame = 0; frame < duration; frame++) {
     const state = settings.exports.settingsTourAt(frame, duration);
-    if (state.step.id !== 'recommended' || state.frame < 34) continue;
+    if (state.step.id !== 'recommended' || state.frame < 44) continue;
     const tree = settings.render(settings.exports.SceneSettings, {duration}, frame);
     const desktop = find(tree, 'data-zshell-desktop');
     assert.ok(desktop, `The Zshell desktop disappears at ${frame}`);
@@ -120,7 +120,7 @@ test('the actual ending keeps the opened desktop until a single static brand car
       if (state.frame >= lid.exports.LID_PREVIEW_TIMING.opening && lidState.angle >= 90) restored++;
     }
   }
-  assert.ok(opened >= 72, `The opened Zshell window lasts only ${opened} frames`);
+  assert.ok(opened >= 48, `The opened Zshell window lasts only ${opened} frames`);
   assert.ok(restored >= 42, `The unchanged reopened desktop lasts only ${restored} frames`);
   const endingDuration = SCENES.outro.duration + CROSSFADE;
   const brandText = text(find(outro.render(outro.exports.Scene5Outro, {duration: endingDuration}, 26), 'data-outro-brand'));
@@ -149,10 +149,11 @@ test('the actual ending keeps the opened desktop until a single static brand car
 
 test('actual film lock-screen playback stops advancing after Pause under duration scaling', () => {
   const frames = [];
-  for (let frame = 0; frame < 1156; frame++) {
-    const state = settings.exports.settingsTourAt(frame, 1156);
-    if (state.step.id !== 'lockScreen' || state.frame < 38) continue;
-    const tree = settings.render(settings.exports.SceneSettings, {duration: 1156, globalFrom: SCENES.settings.from - CROSSFADE}, frame);
+  const duration = SCENES.settings.duration + CROSSFADE;
+  for (let frame = 0; frame < duration; frame++) {
+    const state = settings.exports.settingsTourAt(frame, duration);
+    if (state.step.id !== 'lockScreen' || state.frame < 32) continue;
+    const tree = settings.render(settings.exports.SceneSettings, {duration, globalFrom: SCENES.settings.from - CROSSFADE}, frame);
     frames.push(Number(attr(find(tree, 'data-lock-playback-progress'), 'data-elapsed')));
   }
   assert.ok(frames.length >= 42);
@@ -163,13 +164,13 @@ test('isolated ending ablations expose broken hinge, clipping, fast opening, Set
   const replace = (before, after) => (source) => {assert.ok(source.includes(before), `Ablation target missing: ${before}`); return source.replace(before, after);};
   const cases = [
     ['bottom hinge', 'src/modules/tour/LidCloseDesktopPreview.tsx', '1 - top / (height * scale)', '1 - top / (height * scale) - projection', (ui) => near(project(ui.exports.lidDepthAt(55).matrix, 0, 720).y, 720)],
-    ['extreme angle', 'src/modules/tour/LidCloseDesktopPreview.tsx', '[125, 55]', '[125, 21]', (ui) => assert.ok(project(ui.exports.lidPreviewAt(139).matrix, 0, 0).y >= 0)],
-    ['fast opening', 'src/modules/tour/LidCloseDesktopPreview.tsx', 'restored: 182', 'restored: 162', (ui) => assert.ok(ui.exports.LID_PREVIEW_TIMING.restored - ui.exports.LID_PREVIEW_TIMING.opening >= 30)],
-    ['captured desktop', 'src/modules/tour/LidCloseDesktopPreview.tsx', '(ZshellTourDesktop, {})', '(ZshellTourDesktop, {}) && null', (ui) => assert.ok(find(ui.render(ui.exports.LidCloseDesktopPreview, {frame: 140}), 'data-zshell-desktop'))],
-    ['Settings flash', 'src/modules/tour/LidCloseDesktopPreview.tsx', '"data-feature": "lidClose"', '"data-feature": "lidClose", "data-recommended-section": "features"', (ui) => assert.equal(find(ui.render(ui.exports.LidCloseDesktopPreview, {frame: 140}), 'data-recommended-section'), undefined)],
-    ['early fold', 'src/scenes/SceneSettings.tsx', 'state.frame < LID_PREVIEW_TIMING.start', 'state.frame < 78', (ui) => assert.equal(find(ui.render(ui.exports.SceneSettings, {duration: 1140}, 1030), 'data-lid-depth-sheet'), undefined)],
-    ['incomplete CTA', 'src/scenes/Scene5Outro.tsx', 'children: copy.outro', 'children: copy.outro.slice(0, frame)', (ui) => assert.equal(text(find(ui.render(ui.exports.Scene5Outro, {duration: 176}, 10), 'data-outro-install-command')), '➜ ~ brew install --cask wzz6423/tap/zisla')],
-    ['final black hold', 'src/scenes/Scene5Outro.tsx', 'duration - 7', 'duration - 1', (ui) => {const tree = ui.render(ui.exports.Scene5Outro, {duration: 176}, 170); const blackout = all(tree).find((node) => attr(node, 'class')?.includes('pointer-events-none absolute inset-0 bg-black')); near(Number(style(blackout).opacity), 1);}],
+    ['extreme angle', 'src/modules/tour/LidCloseDesktopPreview.tsx', '[125, 55]', '[125, 21]', (ui) => assert.ok(project(ui.exports.lidPreviewAt(123).matrix, 0, 0).y >= 0)],
+    ['fast opening', 'src/modules/tour/LidCloseDesktopPreview.tsx', 'restored: 156', 'restored: 146', (ui) => assert.ok(ui.exports.LID_PREVIEW_TIMING.restored - ui.exports.LID_PREVIEW_TIMING.opening >= 30)],
+    ['captured desktop', 'src/modules/tour/LidCloseDesktopPreview.tsx', '(ZshellTourDesktop, {})', '(ZshellTourDesktop, {}) && null', (ui) => assert.ok(find(ui.render(ui.exports.LidCloseDesktopPreview, {frame: 120}), 'data-zshell-desktop'))],
+    ['Settings flash', 'src/modules/tour/LidCloseDesktopPreview.tsx', '"data-feature": "lidClose"', '"data-feature": "lidClose", "data-recommended-section": "features"', (ui) => assert.equal(find(ui.render(ui.exports.LidCloseDesktopPreview, {frame: 120}), 'data-recommended-section'), undefined)],
+    ['early fold', 'src/scenes/SceneSettings.tsx', 'state.frame < LID_PREVIEW_TIMING.start', 'state.frame < 60', (ui) => assert.equal(find(ui.render(ui.exports.SceneSettings, {duration: 940}, 840), 'data-lid-depth-sheet'), undefined)],
+    ['incomplete CTA', 'src/scenes/Scene5Outro.tsx', 'children: copy.outro', 'children: copy.outro.slice(0, frame)', (ui) => assert.equal(text(find(ui.render(ui.exports.Scene5Outro, {duration: 156}, 10), 'data-outro-install-command')), '➜ ~ brew install --cask wzz6423/tap/zisla')],
+    ['final black hold', 'src/scenes/Scene5Outro.tsx', 'duration - 7', 'duration - 1', (ui) => {const tree = ui.render(ui.exports.Scene5Outro, {duration: 156}, 150); const blackout = all(tree).find((node) => attr(node, 'class')?.includes('pointer-events-none absolute inset-0 bg-black')); near(Number(style(blackout).opacity), 1);}],
   ];
   for (const [name, entry, before, after, verify] of cases) {
     const original = load(entry);

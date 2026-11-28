@@ -16,6 +16,8 @@ type HomeModuleProps = {
   // Keep the countdown in film time across scene boundaries.
   focusRemaining?: number;
   tasks?: readonly AiTask[];
+  // Optional 0–1 entrance for additional AI provider cards after the first one.
+  extraCardEnter?: number;
 };
 
 const FOCUS_LENGTH = 25 * 60;
@@ -46,13 +48,16 @@ const Card = ({kind, children}: {kind: HomeCardKind; children: ReactNode}) => {
   );
 };
 
-export const HomeModule = ({cards, downloadProgress = 0, aiProgress = 0, focusRemaining = focus.remaining, tasks = aiTasks.slice(0, 1)}: HomeModuleProps) => {
+export const HomeModule = ({cards, downloadProgress = 0, aiProgress = 0, focusRemaining = focus.remaining, tasks = aiTasks.slice(0, 1), extraCardEnter = 1}: HomeModuleProps) => {
   const groups = [...new Set(tasks.map((task) => task.provider))].map((provider) => ({provider, tasks: tasks.filter((task) => task.provider === provider)}));
   const entries = cards.flatMap<{kind: HomeCardKind; group: typeof groups[number] | undefined}>((kind) => kind === 'ai' ? groups.map((group) => ({kind, group})) : [{kind, group: undefined}]);
   return (
     <div className="absolute inset-0 flex flex-wrap content-start gap-2 px-[9px] py-[7px]">
-      {entries.map(({kind, group}) => (
-        <div key={group?.provider ?? kind} className="h-16 shrink-0" style={{width: entries.length === 1 ? 734 : 363}}>
+      {entries.map(({kind, group}, entryIndex) => {
+        const extra = kind === 'ai' && entryIndex >= 2;
+        const enter = extra ? clamp01(extraCardEnter) : 1;
+        return (
+        <div key={group?.provider ?? kind} className="h-16 shrink-0" style={{width: entries.length === 1 ? 734 : 363, opacity: enter, transform: extra ? `translateY(${(1 - enter) * 8}px)` : undefined}}>
           <Card kind={kind}>
             {kind === 'focus' ? (
               <div className="flex items-center gap-[9px]">
@@ -99,7 +104,8 @@ export const HomeModule = ({cards, downloadProgress = 0, aiProgress = 0, focusRe
             ) : null}
           </Card>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

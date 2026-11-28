@@ -37,7 +37,7 @@ export type QuotaWindow = {
 };
 
 export type AccountBalance = {
-  provider: 'claude' | 'codex' | 'cursor';
+  provider: 'claude' | 'codex' | 'cursor' | 'antigravity';
   title: string;
   windows: readonly QuotaWindow[];
 };
@@ -54,6 +54,10 @@ export const aiAccountBalances: readonly AccountBalance[] = [
   ]},
   {provider: 'cursor', title: 'Cursor', windows: [
     {id: 'plan', kind: 'budget', remainingPercent: 68.5, remaining: 68.5, limit: 100, unit: 'usd', resetsAt: '2026-12-01T00:00:00+08:00'},
+  ]},
+  {provider: 'antigravity', title: 'Antigravity', windows: [
+    {id: 'five_hour', kind: 'fiveHours', remainingPercent: 86, unit: 'percent', resetsAt: '2026-11-11T15:00:00+08:00', durationSeconds: 18_000},
+    {id: 'seven_day', kind: 'weekly', remainingPercent: 62, unit: 'percent', resetsAt: '2026-11-17T09:00:00+08:00', durationSeconds: 604_800},
   ]},
 ];
 
@@ -75,6 +79,13 @@ export const aiBalancesAt = (lowQuota: boolean): readonly AccountBalance[] => ai
 
 const modelTokens = (tokens: number) => `${tokens / 1_000_000} M`;
 const providerTitle = {claude: 'Claude', codex: 'ChatGPT', gemini: 'Gemini'} as const;
+
+const AntigravityGlyph = ({size}: {size: number}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path d="M12 3.2L19.2 19.6L15.4 17.6L12 10.1L8.6 17.6L4.8 19.6L12 3.2Z" fill="#70b5ff" />
+    <circle cx="12" cy="17.2" r="2.2" fill="#a78bfa" />
+  </svg>
+);
 
 export const DailyModelUsageList = ({width = RIGHT_WIDTH}: {width?: number}) => (
   <section className="flex shrink-0 flex-col gap-3" data-feature="ai.usage.models" data-usage-date="2026-11-11" data-token-total={aiModelTokenTotal} style={{width}}>
@@ -119,7 +130,9 @@ export const AccountQuotaRing = ({balance, outer, inner, diameter}: {balance: Ac
   return <div className="relative shrink-0" style={{width: diameter, height: diameter}}>
     <svg width={diameter} height={diameter}>{outer ? arc(outer, diameter) : null}{inner ? arc(inner, diameter * 0.7) : null}</svg>
     <div className="absolute inset-0 flex items-center justify-center">
-      {balance.provider === 'cursor' ? <Img src={cursorLogo} style={{width: logoSize, height: logoSize}} /> : <ProviderLogo provider={balance.provider} size={logoSize} />}
+      {balance.provider === 'cursor' ? <Img src={cursorLogo} style={{width: logoSize, height: logoSize}} />
+        : balance.provider === 'antigravity' ? <AntigravityGlyph size={logoSize} />
+          : <ProviderLogo provider={balance.provider} size={logoSize} />}
     </div>
   </div>;
 };
@@ -159,7 +172,7 @@ export const AIAnalyticsModule = ({lowQuota = false}: {lowQuota?: boolean}) => (
       <Gauge size={12} strokeWidth={2.4} />
       <span>Account quota remaining</span>
     </div>
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-2 gap-3">
       {aiBalancesAt(lowQuota).map((balance) => <AccountBalanceCard key={balance.provider} balance={balance} />)}
     </div>
   </section>

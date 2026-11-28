@@ -1,8 +1,8 @@
 import type {ReactNode} from 'react';
-import {BatteryFull, Camera, Check, ChartLine, ChevronDown, ClipboardPaste, Folder, HardDrive, Keyboard, Laptop, Music, Pause, Play, Plug, Power, RotateCcw, Settings, Sun, Trash2, Volume2, VolumeX, X} from 'lucide-react';
+import {BatteryFull, Camera, Check, ChartLine, ChevronDown, ClipboardPaste, Folder, HardDrive, Keyboard, Laptop, Mic, Music, Pause, Play, Plug, Plus, Power, RefreshCw, RotateCcw, Settings, Sun, Trash2, Volume2, VolumeX, X} from 'lucide-react';
 import {IconButton, ProgressTrack} from '../../components/Glass';
 import {BrowserGlyph, formatTime} from '../../components/IslandChrome';
-import {ease, linear} from '../../motion';
+import {ease, easeOutAt, linear} from '../../motion';
 import {alpha, color, white} from '../../theme';
 import {SystemModule} from '../SystemModule';
 import {TourAction, TourCard, TourHeading, TourPointer, TourPointerTrack, TourResult, TourSelect, TourToggle} from './TourSurface';
@@ -11,14 +11,19 @@ export const desktopDemo = {
   mixer: [{name: 'Safari', volume: 0.3}, {name: 'Music', volume: 0.8}],
   typing: {characters: 12846, topApp: 'Xcode', activeMinutes: 86, peak: 12},
   battery: {level: 0.76, health: 96, cycles: 124, celsius: 31, inputWatts: 60, systemWatts: 24, chargingWatts: 36},
-  cleanup: [{name: 'Application caches', sizeMB: 320, safety: 'Safe to clean', source: 'App caches', detail: '~/Library/Caches', reason: 'Regenerated when apps need them'}, {name: 'Package manager caches', sizeMB: 24, safety: 'Safe to clean', source: 'Package manager caches', detail: '~/Library/Caches/Homebrew', reason: 'Downloaded packages can be fetched again'}, {name: 'Old preferences', sizeMB: 3, safety: 'Review required', source: 'Application residuals', detail: '~/Library/Preferences', reason: 'May contain settings you want to keep'}],
+  cleanup: [
+    {name: 'Application caches', sizeMB: 320, safety: 'Safe to clean', source: 'App caches', detail: '~/Library/Caches', reason: 'Regenerated when apps need them'},
+    {name: 'Duplicate apps & update leftovers', sizeMB: 186, safety: 'Safe to clean', source: 'Duplicate installs', detail: '/Applications · Stale installers', reason: 'Keep original app; remove older copies'},
+    {name: 'Orphan AI workspaces', sizeMB: 42, safety: 'Safe to clean', source: 'Agent artifacts', detail: '~/.zisla · Stale task backups', reason: 'Empty agent worktrees and expired backups'},
+    {name: 'Old preferences', sizeMB: 3, safety: 'Review required', source: 'Application residuals', detail: '~/Library/Preferences', reason: 'May contain settings you want to keep'},
+  ],
 } as const;
 
 export const backgroundSounds = ['Pink noise', 'Brown noise', 'White noise', 'Balanced noise', 'Bright noise', 'Dark noise', 'Ocean', 'Rain', 'Stream', 'Night', 'Fire', 'Babble', 'Steam', 'Airplane', 'Boat', 'Bus', 'Train', 'Rain on roof', 'Quiet night'] as const;
 
 export const MixerTourModule = ({frame}: {frame: number}) => {
-  const safari = ease(frame, [25, 78], [1, desktopDemo.mixer[0].volume]);
-  const muted = frame >= 112;
+  const safari = ease(frame, [16, 52], [1, desktopDemo.mixer[0].volume]);
+  const muted = frame >= 66;
   return (
     <div className="absolute inset-0 flex flex-col gap-[8px]" data-feature="volumeMixer" style={{padding: 12}}>
       {desktopDemo.mixer.map((app, index) => {
@@ -32,7 +37,7 @@ export const MixerTourModule = ({frame}: {frame: number}) => {
         </div>;
       })}
       <div className="flex-1" />
-      <TourPointerTrack frame={frame} actions={[{at: 78, x: 417, y: 42}, {at: 112, x: 712, y: 106}]} />
+      <TourPointerTrack frame={frame} actions={[{at: 52, x: 417, y: 42}, {at: 66, x: 712, y: 106}]} />
     </div>
   );
 };
@@ -43,28 +48,31 @@ export const keyboardVoices = ['Holy Panda', 'Cherry MX Brown', 'Cherry MX Clear
 
 const NativeAction = ({label, active = false, icon}: {label: string; active?: boolean; icon?: ReactNode}) => <div className="flex shrink-0 items-center justify-center gap-[5px]" style={{height: 24, padding: '0 8px', borderRadius: 5, background: active ? color.blue : color.fillControl, fontSize: 11}}>{icon}{label}</div>;
 
+// Mirrors the reorganized Settings sidebar groups: Basics, Information, Tools, Sound, Other, Permissions, About.
 export const DesktopSettingsPage = ({title, children}: {title: string; children: ReactNode}) => <div className="absolute inset-0 flex" data-desktop-settings style={{background: '#252529'}}>
   <div className="flex shrink-0 flex-col" style={{width: 250, padding: '16px 12px', background: white(0.035), borderRight: `1px solid ${color.divider}`}}>
-    <div style={{height: 28, padding: '6px 10px', borderRadius: 7, background: white(0.06), fontSize: 11, color: color.secondary}}>Search settings</div>
+    <div data-settings-search style={{height: 28, padding: '6px 10px', borderRadius: 7, background: white(0.06), fontSize: 11, color: color.secondary}}>Search settings · 17 languages</div>
     {[
-      ['Basics', ['General', 'Features', 'Information']],
+      ['Basics', ['General', 'Features']],
+      ['Information', ['Dynamic Island Layout', 'Daily Briefing']],
+      ['Tools', ['PDF, Image & Audio Tools']],
       ['Sound', ['Keyboard sounds']],
-      ['Others', ['System status and cleanup']],
-    ].map(([group, rows]) => <div key={String(group)} style={{marginTop: 18}}><div style={{fontSize: 11, color: color.secondary, padding: '0 10px 7px'}}>{group}</div>{(rows as string[]).map((name) => <div key={name} className="flex items-center gap-[10px]" style={{height: 38, padding: '0 10px', marginBottom: 5, borderRadius: 6, fontSize: 13, color: name === title ? color.blue : color.label, background: name === title ? white(0.12) : 'transparent'}}><div className="flex items-center justify-center" style={{width: 24, height: 24, borderRadius: 6, background: name === 'System status and cleanup' ? '#c34d53' : '#717176'}}>{name === 'Keyboard sounds' ? <Keyboard size={13} color="white" /> : name === 'System status and cleanup' ? <ChartLine size={13} color="white" /> : <Settings size={13} color="white" />}</div>{name}</div>)}</div>)}
+      ['Other', ['Save Locations', 'System status and cleanup']],
+    ].map(([group, rows]) => <div key={String(group)} style={{marginTop: 12}}><div style={{fontSize: 10.5, color: color.secondary, padding: '0 10px 5px'}}>{group}</div>{(rows as string[]).map((name) => <div key={name} className="flex items-center gap-[10px]" style={{height: 32, padding: '0 10px', marginBottom: 3, borderRadius: 6, fontSize: 12.5, color: name === title ? color.blue : color.label, background: name === title ? white(0.12) : 'transparent'}}><div className="flex items-center justify-center" style={{width: 22, height: 22, borderRadius: 6, background: name === 'System status and cleanup' ? '#c34d53' : '#717176'}}>{name === 'Keyboard sounds' ? <Keyboard size={12} color="white" /> : name === 'System status and cleanup' ? <ChartLine size={12} color="white" /> : <Settings size={12} color="white" />}</div><span className="truncate">{name}</span></div>)}</div>)}
   </div>
   <div className="relative min-w-0 flex-1" style={{padding: '24px 28px'}}><div style={{fontSize: 23, fontWeight: 600, marginBottom: 23}}>{title}</div>{children}</div>
 </div>;
 
 export const keyboardTourAt = (frame: number) => {
-  const position = Math.min(179, Math.max(0, frame));
+  const position = Math.min(134, Math.max(0, frame));
   return {
-    phase: position < 78 ? 'settings' : 'dashboard',
-    profileMenu: position >= 10 && position < 35,
-    profile: position < 29 ? 'Holy Panda' : position < 51 ? 'Cherry MX Brown' : 'BCP (Suit80)',
-    preview: position >= 35 && position < 49 || position >= 60 && position < 72,
-    characters: desktopDemo.typing.characters + Math.floor(linear(position, [92, 126], [0, 14])),
-    pressed: position >= 92 && position < 126,
-    scroll: ease(position, [128, 157], [0, 282]),
+    phase: position < 54 ? 'settings' : 'dashboard',
+    profileMenu: position >= 8 && position < 28,
+    profile: position < 22 ? 'Holy Panda' : 'BCP (Suit80)',
+    preview: position >= 34 && position < 46,
+    characters: desktopDemo.typing.characters + Math.floor(linear(position, [62, 88], [0, 14])),
+    pressed: position >= 62 && position < 88,
+    scroll: ease(position, [90, 114], [0, 340]),
   } as const;
 };
 
@@ -77,40 +85,56 @@ const TypingChart = ({history = false}: {history?: boolean}) => <svg width="100%
 
 export const KeyboardTourModule = ({frame}: {frame: number}) => {
   const state = keyboardTourAt(frame);
-  if (state.phase === 'settings') return <DesktopSettingsPage title="Keyboard sounds"><div data-keyboard-settings className="flex flex-col gap-[20px]">
-    <div style={{fontSize: 12, fontWeight: 600, color: color.secondary}}>Global sounds</div>
-    <TourCard style={{padding: '0 12px'}}>
-      <div className="flex items-center gap-[10px]" style={{height: 52, borderBottom: `1px solid ${color.divider}`}}><Keyboard size={15} color={color.secondary} /><div className="flex-1" style={{fontSize: 13}}>Keyboard voice</div><TourSelect value={state.profile} /><div aria-label="Preview"><IconButton icon={Play} compact active={state.preview} /></div></div>
-      <div className="flex items-center gap-[10px]" style={{height: 46, borderBottom: `1px solid ${color.divider}`}}><Volume2 size={15} color={color.secondary} /><div className="flex-1" style={{fontSize: 13}}>Keyboard volume</div><div className="relative" style={{width: 150}}><ProgressTrack value={0.55} tint={color.blue} width={150} height={3} /><div className="absolute" style={{left: 77, top: -4, width: 12, height: 12, borderRadius: 6, background: 'white'}} /></div></div>
-      <div style={{padding: '12px 0', borderBottom: `1px solid ${color.divider}`}}><TourToggle label="Release sounds" on /></div>
-      <div style={{padding: '12px 0'}}><TourToggle label="Pitch variation" on /></div>
-    </TourCard>
-    <div style={{fontSize: 12, fontWeight: 600, color: color.secondary}}>Typing statistics</div>
-    <TourCard style={{padding: 12}}><TourToggle label="Record local typing stats" on /><div style={{fontSize: 10, lineHeight: '16px', marginTop: 6, color: color.secondary}}>Character counts, key presses, apps and time aggregates.</div></TourCard>
-    <div style={{fontSize: 11, color: color.secondary}}>20 voices · Installed custom pack: BCP (Suit80)</div>
-    {state.profileMenu ? <div data-keyboard-profile-menu className="absolute" style={{right: 63, top: 95, width: 259, padding: '6px 0', borderRadius: 7, border: `1px solid ${color.strokeCard}`, background: '#343438', boxShadow: '0 12px 35px #0008'}}>{[...keyboardVoices, 'BCP (Suit80)'].map((name) => <div key={name} className="flex items-center gap-[7px]" style={{height: 22, padding: '0 10px', fontSize: 11, color: name === state.profile ? color.blue : color.label}}><span style={{width: 12}}>{name === state.profile ? '✓' : ''}</span>{name}</div>)}</div> : null}
-    <TourPointerTrack frame={frame} actions={[{at: 29, x: 530, y: 135}, {at: 60, x: 656, y: 147}]} />
-  </div></DesktopSettingsPage>;
-  return <div className="absolute inset-0" data-keyboard-dashboard style={{padding: 12}}>
+  if (state.phase === 'settings') {
+    const menuIn = state.profileMenu ? easeOutAt(frame, [8, 14], [0, 1]) : 0;
+    return <DesktopSettingsPage title="Keyboard sounds"><div data-keyboard-settings className="flex flex-col gap-[20px]">
+      <div style={{fontSize: 12, fontWeight: 600, color: color.secondary}}>Global sounds</div>
+      <TourCard style={{padding: '0 12px'}}>
+        <div className="flex items-center gap-[10px]" style={{height: 52, borderBottom: `1px solid ${color.divider}`}}><Keyboard size={15} color={color.secondary} /><div className="flex-1" style={{fontSize: 13}}>Keyboard voice</div><TourSelect value={state.profile} /><div aria-label="Preview"><IconButton icon={Play} compact active={state.preview} /></div></div>
+        <div className="flex items-center gap-[10px]" style={{height: 46, borderBottom: `1px solid ${color.divider}`}}><Volume2 size={15} color={color.secondary} /><div className="flex-1" style={{fontSize: 13}}>Keyboard volume</div><div className="relative" style={{width: 150}}><ProgressTrack value={0.55} tint={color.blue} width={150} height={3} /><div className="absolute" style={{left: 77, top: -4, width: 12, height: 12, borderRadius: 6, background: 'white'}} /></div></div>
+        <div style={{padding: '12px 0', borderBottom: `1px solid ${color.divider}`}}><TourToggle label="Release sounds" on /></div>
+        <div style={{padding: '12px 0'}}><TourToggle label="Pitch variation" on /></div>
+      </TourCard>
+      <div style={{fontSize: 12, fontWeight: 600, color: color.secondary}}>Typing statistics</div>
+      <TourCard style={{padding: 12}}><TourToggle label="Record local typing stats" on /><div style={{fontSize: 10, lineHeight: '16px', marginTop: 6, color: color.secondary}}>Character counts, key presses, voice dictation stats, apps and time aggregates.</div></TourCard>
+      <div style={{fontSize: 11, color: color.secondary}}>20 voices · Installed custom pack: BCP (Suit80)</div>
+      {state.profileMenu ? <div data-keyboard-profile-menu className="absolute" style={{right: 63, top: 95, width: 259, padding: '6px 0', borderRadius: 7, border: `1px solid ${color.strokeCard}`, background: '#343438', boxShadow: '0 12px 35px #0008', opacity: menuIn, transform: `scale(${0.96 + 0.04 * menuIn})`, transformOrigin: 'top right'}}>{[...keyboardVoices, 'BCP (Suit80)'].map((name) => <div key={name} className="flex items-center gap-[7px]" style={{height: 22, padding: '0 10px', fontSize: 11, color: name === state.profile ? color.blue : color.label}}><span style={{width: 12}}>{name === state.profile ? '✓' : ''}</span>{name}</div>)}</div> : null}
+      <TourPointerTrack frame={frame} actions={[{at: 22, x: 530, y: 555}, {at: 34, x: 656, y: 147}]} />
+    </div></DesktopSettingsPage>;
+  }
+  const dashIn = easeOutAt(frame, [54, 62], [0, 1]);
+  return <div className="absolute inset-0" data-keyboard-dashboard style={{padding: 12, opacity: dashIn}}>
     <div data-keyboard-scroll className="relative" style={{height: 396, overflow: 'hidden'}}>
       <div data-keyboard-scroll-content className="flex flex-col gap-[16px]" style={{transform: `translateY(${-state.scroll}px)`}}>
         <div className="flex gap-[8px]">{[['Characters Today', state.characters.toLocaleString('en-US'), 'Estimated key input'], ['Top app', desktopDemo.typing.topApp, '8,640 characters'], ['Peak Today', '12 chars / s', 'Last input · Just now'], ['Active time', '1 h 26 m', '86 minutes']].map(([label, value, detail]) => <div data-typing-metric={label} key={label} style={{flex: 1, height: 76, padding: 9, borderRadius: 10, background: color.fillCard, border: `1px solid ${color.strokeCard}`}}><div style={{fontSize: 9, lineHeight: '11px', color: color.secondary}}>{label}</div><div className="font-rounded tabular" style={{fontSize: 17, lineHeight: '20px', fontWeight: 700, marginTop: 5}}>{value}</div><div style={{fontSize: 8, lineHeight: '10px', marginTop: 5, color: color.secondary}}>{detail}</div></div>)}</div>
         <div className="flex gap-[10px]" style={{height: 152}}>{['Typing trend', 'History'].map((title, index) => <TourCard key={title} style={{flex: 1, padding: '8px 10px'}}><div style={{fontSize: 11, fontWeight: 600, marginBottom: 4}}>{title}</div><TypingChart history={index === 1} /></TourCard>)}</div>
         <TourCard style={{height: 328, padding: '10px 12px'}}><div style={{fontSize: 11, fontWeight: 600, marginBottom: 8}}>Keyboard</div><div className="flex gap-[18px]" style={{fontSize: 9, color: color.secondary}}>Today’s presses {state.characters.toLocaleString('en-US')}<span>Total presses 218,404</span></div><div className="flex flex-col justify-center gap-[6px]" data-keyboard-heatmap style={{height: 270}}>{KEYS.map((row, rowIndex) => <div key={row} className="flex justify-center gap-[4px]">{row.split(' ').map((key, index) => <div key={key + index} className="flex items-center justify-center" style={{width: key === 'Space' ? 192 : key.length > 2 && rowIndex === 5 ? 48 : rowIndex === 0 ? 39 : 42, height: rowIndex === 0 ? 25 : 30, borderRadius: 5, fontSize: 9, border: `1px solid ${color.strokeCard}`, background: state.pressed && ['Z', 'I', 'S', 'L', 'A'].includes(key) ? color.blue : white(0.04 + ((index * 7 + rowIndex * 5) % 9) * 0.016)}}>{key}</div>)}</div>)}</div></TourCard>
-        <div data-keyboard-timeline data-content-y={604} style={{height: 74}}><TourCard style={{height: 74, padding: '8px 10px'}}><div style={{fontSize: 11, fontWeight: 600, marginBottom: 8}}>App timeline</div><div className="flex items-center gap-[8px]"><div style={{width: 110, fontSize: 10}}>Xcode</div><div className="flex flex-1 items-end gap-[1px]" style={{height: 24}}>{Array.from({length: 30}, (_, index) => <div key={index} style={{flex: 1, height: 4 + (index * 7 % 20), background: color.blue, opacity: 0.72, borderRadius: 1}} />)}</div><div className="tabular" style={{width: 52, textAlign: 'right', fontSize: 9}}>8,640</div></div></TourCard></div>
+        <div data-keyboard-voice-stats style={{height: 34}}><TourCard style={{height: 34, padding: '0 10px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 10}}><Mic size={12} color={color.cyan} /><span style={{fontWeight: 600}}>Voice dictation</span><span style={{color: color.secondary}}>2,410 chars · 18 min · 142 chars/min · 11 min saved</span></TourCard></div>
+        <div data-keyboard-timeline data-content-y={654} style={{height: 74}}><TourCard style={{height: 74, padding: '8px 10px'}}><div style={{fontSize: 11, fontWeight: 600, marginBottom: 8}}>App timeline</div><div className="flex items-center gap-[8px]"><div style={{width: 110, fontSize: 10}}>Xcode</div><div className="flex flex-1 items-end gap-[1px]" style={{height: 24}}>{Array.from({length: 30}, (_, index) => <div key={index} style={{flex: 1, height: 4 + (index * 7 % 20), background: color.blue, opacity: 0.72, borderRadius: 1}} />)}</div><div className="tabular" style={{width: 52, textAlign: 'right', fontSize: 9}}>8,640</div></div></TourCard></div>
       </div>
-      <div className="absolute right-0" style={{top: state.scroll / 282 * 286, width: 4, height: 110, borderRadius: 2, background: white(0.22)}} />
+      <div className="absolute right-0" style={{top: state.scroll / 340 * 286, width: 4, height: 110, borderRadius: 2, background: white(0.22)}} />
     </div>
   </div>;
 };
 
 export const focusTourAt = (frame: number) => {
-  const position = Math.min(239, Math.max(0, frame));
-  const finished = position >= 190;
-  const running = position >= 38 && position < 80 || position >= 112 && position < 190;
-  const paused = position >= 80 && position < 112;
-  const activeFrames = position < 38 ? 0 : Math.min(position - 38, 42) + Math.max(0, position - 112);
-  return {phase: running ? 'running' : paused ? 'paused' : 'idle', mode: finished ? 'rest' : 'focus', running, paused, finished, completed: position >= 190 && position < 224, compact: position >= 68 && position < 190, remaining: finished ? 300 : Math.max(0, 2 - activeFrames / 60)} as const;
+  const position = Math.min(169, Math.max(0, frame));
+  const finished = position >= 128;
+  const running = position >= 24 && position < 66 || position >= 90 && position < 128;
+  const paused = position >= 66 && position < 90;
+  const activeFrames = position < 24 ? 0 : Math.min(position - 24, 42) + Math.max(0, position - 90);
+  const teaRemaining = Math.max(0, 180 - Math.floor(position / 60));
+  return {
+    phase: running ? 'running' : paused ? 'paused' : 'idle',
+    mode: finished ? 'rest' : 'focus',
+    running,
+    paused,
+    finished,
+    completed: position >= 128 && position < 158,
+    compact: position >= 54 && position < 128,
+    remaining: finished ? 300 : Math.max(0, 2 - activeFrames / 60),
+    teaRemaining,
+  } as const;
 };
 
 export const CompactFocusControls = ({frame}: {frame: number}) => {
@@ -121,57 +145,79 @@ export const CompactFocusControls = ({frame}: {frame: number}) => {
   </div>;
 };
 
+// Native 236pt timer panel with Pomodoro + independent named countdown timer, plus 2/2/4 toolbox grid (Clean Junk before Trash).
 export const FocusTourModule = ({frame}: {frame: number}) => {
-  const {running, paused, finished, remaining} = focusTourAt(frame);
+  const {running, paused, finished, remaining, teaRemaining} = focusTourAt(frame);
   return (
     <div className="absolute inset-0 flex gap-[10px]" data-feature="toolbox" data-toolbox-layout="236+10+flex">
-      <div className="flex shrink-0 flex-col" style={{width: 236, height: 136, padding: 10, borderRadius: '8px 8px 8px 22px', background: color.fillCard, border: `1px solid ${color.strokeCard}`}}>
-        <div style={{fontSize: 12, fontWeight: 600, color: color.secondary}}>{finished ? 'Rest' : 'Focus'}</div>
-        <div className="flex flex-1 items-center justify-center font-rounded tabular" style={{fontSize: 26, fontWeight: 700}}>{formatTime(Math.ceil(remaining))}{!running && !paused ? <span style={{fontSize: 9, marginLeft: 3}}>⌄</span> : null}</div>
-        <div className="flex gap-[8px]" style={{height: 40}}>{[running ? 'Pause' : paused ? 'Continue' : 'Start', 'Reset'].map((label, index) => <div key={index} className="flex flex-1 items-center justify-center" style={{fontSize: 11, fontWeight: 600, background: index === 0 ? color.fillCard : color.fillControl, borderRadius: index === 0 ? '8px 8px 8px 12px' : 8}}>{label}</div>)}</div>
+      <div className="relative flex shrink-0 gap-[6px]" data-toolbox-timers style={{width: 236, height: 136}}>
+        <div className="flex flex-col" style={{width: 136, height: 136, padding: 8, borderRadius: '8px 8px 8px 22px', background: color.fillCard, border: `1px solid ${color.strokeCard}`}}>
+          <div style={{fontSize: 11, fontWeight: 600, color: color.secondary}}>{finished ? 'Rest' : 'Focus'}</div>
+          <div className="flex flex-1 items-center justify-center font-rounded tabular" style={{fontSize: 22, fontWeight: 700}}>{formatTime(Math.ceil(remaining))}{!running && !paused ? <span style={{fontSize: 9, marginLeft: 3}}>⌄</span> : null}</div>
+          <div className="flex gap-[6px]" style={{height: 36}}>{[running ? 'Pause' : paused ? 'Continue' : 'Start', 'Reset'].map((label, index) => <div key={index} className="flex flex-1 items-center justify-center" style={{fontSize: 10, fontWeight: 600, background: index === 0 ? color.fillCard : color.fillControl, borderRadius: index === 0 ? '7px 7px 7px 12px' : 7}}>{label}</div>)}</div>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col" data-feature="namedCountdown" data-toolbox-named-timer="Tea" style={{height: 136, padding: 8, borderRadius: 8, background: color.fillCard, border: `1px solid ${color.strokeCard}`}}>
+          <div className="flex items-center justify-between">
+            <span className="truncate" style={{fontSize: 11, fontWeight: 600, color: color.cyan}}>Tea</span>
+            <div data-toolbox-add-timer aria-label="Add timer" className="flex items-center justify-center rounded-full" style={{width: 18, height: 18, background: color.fillControl}}><Plus size={10} /></div>
+          </div>
+          <div className="flex flex-1 items-center justify-center font-rounded tabular" style={{fontSize: 18, fontWeight: 700}}>{formatTime(teaRemaining)}</div>
+          <div className="flex gap-[5px]" style={{height: 36}}>
+            <div className="flex flex-1 items-center justify-center rounded-[7px]" style={{background: color.fillCard}}><Pause size={10} /></div>
+            <div className="flex flex-1 items-center justify-center rounded-[7px]" style={{background: color.fillControl}}><X size={10} /></div>
+          </div>
+        </div>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-[8px]" data-toolbox-actions="2/2/3">
+      <div className="flex min-w-0 flex-1 flex-col gap-[8px]" data-toolbox-actions="2/2/4">
         {[
-          [[Sun, 'Keep display awake', frame >= 50], [Laptop, 'Prevent idle sleep', frame >= 62]],
+          [[Sun, 'Keep display awake', frame >= 34], [Laptop, 'Prevent idle sleep', frame >= 44]],
           [[Sun, 'Clean screen', false], [Keyboard, 'Clean keyboard', false]],
-          [[HardDrive, 'Teleprompter', false], [Camera, 'Mirror', false], [Trash2, 'Trash', false]],
+          [[HardDrive, 'Teleprompter', false], [Camera, 'Mirror', false], [RefreshCw, 'Clean Junk', false], [Trash2, 'Trash', false]],
         ].map((row, index) => <div key={index} className="flex gap-[8px]" style={{height: 40}}>{row.map(([Icon, label, active]) => {
           const Glyph = Icon as typeof Sun;
-          return <div key={String(label)} className="flex min-w-0 flex-1 items-center justify-center gap-[5px]" style={{borderRadius: 8, background: color.fillCard, color: active ? color.blue : color.label, fontSize: 11, fontWeight: 600}}><Glyph size={13} />{String(label)}</div>;
+          return <div key={String(label)} data-toolbox-shortcut={String(label)} className="flex min-w-0 flex-1 items-center justify-center gap-[4px] px-[4px]" style={{borderRadius: 8, background: color.fillCard, color: active ? color.blue : color.label, fontSize: 10.5, fontWeight: 600, whiteSpace: 'nowrap'}}><Glyph size={12} />{String(label)}</div>;
         })}</div>)}
       </div>
-      <TourPointerTrack frame={frame} actions={[{at: 38, x: 64, y: 105}, {at: 50, x: 370, y: 20}, {at: 62, x: 627, y: 20}]} />
+      <TourPointerTrack frame={frame} actions={[{at: 24, x: 38, y: 108}, {at: 34, x: 370, y: 20}, {at: 44, x: 627, y: 20}]} />
     </div>
   );
 };
 
 export const BackgroundSoundsTourModule = ({frame}: {frame: number}) => (
   <div className="absolute inset-0 flex flex-col gap-[22px]" data-feature="backgroundSounds" style={{padding: 28}}>
-    <TourHeading title="Settings → Music" />
-    <TourToggle label="macOS background sounds" on={frame >= 36} />
-    <div className="flex items-center gap-[14px]" style={{fontSize: 15}}><span>Sound</span><div className="flex-1" /><TourSelect value={frame >= 72 ? 'Ocean' : 'Rain'} /><TourAction label={frame >= 36 ? 'Stop' : 'Play'} active={frame >= 36} /></div>
+    <TourHeading title="Settings → Workflow" />
+    <TourToggle label="macOS background sounds" on={frame >= 22} />
+    <div className="flex items-center gap-[14px]" style={{fontSize: 15}}><span>Sound</span><div className="flex-1" /><TourSelect value={frame >= 42 ? 'Ocean' : 'Rain'} /><TourAction label={frame >= 22 ? 'Stop' : 'Play'} active={frame >= 22} /></div>
     <TourToggle label="Stop on lock, screen saver or sleep" on />
     <div style={{fontSize: 14, lineHeight: '24px', color: color.secondary}}>Rain · Ocean · Stream · Night · Noise · Transport</div>
-    {frame >= 93 ? <TourResult>Ocean playing · Stops when unused</TourResult> : <div style={{fontSize: 15, color: color.secondary}}>Choose a background sound.</div>}
-    <TourPointerTrack frame={frame} actions={[{at: 36, x: 995, y: 102}, {at: 72, x: 900, y: 151}]} />
+    {frame >= 48 ? <TourResult>Ocean playing · Stops when unused</TourResult> : <div style={{fontSize: 15, color: color.secondary}}>Choose a background sound.</div>}
+    <TourPointerTrack frame={frame} actions={[{at: 22, x: 995, y: 102}, {at: 42, x: 900, y: 151}]} />
   </div>
 );
 
-export const ScreenCleaningCover = ({frame}: {frame: number}) => <div data-screen-cleaning-cover className="absolute inset-0 flex items-center justify-center" style={{background: '#000'}}><div data-screen-cleaning-exit className="flex items-center justify-center" style={{width: 184, height: 52, borderRadius: 12, background: '#474747', fontSize: 16, fontWeight: 600}}>Exit screen cleaning</div><TourPointer frame={frame} at={68} x={640} y={360} /></div>;
+export const ScreenCleaningCover = ({frame}: {frame: number}) => {
+  const opacity = Math.min(easeOutAt(frame, [24, 30], [0, 1]), linear(frame, [50, 54], [1, 0]));
+  return (
+    <div data-screen-cleaning-cover className="absolute inset-0 flex items-center justify-center" style={{background: '#000', opacity}}>
+      <div data-screen-cleaning-exit className="flex items-center justify-center" style={{width: 184, height: 52, borderRadius: 12, background: '#474747', fontSize: 16, fontWeight: 600}}>Exit screen cleaning</div>
+      <TourPointer frame={frame} at={48} x={640} y={360} />
+    </div>
+  );
+};
 
 export const PresenterTourModule = ({frame}: {frame: number}) => {
-  const playing = frame >= 38 && frame < 112;
-  const closed = frame >= 142;
-  const scriptHover = frame < 64 || frame >= 101 && frame < 126;
+  const playing = frame >= 20 && frame < 62;
+  const closed = frame >= 78;
+  const scriptHover = frame < 38 || frame >= 54 && frame < 70;
   return (
     <div className="absolute inset-0 flex gap-[23px]" style={{padding: 24}}>
       <div className="flex min-w-0 flex-[1.35] flex-col gap-[13px]">
         <TourHeading title="Teleprompter" />
         <div data-teleprompter-stage className="relative min-h-0 flex-1 overflow-hidden" style={{borderRadius: 10, background: '#070708', padding: '28px 24px'}}>
-          <div className="whitespace-pre-line" style={{fontSize: 31, lineHeight: '45px', transform: `translateY(${-linear(frame, [38, 112], [0, 48])}px)`}}>Make room for the work.{'\n'}Keep the tools close.{'\n'}Let the next idea flow.</div>
+          <div className="whitespace-pre-line" style={{fontSize: 31, lineHeight: '45px', transform: `translateY(${-linear(frame, [20, 62], [0, 48])}px)`}}>Make room for the work.{'\n'}Keep the tools close.{'\n'}Let the next idea flow.</div>
           {scriptHover ? <div data-teleprompter-controls className="flex items-center gap-[12px]" style={{position: 'absolute', bottom: 8, left: 14, right: 14, padding: '6px 10px', borderRadius: 22, background: 'rgba(32,32,36,0.92)'}}><div aria-label={playing ? 'Pause' : 'Play'}><IconButton icon={playing ? Pause : Play} /></div><div aria-label="Reset"><IconButton icon={RotateCcw} /></div><div className="relative" style={{width: 132, flexShrink: 0}}><ProgressTrack width={132} value={0.22} height={3} tint={color.blue} /><div className="absolute" style={{left: 25, top: -4, width: 11, height: 11, borderRadius: 6, background: 'white'}} /></div><span style={{fontSize: 11, flexShrink: 0}}>45 pt/s</span><div className="flex-1" /><div aria-label="Paste"><IconButton icon={ClipboardPaste} /></div><div aria-label="Close"><IconButton icon={X} /></div></div> : null}
         </div>
-        <TourResult>{frame >= 112 ? 'Script paused at your place' : 'Drag text here and start scrolling'}</TourResult>
+        <TourResult>{frame >= 62 ? 'Script paused at your place' : 'Drag text here and start scrolling'}</TourResult>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-[13px]">
         <TourHeading title="Camera mirror" />
@@ -182,11 +228,11 @@ export const PresenterTourModule = ({frame}: {frame: number}) => {
             <path d="M83 280 Q88 183 185 181 Q282 183 287 280" fill="#425b6b" /><rect x="160" y="139" width="51" height="53" rx="17" fill="#cfaa93" />
             <ellipse cx="184" cy="104" rx="62" ry="73" fill="#d8b49a" /><path d="M122 102 Q112 21 185 17 Q254 17 251 94 L225 69 Q164 72 145 49 Z" fill="#372b2a" /><path d="M153 107h16M203 107h16" stroke="#554640" strokeWidth="4" strokeLinecap="round" /><path d="M171 143q14 10 28 0" fill="none" stroke="#966457" strokeWidth="3" strokeLinecap="round" />
           </svg>}
-          {frame >= 122 && !closed ? <div data-camera-close aria-label="Close mirror" className="absolute right-[8px] top-[8px] flex items-center justify-center" style={{width: 24, height: 24, borderRadius: 13, background: 'rgba(0,0,0,0.6)'}}><X size={11} /></div> : null}
+          {frame >= 66 && !closed ? <div data-camera-close aria-label="Close mirror" className="absolute right-[8px] top-[8px] flex items-center justify-center" style={{width: 24, height: 24, borderRadius: 13, background: 'rgba(0,0,0,0.6)'}}><X size={11} /></div> : null}
         </div>
         <div style={{fontSize: 15, color: color.secondary}}>{closed ? 'Closed · Camera session released' : 'Mirrored camera preview'}</div>
       </div>
-      <TourPointerTrack frame={frame} actions={[{at: 38, x: 62, y: 362}, {at: 112, x: 62, y: 362}, {at: 136, x: 996, y: 99}]} />
+      <TourPointerTrack frame={frame} actions={[{at: 20, x: 62, y: 362}, {at: 62, x: 62, y: 362}, {at: 72, x: 996, y: 99}]} />
     </div>
   );
 };
@@ -201,9 +247,15 @@ const historyCategories = [
 ] as const;
 
 export const systemHistoryTourAt = (frame: number) => {
-  const position = Math.min(269, Math.max(0, frame));
-  const scroll = position < 120 ? ease(position, [84, 105], [0, 380]) : ease(position, [133, 154], [380, 724]);
-  return {phase: position < 18 ? 'live' : position < 42 ? 'settings' : 'history', range: position >= 68 ? '24 hours' : '7 days', scroll, save: position >= 194 && position < 212, exported: position >= 212} as const;
+  const position = Math.min(149, Math.max(0, frame));
+  const scroll = position < 72 ? ease(position, [52, 68], [0, 380]) : ease(position, [72, 88], [380, 724]);
+  return {
+    phase: position < 36 ? 'live' : 'history',
+    range: position >= 52 ? '24 hours' : '7 days',
+    scroll,
+    save: position >= 96 && position < 108,
+    exported: position >= 108,
+  } as const;
 };
 
 const HistoryChart = ({category, index, range}: {category: typeof historyCategories[number]; index: number; range: string}) => <div data-history-category={category.name} className="shrink-0" style={{height: 178, padding: 12, borderRadius: 10, background: color.fillCard, border: `1px solid ${color.strokeCard}`}}>
@@ -219,8 +271,9 @@ const HistoryChart = ({category, index, range}: {category: typeof historyCategor
 export const SystemHistoryTourModule = ({frame, globalFrame}: {frame: number; globalFrame: number}) => {
   const state = systemHistoryTourAt(frame);
   if (state.phase === 'live') return <SystemModule frame={globalFrame} />;
-  if (state.phase === 'settings') return <DesktopSettingsPage title="System status and cleanup"><div data-system-history-settings><div style={{fontSize: 12, fontWeight: 600, color: color.secondary, marginBottom: 14}}>System monitor</div><TourCard><TourToggle label="Record history" on /><div style={{fontSize: 10, lineHeight: '16px', color: color.secondary, marginTop: 7}}>Minute readings for CPU, GPU, memory, disk, fans and network.</div><div className="flex items-center gap-[12px]" style={{marginTop: 17}}><NativeAction label="View history" active /><div style={{fontSize: 10, color: color.secondary}}>1,440 readings · 24 hours</div></div></TourCard><TourPointer frame={frame} at={36} x={70} y={203} /></div></DesktopSettingsPage>;
-  return <div data-system-history-window className="relative" style={{width: 720, height: 560, padding: 18, background: '#27272b', borderRadius: 12, border: `1px solid ${color.strokeCard}`, boxShadow: '0 22px 60px #0009'}}>
+  const winIn = easeOutAt(frame, [36, 46], [0, 1]);
+  const saveIn = state.save ? easeOutAt(frame, [96, 102], [0, 1]) : 0;
+  return <div data-system-history-window className="relative" style={{width: 720, height: 560, padding: 18, background: '#27272b', borderRadius: 12, border: `1px solid ${color.strokeCard}`, boxShadow: '0 22px 60px #0009', opacity: winIn, transform: `scale(${0.97 + 0.03 * winIn})`}}>
     <div data-system-history-header className="flex flex-col gap-[10px]" style={{height: 76}}>
       <div className="flex items-center gap-[8px]" style={{height: 34}}><div><div style={{fontSize: 16, fontWeight: 600}}>System history</div><div style={{fontSize: 10, color: color.secondary, marginTop: 3}}>10,080 readings · Nov 5–12</div></div><div className="flex-1" /><NativeAction label="Clear" /><NativeAction label="Export" active /></div>
       <div className="flex items-center gap-[10px]" style={{height: 26}}><span style={{fontSize: 11, color: color.secondary}}>Time range</span><div className="flex" style={{width: 280, height: 24, borderRadius: 6, padding: 2, background: color.fillControl}}>{['24 hours', '7 days', '30 days', 'All'].map((range) => <div key={range} className="flex flex-1 items-center justify-center" style={{fontSize: 10, background: range === state.range ? white(0.15) : 'transparent', borderRadius: 4}}>{range}</div>)}</div><div className="flex-1" /><div aria-label="Refresh"><IconButton compact icon={RotateCcw} /></div></div>
@@ -230,17 +283,30 @@ export const SystemHistoryTourModule = ({frame, globalFrame}: {frame: number; gl
       <div className="absolute right-0" style={{top: state.scroll / 724 * 261, height: 143, width: 4, borderRadius: 2, background: white(0.22)}} />
     </div>
     <div data-system-history-footer className="flex items-center gap-[6px]" style={{height: 16, marginTop: 14, fontSize: 10, color: state.exported ? color.green : color.secondary}}>{state.exported ? <Check size={12} /> : null}{state.exported ? 'Saved: System history.xlsx' : state.save ? 'Exporting all recorded readings…' : 'Minute-level readings · All history included in export'}</div>
-    {state.save ? <div data-system-history-save className="absolute flex flex-col gap-[14px]" style={{left: 145, top: 133, width: 430, padding: 20, borderRadius: 12, background: '#353539', border: `1px solid ${color.strokeCard}`, boxShadow: '0 16px 50px #000b'}}><div style={{fontSize: 14, fontWeight: 600}}>Export system history</div><div className="flex items-center gap-[12px]" style={{fontSize: 12}}><span>Save As:</span><div className="flex-1" style={{padding: '7px 9px', background: color.fillControl, borderRadius: 5}}>System history.xlsx</div></div><div className="flex items-center gap-[13px]" style={{fontSize: 12}}><span>Where:</span><span>Documents</span></div><div className="flex justify-end gap-[8px]"><NativeAction label="Cancel" /><NativeAction label="Save" active /></div><TourPointer frame={frame} at={206} x={391} y={145} /></div> : null}
-    {!state.save ? <TourPointerTrack frame={frame} actions={[{at: 68, x: 132, y: 76}, {at: 188, x: 669, y: 36}]} /> : null}
+    {state.save ? <div data-system-history-save className="absolute flex flex-col gap-[14px]" style={{left: 145, top: 133, width: 430, padding: 20, borderRadius: 12, background: '#353539', border: `1px solid ${color.strokeCard}`, boxShadow: '0 16px 50px #000b', opacity: saveIn, transform: `scale(${0.96 + 0.04 * saveIn})`}}><div style={{fontSize: 14, fontWeight: 600}}>Export system history</div><div className="flex items-center gap-[12px]" style={{fontSize: 12}}><span>Save As:</span><div className="flex-1" style={{padding: '7px 9px', background: color.fillControl, borderRadius: 5}}>System history.xlsx</div></div><div className="flex items-center gap-[13px]" style={{fontSize: 12}}><span>Where:</span><span>Documents</span></div><div className="flex justify-end gap-[8px]"><NativeAction label="Cancel" /><NativeAction label="Save" active /></div><TourPointer frame={frame} at={102} x={391} y={145} /></div> : null}
+    {!state.save ? <TourPointerTrack frame={frame} actions={[{at: 52, x: 132, y: 76}, {at: 90, x: 669, y: 36}]} /> : null}
   </div>;
 };
 
 export const batteryTourAt = (frame: number) => {
-  const position = Math.min(209, Math.max(0, frame));
-  const onBattery = position >= 170;
-  const fullyCharged = position >= 110 && !onBattery;
-  const charging = position >= 44 && position < 110;
-  return {...desktopDemo.battery, onBattery, fullyCharged, charging, chargingRequested: position >= 38, lowPower: position >= 151, level: position >= 110 ? 1 : desktopDemo.battery.level, chargingWatts: charging ? desktopDemo.battery.chargingWatts : 0, inputWatts: onBattery ? 0 : fullyCharged ? 12.7 : charging ? desktopDemo.battery.inputWatts : desktopDemo.battery.systemWatts, systemWatts: fullyCharged ? 12.7 : desktopDemo.battery.systemWatts};
+  const position = Math.min(109, Math.max(0, frame));
+  const onBattery = position >= 90;
+  const fullyCharged = position >= 58 && !onBattery;
+  const charging = position >= 24 && position < 58;
+  const flowHeight = position < 24 ? 96 : position < 58 ? ease(position, [24, 34], [96, 176]) : ease(position, [58, 68], [176, 96]);
+  return {
+    ...desktopDemo.battery,
+    onBattery,
+    fullyCharged,
+    charging,
+    flowHeight,
+    chargingRequested: position >= 18,
+    lowPower: position >= 78,
+    level: position >= 58 ? 1 : desktopDemo.battery.level,
+    chargingWatts: charging ? desktopDemo.battery.chargingWatts : 0,
+    inputWatts: onBattery ? 0 : fullyCharged ? 12.7 : charging ? desktopDemo.battery.inputWatts : desktopDemo.battery.systemWatts,
+    systemWatts: fullyCharged ? 12.7 : desktopDemo.battery.systemWatts,
+  };
 };
 
 const BatteryTrend = ({title, value, tint}: {title: string; value: string; tint: string}) => <TourCard style={{padding: 10, height: 77}}><div className="flex items-center" style={{fontSize: 12, fontWeight: 600}}>{title}<div className="flex-1" /><span className="tabular" style={{fontSize: 11, color: tint}}>{value}</span></div><svg width="100%" height="40" viewBox="0 0 425 40" preserveAspectRatio="xMidYMid meet" style={{marginTop: 7}}><polyline points="0,31 20,30 40,31 60,28 80,29 100,27 120,26 140,27 160,25 180,24 200,23 220,22 240,23 260,20 280,20 300,21 320,18 340,18 360,17 380,15 400,16 425,15" stroke={tint} strokeWidth={1.5} fill="none" /></svg></TourCard>;
@@ -253,18 +319,18 @@ export const BatteryTourModule = ({frame}: {frame: number}) => {
   const split = state.charging;
   return <div data-battery-detail className="absolute inset-0 flex flex-col gap-[12px]" style={{padding: 12}}>
     <div data-battery-section="header" className="flex shrink-0 items-center gap-[8px]" style={{height: 30}}><Laptop size={13} /><span style={{fontSize: 12, fontWeight: 600}}>Local battery</span><div className="flex gap-[4px]">{['Automatic', 'Low power', 'High power'].map((mode) => <div key={mode} style={{padding: '2px 8px', borderRadius: 5, fontSize: 10, background: mode === (state.lowPower ? 'Low power' : state.onBattery || state.fullyCharged ? 'Automatic' : 'High power') ? color.blue : color.fillControl}}>{mode}</div>)}</div><div className="flex-1" />{!state.onBattery && !state.fullyCharged && !state.charging ? <div data-feature="chargeToFull"><NativeAction label="Charge to 100%" icon={<Power size={11} />} /></div> : null}<span style={{fontSize: 9, color: color.secondary}}>{state.onBattery ? 'On battery' : state.fullyCharged ? 'Fully charged' : state.charging ? 'Charging' : 'Optimised charging'}</span><BatteryFull size={13} color={state.lowPower ? color.yellow : color.green} /><span className="font-rounded tabular" style={{fontSize: 10, fontWeight: 600}}>{percent}</span></div>
-    <div data-battery-section="flow" className="flex shrink-0 gap-[8px]" style={{height: split ? 176 : 96}}>
+    <div data-battery-section="flow" className="flex shrink-0 gap-[8px] overflow-hidden" style={{height: state.flowHeight}}>
       <div className="shrink-0" style={{width: 84}}><PowerEndpoint icon={state.onBattery ? <BatteryFull size={22} color={color.green} /> : <Plug size={22} color={color.orange} />} value={state.onBattery ? percent : `${state.inputWatts} W`} caption={state.onBattery ? 'Battery supply' : 'Adapter input'} /></div>
       {split ? <>
         <div className="relative min-w-0 flex-1">
-          <svg width="100%" height="176" viewBox="0 0 540 176" preserveAspectRatio="none">
+          <svg width="100%" height="100%" viewBox="0 0 540 176" preserveAspectRatio="none">
             <defs><linearGradient id="battery-charge-route" x1="0" y1="0" x2="1" y2="0"><stop stopColor={color.orange} stopOpacity={0.30} /><stop offset="1" stopColor={color.green} stopOpacity={0.16} /></linearGradient><linearGradient id="battery-system-route" x1="0" y1="0" x2="1" y2="0"><stop stopColor={color.orange} stopOpacity={0.30} /><stop offset="1" stopColor={color.cyan} stopOpacity={0.16} /></linearGradient></defs>
             <path data-power-route="battery" d="M0 0H532Q540 0 540 8V83.6Q540 91.6 532 91.6C334.8 91.6 194.4 105.6 97.2 105.6H0Z" fill="url(#battery-charge-route)" stroke={color.strokeCard} strokeWidth={0.5} />
             <path data-power-route="system" d="M0 105.6H97.2C194.4 105.6 334.8 119.6 532 119.6Q540 119.6 540 127.6V168Q540 176 532 176H0Z" fill="url(#battery-system-route)" stroke={color.strokeCard} strokeWidth={0.5} />
           </svg>
-          {[['Charging', state.chargingWatts, 52.8], ['System use', state.systemWatts, 140.8]].map(([title, watts, y]) => <div key={title} className="absolute inset-x-0 flex flex-col items-center gap-[2px]" style={{top: Number(y), transform: 'translateY(-50%)'}}><span className="font-rounded tabular" style={{fontSize: 15, fontWeight: 700}}>{watts} W</span><span style={{fontSize: 9, fontWeight: 500, color: color.secondary}}>{title}</span></div>)}
+          {[['Charging', state.chargingWatts, '30%'], ['System use', state.systemWatts, '80%']].map(([title, watts, top]) => <div key={String(title)} className="absolute inset-x-0 flex flex-col items-center gap-[2px]" style={{top: String(top), transform: 'translateY(-50%)'}}><span className="font-rounded tabular" style={{fontSize: 15, fontWeight: 700}}>{watts} W</span><span style={{fontSize: 9, fontWeight: 500, color: color.secondary}}>{title}</span></div>)}
         </div>
-        <div className="flex shrink-0 flex-col gap-[8px]" style={{width: 88}}><div style={{height: 100.8}}><PowerEndpoint icon={<BatteryFull size={22} color={color.green} />} value={percent} caption="Charging" /></div><div className="flex-1"><PowerEndpoint icon={<Laptop size={22} color={color.cyan} />} caption="This Mac" /></div></div>
+        <div className="flex shrink-0 flex-col gap-[8px]" style={{width: 88}}><div className="flex-[1.3]"><PowerEndpoint icon={<BatteryFull size={22} color={color.green} />} value={percent} caption="Charging" /></div><div className="flex-1"><PowerEndpoint icon={<Laptop size={22} color={color.cyan} />} caption="This Mac" /></div></div>
       </> : <>
         <div data-power-route="system" className="flex min-w-0 flex-1 flex-col items-center justify-center gap-[2px]" style={{borderRadius: 8, border: `0.5px solid ${color.strokeCard}`, background: `linear-gradient(90deg, ${alpha(color.orange, 0.28)}, ${alpha(color.cyan, 0.14)})`}}><span className="font-rounded tabular" style={{fontSize: 15, fontWeight: 700}}>{state.systemWatts.toFixed(1)} W</span><span style={{fontSize: 9, fontWeight: 500, color: color.secondary}}>{state.onBattery ? 'Battery supply' : 'System use'}</span></div>
         <div className="shrink-0" style={{width: 84}}><PowerEndpoint icon={<Laptop size={22} color={color.cyan} />} caption="This Mac" /></div>
@@ -272,22 +338,24 @@ export const BatteryTourModule = ({frame}: {frame: number}) => {
     </div>
     <div data-battery-section="readings" className="flex gap-[12px]" style={{height: 164}}><div className="flex min-w-0 flex-1 flex-col gap-[10px]"><BatteryTrend title="Battery level" value={percent} tint={state.lowPower ? color.yellow : color.green} /><BatteryTrend title="System power" value={`${state.systemWatts.toFixed(1)} W`} tint={color.orange} /></div><div data-battery-metrics className="flex shrink-0 flex-col gap-[4px]" style={{width: 250, padding: 8, borderRadius: 6, background: white(0.06), border: `1px solid ${color.strokeCard}`}}>{[['Health', '96%'], ['Cycles', '124'], ['Temperature', '31°C'], ['Max capacity', '4,800 mAh'], ['Design capacity', '5,000 mAh'], ['Current charge', `${Math.round(4800 * state.level).toLocaleString('en-US')} mAh`], ['Current', state.onBattery ? '−1.60 A' : state.charging ? '+2.40 A' : '0.00 A'], ['Voltage', '15.00 V'], ['Adapter rated', '96 W']].map(([label, value]) => <div key={label} className="flex items-center" style={{height: 12, fontSize: 9}}><span style={{color: color.secondary}}>{label}</span><div className="flex-1" /><span className="tabular">{value}</span></div>)}</div></div>
     <div data-battery-section="devices" className="flex items-center gap-[14px]" style={{height: 30, fontSize: 11}}><span style={{fontSize: 12, fontWeight: 600}}>Nearby devices</span><Keyboard size={16} color={color.secondary} /><span>Keyboard 82%</span><Music size={16} color={color.secondary} /><span>Headphones 64%</span></div>
-    <TourPointerTrack frame={frame} actions={[{at: 38, x: 570, y: 27}, {at: 145, x: 245, y: 27}]} />
+    <TourPointerTrack frame={frame} actions={[{at: 18, x: 570, y: 27}, {at: 72, x: 245, y: 27}]} />
   </div>;
 };
 
 export const CleanupTourModule = ({frame}: {frame: number}) => {
-  const review = frame >= 20;
-  const confirmation = frame >= 55 && frame < 80;
-  const done = frame >= 80;
+  const review = frame >= 12;
+  const confirmation = frame >= 32 && frame < 50;
+  const done = frame >= 50;
+  const dialogIn = confirmation ? easeOutAt(frame, [32, 38], [0, 1]) : 0;
+  const winIn = easeOutAt(frame, [0, 10], [0, 1]);
   return (
-    <div data-cleanup-window className="relative" style={{width: 560, height: 430, padding: 18, borderRadius: 12, background: '#27272b', border: `1px solid ${color.strokeCard}`, boxShadow: '0 22px 60px #0009'}}>
+    <div data-cleanup-window className="relative" style={{width: 560, height: 430, padding: 18, borderRadius: 12, background: '#27272b', border: `1px solid ${color.strokeCard}`, boxShadow: '0 22px 60px #0009', opacity: winIn, transform: `scale(${0.97 + 0.03 * winIn})`}}>
       <div className="flex items-center gap-[7px]" style={{height: 47}}><div className="min-w-0 flex-1"><div style={{fontSize: 16, fontWeight: 600}}>Cleanup candidates</div><div style={{fontSize: 10, color: color.secondary, marginTop: 4}}>Grouped by source · Move selected items to Trash</div></div><NativeAction label="Select all" /><NativeAction label="Invert" /><div aria-label="Rescan"><IconButton compact icon={RotateCcw} /></div></div>
-      <div data-cleanup-list style={{height: 276, marginTop: 14, padding: '6px 10px', borderRadius: 6, background: white(0.035), overflow: 'hidden'}}>{desktopDemo.cleanup.map((item, index) => !done || index === 2 ? <div key={item.name} style={{marginBottom: 8}}><div className="flex items-center gap-[6px]" style={{height: 18, fontSize: 10, color: color.secondary}}><ChevronDown size={9} /><span>{item.source}</span><span style={{fontSize: 9}}>· {review && index < 2 ? 1 : 0}/1</span><div className="flex-1" /><span className="tabular" style={{fontSize: 9}}>{item.sizeMB} MB</span></div><div data-cleanup-candidate={item.name} className="flex items-start gap-[10px]" style={{padding: '8px 5px', height: 65}}><div className="flex shrink-0 items-center justify-center" style={{width: 13, height: 13, marginTop: 3, borderRadius: 3, background: review && index < 2 ? color.blue : 'transparent', border: `1px solid ${review && index < 2 ? color.blue : color.secondary}`}}>{review && index < 2 ? <Check size={10} /> : null}</div><Folder size={17} color={color.secondary} style={{marginTop: 2, flexShrink: 0}} /><div className="min-w-0 flex-1"><div className="flex items-center gap-[7px]" style={{fontSize: 11}}><span>{item.name}</span><span style={{fontSize: 9, color: index < 2 ? color.green : color.orange}}>{item.safety}</span></div><div style={{fontSize: 9, color: color.secondary, marginTop: 3}}>{item.detail}</div><div style={{fontSize: 9, color: color.secondary, marginTop: 3}}>{item.reason}</div></div><span className="tabular" style={{fontSize: 10, color: color.secondary}}>{item.sizeMB} MB</span></div></div> : null)}</div>
-      {done ? <div data-cleanup-result className="flex items-center gap-[5px]" style={{fontSize: 10, color: color.green, marginTop: 10}}><Check size={12} />2 items moved to Trash · 344 MB · Review item kept</div> : null}
-      <div data-cleanup-footer className="absolute flex items-center gap-[8px]" style={{left: 18, right: 18, top: 383, height: 29, fontSize: 10}}><span style={{color: color.secondary}}>{done ? 'Selected 0 / 1 · 0 MB' : `Selected ${review ? 2 : 0} / 3 · ${review ? 344 : 0} MB`}</span><div className="flex-1" /><NativeAction label={done ? 'Done' : 'Cancel'} /><NativeAction label="Move to Trash" active={review && !done} /></div>
-      {confirmation ? <div data-cleanup-confirmation className="absolute" style={{left: 95, top: 127, width: 370, padding: 18, borderRadius: 13, border: `1px solid ${color.strokeCard}`, background: '#343438', boxShadow: '0 15px 60px rgba(0,0,0,0.75)'}}><div style={{fontSize: 15, fontWeight: 600}}>Move 2 items to Trash?</div><div style={{fontSize: 11, lineHeight: '17px', marginTop: 10, color: color.secondary}}>Application and package manager caches · 344 MB</div><div className="flex justify-end gap-[8px]" style={{marginTop: 18}}><NativeAction label="Cancel" /><NativeAction label="Move to Trash" active /></div><TourPointer frame={frame} at={74} x={294} y={100} /></div> : null}
-      {!confirmation ? <TourPointer frame={frame} at={49} x={480} y={397} /> : null}
+      <div data-cleanup-list style={{height: 276, marginTop: 14, padding: '6px 10px', borderRadius: 6, background: white(0.035), overflow: 'hidden'}}>{desktopDemo.cleanup.map((item, index) => !done || index === 3 ? <div key={item.name} style={{marginBottom: 4}}><div className="flex items-center gap-[6px]" style={{height: 16, fontSize: 9.5, color: color.secondary}}><ChevronDown size={9} /><span>{item.source}</span><span style={{fontSize: 8.5}}>· {review && index < 3 ? 1 : 0}/1</span><div className="flex-1" /><span className="tabular" style={{fontSize: 8.5}}>{item.sizeMB} MB</span></div><div data-cleanup-candidate={item.name} className="flex items-start gap-[10px]" style={{padding: '5px 5px', height: 48}}><div className="flex shrink-0 items-center justify-center" style={{width: 13, height: 13, marginTop: 2, borderRadius: 3, background: review && index < 3 ? color.blue : 'transparent', border: `1px solid ${review && index < 3 ? color.blue : color.secondary}`}}>{review && index < 3 ? <Check size={10} /> : null}</div><Folder size={15} color={color.secondary} style={{marginTop: 2, flexShrink: 0}} /><div className="min-w-0 flex-1"><div className="flex items-center gap-[7px]" style={{fontSize: 10.5}}><span>{item.name}</span><span style={{fontSize: 8.5, color: index < 3 ? color.green : color.orange}}>{item.safety}</span></div><div style={{fontSize: 8.5, color: color.secondary, marginTop: 2}}>{item.detail} · {item.reason}</div></div><span className="tabular" style={{fontSize: 9.5, color: color.secondary}}>{item.sizeMB} MB</span></div></div> : null)}</div>
+      {done ? <div data-cleanup-result className="flex items-center gap-[5px]" style={{fontSize: 10, color: color.green, marginTop: 10, opacity: easeOutAt(frame, [50, 58], [0, 1])}}><Check size={12} />3 items moved to Trash · 548 MB · Review item kept · Background cleanup ready in Toolbox</div> : null}
+      <div data-cleanup-footer className="absolute flex items-center gap-[8px]" style={{left: 18, right: 18, top: 383, height: 29, fontSize: 10}}><span style={{color: color.secondary}}>{done ? 'Selected 0 / 1 · 0 MB' : `Selected ${review ? 3 : 0} / 4 · ${review ? 548 : 0} MB`}</span><div className="flex-1" /><NativeAction label={done ? 'Done' : 'Cancel'} /><NativeAction label="Move to Trash" active={review && !done} /></div>
+      {confirmation ? <div data-cleanup-confirmation className="absolute" style={{left: 95, top: 127, width: 370, padding: 18, borderRadius: 13, border: `1px solid ${color.strokeCard}`, background: '#343438', boxShadow: '0 15px 60px rgba(0,0,0,0.75)', opacity: dialogIn, transform: `scale(${0.96 + 0.04 * dialogIn})`}}><div style={{fontSize: 15, fontWeight: 600}}>Move 3 items to Trash?</div><div style={{fontSize: 11, lineHeight: '17px', marginTop: 10, color: color.secondary}}>Caches, duplicate apps &amp; orphan AI workspaces · 548 MB</div><div className="flex justify-end gap-[8px]" style={{marginTop: 18}}><NativeAction label="Cancel" /><NativeAction label="Move to Trash" active /></div><TourPointer frame={frame} at={44} x={294} y={100} /></div> : null}
+      {!confirmation ? <TourPointer frame={frame} at={26} x={480} y={397} /> : null}
     </div>
   );
 };

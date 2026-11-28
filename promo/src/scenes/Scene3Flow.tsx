@@ -33,10 +33,10 @@ import {ISLAND, MODULE_HEIGHT, STAGE, clamp01, color, islandHeightFor, lerp, whi
 
 const CENTER = STAGE.width / 2;
 
-// Continue the previous scene's expanded state before handoff and downloads.
-const MEDIA = {open: 0, close: 226};
-const HANDOFF = {start: 250, grab: 292, open: 326, drop: 384, close: 500};
-const DOWNLOAD = {start: 516, done: 640, toast: 650, click: 716, finder: 722};
+// Media → Shelf drop → Browser download; shelf finishes collapsing before download starts.
+const MEDIA = {open: 0, close: 186};
+const HANDOFF = {start: 222, grab: 262, open: 296, drop: 352, close: 466};
+const DOWNLOAD = {start: 510, done: 632, toast: 642, click: 706, finder: 714};
 
 const LYRIC_PERIOD = 132;
 
@@ -92,13 +92,13 @@ export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
   const reveal = inMedia ? mediaReveal : shelfReveal;
 
   // The film spotlight rotates; the application's artwork stays still.
-  const spotlight = Math.min(springAt(frame, fps, MEDIA.open + 22, FilmMotion.gentle, 38), linear(frame, [MEDIA.close - 22, MEDIA.close], [1, 0]));
+  const spotlight = Math.min(springAt(frame, fps, MEDIA.open + 18, FilmMotion.gentle, 34), linear(frame, [MEDIA.close - 20, MEDIA.close], [1, 0]));
   const lyricIndex = Math.floor(played / LYRIC_PERIOD) % song.lyrics.length;
   const lyric = lyricAt(played, LYRIC_PERIOD);
 
   // Enter the top trigger, expand the shelf, then settle the file in its grid slot.
-  const windowIn = Math.min(springAt(frame, fps, HANDOFF.start, FilmMotion.gentle, 34), linear(frame, [HANDOFF.close - 6, HANDOFF.close + 14], [1, 0]));
-  const hold = springAt(frame, fps, HANDOFF.grab, FilmMotion.pop, 24);
+  const windowIn = Math.min(springAt(frame, fps, HANDOFF.start, FilmMotion.gentle, 30), linear(frame, [HANDOFF.close - 6, HANDOFF.close + 14], [1, 0]));
+  const hold = springAt(frame, fps, HANDOFF.grab, FilmMotion.pop, 22);
   const toTrigger = ease(frame, [HANDOFF.grab + 10, HANDOFF.open], [0, 1]);
   const toGrid = ease(frame, [HANDOFF.open + 8, HANDOFF.drop], [0, 1]);
   const ghostX = frame < HANDOFF.open ? lerp(GRAB.x, CENTER, toTrigger) : lerp(CENTER, DROP.x, toGrid);
@@ -106,16 +106,16 @@ export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
   const ghostOpacity = frame >= HANDOFF.grab ? linear(frame, [HANDOFF.drop, HANDOFF.drop + 10], [1, 0]) : 0;
   const dropHover = frame >= HANDOFF.open + 8 && frame < HANDOFF.drop ? 1 : 0;
   const landed = springAt(frame, fps, HANDOFF.drop, ZislaMotion.surfaceResize, 24);
-  const menu = Math.min(linear(frame, [448, 458], [0, 1]), linear(frame, [HANDOFF.close - 16, HANDOFF.close - 6], [1, 0]));
+  const menu = Math.min(linear(frame, [414, 424], [0, 1]), linear(frame, [HANDOFF.close - 16, HANDOFF.close - 6], [1, 0]));
 
   // Download progress hands off to the top-edge quick action.
-  const downloadProgress = ease(frame, [DOWNLOAD.start + 34, DOWNLOAD.done], [0.38, 1]);
+  const downloadProgress = ease(frame, [DOWNLOAD.start + 30, DOWNLOAD.done], [0.38, 1]);
   const done = frame >= DOWNLOAD.done;
-  const browserIn = Math.min(springAt(frame, fps, DOWNLOAD.start, FilmMotion.gentle, 34), linear(frame, [DOWNLOAD.finder, DOWNLOAD.finder + 18], [1, 0.0]));
-  const popover = Math.min(linear(frame, [DOWNLOAD.start + 24, DOWNLOAD.start + 38], [0, 1]), linear(frame, [DOWNLOAD.toast + 10, DOWNLOAD.toast + 24], [1, 0]));
-  const downloadWing = lerp(0, 44, clamp01(springAt(frame, fps, DOWNLOAD.start + 30, ZislaMotion.notice, 30)));
-  const toast = springAt(frame, fps, DOWNLOAD.toast, ZislaMotion.quickAction, 30);
-  const finderIn = springAt(frame, fps, DOWNLOAD.finder, FilmMotion.gentle, 36);
+  const browserIn = Math.min(springAt(frame, fps, DOWNLOAD.start, FilmMotion.gentle, 30), linear(frame, [DOWNLOAD.finder, DOWNLOAD.finder + 18], [1, 0.0]));
+  const popover = Math.min(linear(frame, [DOWNLOAD.start + 22, DOWNLOAD.start + 34], [0, 1]), linear(frame, [DOWNLOAD.toast + 8, DOWNLOAD.toast + 20], [1, 0]));
+  const downloadWing = lerp(0, 44, clamp01(springAt(frame, fps, DOWNLOAD.start + 26, ZislaMotion.notice, 28)));
+  const toast = springAt(frame, fps, DOWNLOAD.toast, ZislaMotion.quickAction, 28);
+  const finderIn = springAt(frame, fps, DOWNLOAD.finder, FilmMotion.gentle, 30);
 
   let cursorX = 0;
   let cursorY = 0;
@@ -123,34 +123,55 @@ export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
   let pressed = 0;
   if (!inMedia && !inDownload) {
     const approach = easeOutAt(frame, [HANDOFF.start + 6, HANDOFF.grab], [0, 1]);
-    const toFile = ease(frame, [HANDOFF.drop + 16, 448], [0, 1]);
-    const toAction = ease(frame, [458, 474], [0, 1]);
-    cursorX = frame < HANDOFF.grab ? lerp(330, GRAB.x, approach) : frame < 458 ? lerp(ghostX, MENU_ANCHOR.x, toFile) : lerp(MENU_ANCHOR.x, FINDER_ACTION.x, toAction);
-    cursorY = frame < HANDOFF.grab ? lerp(560, GRAB.y, approach) : frame < 458 ? lerp(ghostY, MENU_ANCHOR.y, toFile) : lerp(MENU_ANCHOR.y, FINDER_ACTION.y, toAction);
+    const toFile = ease(frame, [HANDOFF.drop + 16, 414], [0, 1]);
+    const toAction = ease(frame, [424, 440], [0, 1]);
+    cursorX = frame < HANDOFF.grab ? lerp(330, GRAB.x, approach) : frame < 424 ? lerp(ghostX, MENU_ANCHOR.x, toFile) : lerp(MENU_ANCHOR.x, FINDER_ACTION.x, toAction);
+    cursorY = frame < HANDOFF.grab ? lerp(560, GRAB.y, approach) : frame < 424 ? lerp(ghostY, MENU_ANCHOR.y, toFile) : lerp(MENU_ANCHOR.y, FINDER_ACTION.y, toAction);
     cursorOpacity = Math.min(linear(frame, [HANDOFF.start + 4, HANDOFF.start + 18], [0, 1]), linear(frame, [HANDOFF.close - 4, HANDOFF.close + 10], [1, 0]));
     pressed = frame >= HANDOFF.grab && frame < HANDOFF.drop ? 1 : 0;
   } else if (inDownload) {
-    const toAction = ease(frame, [DOWNLOAD.toast + 10, DOWNLOAD.click - 6], [0, 1]);
+    const toAction = ease(frame, [DOWNLOAD.toast + 8, DOWNLOAD.click - 6], [0, 1]);
     cursorX = lerp(700, TOAST_ACTION.x, toAction);
     cursorY = lerp(330, TOAST_ACTION.y, toAction);
-    cursorOpacity = linear(frame, [DOWNLOAD.start + 8, DOWNLOAD.start + 22], [0, 1]);
+    cursorOpacity = linear(frame, [DOWNLOAD.start + 8, DOWNLOAD.start + 20], [0, 1]);
     pressed = frame >= DOWNLOAD.click && frame < DOWNLOAD.click + 8 ? 1 : 0;
   }
 
   const mediaWing = lerp(74, 0, clamp01((frame - HANDOFF.grab - 16) / 20));
 
-  if (localFrame >= 540 && localFrame < 780) return <NativeModuleSurface title="Select once. Act on the right files." caption="Multi-select · Images to PDF · OCR to Notes · Video to Studio" module="shelf" height={355}>
-    <ShelfSelectionTour frame={localFrame - 540} />
-  </NativeModuleSurface>;
+  if (localFrame >= 540 && localFrame < 780) {
+    const selectionFrame = localFrame - 540;
+    const selectionReveal = clamp01(springAt(selectionFrame, fps, 0, ZislaMotion.islandReveal, 20));
+    return (
+      <NativeModuleSurface
+        title="Batch actions straight from the Shelf."
+        caption="ZIP · Resize & convert · Images to PDF · Import to Studio"
+        module="shelf"
+        height={355}
+        frame={selectionFrame}
+        fps={fps}
+        reveal={selectionReveal}
+      >
+        <ShelfSelectionTour frame={selectionFrame} />
+      </NativeModuleSurface>
+    );
+  }
 
-  if (localFrame >= 780) return (
-    <>
-      <Wallpaper dim={0.25} /><MenuBar /><Notch />
-      <Headline lines={['Bring the video. Keep the audio.']} top={104} size={38} align="left" opacity={clamp01((localFrame - 780) / 12)} />
-      <GlassPanel style={{left: 120, top: 185, width: 1040, height: 452}}><DownloadTourModule frame={localFrame - 780} /></GlassPanel>
-      <TourPointerTrack frame={localFrame - 780} actions={[{at: 60, x: 306, y: 371}, {at: 86, x: 1073, y: 441}]} />
-    </>
-  );
+  if (localFrame >= 780) {
+    const dlFrame = localFrame - 780;
+    const dlIn = clamp01(springAt(dlFrame, fps, 0, FilmMotion.pop, 18));
+    return (
+      <>
+        <Wallpaper dim={0.25} /><MenuBar /><Notch />
+        <Headline lines={['Video & audio downloads, built in.']} top={98} size={36} align="left" opacity={easeOutAt(dlFrame, [0, 12], [0, 1])} />
+        <GlassPanel opacity={dlIn} style={{left: 120, top: 185, width: 1040, height: 452, transform: `translateY(${(1 - dlIn) * 8}px)`}}>
+          <DownloadTourModule frame={dlFrame} />
+        </GlassPanel>
+        <Caption text="Paste a URL, pick video or audio quality, track live progress" size={16} bottom={24} opacity={easeOutAt(dlFrame, [0, 12], [0, 1])} />
+        <TourPointerTrack frame={dlFrame} actions={[{at: 60, x: 306, y: 371}, {at: 86, x: 1073, y: 441}]} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -261,7 +282,7 @@ export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
         }
         progress={
           inDownload
-            ? frame >= DOWNLOAD.start + 30
+            ? frame >= DOWNLOAD.start + 26
               ? {value: downloadProgress, tint: done ? color.green : color.blue}
               : undefined
             : frame < HANDOFF.grab + 16
@@ -282,8 +303,8 @@ export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
                 items={SHELF}
                 enter={SHELF.length - 1 + clamp01(landed)}
                 highlight={SHELF.length - 1}
-                moreButtons={linear(frame, [HANDOFF.open + 40, HANDOFF.open + 54], [0, 1])}
-                actionGlow={fadeWindow(frame, HANDOFF.open + 52, 452, 10)}
+                moreButtons={linear(frame, [HANDOFF.open + 36, HANDOFF.open + 50], [0, 1])}
+                actionGlow={fadeWindow(frame, HANDOFF.open + 48, 418, 10)}
                 dropHover={dropHover}
               />
             </div>
@@ -291,7 +312,7 @@ export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
         )}
       </Island>
       <Notch />
-      {menu > 0 ? <ShelfContextMenu anchor={MENU_ANCHOR} opacity={menu} highlight={linear(frame, [462, 474], [0, 1])} /> : null}
+      {menu > 0 ? <ShelfContextMenu anchor={MENU_ANCHOR} opacity={menu} highlight={linear(frame, [428, 440], [0, 1])} /> : null}
 
       {inDownload && frame >= DOWNLOAD.toast ? (
         <QuickActionToast
@@ -308,9 +329,9 @@ export const Scene3Flow = ({duration = FLOW_DURATION}: {duration?: number}) => {
       {inDownload ? <ClickRipple x={TOAST_ACTION.x} y={TOAST_ACTION.y} progress={linear(frame, [DOWNLOAD.click, DOWNLOAD.click + 22], [0, 1])} /> : null}
       <Cursor x={cursorX} y={cursorY} pressed={pressed} opacity={cursorOpacity} />
 
-      <Caption text={copy.flow.media} opacity={fadeWindow(frame, MEDIA.open + 40, MEDIA.close + 4)} bottom={86} />
-      <Caption text={copy.flow.handoff} opacity={fadeWindow(frame, HANDOFF.grab + 20, HANDOFF.close + 2)} bottom={40} />
-      <Caption text={copy.flow.download} opacity={fadeWindow(frame, DOWNLOAD.start + 40, 772)} bottom={40} />
+      <Caption text={copy.flow.media} opacity={fadeWindow(frame, MEDIA.open + 28, MEDIA.close + 4)} bottom={86} />
+      <Caption text={copy.flow.handoff} opacity={fadeWindow(frame, HANDOFF.grab + 16, HANDOFF.close + 2)} bottom={40} />
+      <Caption text={copy.flow.download} opacity={fadeWindow(frame, DOWNLOAD.start + 30, 772)} bottom={40} />
     </>
   );
 };

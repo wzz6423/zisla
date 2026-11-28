@@ -18,6 +18,7 @@ const {read: READ, compose: COMPOSE, to: TO, subject: SUBJECT, body: BODY, send:
 
 const MAIL_ROW = {x: 372, y: 246};
 const COMPOSE_BUTTON = {x: 444, y: 155};
+const ALL_READ_BUTTON = {x: 420, y: 155};
 const SEND_BUTTON = {x: 974, y: 523};
 
 export const SceneMail = ({duration = MAIL_DURATION}: {duration?: number}) => {
@@ -27,13 +28,18 @@ export const SceneMail = ({duration = MAIL_DURATION}: {duration?: number}) => {
   const compose = Math.min(linear(frame, [COMPOSE, COMPOSE + 12], [0, 1]), linear(frame, [SENT, SENT + 12], [1, 0]));
   const reveal = springAt(frame, fps, OPEN, ZislaMotion.islandReveal, 36);
   const moduleIn = clamp01((frame - OPEN - 8) / 24);
-  const notice = clamp01(springAt(frame, fps, SENT, ZislaMotion.notice, 24));
+  const allRead = frame >= MAIL_TIMING.allRead;
+  const notice = allRead
+    ? clamp01(springAt(frame, fps, MAIL_TIMING.allRead, ZislaMotion.notice, 20))
+    : clamp01(springAt(frame, fps, SENT, ZislaMotion.notice, 24));
   const to = mailDraft.to.slice(0, Math.floor(typedChars(frame, TO, mailDraft.to.length, 48, fps)));
   const subject = mailDraft.subject.slice(0, Math.floor(typedChars(frame, SUBJECT, mailDraft.subject.length, 40, fps)));
   const body = mailDraft.body.slice(0, Math.floor(typedChars(frame, BODY, mailDraft.body.length, 64, fps)));
   const focus = frame < TO || frame >= SEND ? null : frame < SUBJECT ? 'to' : frame < BODY ? 'subject' : 'body';
   const sending = frame >= SEND && frame < SENT;
-  const allRead = frame >= MAIL_TIMING.allRead;
+
+  // Ease camera gently back to 1.0 after sending so the handoff into the next scene is seamless.
+  const zoom = ease(frame, [READ + 24, COMPOSE - 12], [1, 1.12]) - ease(frame, [SENT + 8, MAIL_TIMING.allRead + 20], [0, 0.12]);
 
   const cursorX = track(frame, [
     [0, 1066],
@@ -51,8 +57,8 @@ export const SceneMail = ({duration = MAIL_DURATION}: {duration?: number}) => {
     [SEND - 14, SEND_BUTTON.x],
     [SEND + 12, SEND_BUTTON.x],
     [SENT + 34, 1070],
-    [MAIL_TIMING.allRead - 15, 420],
-    [MAIL_TIMING.allRead + 18, 420],
+    [MAIL_TIMING.allRead - 15, ALL_READ_BUTTON.x],
+    [MAIL_TIMING.allRead + 18, ALL_READ_BUTTON.x],
   ]);
   const cursorY = track(frame, [
     [0, 430],
@@ -70,15 +76,15 @@ export const SceneMail = ({duration = MAIL_DURATION}: {duration?: number}) => {
     [SEND - 14, SEND_BUTTON.y],
     [SEND + 12, SEND_BUTTON.y],
     [SENT + 34, 577],
-    [MAIL_TIMING.allRead - 15, 155],
-    [MAIL_TIMING.allRead + 18, 155],
+    [MAIL_TIMING.allRead - 15, ALL_READ_BUTTON.y],
+    [MAIL_TIMING.allRead + 18, ALL_READ_BUTTON.y],
   ]);
   const pressed = [READ, COMPOSE, TO - 6, SUBJECT - 6, BODY - 6, SEND, MAIL_TIMING.allRead].some((at) => frame >= at && frame < at + 6) ? 1 : 0;
   const cursorOpacity = Math.min(linear(frame, [0, 10], [0, 1]), linear(frame, [MAIL_TIMING.allRead + 20, MAIL_TIMING.allRead + 40], [1, 0]));
 
   return (
     <>
-      <Camera scale={ease(frame, [READ + 24, COMPOSE - 12], [1, 1.12])} x={STAGE.width / 2} y={0}>
+      <Camera scale={zoom} x={STAGE.width / 2} y={0}>
         <Wallpaper dim={0.14} />
         <MenuBar />
         <Island
@@ -106,9 +112,10 @@ export const SceneMail = ({duration = MAIL_DURATION}: {duration?: number}) => {
         <ClickRipple x={MAIL_ROW.x} y={MAIL_ROW.y} progress={linear(frame, [READ, READ + 22], [0, 1])} />
         <ClickRipple x={COMPOSE_BUTTON.x} y={COMPOSE_BUTTON.y} progress={linear(frame, [COMPOSE, COMPOSE + 22], [0, 1])} />
         <ClickRipple x={SEND_BUTTON.x} y={SEND_BUTTON.y} progress={linear(frame, [SEND, SEND + 22], [0, 1])} />
+        <ClickRipple x={ALL_READ_BUTTON.x} y={ALL_READ_BUTTON.y} progress={linear(frame, [MAIL_TIMING.allRead, MAIL_TIMING.allRead + 22], [0, 1])} />
         <Cursor x={cursorX} y={cursorY} pressed={pressed} opacity={cursorOpacity} />
       </Camera>
-      <Caption text="Read, write, send. Mark the inbox read in one click." opacity={fadeWindow(frame, OPEN + 22, MAIL_DURATION - 1, 14)} bottom={40} />
+      <Caption text="Triage Mail.app in the island — read, reply, or clear unread" opacity={fadeWindow(frame, OPEN + 20, MAIL_DURATION - 1, 14)} bottom={40} />
     </>
   );
 };

@@ -11,7 +11,7 @@ import {aiTasks, copy} from '../content';
 import type {AiTask} from '../content';
 import {AI_HEATMAP_TARGET, AIModule, TrendChart} from '../modules/AIModule';
 import {AIAnalyticsModule, AccountQuotaRing, DailyModelUsageList, aiBalancesAt, aiModelTokenTotal, quotaValue} from '../modules/AIAnalyticsModule';
-import {FilmMotion, ZislaMotion, ease, linear, springAt, track} from '../motion';
+import {FilmMotion, ZislaMotion, ease, easeOutAt, linear, springAt, track} from '../motion';
 import {MODULE_HEIGHT, NOTCH_WIDTH, STAGE, alpha, clamp01, color, islandHeightFor, lerp} from '../theme';
 
 const COMMAND = 'zislactl update --id build-01 --provider claude --title "Refactoring core" --progress 74';
@@ -30,7 +30,7 @@ export const aiSceneStateAt = (frame: number, duration = AI_DURATION) => {
     local,
     selected: local >= AI_ACTIONS.selectDay,
     lowQuota: local >= AI_ACTIONS.lowQuota,
-    scroll: track(local, [[AI_ACTIONS.models, 0], [AI_ACTIONS.models + 42, 180], [AI_ACTIONS.balance, 180], [AI_ACTIONS.balance + 42, 322]]),
+    scroll: track(local, [[AI_ACTIONS.models, 0], [AI_ACTIONS.models + 42, 180], [AI_ACTIONS.balance, 180], [AI_ACTIONS.balance + 42, 415]]),
     settings: local >= AI_ACTIONS.settings + 12 && local < AI_ACTIONS.history,
     history: local >= AI_ACTIONS.history && local < AI_ACTIONS.balance,
     historySelected: local >= AI_ACTIONS.historyDay,
@@ -43,66 +43,118 @@ export const aiSceneStateAt = (frame: number, duration = AI_DURATION) => {
   };
 };
 
-const UsageHistorySettings = () => <div className="absolute" data-feature="ai.usage.settings" style={{left: 350, top: 78, width: 580}}>
-  <GlassPanel radius={12} tint="rgba(28,28,32,0.98)" style={{width: 580, padding: 24}}>
-    <div className="mb-5 text-[18px] font-semibold">Settings · AI usage</div>
-    <div className="mb-4 text-[13px] text-label-2">AI usage history</div>
-    <div className="flex gap-3 text-[12px]">
-      <span className="rounded-[6px] px-4 py-2" style={{background: color.fillControl}}>View History</span>
-      <span className="rounded-[6px] px-4 py-2" style={{background: color.fillControl}}>Export</span>
-      <span className="rounded-[6px] px-4 py-2" style={{background: color.fillControl}}>Clear</span>
+const UsageHistorySettings = ({local, fps}: {local: number; fps: number}) => {
+  const enter = clamp01(springAt(local, fps, AI_ACTIONS.settings + 12, FilmMotion.pop, 14));
+  return (
+    <div className="absolute" data-feature="ai.usage.settings" style={{left: 350, top: 78, width: 580, transform: `scale(${0.96 + 0.04 * enter})`, transformOrigin: 'top center'}}>
+      <GlassPanel radius={12} tint="rgba(28,28,32,0.98)" opacity={enter} style={{width: 580, padding: 24}}>
+        <div className="mb-5 text-[18px] font-semibold">Settings · AI usage</div>
+        <div className="mb-4 text-[13px] text-label-2">AI usage history</div>
+        <div className="flex gap-3 text-[12px]">
+          <span className="rounded-[6px] px-4 py-2" style={{background: color.fillControl}}>View History</span>
+          <span className="rounded-[6px] px-4 py-2" style={{background: color.fillControl}}>Export</span>
+          <span className="rounded-[6px] px-4 py-2" style={{background: color.fillControl}}>Clear</span>
+        </div>
+      </GlassPanel>
     </div>
-  </GlassPanel>
-</div>;
+  );
+};
 
-const UsageHistoryWindow = ({state}: {state: ReturnType<typeof aiSceneStateAt>}) => <div className="absolute flex flex-col" data-feature="ai.usage.history" data-export-stage={state.saved ? 'saved' : state.exporting ? 'saving' : 'ready'} style={{left: HISTORY_WINDOW.x, top: HISTORY_WINDOW.y, width: HISTORY_WINDOW.width, height: HISTORY_WINDOW.height, borderRadius: 12, background: '#242426', border: `1px solid ${color.strokeCard}`, boxShadow: '0 24px 70px rgba(0,0,0,0.5)'}}>
-  <div className="flex h-[28px] shrink-0 items-center gap-[7px] px-3">
-    {['#ff5f57', '#febc2e', '#28c840'].map((tint) => <span key={tint} className="rounded-full" style={{width: 10, height: 10, background: tint}} />)}
-  </div>
-  <div className="flex min-h-0 flex-1 flex-col gap-[14px] px-[18px] pb-[18px]">
-    <div className="flex h-[28px] shrink-0 items-center gap-3">
-      <span className="text-[16px] font-semibold">AI usage history</span><span className="flex-1" />
-      <span className="text-[11px]">Clear</span>
-      <span className="rounded-[6px] px-3 py-[6px] text-[11px] font-semibold" data-feature="ai.usage.export" style={{background: color.blue}}>Export</span>
-    </div>
-    <div className="flex h-[24px] shrink-0 items-center gap-3 text-[11px]">
-      <span className="text-label-2">Time range</span>
-      <div className="flex rounded-[6px] p-[2px]" style={{width: 280, background: color.fillControl}}>{['24 hours', '7 days', '30 days', 'All'].map((range) => <span key={range} className="flex-1 rounded-[4px] py-[3px] text-center" style={{background: range === '7 days' ? color.fillCard : undefined}}>{range}</span>)}</div>
-      <span className="flex-1" /><RotateCw size={13} />
-    </div>
-    <div className="h-px shrink-0" style={{background: color.divider}} />
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <TrendChart reveal={1} todayTokens={aiModelTokenTotal} width={722} height={180} />
-      <div className="flex gap-[1.5px] text-[9px]" data-feature="ai.usage.history.days">
-        {['11/05', '11/06', '11/07', '11/08', '11/09', '11/10', '11/11'].map((day, index) => <div key={day} className="flex flex-1 flex-col items-center gap-[3px]">
-          <span style={{width: 12, height: 12, borderRadius: 1, background: alpha(color.green, [0.45, 0.7, 0.25, 0.7, 0.7, 1, 0.7][index]!), outline: index === 6 && state.historySelected ? '1px solid white' : undefined, outlineOffset: -1}} /><span>{day}</span>
-        </div>)}
+const UsageHistoryWindow = ({state, fps}: {state: ReturnType<typeof aiSceneStateAt>; fps: number}) => {
+  const enter = clamp01(springAt(state.local, fps, AI_ACTIONS.history, FilmMotion.pop, 16));
+  const exit = linear(state.local, [AI_ACTIONS.balance - 8, AI_ACTIONS.balance], [1, 0]);
+  const saveEnter = state.exporting ? clamp01(springAt(state.local, fps, AI_ACTIONS.export, FilmMotion.pop, 12)) : 0;
+  return (
+    <div
+      className="absolute flex flex-col"
+      data-feature="ai.usage.history"
+      data-export-stage={state.saved ? 'saved' : state.exporting ? 'saving' : 'ready'}
+      style={{
+        left: HISTORY_WINDOW.x,
+        top: HISTORY_WINDOW.y,
+        width: HISTORY_WINDOW.width,
+        height: HISTORY_WINDOW.height,
+        borderRadius: 12,
+        background: '#242426',
+        border: `1px solid ${color.strokeCard}`,
+        boxShadow: '0 24px 70px rgba(0,0,0,0.5)',
+        opacity: enter * exit,
+        transform: `scale(${0.96 + 0.04 * enter})`,
+      }}
+    >
+      <div className="flex h-[28px] shrink-0 items-center gap-[7px] px-3">
+        {['#ff5f57', '#febc2e', '#28c840'].map((tint) => <span key={tint} className="rounded-full" style={{width: 10, height: 10, background: tint}} />)}
       </div>
-      {state.historySelected ? <DailyModelUsageList width={722} /> : null}
+      <div className="flex min-h-0 flex-1 flex-col gap-[14px] px-[18px] pb-[18px]">
+        <div className="flex h-[28px] shrink-0 items-center gap-3">
+          <span className="text-[16px] font-semibold">AI usage history</span><span className="flex-1" />
+          <span className="text-[11px]">Clear</span>
+          <span className="rounded-[6px] px-3 py-[6px] text-[11px] font-semibold" data-feature="ai.usage.export" style={{background: color.blue}}>Export</span>
+        </div>
+        <div className="flex h-[24px] shrink-0 items-center gap-3 text-[11px]">
+          <span className="text-label-2">Time range</span>
+          <div className="flex rounded-[6px] p-[2px]" style={{width: 280, background: color.fillControl}}>{['24 hours', '7 days', '30 days', 'All'].map((range) => <span key={range} className="flex-1 rounded-[4px] py-[3px] text-center" style={{background: range === '7 days' ? color.fillCard : undefined}}>{range}</span>)}</div>
+          <span className="flex-1" /><RotateCw size={13} />
+        </div>
+        <div className="h-px shrink-0" style={{background: color.divider}} />
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+          <TrendChart reveal={1} todayTokens={aiModelTokenTotal} width={722} height={180} />
+          <div className="flex gap-[1.5px] text-[9px]" data-feature="ai.usage.history.days">
+            {['11/05', '11/06', '11/07', '11/08', '11/09', '11/10', '11/11'].map((day, index) => <div key={day} className="flex flex-1 flex-col items-center gap-[3px]">
+              <span style={{width: 12, height: 12, borderRadius: 1, background: alpha(color.green, [0.45, 0.7, 0.25, 0.7, 0.7, 1, 0.7][index]!), outline: index === 6 && state.historySelected ? '1px solid white' : undefined, outlineOffset: -1}} /><span>{day}</span>
+            </div>)}
+          </div>
+          {state.historySelected ? <DailyModelUsageList width={722} /> : null}
+        </div>
+        <div className="flex h-[18px] shrink-0 items-center text-[11px] text-label-2">
+          {state.saved ? <span data-feature="ai.usage.exported">Saved to AI usage.xlsx</span> : null}
+        </div>
+      </div>
+      {state.exporting ? (
+        <div
+          className="absolute flex flex-col gap-4 rounded-[8px] p-6 text-[12px]"
+          data-feature="ai.usage.save"
+          style={{
+            left: 140,
+            top: 206,
+            width: 480,
+            background: '#303034',
+            border: `1px solid ${color.strokeCard}`,
+            boxShadow: '0 18px 44px rgba(0,0,0,0.45)',
+            opacity: saveEnter,
+            transform: `scale(${0.95 + 0.05 * saveEnter})`,
+          }}
+        >
+          <div className="flex items-center gap-3"><span className="w-[66px]">Save As:</span><span className="flex-1 rounded-[5px] px-2 py-[6px]" style={{background: color.fillControl}}>AI usage.xlsx</span></div>
+          <div className="flex items-center gap-3"><span className="w-[66px]">Where:</span><span className="flex flex-1 items-center gap-2 rounded-[5px] px-2 py-[6px]" style={{background: color.fillControl}}><ChevronLeft size={12} /><span className="flex-1">Documents</span><ChevronRight size={12} /></span></div>
+          <div className="flex justify-end gap-3"><span className="rounded-[6px] px-4 py-[6px]" style={{background: color.fillControl}}>Cancel</span><span className="rounded-[6px] px-4 py-[6px]" style={{background: color.blue}}>Export</span></div>
+        </div>
+      ) : null}
     </div>
-    <div className="flex h-[18px] shrink-0 items-center text-[11px] text-label-2">
-      {state.saved ? <span data-feature="ai.usage.exported">Saved to AI usage.xlsx</span> : null}
-    </div>
-  </div>
-  {state.exporting ? <div className="absolute flex flex-col gap-4 rounded-[8px] p-6 text-[12px]" data-feature="ai.usage.save" style={{left: 140, top: 206, width: 480, background: '#303034', border: `1px solid ${color.strokeCard}`, boxShadow: '0 18px 44px rgba(0,0,0,0.45)'}}>
-    <div className="flex items-center gap-3"><span className="w-[66px]">Save As:</span><span className="flex-1 rounded-[5px] px-2 py-[6px]" style={{background: color.fillControl}}>AI usage.xlsx</span></div>
-    <div className="flex items-center gap-3"><span className="w-[66px]">Where:</span><span className="flex flex-1 items-center gap-2 rounded-[5px] px-2 py-[6px]" style={{background: color.fillControl}}><ChevronLeft size={12} /><span className="flex-1">Documents</span><ChevronRight size={12} /></span></div>
-    <div className="flex justify-end gap-3"><span className="rounded-[6px] px-4 py-[6px]" style={{background: color.fillControl}}>Cancel</span><span className="rounded-[6px] px-4 py-[6px]" style={{background: color.blue}}>Export</span></div>
-  </div> : null}
-</div>;
+  );
+};
 
-const CompactQuota = () => {
+const CompactQuota = ({local}: {local: number}) => {
   const balance = aiBalancesAt(true)[0]!;
   const fiveHour = balance.windows[0]!;
   const weekly = balance.windows[1]!;
   const sideWidth = 64;
-  return <div className="absolute top-0 flex items-center justify-between" data-feature="ai.quota.compact" data-severity="critical" data-notice-id="ai-balance-low-claude" style={{left: (STAGE.width - NOTCH_WIDTH) / 2 - sideWidth, width: NOTCH_WIDTH + sideWidth * 2, height: 34, borderRadius: '0 0 14px 14px', background: '#000'}}>
-    <div className="flex items-center justify-center" style={{width: sideWidth}}><AccountQuotaRing balance={balance} outer={weekly} inner={fiveHour} diameter={26} /></div>
-    <div className="flex flex-col gap-[1px] pl-3 text-[9px] leading-[13px] font-semibold" style={{width: sideWidth}}>
-      <span data-feature="ai.quota.warning" style={{color: color.red}}>5h {quotaValue(fiveHour)}</span>
-      <span style={{color: color.green}}>7d {quotaValue(weekly)}</span>
+  const enter = easeOutAt(local, [AI_ACTIONS.collapse + 36, AI_ACTIONS.collapse + 48], [0, 1]);
+  return (
+    <div
+      className="absolute top-0 flex items-center justify-between"
+      data-feature="ai.quota.compact"
+      data-severity="critical"
+      data-notice-id="ai-balance-low-claude"
+      style={{left: (STAGE.width - NOTCH_WIDTH) / 2 - sideWidth, width: NOTCH_WIDTH + sideWidth * 2, height: 34, borderRadius: '0 0 14px 14px', background: '#000', opacity: enter}}
+    >
+      <div className="flex items-center justify-center" style={{width: sideWidth}}><AccountQuotaRing balance={balance} outer={weekly} inner={fiveHour} diameter={26} /></div>
+      <div className="flex flex-col gap-[1px] pl-3 text-[9px] leading-[13px] font-semibold" style={{width: sideWidth}}>
+        <span data-feature="ai.quota.warning" style={{color: color.red}}>5h {quotaValue(fiveHour)}</span>
+        <span style={{color: color.green}}>7d {quotaValue(weekly)}</span>
+      </div>
     </div>
-  </div>;
+  );
 };
 
 export const Scene2AICenter = ({duration = AI_DURATION}: {duration?: number; globalFrom?: number}) => {
@@ -126,7 +178,11 @@ export const Scene2AICenter = ({duration = AI_DURATION}: {duration?: number; glo
   const terminalY = lerp(300, 514, terminalDrop) + (1 - terminalIn) * 24;
   const terminalOut = linear(frame, [AI_ACTIONS.selectDay - 24, AI_ACTIONS.selectDay + 12], [1, 0]);
 
-  const zoom = ease(frame, [AI_ACTIONS.expand + 30, AI_ACTIONS.models + 42], [1, 1.1]) - ease(frame, [AI_ACTIONS.settings, AI_ACTIONS.settings + 12], [0, 0.1]) + ease(frame, [AI_ACTIONS.balance, AI_ACTIONS.balance + 42], [0, 0.1]);
+  // Smoothly return camera zoom to 1.0 as the island collapses to its compact quota notice.
+  const zoom = ease(frame, [AI_ACTIONS.expand + 30, AI_ACTIONS.models + 42], [1, 1.1])
+    - ease(frame, [AI_ACTIONS.settings, AI_ACTIONS.settings + 12], [0, 0.1])
+    + ease(frame, [AI_ACTIONS.balance, AI_ACTIONS.balance + 42], [0, 0.1])
+    - ease(frame, [AI_ACTIONS.collapse - 12, AI_ACTIONS.collapse + 24], [0, 0.1]);
   const privacy = springAt(frame, fps, 276, FilmMotion.gentle, 36) * (1 - linear(frame, [AI_ACTIONS.settings, AI_ACTIONS.settings + 12], [0, 1]) + linear(frame, [AI_ACTIONS.balance, AI_ACTIONS.balance + 24], [0, 1]));
   const pressed = [AI_ACTIONS.selectDay, AI_ACTIONS.settings, AI_ACTIONS.viewHistory, AI_ACTIONS.historyDay, AI_ACTIONS.export, AI_ACTIONS.save, AI_ACTIONS.balance - 6].some((at) => frame >= at && frame < at + 6);
 
@@ -176,10 +232,10 @@ export const Scene2AICenter = ({duration = AI_DURATION}: {duration?: number; glo
             </div>
           </IslandBody>
         </Island>
-        {frame >= AI_ACTIONS.collapse + 36 ? <CompactQuota /> : null}
+        {frame >= AI_ACTIONS.collapse + 36 ? <CompactQuota local={frame} /> : null}
         <Notch />
-        {state.settings ? <UsageHistorySettings /> : null}
-        {state.history ? <UsageHistoryWindow state={state} /> : null}
+        {state.settings ? <UsageHistorySettings local={frame} fps={fps} /> : null}
+        {state.history ? <UsageHistoryWindow state={state} fps={fps} /> : null}
 
         {/* The connector establishes that task metadata enters through the local CLI. */}
         <div
@@ -197,6 +253,9 @@ export const Scene2AICenter = ({duration = AI_DURATION}: {duration?: number; glo
         />
         <Cursor x={state.cursor.x} y={state.cursor.y} pressed={pressed ? 1 : 0} opacity={linear(frame, [AI_ACTIONS.collapse + 18, AI_ACTIONS.collapse + 36], [1, 0])} />
         <ClickRipple x={264 + AI_HEATMAP_TARGET.x} y={AI_HEATMAP_TARGET.y} progress={linear(frame, [AI_ACTIONS.selectDay, AI_ACTIONS.selectDay + 18], [0, 1])} />
+        <ClickRipple x={HISTORY_TARGETS.view.x} y={HISTORY_TARGETS.view.y} progress={linear(frame, [AI_ACTIONS.viewHistory, AI_ACTIONS.viewHistory + 18], [0, 1])} />
+        <ClickRipple x={HISTORY_TARGETS.export.x} y={HISTORY_TARGETS.export.y} progress={linear(frame, [AI_ACTIONS.export, AI_ACTIONS.export + 18], [0, 1])} />
+        <ClickRipple x={HISTORY_TARGETS.save.x} y={HISTORY_TARGETS.save.y} progress={linear(frame, [AI_ACTIONS.save, AI_ACTIONS.save + 18], [0, 1])} />
       </Camera>
 
       <div data-feature="ai.privacy">

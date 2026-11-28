@@ -2,12 +2,12 @@ import {Img} from 'remotion';
 import {CircleArrowDown, CircleArrowUp, CircleCheck, Clock3, Folder, GitBranch, Monitor, PanelLeft, PanelRight, Plus, RefreshCw, Settings, Terminal} from 'lucide-react';
 import {Caption, Headline} from '../../components/Caption';
 import {MenuBar, Notch, Wallpaper} from '../../components/Desktop';
-import {ease} from '../../motion';
+import {ease, easeOutAt} from '../../motion';
 import {color, white} from '../../theme';
 import {TourHeading, TourPointer, TourResult, TourSurface} from './TourSurface';
 
 export const recommendedDemo = [{name: 'OpenScreen', purpose: 'Screen recording and video editing'}, {name: 'DockDoor', purpose: 'Dock previews and app switching'}, {name: 'Zshell', purpose: 'Native macOS terminal workspace'}] as const;
-export const recommendedTourAt = (frame: number) => ({opened: frame >= 34});
+export const recommendedTourAt = (frame: number) => ({opened: frame >= 44});
 
 // Existing Zshell app asset: mac/zshell/Assets.xcassets/AppIcon.appiconset/icon_128x128.png.
 // Required Notice: Copyright 2026 Zshell Contributors (https://github.com/wzz6423/zshell).
@@ -38,12 +38,13 @@ export const ZshellTourDesktop = () => <div className="absolute inset-0" data-zs
 
 export const RecommendedDesktopTour = ({frame}: {frame: number}) => {
   const state = recommendedTourAt(frame);
-  const captionOpacity = ease(frame, [96, 108], [1, 0]);
-  if (frame < 24) return <TourSurface title="Discover more tools. Keep control." caption="Recommended tools · Desktop applications" frame={frame} fps={60}><RecommendedToolsList /></TourSurface>;
+  const captionOpacity = ease(frame, [82, 92], [1, 0]);
+  if (frame < 22) return <TourSurface title="Curated Mac companions." caption="Recommended tools · Installed separately" frame={frame} fps={60}><RecommendedToolsList /></TourSurface>;
+  const appIn = state.opened ? easeOutAt(frame, [44, 52], [0, 1]) : easeOutAt(frame, [22, 28], [0, 1]);
   return <div className="absolute inset-0" data-feature="recommendedTools">
-    {state.opened ? <ZshellTourDesktop /> : <><Wallpaper dim={0.24} /><MenuBar appName="Finder" /><Notch /><div className="absolute overflow-hidden" data-recommended-applications style={{left: 292, top: 205, width: 696, height: 345, borderRadius: 12, background: '#27272c', border: `1px solid ${color.strokeCard}`, boxShadow: '0 24px 80px #0008'}}><div className="flex items-center gap-[7px]" style={{height: 36, padding: '0 14px', fontSize: 13, background: '#303035'}}>{['#ff5f57', '#febc2e', '#28c840'].map((dot) => <span key={dot} style={{width: 10, height: 10, borderRadius: 5, background: dot}} />)}<span style={{marginLeft: 12}}>Applications</span></div><div data-open-zshell className="flex flex-col items-center gap-[10px]" style={{position: 'absolute', left: 282, top: 94, width: 132, height: 140}}><Img src={ZSHELL_ICON} alt="Zshell" style={{width: 86, height: 86}} /><span style={{padding: '3px 8px', borderRadius: 4, fontSize: 17, background: color.blue}}>Zshell.app</span></div></div></>}
-    <Headline lines={['A terminal workspace of its own.']} top={85} size={34} opacity={captionOpacity} />
-    {!state.opened ? <TourPointer frame={frame} at={28} x={640} y={356} /> : <div className="absolute" style={{left: 479, top: 607, opacity: captionOpacity}}><TourResult>Zshell opened as a separate app</TourResult></div>}
-    <Caption text="Recommended tools · Installed and opened as separate applications" size={17} bottom={35} opacity={captionOpacity} />
+    {state.opened ? <div className="absolute inset-0" style={{opacity: appIn}}><ZshellTourDesktop /></div> : <><Wallpaper dim={0.24} /><MenuBar appName="Finder" /><Notch /><div className="absolute overflow-hidden" data-recommended-applications style={{left: 292, top: 205, width: 696, height: 345, borderRadius: 12, background: '#27272c', border: `1px solid ${color.strokeCard}`, boxShadow: '0 24px 80px #0008', opacity: appIn, transform: `scale(${0.97 + 0.03 * appIn})`}}><div className="flex items-center gap-[7px]" style={{height: 36, padding: '0 14px', fontSize: 13, background: '#303035'}}>{['#ff5f57', '#febc2e', '#28c840'].map((dot) => <span key={dot} style={{width: 10, height: 10, borderRadius: 5, background: dot}} />)}<span style={{marginLeft: 12}}>Applications</span></div><div data-open-zshell className="flex flex-col items-center gap-[10px]" style={{position: 'absolute', left: 282, top: 94, width: 132, height: 140}}><Img src={ZSHELL_ICON} alt="Zshell" style={{width: 86, height: 86}} /><span style={{padding: '3px 8px', borderRadius: 4, fontSize: 17, background: color.blue}}>Zshell.app</span></div></div></>}
+    <Headline lines={['A native terminal workspace of its own.']} top={85} size={34} opacity={captionOpacity} />
+    {!state.opened ? <TourPointer frame={frame} at={38} x={640} y={356} /> : <div className="absolute" style={{left: 479, top: 607, opacity: captionOpacity}}><TourResult>Zshell opened as a separate app</TourResult></div>}
+    <Caption text="Optional third-party tools, installed and opened as separate apps" size={17} bottom={35} opacity={captionOpacity} />
   </div>;
 };

@@ -196,21 +196,21 @@ export const notes = {
   ],
 } as const;
 
-// Six code entries fill the filtered clipboard viewport.
+// Six code entries fill the filtered clipboard viewport; source apps and image OCR support native grouping and search.
 export const clipboard = {
   items: [
-    {kind: 'code', preview: 'let island = IslandLayout(module: .ai)'},
-    {kind: 'text', preview: 'Privacy copy: structured metadata only.'},
-    {kind: 'link', preview: 'github.com/wzz6423/zisla'},
-    {kind: 'text', preview: 'Ship the film at 60 fps, 1080p and 4K.'},
-    {kind: 'code', preview: 'brew install --cask wzz6423/tap/zisla'},
-    {kind: 'image', preview: 'Screenshot 09-41-12.png'},
-    {kind: 'code', preview: '.spring(response: 0.22, dampingFraction: 0.8)'},
-    {kind: 'link', preview: 'developer.apple.com/design/human-interface-guidelines'},
-    {kind: 'text', preview: 'Bento grid: notes, clipboard, weather, metrics.'},
-    {kind: 'code', preview: 'zislactl finish --id build-01'},
-    {kind: 'code', preview: 'panel.styleMask.insert(.nonactivatingPanel)'},
-    {kind: 'code', preview: 'swift build -c release'},
+    {kind: 'code', app: 'Xcode', preview: 'let island = IslandLayout(module: .ai)'},
+    {kind: 'image', app: 'Preview', preview: 'Screenshot 09-41-12.png', ocrText: 'Release checklist · macOS 14–26'},
+    {kind: 'code', app: 'Terminal', preview: 'brew install --cask wzz6423/tap/zisla'},
+    {kind: 'text', app: 'Notes', preview: 'Privacy copy: structured metadata only.'},
+    {kind: 'link', app: 'Safari', preview: 'github.com/wzz6423/zisla'},
+    {kind: 'text', app: 'Notes', preview: 'Ship the film at 60 fps, 1080p and 4K.'},
+    {kind: 'code', app: 'Xcode', preview: '.spring(response: 0.22, dampingFraction: 0.8)'},
+    {kind: 'link', app: 'Safari', preview: 'developer.apple.com/design/human-interface-guidelines'},
+    {kind: 'text', app: 'Notes', preview: 'Bento grid: notes, clipboard, weather, metrics.'},
+    {kind: 'code', app: 'Terminal', preview: 'zislactl finish --id build-01'},
+    {kind: 'code', app: 'Xcode', preview: 'panel.styleMask.insert(.nonactivatingPanel)'},
+    {kind: 'code', app: 'Terminal', preview: 'swift build -c release'},
   ],
 } as const;
 
@@ -274,9 +274,9 @@ export const copy = {
     detail: 'zisla reads task state, progress and token counts. Prompts and answer bodies are never read.',
   },
   flow: {
-    media: 'MediaRemote + Core Audio know which app is really playing',
-    handoff: 'Drop it on the shelf. No copies, just a security-scoped bookmark.',
-    download: 'Finished downloads come back with one tap',
+    media: 'Live playback, synced lyrics, and real audio waveforms',
+    handoff: 'Drop files onto the shelf — bookmarked, never duplicated',
+    download: 'Browser downloads surface at the top edge and open in one click',
   },
   bento: 'Native modules, laid out like a bento box',
   outro: 'brew install --cask wzz6423/tap/zisla',

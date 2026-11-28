@@ -1,10 +1,12 @@
 import {
+  AppWindow,
   Clipboard as ClipboardIcon,
   Code,
   FileText,
   Image as ImageIcon,
   LayoutGrid,
   Link,
+  ScanText,
   Search,
   Star,
   StarOff,
@@ -15,7 +17,8 @@ import type {LucideIcon} from 'lucide-react';
 import {clipboard} from '../content';
 import {clamp01, color, lerp, white} from '../theme';
 
-type ClipKind = (typeof clipboard.items)[number]['kind'];
+type ClipItem = (typeof clipboard.items)[number];
+type ClipKind = ClipItem['kind'];
 
 const TYPES: readonly {name: string; icon: LucideIcon; kind?: ClipKind}[] = [
   {name: 'All', icon: LayoutGrid},
@@ -33,27 +36,34 @@ const SCOPES: readonly {name: string; icon: LucideIcon}[] = [
 
 const countOf = (kind?: ClipKind): number => (kind ? clipboard.items.filter((item) => item.kind === kind).length : clipboard.items.length);
 
-// 真实界面的副行是 “<类型> · Copied at HH:mm:ss”；时间由序号推出，保持确定性
 const copiedAt = (index: number): string => {
   const seconds = 9 * 3600 + 40 * 60 + 52 - index * 137;
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor((seconds % 3600) / 60))}:${pad(seconds % 60)}`;
 };
 
+const ocrTextOf = (item: ClipItem): string | undefined => ('ocrText' in item ? item.ocrText : undefined);
+
 type ClipboardModuleProps = {
-  // 选中的类型胶囊序号，可小数：0 = All，4 = Code
+  // Selected category pill index (fractional values animate filter transitions): 0 = All, 4 = Code.
   filter?: number;
-  // 搜索框里已输入的文字
+  // Query typed in the search field (matches content, source app, and recognized image OCR text).
   query?: string;
+  // Highlight source-app grouping badge in the header.
+  groupByApp?: boolean;
 };
 
-export const ClipboardModule = ({filter = 0, query = ''}: ClipboardModuleProps) => {
+export const ClipboardModule = ({filter = 0, query = '', groupByApp = true}: ClipboardModuleProps) => {
   const active = TYPES[Math.round(filter)] ?? TYPES[0];
   const needle = query.toLowerCase();
   const rows = clipboard.items
     .map((item, index) => ({item, index}))
-    .filter(({item}) => (!active?.kind || item.kind === active.kind) && item.preview.toLowerCase().includes(needle));
-  // 胶囊切换的一瞬列表淡一下，交代内容是被过滤出来的
+    .filter(({item}) => {
+      if (active?.kind && item.kind !== active.kind) return false;
+      if (!needle) return true;
+      const ocr = ocrTextOf(item)?.toLowerCase() ?? '';
+      return item.preview.toLowerCase().includes(needle) || item.app.toLowerCase().includes(needle) || ocr.includes(needle);
+    });
   const settle = 1 - Math.abs(filter - Math.round(filter)) * 2;
 
   return (
@@ -65,6 +75,14 @@ export const ClipboardModule = ({filter = 0, query = ''}: ClipboardModuleProps) 
         <ClipboardIcon size={12} strokeWidth={2.2} color={color.label} />
         <div className="text-[12px] font-semibold">Clipboard</div>
         <div className="flex-1" />
+        <div
+          data-clipboard-grouping={groupByApp ? 'sourceApp' : 'recent'}
+          className="flex items-center gap-[4px] rounded-full px-[7px] py-[2px] text-[9px] font-medium"
+          style={{background: groupByApp ? white(0.14) : 'transparent', color: groupByApp ? color.label : color.secondary}}
+        >
+          <AppWindow size={9} strokeWidth={2.2} />
+          <span>By App</span>
+        </div>
         <div className="tabular font-mono text-[10px] text-label-2">{clipboard.items.length}</div>
         <Trash2 size={11} strokeWidth={2.1} color={color.secondary} />
       </div>
@@ -102,37 +120,54 @@ export const ClipboardModule = ({filter = 0, query = ''}: ClipboardModuleProps) 
       <div data-clipboard-search className="flex shrink-0 items-center gap-[6px]" style={{padding: '8px 20px 6px'}}>
         <Search size={11} strokeWidth={2.3} color={color.secondary} />
         <span className="text-[11px] leading-[14px]" style={{color: query ? color.label : color.tertiary}}>
-          {query || 'Search'}
+          {query || 'Search content, image OCR, or app'}
         </span>
         {query ? <div style={{width: 1, height: 12, marginLeft: -4, background: color.blue}} /> : null}
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-[6px] overflow-hidden" style={{padding: 8, opacity: 0.35 + 0.65 * settle}}>
-        {rows.map(({item, index}) => (
-          <div
-            key={item.preview}
-            data-clipboard-row={item.preview}
-            className="flex shrink-0 items-center gap-[8px]"
-            style={{padding: '6px 8px', background: white(0.1), borderRadius: 6}}
-          >
-            {item.kind === 'image' ? (
-              <div
-                className="shrink-0"
-                style={{width: 42, height: 28, borderRadius: 5, background: 'linear-gradient(135deg, #2b3a67, #7fb2ff 60%, #ffcf7a)'}}
-              />
-            ) : null}
-            <div className="min-w-0 flex-1">
-              <div className={`truncate text-[11px] leading-[14px] font-medium ${item.kind === 'code' ? 'font-mono' : ''}`}>{item.preview}</div>
-              <div className="tabular text-[9px] leading-[12px] font-medium text-label-2">
-                {item.kind === 'image' ? 'Image' : 'Text'} · Copied at {copiedAt(index)}
+        {rows.map(({item, index}) => {
+          const ocr = ocrTextOf(item);
+          return (
+            <div
+              key={item.preview}
+              data-clipboard-row={item.preview}
+              data-clipboard-app={item.app}
+              className="flex shrink-0 items-center gap-[8px]"
+              style={{padding: '6px 8px', background: white(0.1), borderRadius: 6}}
+            >
+              {item.kind === 'image' ? (
+                <div
+                  className="shrink-0"
+                  style={{width: 42, height: 28, borderRadius: 5, background: 'linear-gradient(135deg, #2b3a67, #7fb2ff 60%, #ffcf7a)'}}
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-[6px]">
+                  <span className={`truncate text-[11px] leading-[14px] font-medium ${item.kind === 'code' ? 'font-mono' : ''}`}>{item.preview}</span>
+                  {ocr ? (
+                    <span
+                      data-clipboard-ocr={ocr}
+                      className="flex shrink-0 items-center gap-[3px] rounded-[4px] px-[5px] py-[1px] text-[8.5px] leading-[11px] font-medium"
+                      style={{background: 'rgba(100,210,255,0.14)', color: color.cyan}}
+                    >
+                      <ScanText size={8.5} strokeWidth={2.2} />
+                      <span>OCR: {ocr}</span>
+                    </span>
+                  ) : null}
+                </div>
+                <div className="tabular text-[9px] leading-[12px] font-medium text-label-2">
+                  {item.kind === 'image' ? 'Image' : 'Text'} · {item.app} · Copied at {copiedAt(index)}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-[8px] text-[10px] font-medium text-label-2">
+                {item.kind === 'image' ? <ScanText size={10} strokeWidth={2.2} color={color.cyan} /> : null}
+                <StickyNote size={10} strokeWidth={2.2} />
+                <Star size={10} strokeWidth={2.2} />
+                <Trash2 size={10} strokeWidth={2.2} />
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-[8px] text-[10px] font-medium text-label-2">
-              <StickyNote size={10} strokeWidth={2.2} />
-              <Star size={10} strokeWidth={2.2} />
-              <Trash2 size={10} strokeWidth={2.2} />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

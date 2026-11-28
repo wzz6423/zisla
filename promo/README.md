@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A 160-second, 60 fps product film for zisla, rendered frame by frame with [Remotion](https://www.remotion.dev/) using React, TypeScript, and Tailwind CSS. It covers the website's 12 modules and 19 additional features. The same visual timeline has funk and cinematic soundtrack variants, each available in 1080p and 4K. Layouts, dimensions, and spring parameters come from the native app's source code; all demonstration data is fictional.
+A 120-second, 60 fps product film for zisla, rendered frame by frame with [Remotion](https://www.remotion.dev/) using React, TypeScript, and Tailwind CSS. It covers the website's 12 modules and 19 additional features, plus recent native updates including Antigravity account quotas, Shelf ZIP/image/Studio actions, Clipboard OCR and source-app grouping, Recording Studio HDR, independent named countdown timers, Clean Junk, duplicate and orphan workspace cleanup, and 17-language settings search. The same visual timeline has funk and cinematic soundtrack variants, each available in 1080p and 4K. Layouts, dimensions, and spring parameters come from the native app's source code; all demonstration data is fictional.
 
 ## Run locally
 
@@ -50,27 +50,27 @@ npm test
 
 | Composition ID | Dimensions | Frames | Content |
 | --- | --- | --- | --- |
-| `ZislaLaunchFilm` | 1920×1080 | 9600 | 2 minutes 40 seconds, with Funkorama |
-| `ZislaLaunchFilm4K` | 3840×2160 | 9600 | The same funk version in 4K |
-| `ZislaLaunchFilmCinematic` | 1920×1080 | 9600 | The same visuals, with The Miracle of Flight |
-| `ZislaLaunchFilmCinematic4K` | 3840×2160 | 9600 | The same cinematic version in 4K |
-| `Scene1Awakening` | 1920×1080 | 300 | 0–5s, top-edge activation and activity grouped by app |
-| `SceneLayouts` | 1920×1080 | 960 | 5–21s, notch, camera, placement along all four edges, and pets |
-| `Scene2AICenter` | 1920×1080 | 840 | 21–35s, tasks, daily model statistics, history, and account quotas in two windows |
-| `Scene3Flow` | 1920×1080 | 900 | 35–50s, media, handoff tray multi-selection, and video/audio downloads |
-| `SceneMail` | 1920×1080 | 480 | 50–58s, reading, composing, sending, and marking all messages read |
-| `SceneEveryday` | 1920×1080 | 1440 | 58–82s, notes, clipboard, meetings, location notes, briefings, and voice |
-| `SceneCreativeTools` | 1920×1080 | 1920 | 82–114s, screenshots, recording, images, audio, and PDF tools |
-| `SceneDesktopTools` | 1920×1080 | 1460 | 114–138.3s, mixing, keyboard, focus, cleaning, system history, and battery |
-| `SceneSettings` | 1920×1080 | 1140 | 138.3–157.3s, windows, Quick Actions, permissions, CLI/Skills, Zshell, and full-screen lid-close effect |
+| `ZislaLaunchFilm` | 1920×1080 | 7200 | 2 minutes, with Funkorama |
+| `ZislaLaunchFilm4K` | 3840×2160 | 7200 | The same funk version in 4K |
+| `ZislaLaunchFilmCinematic` | 1920×1080 | 7200 | The same visuals, with The Miracle of Flight |
+| `ZislaLaunchFilmCinematic4K` | 3840×2160 | 7200 | The same cinematic version in 4K |
+| `Scene1Awakening` | 1920×1080 | 270 | 0–4.5s, top-edge activation and activity grouped by app |
+| `SceneLayouts` | 1920×1080 | 600 | 4.5–14.5s, notch, camera, placement along all four edges, and pets |
+| `Scene2AICenter` | 1920×1080 | 690 | 14.5–26s, tasks, daily model statistics, history, and account quotas (Claude, Codex, Cursor, Antigravity) |
+| `Scene3Flow` | 1920×1080 | 780 | 26–39s, media, handoff tray multi-selection (ZIP, PDF, Studio), and video/audio downloads |
+| `SceneMail` | 1920×1080 | 420 | 39–46s, reading, composing, sending, and marking all messages read |
+| `SceneEveryday` | 1920×1080 | 1080 | 46–64s, notes, clipboard (source-app grouping + OCR), meetings, location notes, briefings, and voice |
+| `SceneCreativeTools` | 1920×1080 | 1140 | 64–83s, screenshots (with pin zoom), HDR recording, images, audio, and PDF tools |
+| `SceneDesktopTools` | 1920×1080 | 1140 | 83–102s, mixing, keyboard (with voice stats), focus (named timers + Clean Junk), cleaning, system history, and battery |
+| `SceneSettings` | 1920×1080 | 940 | 102–117.7s, settings search, save locations, Quick Actions, permissions, CLI/Skills, Zshell, and full-screen lid-close effect |
 | `Scene4Bento` | 1920×1080 | 600 | Standalone preview of the quick tool overview |
-| `Scene5Outro` | 1920×1080 | 160 | 157.3–160s, branding, the complete install command, and the matching music credit |
+| `Scene5Outro` | 1920×1080 | 140 | 117.7–120s, branding, the complete install command, and the matching music credit |
 
 Adjacent scenes use a 16-frame crossfade: the incoming scene starts 16 frames early and fades in over the still-opaque outgoing scene, becoming fully visible at its nominal start. Song progress and the Pomodoro timer use `filmFrame()` to convert to full-film frame numbers. Individual scene compositions are registered with their nominal durations for silent previews. Layout and tool tours in the full film are scaled to scene durations that include crossfades, retaining each scene's final state.
 
 ## Soundtracks
 
-Both variants use the continuous first 160 seconds of one complete work, preserving the original arrangement with fades only at the beginning and end. The MP3 files are 44.1 kHz stereo at 320 kbps, reduced by 2 dB overall, with a 0.4-second fade-in and a fade-out from 155.8 to 159.6 seconds.
+Both variants use the continuous first 120 seconds of one complete work, preserving the original arrangement with fades only at the beginning and end. The MP3 files are 44.1 kHz stereo at 320 kbps, reduced by 2 dB overall, with a 0.4-second fade-in and a fade-out from 115.8 to 119.6 seconds.
 
 - Funk: [Funkorama by Kevin MacLeod](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474). This variant is used by the website player.
 - Cinematic: [The Miracle of Flight by Scott Buckley](https://www.scottbuckley.com.au/library/the-miracle-of-flight/).

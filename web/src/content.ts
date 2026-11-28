@@ -184,9 +184,9 @@ export type WorkflowId = (typeof workflowIds)[number];
 
 /** Existing feature-tour excerpts use its authored timeline, with synthetic demonstration content. */
 export const workflowExcerpts: Record<WorkflowId, { guide: GuideId; start: number; end: number }> = {
-  'copy-next': { guide: 'clipboard', start: 60.4, end: 62.9 },
-  'drop-output': { guide: 'shelf', start: 38.3, end: 40.7 },
-  'meeting-note': { guide: 'meeting', start: 65.7, end: 70.7 },
+  'copy-next': { guide: 'clipboard', start: 48.0, end: 50.4 },
+  'drop-output': { guide: 'shelf', start: 28.0, end: 29.7 },
+  'meeting-note': { guide: 'meeting', start: 52.5, end: 56.9 },
 };
 
 export interface UserGuideCopy {

@@ -3,7 +3,7 @@ import {clamp01, STAGE} from '../../theme';
 import {ease, easeOutAt} from '../../motion';
 import {ZshellTourDesktop} from './RecommendedDesktopTour';
 
-export const LID_PREVIEW_TIMING = {start: 108, closed: 140, opening: 150, restored: 182} as const;
+export const LID_PREVIEW_TIMING = {start: 94, closed: 124, opening: 126, restored: 156} as const;
 
 // Match DepthGeometry's bottom hinge and fixed eye; CSS coordinates grow downwards.
 export const lidDepthAt = (angle: number) => {
@@ -39,7 +39,7 @@ export const LidCloseDesktopPreview = ({frame}: {frame: number}) => {
         <div className="absolute inset-0" style={{background: 'linear-gradient(to top, rgba(0,0,0,0.08), rgba(0,0,0,0.4))', opacity: Math.pow(state.progress, 0.7)}} />
       </div>
     </div>
-    <Headline lines={['Close the lid. Open it again.']} top={85} size={34} opacity={captionOpacity} />
-    <Caption text="Lid-close animation · A smooth return to your desktop" size={17} bottom={35} opacity={captionOpacity} />
+    <Headline lines={['Smooth even when you close the lid.']} top={85} size={34} opacity={captionOpacity} />
+    <Caption text="Lid-close animation · Depth-aware return to your desktop" size={17} bottom={35} opacity={captionOpacity} />
   </div>;
 };
