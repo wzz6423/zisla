@@ -510,6 +510,7 @@ export const de: SiteContent = {
     "videoNotice": "Ausschnitte der vorhandenen Produkttour mit Demodaten. Video-Untertitel sind Englisch, die Schritte folgen deiner Sprache. Die vollständige 2:40-Tour und Musikangaben stehen weiter unten.",
     "preferencesTitle": "Nützliche Einstellungen",
     "preferences": [
+      "Aktiviere unter Einstellungen → Sonstige → Menüleistenverwaltung die Trennlinie. Ziehe Symbole bei gedrückter ⌘-Taste auf die von der Uhr abgewandte Seite und klicke zum Ein- oder Ausblenden auf den Pfeil. Mit Zugriff auf die Bedienungshilfen kannst du einzelne Symbole auch auf dieser Seite auswählen.",
       "Unter „Einstellungen → Haustier“ sehen Sie integrierte und importierte Tiere in der Vorschau. „Festes Haustier“ zeigt immer dasselbe Tier. „Zufälliger Wechsel“ lost standardmäßig unter allen Tieren aus. Unter „Haustiere für die Auslosung“ schränken Sie die Auswahl ein. Der Wechsel erfolgt standardmäßig um Mitternacht nach Ortszeit. Wählen Sie beim Wechselintervall „Eigen“, um eine Dauer zwischen 1 Sekunde und 99:59:59 einzustellen. Voreingestellt ist 1 Stunde.",
       "Aktiviere Schütteln beim Ziehen, um die Ablage einzublenden. Kontextnotizen nutzen eine eigene gehaltene Taste.",
       "Wähle die Audioausgabe im Medienbereich und automatische Quelle oder bevorzugten Player in Einstellungen. Diese Wahl weist Apps keine getrennten Geräte zu.",

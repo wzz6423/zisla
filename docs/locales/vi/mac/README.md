@@ -55,6 +55,12 @@ Hỗ trợ macOS 14 trở lên. macOS 26 dùng Liquid Glass; 14/15 dùng vật l
 
 Cửa sổ Thao tác Nhanh gán `Command+1` đến `Command+9`, rồi `Command+0`, theo thứ tự hành động hiện tại. Phím kích hoạt mặc định bổ sung của cấu hình mới là `Command+N`, chạy hành động đầu tiên; `Command+Delete` đóng cửa sổ. Thiết lập phím kích hoạt, nút chuột bên và thứ tự hành động trong Cài đặt. Nâng cấp giữ mọi tổ hợp đã lưu rõ ràng, gồm `Command+1` cũ, phím tự đặt và trạng thái xóa phím kích hoạt; chỉ cấu hình mới hoặc thiếu trường kích hoạt mới dùng `Command+N`.
 
+### Quản lý thanh menu
+
+Trong Cài đặt → Khác → Quản lý thanh menu, hãy bật vạch ngăn. Giữ ⌘ rồi kéo các biểu tượng sang phía cách xa đồng hồ. Bấm vào mũi tên để ẩn hoặc hiển thị chúng. Với quyền Trợ năng, bạn cũng có thể chọn từng biểu tượng trên trang này.
+
+Bạn có thể thu gọn các biểu tượng di chuyển được ngay cả khi ứng dụng không có tùy chọn ẩn. macOS cố định vị trí của đồng hồ và Trung tâm điều khiển. Trên macOS 27, nếu các màn hình kết nối có chiều rộng chênh lệch lớn, một số biểu tượng có thể vẫn hiển thị trên màn hình rộng hơn.
+
 ### Nơi lưu
 
 Cài đặt → Nơi lưu cho phép chọn thư mục riêng cho tải xuống, ảnh chụp màn hình, công cụ ảnh, ghi hình, PDF, Thao tác Nhanh và bản tin hằng ngày. Cấu hình mới mặc định dùng thư mục con của `~/Downloads`: `picture` cho ảnh chụp/ảnh, `video` cho ghi hình, `pdf`, `quick` và `daily`. Công cụ âm thanh dùng hộp thoại xuất để chọn tệp hoặc thư mục. Tệp trên kệ giữ tham chiếu đến bản gốc; ảnh cất và trạng thái ghi chú theo ngữ cảnh được quản lý cục bộ trong `~/Library/Application Support/zisla`, còn dự án ghi dùng thư mục ghi hình. Nội dung ghi chú nhanh nằm trong Apple Notes.

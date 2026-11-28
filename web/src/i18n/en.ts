@@ -493,6 +493,7 @@ export const en: SiteContent = {
     "videoNotice": "These are excerpts from the existing feature tour, built with demonstration data. Its embedded captions are English; the steps here follow your language. The complete 2:40 tour and music credits remain below.",
     "preferencesTitle": "Useful preferences",
     "preferences": [
+      "In Settings → Other → Menu Bar Management, enable the divider. Hold ⌘ and drag icons to the side away from the clock, then click the arrow to hide or show them. With Accessibility access, you can also select individual icons on this page.",
       "In Settings → Pet, preview built-in or imported pets. Fixed Pet keeps one pet. Random Rotation draws from all pets unless you narrow the Random Pool. By default it picks at local midnight. Set Rotation Interval to Custom for a timer from 1 second to 99:59:59, initially set to 1 hour.",
       "Enable Shake to Drop in Settings to reveal a shelf target while dragging files. Context-note shaking uses its own configured hold key.",
       "Choose an audio output device from the media area. In Settings, choose automatic media source or a preferred player; this does not route each app to a different device.",

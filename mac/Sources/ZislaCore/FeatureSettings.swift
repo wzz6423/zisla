@@ -354,6 +354,10 @@ public enum SystemMonitorMenuBarMetric: String, Codable, CaseIterable, Sendable,
     }
 }
 
+public enum MenuBarManagementMode: String, Codable, Sendable {
+    case disabled, expanded, collapsed
+}
+
 public enum StatusIconDestination: String, Codable, CaseIterable, Sendable, Equatable {
     case menuBar
     case island
@@ -792,6 +796,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions
     /// Whether to show Zisla's menu bar icon separately; does not affect monitor status items.
     public var menuBarAppIconEnabled: Bool
+    public var menuBarManagementMode: MenuBarManagementMode
     public var islandAppIconEnabled: Bool
     public var statusIconDestination: StatusIconDestination
     public var supportsStatusIconsInIsland: Bool {
@@ -1045,6 +1050,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance = SystemMonitorCombinedIconAppearance(),
         systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions(),
         menuBarAppIconEnabled: Bool = true,
+        menuBarManagementMode: MenuBarManagementMode = .disabled,
         islandAppIconEnabled: Bool = true,
         statusIconDestination: StatusIconDestination = .island,
         weatherEnabled: Bool = true,
@@ -1193,6 +1199,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.systemMonitorMenuBarCombinedIconAppearance = systemMonitorMenuBarCombinedIconAppearance
         self.systemMonitorMenuBarHeadphoneOptions = systemMonitorMenuBarHeadphoneOptions
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
+        self.menuBarManagementMode = menuBarManagementMode
         self.islandAppIconEnabled = islandAppIconEnabled
         self.statusIconDestination = statusIconDestination
         self.weatherEnabled = weatherEnabled
@@ -1391,6 +1398,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case systemMonitorMenuBarCombinedIconAppearance
         case systemMonitorMenuBarHeadphoneOptions
         case menuBarAppIconEnabled
+        case menuBarManagementMode
         case islandAppIconEnabled
         case statusIconDestination
         case weatherEnabled
@@ -1616,6 +1624,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .menuBarAppIconEnabled
         ) ?? defaults.menuBarAppIconEnabled
+        menuBarManagementMode = (try? container.decode(MenuBarManagementMode.self, forKey: .menuBarManagementMode)) ?? .disabled
         islandAppIconEnabled = (try? container.decode(Bool.self, forKey: .islandAppIconEnabled))
             ?? defaults.islandAppIconEnabled
         // A malformed destination must not make the store reset unrelated preferences.

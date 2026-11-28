@@ -3811,3 +3811,16 @@
 "Gemini App 网站额度" = "Hạn mức web Gemini App";
 "显示器模式" = "Chế độ màn hình";
 "在该屏幕不显示" = "Ẩn trên màn hình này";
+"菜单栏管理" = "Quản lý thanh menu";
+"整理菜单栏图标，按需收起或展开。" = "Sắp xếp các biểu tượng trên thanh menu, rồi thu gọn hoặc mở rộng khi cần.";
+"菜单栏图标" = "Biểu tượng thanh menu";
+"启用菜单栏分隔线" = "Bật vạch ngăn trên thanh menu";
+"按住 ⌘，将要收起的图标拖到分隔线远离时钟的一侧。" = "Giữ ⌘ và kéo các biểu tượng muốn ẩn sang phía vạch ngăn cách xa đồng hồ.";
+"收起图标" = "Thu gọn biểu tượng";
+"点按菜单栏中的箭头也可以展开或收起图标。" = "Bấm vào mũi tên trên thanh menu để hiển thị hoặc ẩn các biểu tượng.";
+"授权后可以直接在此选择要收起的图标。" = "Cấp quyền Trợ năng để chọn các biểu tượng muốn ẩn ngay tại đây.";
+"收起时隐藏" = "Ẩn khi thu gọn";
+"未能移动图标。按住 ⌘，将分隔线拖过这个图标。" = "Không thể di chuyển biểu tượng. Giữ ⌘ và kéo vạch ngăn sang phía bên kia biểu tượng này.";
+"系统固定" = "Do macOS cố định";
+"当前无法移动" = "Hiện không thể di chuyển";
+"暂未找到菜单栏图标" = "Không tìm thấy biểu tượng trên thanh menu";

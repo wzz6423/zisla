@@ -189,6 +189,7 @@ struct SettingsNavigationTests {
             "语音",
             "键盘音效",
             "系统状态与清理",
+            "菜单栏管理",
             "保存位置",
             "依赖组件",
             "网络",
@@ -449,7 +450,7 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.allCases.filter { $0.group == .capture } == [.screenshot, .recording])
         #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
         #expect(SettingsSection.allCases.filter { $0.group == .others }
-            == [.scheduledCleanup, .saveLocations, .download, .networkProxy, .pet, .recommendations])
+            == [.scheduledCleanup, .menuBarManagement, .saveLocations, .download, .networkProxy, .pet, .recommendations])
         #expect(SettingsSection.allCases.filter { $0.group == .recommendationsAndUpdates } == [.updates])
     }
 
@@ -466,7 +467,7 @@ struct SettingsNavigationTests {
         settings.petEnabled = petEnabled
         settings.recommendedToolsEnabled = recommendationsEnabled
 
-        var expectedSections: [SettingsSection] = [.scheduledCleanup, .saveLocations]
+        var expectedSections: [SettingsSection] = [.scheduledCleanup, .menuBarManagement, .saveLocations]
         if dependencySource != 0 { expectedSections.append(.download) }
         expectedSections.append(.networkProxy)
         if petEnabled { expectedSections.append(.pet) }
@@ -681,4 +682,9 @@ private final class SettingsTestScreen: NSScreen {
     }
 
     override var localizedName: String { name }
+    override var frame: CGRect { CGRect(x: 0, y: 0, width: 1440, height: 900) }
+    override var visibleFrame: CGRect { frame }
+    override var safeAreaInsets: NSEdgeInsets { NSEdgeInsets() }
+    override var __auxiliaryTopLeftArea: NSRect { .zero }
+    override var __auxiliaryTopRightArea: NSRect { .zero }
 }

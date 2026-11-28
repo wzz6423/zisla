@@ -55,6 +55,12 @@ Se admite macOS 14 y posteriores. macOS 26 usa Liquid Glass; macOS 14/15 recurre
 
 El aviso asigna `Command+1` a `Command+9` y después `Command+0` según el orden de las acciones. El activador adicional predeterminado de configuraciones nuevas es `Command+N`, que ejecuta la primera acción; `Command+Delete` cierra el aviso. Configura activador, botón lateral y orden en Ajustes. Las actualizaciones conservan cada combinación guardada explícitamente, incluido el antiguo `Command+1`, atajos propios y activadores borrados; solo configuraciones nuevas o sin campo de activador adoptan `Command+N`.
 
+### Gestión de la barra de menús
+
+En Ajustes → Otros → Gestión de la barra de menús, activa el separador. Mantén pulsada ⌘ y arrastra los iconos al lado opuesto al reloj. Haz clic en la flecha para ocultarlos o mostrarlos. Con permiso de Accesibilidad, también puedes elegirlos uno a uno en esta página.
+
+Puedes contraer los iconos que se puedan mover aunque su app no ofrezca la opción de ocultarlos. macOS fija el reloj y el centro de control. En macOS 27, si las pantallas conectadas tienen anchuras muy diferentes, algunos iconos pueden seguir visibles en la más ancha.
+
 ### Ubicaciones de guardado
 
 Ajustes → Ubicación de guardado elige carpetas independientes para descargas, capturas, herramientas de imagen, grabaciones, PDF, acciones rápidas y resúmenes. Las configuraciones nuevas usan subcarpetas de `~/Downloads`: `picture` para capturas/imágenes, `video` para grabaciones, `pdf`, `quick` y `daily`. Audio usa un diálogo de exportación para elegir archivo o carpeta. La estantería mantiene referencias a originales; capturas guardadas y estado de notas contextuales se gestionan en `~/Library/Application Support/zisla`, mientras los proyectos usan la carpeta de grabación. El texto de notas rápidas vive en Notas de Apple.

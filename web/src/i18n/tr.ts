@@ -383,6 +383,7 @@ export const tr = createCatalog({
     "videoNotice": "Mevcut özellik turundan, gösterim verili kesitler. Video yazıları İngilizce; buradaki adımlar seçtiğiniz dilde. Tam 2:40 tur ve müzik bilgileri aşağıdadır.",
     "preferencesTitle": "Yararlı tercihler",
     "preferences": [
+      "Ayarlar → Diğer → Menü Çubuğu Yönetimi bölümünde ayırıcıyı etkinleştirin. ⌘ tuşunu basılı tutarak simgeleri ayırıcının saatten uzak tarafına sürükleyin. Ardından gizlemek veya göstermek için oka tıklayın. Erişilebilirlik izniyle bu sayfada simgeleri tek tek de seçebilirsiniz.",
       "Ayarlar → Evcil Hayvan bölümünde yerleşik ve içe aktarılmış hayvanların önizlemesine bakabilirsiniz. “Sabit evcil hayvan” seçtiğiniz hayvanı gösterir. “Rastgele değişim” varsayılan olarak yerel saatle gece yarısında tüm hayvanlar arasından seçim yapar. Adayları “Rastgele seçim listesi” ile sınırlandırabilirsiniz. “Değişim aralığı” altında “Özel” seçeneğiyle 1 saniye ile 99:59:59 arasında bir süre belirleyebilirsiniz. Başlangıç değeri 1 saattir.",
       "Sürüklerken sallamayı açarak rafı gösterin. Bağlam notları kendi basılı tutma tuşunu kullanır.",
       "Medya alanında ses çıkışı, Ayarlar’da otomatik kaynak veya tercih edilen oynatıcı seçin. Bu seçim uygulamalara ayrı cihaz atamaz.",

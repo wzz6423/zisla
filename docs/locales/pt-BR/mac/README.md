@@ -55,6 +55,12 @@ O macOS 14 e versões posteriores são compatíveis. O macOS 26 usa Liquid Glass
 
 O aviso de Ações rápidas atribui `Command+1` até `Command+9`, depois `Command+0`, na ordem atual das ações. O gatilho adicional padrão para novas configurações é `Command+N`, que executa a primeira ação; `Command+Delete` fecha o aviso. Configure o gatilho, o botão lateral do mouse e a ordem das ações em Ajustes. As atualizações mantêm todas as combinações explicitamente salvas, incluindo o antigo `Command+1`, atalhos personalizados e gatilhos apagados; somente configurações novas ou um campo de gatilho ausente adotam `Command+N`.
 
+### Gerenciamento da barra de menus
+
+Em Ajustes → Outros → Gerenciamento da barra de menus, ative o divisor. Mantenha ⌘ pressionada e arraste os ícones para o lado oposto ao relógio. Clique na seta para ocultá-los ou mostrá-los. Com a permissão de Acessibilidade, você também pode selecioná-los individualmente nesta página.
+
+Os ícones que podem ser movidos podem ser recolhidos mesmo que o app não ofereça uma opção para ocultá-los. O macOS fixa a posição do relógio e da Central de Controle. No macOS 27, se as telas conectadas tiverem larguras muito diferentes, alguns ícones poderão continuar visíveis na tela mais larga.
+
 ### Locais de salvamento
 
 Ajustes → Local de salvamento seleciona pastas separadas para downloads, capturas de tela, ferramentas de imagem, gravações, PDF, Ações rápidas e resumos diários. As configurações novas usam por padrão subpastas de `~/Downloads`: `picture` para capturas/imagens, `video` para gravações, `pdf`, `quick` e `daily`. As ferramentas de áudio usam uma janela de exportação para escolher um arquivo ou uma pasta. Os arquivos da prateleira mantêm referências aos originais; as capturas guardadas e o estado das notas contextuais são gerenciados localmente em `~/Library/Application Support/zisla`, enquanto os projetos usam a pasta de gravação. O texto das Notas rápidas fica em Notas da Apple.

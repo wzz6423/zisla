@@ -55,6 +55,7 @@ Het eiland heeft 12 modules: Home, Overdracht, Klembord, AI-monitor, Toetsenbord
 - **Dagoverzicht:** 8 sjablonen, voorvertoning, handmatige of geplande PNG-export, geselecteerde statistieken en een afzonderlijke opslagmap.
 - **AI-accounts:** bekijk ondersteunde accounttegoeden, resetmomenten, waarschuwingen bij laag tegoed en meetmomenten; exporteer lokale tokengeschiedenis als `.xlsx`. De Gemini- en Claude/GPT-tegoeden van Antigravity hebben afzonderlijke bewaking, weergave en meldingen. Gemini App gebruikt voor chattegoeden een web-Cookie van hetzelfde Google-account; Gemini CLI blijft apart.
 - **Snelle acties:** popupacties gebruiken `Command+1` tot en met `Command+0` in volgorde. De aanvullende standaardsneltoets voor nieuwe configuraties is `Command+N` voor de eerste actie. Updates behouden opgeslagen en gewiste sneltoetsen.
+- **Menubalkbeheer** — Verberg vaste menubalksymbolen terwijl de bijbehorende apps blijven draaien.
 
 De [gebruikershulp](https://wzz6423.github.io/zisla/help.html?lang=nl#help) bevat negen stapsgewijze gidsen: klembord, schermafbeeldingen/opnames, plank, vergaderingen, AI, mediatools, dagoverzichten, desktopnotities/venstervoorbeelden en afspelen/mixen. De [macOS-gids](mac/README.md#opslaglocaties) beschrijft uitvoermappen en afhankelijkheden.
 

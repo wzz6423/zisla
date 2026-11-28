@@ -311,6 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// close overlay in it and the overlay has stepped off the screen; the
     /// overlay returns when the session ends.
     private var isLidOverlaySuspendedForScreenshotSession = false
+    private lazy var menuBarManager = MenuBarManager(store: AppModel.shared.settingsStore)
     private var statusItem: NSStatusItem?
     private var monitorStatusItems: [SystemMonitorMenuBarMetric: NSStatusItem] = [:]
     private var monitorStatusItemStyles: [SystemMonitorMenuBarMetric: SystemMonitorMenuBarDisplayStyle] = [:]
@@ -729,6 +730,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         startSystemScreenshotMonitoring()
         syncAppStatusItem()
         syncMonitorStatusItems(force: true)
+        menuBarManager.start()
 
         model.languageStore.$language
             .removeDuplicates()
@@ -1655,6 +1657,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.statusItem = nil
         }
         syncAppStatusItem()
+        menuBarManager.refresh()
         monitorStatusItemStyles.removeAll()
         monitorStatusTitles.removeAll()
         syncMonitorStatusItems(force: true)
@@ -2093,7 +2096,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if settingsWindowController == nil {
             let input = settingsInput ?? SettingsInput()
             settingsInput = input
-            let rootView = SettingsView(model: runningModel, petController: petController, input: input)
+            let rootView = SettingsView(model: runningModel, petController: petController, menuBarManager: menuBarManager, input: input)
             let window = SettingsWindow(
                 contentRect: CGRect(x: 0, y: 0, width: 960, height: 680),
                 styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],

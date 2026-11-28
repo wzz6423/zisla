@@ -3807,3 +3807,16 @@
 "Gemini App 网站额度" = "Quota web de Gemini App";
 "显示器模式" = "Modes des écrans";
 "在该屏幕不显示" = "Masquer sur cet écran";
+"菜单栏管理" = "Gestion de la barre des menus";
+"整理菜单栏图标，按需收起或展开。" = "Organisez les icônes de la barre des menus et masquez-les ou affichez-les à la demande.";
+"菜单栏图标" = "Icônes de la barre des menus";
+"启用菜单栏分隔线" = "Activer le séparateur de la barre des menus";
+"按住 ⌘，将要收起的图标拖到分隔线远离时钟的一侧。" = "Maintenez ⌘ et faites glisser les icônes à masquer du côté du séparateur opposé à l’horloge.";
+"收起图标" = "Replier les icônes";
+"点按菜单栏中的箭头也可以展开或收起图标。" = "Cliquez sur la flèche dans la barre des menus pour afficher ou masquer les icônes.";
+"授权后可以直接在此选择要收起的图标。" = "Autorisez l’accès aux fonctions d’accessibilité pour choisir ici les icônes à masquer.";
+"收起时隐藏" = "Masquer au repli";
+"未能移动图标。按住 ⌘，将分隔线拖过这个图标。" = "Impossible de déplacer cette icône. Maintenez ⌘ et faites passer le séparateur de l’autre côté de l’icône.";
+"系统固定" = "Fixée par macOS";
+"当前无法移动" = "Déplacement indisponible";
+"暂未找到菜单栏图标" = "Aucune icône trouvée dans la barre des menus";

@@ -24,6 +24,7 @@
 ## สถานะและงานพร้อมกัน
 
 - AppKit, SwiftUI state และหน้าต่างอยู่ `MainActor`
+- เมื่อเปิดใช้การจัดการแถบเมนู zisla จะสร้างตัวควบคุม `NSStatusItem` สองตัว ขณะที่รายการไอคอนเปิดอยู่ zisla จะอ่าน `AXExtrasMenuBar` และตรวจสอบตำแหน่งของไอคอนที่เลือกหลังจากย้าย
 - ดาวน์โหลด อากาศ และ GitHub ใช้ actor
 - AI hook ตรวจด้วย event ระบบไฟล์ directory แต่ละแหล่งเทียบไฟล์ session/activity ล่าสุดด้วย mtime/ขนาด ใช้ parse cache เดิมถ้าไม่เปลี่ยน
 - auto อ่านเหตุการณ์มีโครงสร้าง marker คงที่และ metadata จำเป็น ไม่อ่านพรอมป์ต์/คำตอบ parser provider ผิดไม่ขวางอื่น

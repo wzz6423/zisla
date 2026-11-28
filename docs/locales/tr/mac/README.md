@@ -55,6 +55,12 @@ macOS 14 ve sonrası desteklenir. macOS 26 Liquid Glass kullanır; macOS 14/15 y
 
 Açılır pencere işlem sırasına göre `Command+1` ile `Command+9`, ardından `Command+0` atar. Yeni yapılandırmanın ek varsayılan tetikleyicisi ilk işlem için `Command+N`; `Command+Delete` pencereyi kapatır. Tetikleyici, fare yan tuşu ve sırayı Ayarlar'dan belirleyin. Yükseltmeler eski `Command+1`, özel kombinasyonlar ve temizlenmiş tetikleyiciler dahil açıkça kaydedilen her ayarı korur; yalnızca yeni yapılandırmalar veya eksik alan `Command+N` kullanır.
 
+### Menü Çubuğu Yönetimi
+
+Ayarlar → Diğer → Menü Çubuğu Yönetimi bölümünde ayırıcıyı etkinleştirin. ⌘ tuşunu basılı tutarak simgeleri ayırıcının saatten uzak tarafına sürükleyin. Ardından gizlemek veya göstermek için oka tıklayın. Erişilebilirlik izniyle bu sayfada simgeleri tek tek de seçebilirsiniz.
+
+Uygulamada gizleme seçeneği olmasa bile taşınabilir simgeleri daraltabilirsiniz. Saat ve Denetim Merkezi’nin konumunu macOS sabitler. macOS 27’de bağlı ekranların genişlikleri çok farklıysa geniş ekranda bazı simgeler görünür kalabilir.
+
 ### Kayıt konumları
 
 Ayarlar → Kayıt Konumu; indirme, ekran görüntüsü, görüntü araçları, kayıt, PDF, Hızlı İşlemler ve günlük özet için ayrı klasör seçer. Yeni ayarlar `~/Downloads` altındaki `picture` görüntüleri, `video` kayıtları, `pdf`, `quick` ve `daily` kullanır. Ses araçları dosya/klasör aktarım penceresi kullanır. Raf dosyaları özgünlere başvurur; saklanan görüntüler ve bağlam notu durumu `~/Library/Application Support/zisla` altında, kayıt projeleri kayıt klasöründe yönetilir. Hızlı Notlar metni Apple Notlar'dadır.

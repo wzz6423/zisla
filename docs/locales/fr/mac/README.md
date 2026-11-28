@@ -55,6 +55,12 @@ macOS 14 et versions ultérieures sont pris en charge. macOS 26 utilise Liquid G
 
 La fenêtre des actions rapides attribue `Command+1` à `Command+9`, puis `Command+0`, selon l'ordre actuel des actions. Le déclencheur supplémentaire par défaut des nouvelles configurations est `Command+N`, qui exécute la première action ; `Command+Delete` ferme la fenêtre. Configurez le déclencheur, le bouton latéral et l'ordre des actions dans les réglages. Les mises à niveau conservent chaque combinaison explicitement enregistrée, y compris l'ancien `Command+1`, les raccourcis personnalisés et les déclencheurs effacés ; seules les nouvelles configurations ou un champ de déclencheur absent adoptent `Command+N`.
 
+### Gestion de la barre des menus
+
+Dans Réglages → Autre → Gestion de la barre des menus, activez le séparateur. Maintenez ⌘ et faites glisser les icônes du côté opposé à l’horloge. Cliquez sur la flèche pour les masquer ou les afficher. L’autorisation d’accessibilité permet aussi de les choisir individuellement sur cette page.
+
+Les icônes déplaçables peuvent être repliées même si leur app ne permet pas de les masquer. macOS fixe la position de l’horloge et du centre de contrôle. Sous macOS 27, si les écrans connectés ont des largeurs très différentes, certaines icônes peuvent rester visibles sur l’écran le plus large.
+
 ### Emplacements d'enregistrement
 
 Réglages → Emplacement d'enregistrement sélectionne des dossiers distincts pour les téléchargements, captures d'écran, outils d'image, enregistrements, PDF, actions rapides et bulletins quotidiens. Les nouvelles configurations utilisent par défaut les sous-dossiers de `~/Downloads` : `picture` pour captures/images, `video` pour enregistrements, `pdf`, `quick` et `daily`. Les outils audio utilisent une boîte d'export pour choisir un fichier ou un dossier. Les fichiers de l'étagère conservent des références aux originaux ; les captures conservées et l'état des notes contextuelles sont gérés localement sous `~/Library/Application Support/zisla`, tandis que les projets d'enregistrement utilisent le dossier d'enregistrement. Le texte des notes rapides est stocké dans Apple Notes.

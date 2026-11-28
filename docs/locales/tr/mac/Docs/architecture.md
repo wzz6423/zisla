@@ -24,6 +24,7 @@ Sol ve sağ bildirim panelleri gerektiğinde oluşturulur ve kuyrukları boşal�
 ## Durum ve eşzamanlılık
 
 - AppKit, SwiftUI durumu ve pencere denetimi `MainActor` üzerinde kalır.
+- Menü çubuğu yönetimi etkinleştirildiğinde zisla iki `NSStatusItem` denetimi oluşturur. Simge listesi açıkken `AXExtrasMenuBar` öğesini okur ve taşımadan sonra seçilen simgenin konumunu denetler.
 - İndirmeler, hava durumu ve GitHub istekleri actors kullanır.
 - Kancaların yazdığı yapay zekâ durumu, dizinin dosya sistemi olayları üzerinden izlenir. Her yapay zekâ oturum kaynağı, en son yerel oturum veya etkinlik dosyasının değişiklik zamanını ve boyutunu karşılaştırır. Hiçbir şey değişmediyse ayrıştırma önbelleğini yeniden kullanır.
 - Otomatik algılama yalnızca görev durumunu belirlemek için gereken yapılandırılmış olayları, sabit durum işaretlerini ve etkinlik meta verilerini okur. İstem veya yanıt içeriklerini okumaz; bir sağlayıcının ayrıştırma hatası diğer sağlayıcıları engellemez.

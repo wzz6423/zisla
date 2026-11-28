@@ -233,6 +233,8 @@ enum SettingsSearchIndex {
         for tool in [ManagedTool.ytDLP, .libreOffice, .libvips, .libavif] {
             entry(.download, tool.displayName, anchor: .row(tool.displayName), keywords: ["下载", "Downloads"])
         }
+        entry(.menuBarManagement, "菜单栏图标", anchor: .group("菜单栏图标"),
+              keywords: ["菜单栏管理", "启用菜单栏分隔线", "收起图标", "收起时隐藏", "展开"])
         for location in SaveLocation.allCases {
             entry(.saveLocations, location.title, anchor: .row(location.title),
                   keywords: ["默认保存位置", "更改保存位置"]

@@ -55,6 +55,7 @@ Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi Code、Qwen Cod
 - **日次レポート：** 8 テンプレート、プレビュー、手動・定時 PNG 出力、統計の選択、独立保存先。
 - **AI アカウント：** 対応する残量、リセット時刻、低残量通知、取得時刻。ローカル token 履歴は `.xlsx` 出力できます。 Antigravity の Gemini と Claude/GPT の割当は、監視・表示・通知を個別に設定できます。Gemini App の通常チャットの割当は同じ Google アカウントのウェブ Cookie で取得し、Gemini CLI は別に監視します。
 - **クイックアクション：** Command+1 から Command+0 が操作順に対応。新規設定の追加キー Command+N は最初の操作です。更新時も保存済みキーと解除状態を保持します。
+- **メニューバー管理** — アプリを実行したまま、メニューバーの常駐アイコンを隠せます。
 
 [ユーザーヘルプ](https://wzz6423.github.io/zisla/help.html?lang=ja#help) にはクリップボード、撮影、棚、会議、AI、メディアツール、日次レポート、場所メモ・ウィンドウプレビュー、再生・ミックスの 9 つの手順ガイドと短い映像があります。 [macOS ガイド](mac/README.md#保存先) は出力先と依存ツールを記載します。
 

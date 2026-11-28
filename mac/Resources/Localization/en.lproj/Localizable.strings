@@ -3810,3 +3810,16 @@
 "Gemini App 网站额度" = "Gemini App website quota";
 "显示器模式" = "Display Modes";
 "在该屏幕不显示" = "Hide on This Display";
+"菜单栏管理" = "Menu Bar Management";
+"整理菜单栏图标，按需收起或展开。" = "Organize menu bar icons and collapse or expand them as needed.";
+"菜单栏图标" = "Menu Bar Icons";
+"启用菜单栏分隔线" = "Enable Menu Bar Divider";
+"按住 ⌘，将要收起的图标拖到分隔线远离时钟的一侧。" = "Hold ⌘ and drag icons you want to hide to the side of the divider away from the clock.";
+"收起图标" = "Collapse Icons";
+"点按菜单栏中的箭头也可以展开或收起图标。" = "Click the arrow in the menu bar to show or hide the icons.";
+"授权后可以直接在此选择要收起的图标。" = "Allow Accessibility access to choose which icons to hide here.";
+"收起时隐藏" = "Hide When Collapsed";
+"未能移动图标。按住 ⌘，将分隔线拖过这个图标。" = "Couldn’t move this icon. Hold ⌘ and drag the divider past it.";
+"系统固定" = "Fixed by macOS";
+"当前无法移动" = "Can’t move right now";
+"暂未找到菜单栏图标" = "No menu bar icons found";

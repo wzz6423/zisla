@@ -382,6 +382,7 @@ export const vi = createCatalog({
     "videoNotice": "Các đoạn từ video giới thiệu hiện có dùng dữ liệu minh họa. Chữ trong video là tiếng Anh; các bước ở đây theo ngôn ngữ bạn chọn. Video đầy đủ 2:40 và ghi công âm nhạc ở dưới.",
     "preferencesTitle": "Tùy chọn hữu ích",
     "preferences": [
+      "Trong Cài đặt → Khác → Quản lý thanh menu, hãy bật vạch ngăn. Giữ ⌘ rồi kéo các biểu tượng sang phía cách xa đồng hồ. Bấm vào mũi tên để ẩn hoặc hiển thị chúng. Với quyền Trợ năng, bạn cũng có thể chọn từng biểu tượng trên trang này.",
       "Trong Cài đặt → Thú cưng, bạn có thể xem trước thú cưng có sẵn và thú cưng đã nhập. “Thú cưng cố định” luôn hiển thị con bạn chọn. Theo mặc định, “Luân phiên ngẫu nhiên” chọn từ tất cả thú cưng vào nửa đêm theo giờ địa phương. Mở “Danh sách chọn ngẫu nhiên” để thu hẹp danh sách. Chọn “Tùy chỉnh” trong “Khoảng thời gian đổi” để đặt từ 1 giây đến 99:59:59. Giá trị ban đầu là 1 giờ.",
       "Bật lắc khi kéo để hiện kệ. Ghi chú ngữ cảnh dùng phím giữ riêng.",
       "Chọn thiết bị âm thanh đầu ra ở vùng media và nguồn tự động hoặc trình phát ưu tiên trong Cài đặt. Tùy chọn này không gán thiết bị riêng cho từng ứng dụng.",

@@ -55,6 +55,12 @@ macOS 14 dan lebih baru didukung. macOS 26 memakai Liquid Glass; macOS 14/15 mem
 
 Popup memberikan `Command+1` hingga `Command+9`, lalu `Command+0` sesuai urutan tindakan saat ini. Pemicu tambahan default konfigurasi baru adalah `Command+N` untuk tindakan pertama; `Command+Delete` menutup popup. Atur pemicu, tombol samping, dan urutan di Pengaturan. Peningkatan mempertahankan setiap kombinasi tersimpan, termasuk `Command+1` lama, pintasan khusus, dan pemicu kosong. Hanya konfigurasi baru atau kolom pemicu yang tidak ada memakai `Command+N`.
 
+### Pengelolaan Bar Menu
+
+Di Pengaturan → Lainnya → Pengelolaan Bar Menu, aktifkan pemisah. Tahan ⌘ dan seret ikon ke sisi yang menjauhi jam, lalu klik panah untuk menyembunyikan atau menampilkannya. Dengan izin Aksesibilitas, Anda juga dapat memilih ikon satu per satu di halaman ini.
+
+Ikon yang dapat dipindahkan bisa diciutkan meski aplikasinya tidak menyediakan opsi untuk menyembunyikannya. macOS menetapkan posisi jam dan Pusat Kontrol. Pada macOS 27, jika lebar layar yang terhubung sangat berbeda, beberapa ikon mungkin tetap terlihat di layar yang lebih lebar.
+
 ### Lokasi penyimpanan
 
 Pengaturan → Lokasi Simpan memilih folder terpisah untuk unduhan, tangkapan, gambar, rekaman, PDF, Tindakan Cepat, dan ringkasan harian. Konfigurasi baru memakai subfolder `~/Downloads`: `picture` untuk tangkapan/gambar, `video` untuk rekaman, `pdf`, `quick`, dan `daily`. Alat audio memilih berkas/folder melalui dialog ekspor. Berkas rak tetap merujuk aslinya; tangkapan tersimpan dan status catatan konteks dikelola di `~/Library/Application Support/zisla`, proyek rekaman memakai folder rekaman. Teks Catatan Cepat tersimpan di Apple Notes.

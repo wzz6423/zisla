@@ -55,6 +55,12 @@ macOS 14 und neuer werden unterstützt. macOS 26 nutzt Liquid Glass; macOS 14/15
 
 Das Schnellaktions-Popup vergibt `Command+1` bis `Command+9`, danach `Command+0`, in der aktuellen Aktionsreihenfolge. Der zusätzliche Standardauslöser für neue Konfigurationen ist `Command+N` für die erste Aktion; `Command+Delete` schließt das Popup. Stellen Sie Auslöser, Maus-Seitentaste und Reihenfolge in den Einstellungen ein. Aktualisierungen behalten jede ausdrücklich gespeicherte Kombination, darunter das alte `Command+1`, eigene Kurzbefehle und gelöschte Auslöser; nur neue Konfigurationen oder ein fehlendes Auslöserfeld übernehmen `Command+N`.
 
+### Menüleistenverwaltung
+
+Aktiviere unter Einstellungen → Sonstige → Menüleistenverwaltung die Trennlinie. Ziehe Symbole bei gedrückter ⌘-Taste auf die von der Uhr abgewandte Seite und klicke zum Ein- oder Ausblenden auf den Pfeil. Mit Zugriff auf die Bedienungshilfen kannst du einzelne Symbole auch auf dieser Seite auswählen.
+
+Verschiebbare Symbole lassen sich auch ohne Ausblendoption in der jeweiligen App einklappen. Uhr und Kontrollzentrum haben in macOS einen festen Platz. Sind die angeschlossenen Displays sehr unterschiedlich breit, können unter macOS 27 auf dem breiteren Display einige Symbole sichtbar bleiben.
+
 ### Speicherorte
 
 Einstellungen → Speicherort wählt separate Ordner für Downloads, Screenshots, Bildwerkzeuge, Aufnahmen, PDF, Schnellaktionen und Tagesberichte. Neue Konfigurationen verwenden Unterordner von `~/Downloads`: `picture` für Screenshots/Bilder, `video` für Aufnahmen, `pdf`, `quick` und `daily`. Audiowerkzeuge wählen Datei oder Ordner über einen Exportdialog. Ablagedateien behalten Verweise auf die Originale; abgelegte Screenshots und Kontextnotizstatus werden lokal unter `~/Library/Application Support/zisla` verwaltet, Aufnahmeprojekte im Aufnahmeordner. Schnellnotiztext liegt in Apple Notizen.

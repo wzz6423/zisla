@@ -55,6 +55,12 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 
 The Quick Actions popup assigns `Command+1` through `Command+9`, then `Command+0`, in the current action order. The additional default trigger for new configurations is `Command+N`, which runs the first action; `Command+Delete` dismisses the popup. Configure the trigger, mouse side button, and action order in Settings. Upgrades retain every explicitly saved combination, including the old `Command+1`, custom shortcuts, and cleared triggers; only new configurations or an absent trigger field adopt `Command+N`.
 
+### Menu Bar Management
+
+In Settings → Other → Menu Bar Management, enable the divider. Hold ⌘ and drag icons to the side away from the clock, then click the arrow to hide or show them. With Accessibility access, you can also select individual icons on this page.
+
+Movable icons can be tucked away even when their app has no hide option. macOS fixes the clock and Control Center in place. On macOS 27, when connected displays have very different widths, some icons may remain visible on the wider display.
+
 ### Save locations
 
 Settings → Save Location selects separate folders for downloads, screenshots, image tools, recordings, PDF, Quick Actions, and daily briefings. New configurations default to `~/Downloads` subfolders: `picture` for screenshots/images, `video` for recordings, `pdf`, `quick`, and `daily`. Audio tools use an export dialog to select a file or folder. Shelf files retain references to the originals; stashed screenshots and context-note state are managed locally under `~/Library/Application Support/zisla`, while recording projects use the recording folder. Quick Notes text lives in Apple Notes.

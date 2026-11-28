@@ -55,6 +55,7 @@ La isla tiene 12 módulos: Inicio, Transferencia, Portapapeles, Supervisión de 
 - **Resumen diario:** 8 plantillas, vista previa, exportación PNG manual o programada, métricas seleccionadas y carpeta de guardado independiente.
 - **Cuentas de IA:** Consulta cuotas disponibles de cuentas compatibles, horas de reinicio, avisos de cuota baja y horas de muestreo; exporta el historial local de tokens como `.xlsx`. Las cuotas Gemini y Claude/GPT de Antigravity tienen supervisión, visualización y avisos independientes. Las cuotas de conversación de Gemini App usan un Cookie web de la misma cuenta de Google; Gemini CLI se supervisa por separado.
 - **Acciones rápidas:** Las acciones del aviso usan `Command+1` a `Command+0` en orden. El activador adicional predeterminado para configuraciones nuevas es `Command+N` para la primera acción. Las actualizaciones conservan atajos guardados y activadores borrados.
+- **Gestión de la barra de menús** — Oculta los iconos permanentes de la barra de menús mientras sus apps siguen ejecutándose.
 
 La [ayuda para usuarios](https://wzz6423.github.io/zisla/help.html?lang=es#help) ofrece nueve guías paso a paso: portapapeles, captura, estantería, reuniones, IA, herramientas multimedia, resúmenes diarios, notas de escritorio/vistas previas de ventanas y reproducción/mezcla. La [guía de macOS](mac/README.md) enumera las carpetas de guardado y dependencias de las herramientas.
 

@@ -55,6 +55,12 @@ Sono supportati macOS 14 e successivi. macOS 26 usa Liquid Glass; macOS 14/15 us
 
 Il popup assegna `Command+1`…`Command+9`, poi `Command+0`, nell'ordine delle azioni. La scorciatoia aggiuntiva per nuove configurazioni è `Command+N` per la prima azione; `Command+Delete` chiude. Configura tasto, pulsante laterale e ordine nelle impostazioni. L'aggiornamento conserva ogni combinazione esplicitamente salvata, compresi vecchio `Command+1`, personalizzazioni e comandi rimossi; soltanto nuove configurazioni o campo assente adottano `Command+N`.
 
+### Gestione della barra dei menu
+
+In Impostazioni → Altri → Gestione della barra dei menu attiva il separatore. Tieni premuto ⌘ e trascina le icone sul lato opposto all’orologio, poi fai clic sulla freccia per nasconderle o mostrarle. Con il permesso di Accessibilità puoi anche selezionarle singolarmente in questa pagina.
+
+Puoi comprimere le icone spostabili anche se l’app non offre un’opzione per nasconderle. macOS fissa la posizione dell’orologio e del Centro di Controllo. Su macOS 27, se gli schermi collegati hanno larghezze molto diverse, alcune icone possono rimanere visibili sullo schermo più largo.
+
 ### Posizioni di salvataggio
 
 Impostazioni → Posizione di salvataggio separa download, screenshot, immagini, registrazioni, PDF, azioni rapide e riepiloghi. Le nuove configurazioni usano sottocartelle di `~/Downloads`: `picture` per immagini/screenshot, `video` per registrazioni, `pdf`, `quick`, `daily`. L'audio usa la finestra di export per scegliere file o cartella. Lo scaffale conserva riferimenti agli originali; screenshot e stato delle note contestuali sono locali in `~/Library/Application Support/zisla`, i progetti nella cartella registrazioni e le Note rapide in Note di Apple.

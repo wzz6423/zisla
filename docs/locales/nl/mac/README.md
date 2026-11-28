@@ -55,6 +55,12 @@ macOS 14 en later zijn ondersteund. macOS 26 gebruikt Liquid Glass; macOS 14/15 
 
 De popup gebruikt `Command+1`…`Command+9` en `Command+0` in actievolgorde. Nieuwe configuraties krijgen aanvullend `Command+N` voor de eerste actie; `Command+Delete` sluit. Stel toets, muiszijtoets en volgorde in. Elke expliciet opgeslagen combinatie blijft bij updates behouden, ook oude `Command+1`, eigen toetsen en gewiste triggers. Alleen nieuw of ontbrekend triggerveld neemt N over.
 
+### Menubalkbeheer
+
+Schakel in Instellingen → Overig → Menubalkbeheer het scheidingsteken in. Houd ⌘ ingedrukt en sleep symbolen naar de kant die van de klok af ligt. Klik op de pijl om ze te verbergen of te tonen. Met toestemming voor Toegankelijkheid kun je ze ook op deze pagina afzonderlijk kiezen.
+
+Verplaatsbare symbolen kunnen worden ingeklapt, ook als hun app geen optie heeft om ze te verbergen. De klok en het bedieningspaneel hebben een vaste positie in macOS. Als de aangesloten beeldschermen sterk in breedte verschillen, kunnen op het bredere scherm in macOS 27 enkele symbolen zichtbaar blijven.
+
 ### Opslaglocaties
 
 Instellingen → Opslaglocatie biedt afzonderlijke mappen voor downloads, schermafbeeldingen, afbeeldingstools, opnames, PDF, Snelle acties en dagoverzicht. Nieuwe configuraties gebruiken `~/Downloads` met `picture`, `video`, `pdf`, `quick`, `daily`. Audiotools kiezen bestand/map met exportdialoog. De plank bewaart verwijzingen naar originelen; schermafbeeldingen en contextnotities onder `~/Library/Application Support/zisla`, projecten in de opnamemap en Snelle notities in Apple Notities.

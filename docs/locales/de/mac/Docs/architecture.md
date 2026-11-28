@@ -24,6 +24,7 @@ Linke und rechte Mitteilungsfenster werden bei Bedarf erstellt und sofort verbor
 ## Status und Nebenläufigkeit
 
 - AppKit, SwiftUI-Status und Fenstersteuerung bleiben auf `MainActor`.
+- Bei aktivierter Menüleistenverwaltung legt zisla zwei `NSStatusItem`-Elemente an. Solange die Symbolliste geöffnet ist, liest zisla `AXExtrasMenuBar` und prüft nach dem Verschieben die Position des gewählten Symbols.
 - Downloads, Wetter und GitHub-Anfragen verwenden Actors.
 - Von Hooks geschriebener KI-Status wird durch Dateisystemereignisse des Ordners überwacht. Jede KI-Sitzungsquelle vergleicht Änderungszeit und Größe der neuesten lokalen Sitzungs- oder Aktivitätsdatei und verwendet bei unveränderten Daten den Parsing-Cache erneut.
 - Automatische Erkennung liest nur strukturierte Ereignisse, feste Statusmarker und Aktivitätsmetadaten zur Aufgabenstatusbestimmung. Prompts und Antwortinhalte werden nicht gelesen; ein Anbieterparserfehler blockiert andere Anbieter nicht.

@@ -3811,3 +3811,16 @@
 "Gemini App 网站额度" = "Quota web di Gemini App";
 "显示器模式" = "Modalità degli schermi";
 "在该屏幕不显示" = "Nascondi su questo schermo";
+"菜单栏管理" = "Gestione della barra dei menu";
+"整理菜单栏图标，按需收起或展开。" = "Organizza le icone della barra dei menu e nascondile o mostrale quando vuoi.";
+"菜单栏图标" = "Icone della barra dei menu";
+"启用菜单栏分隔线" = "Attiva il separatore nella barra dei menu";
+"按住 ⌘，将要收起的图标拖到分隔线远离时钟的一侧。" = "Tieni premuto ⌘ e trascina le icone da nascondere sul lato del separatore opposto all’orologio.";
+"收起图标" = "Comprimi le icone";
+"点按菜单栏中的箭头也可以展开或收起图标。" = "Fai clic sulla freccia nella barra dei menu per mostrare o nascondere le icone.";
+"授权后可以直接在此选择要收起的图标。" = "Consenti l’accesso ad Accessibilità per scegliere qui quali icone nascondere.";
+"收起时隐藏" = "Nascondi quando compresse";
+"未能移动图标。按住 ⌘，将分隔线拖过这个图标。" = "Impossibile spostare l’icona. Tieni premuto ⌘ e trascina il separatore oltre l’icona.";
+"系统固定" = "Fissata da macOS";
+"当前无法移动" = "Al momento non spostabile";
+"暂未找到菜单栏图标" = "Nessuna icona trovata nella barra dei menu";
