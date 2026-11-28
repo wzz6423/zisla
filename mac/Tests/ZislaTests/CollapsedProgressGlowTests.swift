@@ -577,7 +577,7 @@ struct CollapsedProgressGlowTests {
         enabled: Bool = true, expanded: Bool = false
     ) throws -> [Double] {
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
-        controller.screenAtPoint = { _ in nil }
+        controller.screenAtPoint = { _ in expanded ? NSScreen.screens.first : nil }
         controller.presentation.progressGlowEnabled = enabled
         if expanded {
             let detection = ClipboardAssistantDetection(kind: .filePath, title: "File", fullContent: String(repeating: "x", count: 80))

@@ -55,7 +55,7 @@ Die Insel hat 12 Module: Startseite, Übergabe, Zwischenablage, KI-Überwachung,
 - **Tagesbericht:** 8 Vorlagen, Vorschau, manueller oder geplanter PNG-Export, ausgewählte Messwerte und eigener Speicherordner.
 - **KI-Konten:** Zeigt verfügbare Kontingente unterstützter Konten, Zurücksetzungszeiten, Hinweise bei geringem Kontingent und Stichprobenzeiten; exportiert den lokalen Token-Verlauf als `.xlsx`. Die Gemini- und Claude/GPT-Kontingente von Antigravity werden unabhängig überwacht, angezeigt und gemeldet. Gemini App nutzt für Chat-Kontingente ein Web-Cookie desselben Google-Kontos; Gemini CLI bleibt getrennt.
 - **Schnellaktionen:** Popup-Aktionen verwenden `Command+1` bis `Command+0` in ihrer Reihenfolge. Der zusätzliche Standardauslöser für neue Konfigurationen ist `Command+N` für die erste Aktion. Aktualisierungen behalten gespeicherte Kurzbefehle und gelöschte Auslöser bei.
-- **Menüleistenverwaltung** — Blende einzelne Menüleistensymbole ein oder aus, während die Apps weiterlaufen.
+- **Menüleiste verwalten** — Blende einzelne Menüleistensymbole ein oder aus, während die Apps weiterlaufen.
 
 Die [Benutzerhilfe](https://wzz6423.github.io/zisla/help.html?lang=de#help) bietet neun Schrittanleitungen: Zwischenablage, Aufnahme, Ablage, Besprechungen, KI, Medienwerkzeuge, Tagesberichte, Desktop-Notizen/Fenstervorschauen und Wiedergabe/Mixing. Der [macOS-Leitfaden](mac/README.md) nennt Speicherordner und Abhängigkeiten der Werkzeuge.
 

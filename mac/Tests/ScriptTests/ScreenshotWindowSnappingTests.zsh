@@ -101,5 +101,6 @@ func window(_ rect: CGRect, layer: Int = 0, alpha: Double = 1, owner: pid_t) -> 
 ''')
 PYTHON
 
-xcrun swiftc -swift-version 6 -parse-as-library "$TEST_ROOT/Snapping.swift" -o "$TEST_ROOT/snapping-tests"
+xcrun swiftc -swift-version 6 -parse-as-library "$TEST_ROOT/Snapping.swift" \
+  "$ROOT/Sources/Zisla/AccessibilityGeometry.swift" -o "$TEST_ROOT/snapping-tests"
 "$TEST_ROOT/snapping-tests"

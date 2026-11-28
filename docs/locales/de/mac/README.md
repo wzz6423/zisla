@@ -55,9 +55,9 @@ macOS 14 und neuer werden unterstützt. macOS 26 nutzt Liquid Glass; macOS 14/15
 
 Das Schnellaktions-Popup vergibt `Command+1` bis `Command+9`, danach `Command+0`, in der aktuellen Aktionsreihenfolge. Der zusätzliche Standardauslöser für neue Konfigurationen ist `Command+N` für die erste Aktion; `Command+Delete` schließt das Popup. Stellen Sie Auslöser, Maus-Seitentaste und Reihenfolge in den Einstellungen ein. Aktualisierungen behalten jede ausdrücklich gespeicherte Kombination, darunter das alte `Command+1`, eigene Kurzbefehle und gelöschte Auslöser; nur neue Konfigurationen oder ein fehlendes Auslöserfeld übernehmen `Command+N`.
 
-### Menüleistenverwaltung
+### Menüleiste verwalten
 
-Öffne Einstellungen → Sonstige → Menüleistenverwaltung. Schalte den Schalter neben einem Symbol aus, um es auszublenden, oder wieder ein, um es anzuzeigen. Ausgeblendete Symbole bleiben in der Liste. Für Symbole anderer Apps ist der Zugriff auf die Bedienungshilfen erforderlich.
+Öffne Einstellungen → Sonstige → Menüleiste verwalten. Schalte den Schalter neben einem Symbol aus, um es auszublenden, oder wieder ein, um es anzuzeigen. Ausgeblendete Symbole bleiben in der Liste. Für Symbole anderer Apps ist der Zugriff auf die Bedienungshilfen erforderlich.
 
 ### Speicherorte
 
