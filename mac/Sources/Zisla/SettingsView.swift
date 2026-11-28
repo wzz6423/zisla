@@ -2579,9 +2579,8 @@ struct SettingsView: View {
             guard let number = screen.deviceDescription[key] as? NSNumber else { return nil }
             let name = screen.localizedName.isEmpty
                 ? AppLocalization.format("显示器 %ld", locale: locale, [index + 1]) : screen.localizedName
-            let snapshot = ScreenSnapshot(screen: screen)
             return ActivityNoticeDisplay(id: number.uint32Value, name: name,
-                                         persistentID: snapshot?.persistentID ?? String(number.uint32Value))
+                                         persistentID: ScreenSnapshot.persistentID(for: number.uint32Value))
         }
         return displays.count > 1 ? displays : []
     }

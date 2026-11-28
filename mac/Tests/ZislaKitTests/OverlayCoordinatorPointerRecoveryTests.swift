@@ -151,6 +151,45 @@ struct OverlayCoordinatorPointerRecoveryTests {
         #expect(!panel.ignoresMouseEvents)
     }
 
+    @Test(arguments: [false, true])
+    func captureReleaseRestoresARevealRequestedOverAStationaryPointer(pinned: Bool) throws {
+        let fixture = Fixture()
+        defer { fixture.coordinator.stop() }
+        let panel = try #require(fixture.content.window as? IslandPanel)
+        var activations = 0
+        fixture.coordinator.applicationActivationHandler = { activations += 1 }
+        fixture.coordinator.setAllowsKeyWindow(true, focusesKeyboardInputSurface: false)
+        fixture.pointer.location = fixture.trigger
+        fixture.coordinator.handlePointer(at: fixture.trigger)
+        fixture.coordinator.collapseImmediately()
+        var visibilityChanges: [Bool] = []
+        fixture.coordinator.onVisibilityChanged = { visibilityChanges.append($0) }
+
+        fixture.coordinator.setScreenshotCaptureInProgress(true)
+        if pinned {
+            fixture.coordinator.setPinned(true)
+        } else {
+            fixture.coordinator.showExpanded()
+        }
+        #expect(panel.ignoresMouseEvents)
+        fixture.coordinator.setScreenshotCaptureInProgress(false)
+        #expect(panel.isVisible)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(panel.isPinned == pinned)
+        #expect(visibilityChanges == [true])
+        #expect(activations == 0)
+        #expect(!panel.isKeyWindow)
+
+        fixture.coordinator.setScreenshotCaptureInProgress(true)
+        fixture.coordinator.collapseImmediately()
+        panel.orderOut(nil)
+        fixture.coordinator.setScreenshotCaptureInProgress(false)
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(!panel.isVisible)
+        #expect(panel.ignoresMouseEvents)
+        #expect(visibilityChanges == [true, false])
+    }
+
     @Test(arguments: [1, 2, 4])
     func recoveryWaitsForMouseReleaseInsteadOfTurningADragIntoHover(buttons: Int) throws {
         let fixture = Fixture()

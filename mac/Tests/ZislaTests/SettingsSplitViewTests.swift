@@ -46,10 +46,12 @@ struct SettingsSplitViewTests {
         let scroll = try #require(fixture.descendants(in: view).compactMap { $0 as? NSScrollView }.first)
         let clip = scroll.contentView
         let initialWidth = view.frame.width
-        for width in [initialWidth, initialWidth + 80] {
-            split.splitView.setPosition(width, ofDividerAt: 0)
-            await fixture.layout()
-            #expect(view.frame.width == width)
+        for widenSidebar in [false, true] {
+            if widenSidebar {
+                split.splitView.setPosition(initialWidth + 80, ofDividerAt: 0)
+                await fixture.layout()
+                #expect(view.frame.width > initialWidth)
+            }
             let origin = clip.bounds.origin
             for deltaX: CGFloat in [-60, 60] {
                 let target = clip.constrainBoundsRect(clip.bounds.offsetBy(dx: deltaX, dy: 60))

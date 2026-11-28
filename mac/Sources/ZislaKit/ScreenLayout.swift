@@ -34,6 +34,11 @@ public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
 
     public var id: CGDirectDisplayID { displayID }
 
+    public static func persistentID(for displayID: CGDirectDisplayID) -> String {
+        CGDisplayCreateUUIDFromDisplayID(displayID)
+            .map { CFUUIDCreateString(nil, $0.takeRetainedValue()) as String } ?? String(displayID)
+    }
+
     /// The depth reserved by the current screen's menu bar/top safe area.
     /// `visibleFrame` is the most reliable per-display value; some virtual or
     /// full-screen configurations omit it, so safe-area, auxiliary-region, and
@@ -97,8 +102,7 @@ public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
             auxiliaryTopLeftArea: screen.auxiliaryTopLeftArea,
             auxiliaryTopRightArea: screen.auxiliaryTopRightArea,
             menuBarHeightFallback: max(24, NSStatusBar.system.thickness),
-            persistentID: CGDisplayCreateUUIDFromDisplayID(number.uint32Value)
-                .map { CFUUIDCreateString(nil, $0.takeRetainedValue()) as String }
+            persistentID: Self.persistentID(for: number.uint32Value)
         )
     }
 }

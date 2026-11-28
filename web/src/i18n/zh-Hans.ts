@@ -227,7 +227,7 @@ export const zhHans: SiteContent = {
       browserDownloads: {
         title: '浏览器下载进度',
         description:
-          '识别 Safari、Chrome、Edge、Firefox、Brave、Vivaldi、Opera 与 Arc 的下载，在顶部显示来源和实时进度。浏览器提供目标名称时，进度提示显示真实文件名。仅在系统临时目录出现 .crdownload 文件时，灵动岛不会显示下载卡片。',
+          '识别 Safari、Chrome、Edge、Firefox、Brave、Vivaldi、Opera 与 Arc 的下载，在顶部显示来源和实时进度。浏览器提供目标名称时，进度提示显示真实文件名。系统临时目录中的 .crdownload 文件本身不会触发下载卡片。',
         detail: '8 种浏览器 · 来源识别 · 完成提示',
       },
       copyAssistant: {

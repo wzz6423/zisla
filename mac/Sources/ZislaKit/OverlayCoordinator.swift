@@ -708,6 +708,10 @@ public final class OverlayCoordinator: NSObject {
             cancelPointerRevalidation()
             cancelPendingPanelCollapse()
         } else {
+            // A reveal requested during capture may already own the pointer without an interactive panel.
+            if reducer.state.visibility == .expanded || reducer.state.visibility == .pinned {
+                presentCurrentLayout()
+            }
             handlePointer(at: pointerLocationProvider())
         }
     }

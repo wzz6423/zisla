@@ -227,7 +227,7 @@ export const zhHant: SiteContent = {
       browserDownloads: {
         title: '瀏覽器下載進度',
         description:
-          '辨識 Safari、Chrome、Edge、Firefox、Brave、Vivaldi、Opera 與 Arc 的下載，在頂端顯示來源與即時進度。瀏覽器提供目標名稱時，進度提示顯示實際檔名。僅在系統暫存資料夾出現 .crdownload 檔案時，靈動島不會顯示下載卡片。',
+          '辨識 Safari、Chrome、Edge、Firefox、Brave、Vivaldi、Opera 與 Arc 的下載，在頂端顯示來源與即時進度。瀏覽器提供目標名稱時，進度提示顯示實際檔名。系統暫存資料夾中的 .crdownload 檔案本身不會觸發下載卡片。',
         detail: '8 種瀏覽器 · 來源辨識 · 完成提示',
       },
       copyAssistant: {

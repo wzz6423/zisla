@@ -50,7 +50,7 @@ public enum ToolboxReminder {
         switch (keepDisplayAwake, preventIdleSystemSleep) {
         case (true, true):
             return ToolboxReminderContent(title: "亮屏 · 防休眠", compactTitle: "亮屏",
-                                         symbolName: displayAwakeSymbol, secondarySymbolName: preventIdleSleepSymbol)
+                                          symbolName: displayAwakeSymbol, secondarySymbolName: preventIdleSleepSymbol)
         case (true, false):
             return ToolboxReminderContent(title: "保持亮屏", compactTitle: "亮屏", symbolName: displayAwakeSymbol)
         case (false, true):
