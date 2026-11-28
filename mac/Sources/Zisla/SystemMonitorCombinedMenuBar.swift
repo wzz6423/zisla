@@ -163,10 +163,15 @@ enum IslandStatusIconRouting {
         readings: [IslandStatusIcon.Reading],
         combined: NSStatusItem?,
         style: SystemMonitorMenuBarDisplayStyle,
+        hidden: [String: String] = [:],
         islandAppIconEnabled: Bool = true
     ) -> [IslandStatusIcon] {
-        let items = [application, stacked, combined].compactMap { $0 } + metrics.map { $0.1 }
-        items.forEach { $0.isVisible = destination == .menuBar }
+        let items = [("application", application), ("stacked", stacked), ("combined", combined)] +
+            metrics.map { ($0.0.rawValue, Optional($0.1)) }
+        for (id, item) in items {
+            let visible = destination == .menuBar && hidden[MenuBarIconRow.localID(id)] == nil
+            if let item, item.isVisible != visible { item.isVisible = visible }
+        }
         guard destination == .island else { return [] }
         var icons: [IslandStatusIcon] = []
         if islandAppIconEnabled {

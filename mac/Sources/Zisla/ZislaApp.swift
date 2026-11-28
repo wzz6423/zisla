@@ -1053,6 +1053,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         onboardingController?.close()
         onboardingController = nil
         guard let runningModel else { return }
+        menuBarManager.stop()
         combinedIconReadTask?.cancel()
         expandedSizeUpdateTask?.cancel()
         fileShelfShakeController?.stop()
@@ -1342,6 +1343,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         guard statusItem == nil else { return }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.button?.setAccessibilityIdentifier(MenuBarIconRow.localID("application"))
         item.button?.image = NSImage(systemSymbolName: "capsule.inset.filled", accessibilityDescription: "zisla")
         let menu = NSMenu()
         menu.addItem(withTitle: localized("显示灵动岛"), action: #selector(showIsland), keyEquivalent: "")
@@ -1380,6 +1382,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 item = existing
             } else {
                 item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                item.button?.setAccessibilityIdentifier(MenuBarIconRow.localID(metric.rawValue))
                 item.button?.target = self
                 item.button?.action = #selector(showSystemMonitor)
                 monitorStatusItems[metric] = item
@@ -1431,9 +1434,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let displayIDs = NSScreen.screens.compactMap { ScreenSnapshot(screen: $0)?.persistentID }
         let destination = settings.supportsStatusIconsInIsland(on: displayIDs) ? settings.statusIconDestination : .menuBar
+        let localRows: [MenuBarIconRow] = [
+            statusItem.map { _ in .local("application", title: "zisla") },
+            mergedMonitorStatusItem.map { _ in .local("stacked", title: "系统监控") },
+            combinedMonitorStatusItem.map { _ in .local("combined", title: "合并状态图标") },
+        ].compactMap { $0 } + metrics.map { .local($0.0.rawValue, title: $0.0.menuTitle) }
+        menuBarManager.updateLocalRows(destination == .menuBar ? localRows : [])
         let icons = IslandStatusIconRouting.update(destination: destination,
                                                    application: statusItem, metrics: metrics, stacked: mergedMonitorStatusItem, readings: readings,
                                                    combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle,
+                                                   hidden: settings.hiddenMenuBarIcons,
                                                    islandAppIconEnabled: settings.islandAppIconEnabled)
         AppModel.shared.islandHasSystemMonitorIcons = icons.contains(where: \.isSystemMonitor)
         noticePresenter?.setStatusIcons(icons)
@@ -1449,6 +1459,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         if mergedMonitorStatusItem == nil {
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.button?.setAccessibilityIdentifier(MenuBarIconRow.localID("stacked"))
             item.button?.target = self
             item.button?.action = #selector(showSystemMonitor)
             item.button?.imagePosition = .imageOnly
@@ -1486,6 +1497,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         if combinedMonitorStatusItem == nil {
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.button?.setAccessibilityIdentifier(MenuBarIconRow.localID("combined"))
             item.button?.target = self
             item.button?.action = #selector(showSystemMonitor)
             item.button?.imagePosition = .imageOnly
@@ -1657,7 +1669,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.statusItem = nil
         }
         syncAppStatusItem()
-        menuBarManager.refresh()
         monitorStatusItemStyles.removeAll()
         monitorStatusTitles.removeAll()
         syncMonitorStatusItems(force: true)

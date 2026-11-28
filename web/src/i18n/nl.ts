@@ -480,7 +480,7 @@ export const nl = createCatalog({
     "videoNotice": "Fragmenten uit de bestaande rondleiding met demogegevens. Video-onderschriften zijn Engels; deze stappen volgen je taal. De volledige 2:40-rondleiding en muziekvermelding staan hieronder.",
     "preferencesTitle": "Handige voorkeuren",
     "preferences": [
-      "Schakel in Instellingen → Overig → Menubalkbeheer het scheidingsteken in. Houd ⌘ ingedrukt en sleep symbolen naar de kant die van de klok af ligt. Klik op de pijl om ze te verbergen of te tonen. Met toestemming voor Toegankelijkheid kun je ze ook op deze pagina afzonderlijk kiezen.",
+      "Open Instellingen → Overig → Menubalkbeheer. Zet de schakelaar bij een symbool uit om het te verbergen of weer aan om het te tonen. Verborgen symbolen blijven in de lijst staan. Voor symbolen van andere apps is toestemming voor Toegankelijkheid nodig.",
       "Bekijk ingebouwde en geïmporteerde dieren via Instellingen → Huisdier. ‘Vast huisdier’ toont steeds hetzelfde dier. ‘Willekeurig wisselen’ loot standaard uit alle dieren. Beperk de selectie via ‘Huisdieren voor de loting’. Standaard wisselt het dier om middernacht lokale tijd. Kies bij ‘Wisselinterval’ voor ‘Aangepast’ om een duur van 1 seconde tot 99:59:59 in te stellen. De beginwaarde is 1 uur.",
       "Schakel schudden tijdens slepen in om de plank te tonen. Contextnotities gebruiken een eigen vastgehouden toets.",
       "Kies audio-uitvoer in het mediagebied en automatische bron of favoriete speler in instellingen. Dit wijst apps geen aparte apparaten toe.",

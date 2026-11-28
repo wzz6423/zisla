@@ -24,7 +24,7 @@
 ## 状态与并发
 
 - AppKit、SwiftUI 状态和窗口控制限制在 `MainActor`。
-- 开启菜单栏管理后，zisla 创建两个 `NSStatusItem` 控件。图标列表打开时，zisla 读取 `AXExtrasMenuBar`，并在移动后核对所选图标的位置。
+- Zisla 使用 `NSStatusItem` 控制自身图标。对于其他应用，Zisla 读取 `AXExtrasMenuBar`，并在保存选择前检查菜单栏布局。
 - 下载、天气和 GitHub 请求使用 actor。
 - hook 写入的 AI 状态使用目录文件系统事件监听；各 AI 会话源定期比较最近本地会话或活动文件的 mtime/size，未变化时复用解析缓存。
 - 自动检测只读取判断任务状态所需的结构化事件、固定状态 marker 或活动元数据，不读取 prompt/answer 正文；任一 Provider 解析失败不会阻断其他 Provider。

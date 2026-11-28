@@ -382,7 +382,7 @@ export const id = createCatalog({
     "videoNotice": "Cuplikan dari tur fitur yang sudah ada dengan data demo. Teks dalam video berbahasa Inggris; langkah di sini memakai bahasa pilihan. Tur lengkap 2:40 dan kredit musik ada di bawah.",
     "preferencesTitle": "Preferensi berguna",
     "preferences": [
-      "Di Pengaturan → Lainnya → Pengelolaan Bar Menu, aktifkan pemisah. Tahan ⌘ dan seret ikon ke sisi yang menjauhi jam, lalu klik panah untuk menyembunyikan atau menampilkannya. Dengan izin Aksesibilitas, Anda juga dapat memilih ikon satu per satu di halaman ini.",
+      "Buka Pengaturan → Lainnya → Pengelolaan Bar Menu. Matikan sakelar di samping ikon untuk menyembunyikannya atau nyalakan kembali untuk menampilkannya. Ikon tersembunyi tetap ada dalam daftar. Pengelolaan ikon aplikasi lain memerlukan izin Aksesibilitas.",
       "Di Pengaturan → Pet, lihat pratinjau peliharaan bawaan dan yang diimpor. Mode Peliharaan tetap menampilkan satu peliharaan. Rotasi acak mengundi dari semua peliharaan kecuali Anda membatasi Daftar undian. Secara bawaan, undian berlangsung pada tengah malam waktu setempat. Pilih Kustom pada Interval pergantian untuk mengatur durasi dari 1 detik hingga 99:59:59. Nilai awalnya 1 jam.",
       "Aktifkan goyang saat menyeret untuk menampilkan rak. Catatan konteks memakai tombol tahan tersendiri.",
       "Pilih keluaran audio di area media dan sumber otomatis atau pemutar favorit di Pengaturan. Ini tidak membagi perangkat berbeda per aplikasi.",

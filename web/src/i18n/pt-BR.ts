@@ -493,7 +493,7 @@ export const ptBR = createCatalog({
     "videoNotice": "Trechos da apresentação existente com dados de demonstração. As legendas do vídeo estão em inglês; as etapas usam seu idioma. O vídeo completo de 2:40 e os créditos musicais estão abaixo.",
     "preferencesTitle": "Preferências úteis",
     "preferences": [
-      "Em Ajustes → Outros → Gerenciamento da barra de menus, ative o divisor. Mantenha ⌘ pressionada e arraste os ícones para o lado oposto ao relógio. Clique na seta para ocultá-los ou mostrá-los. Com a permissão de Acessibilidade, você também pode selecioná-los individualmente nesta página.",
+      "Abra Ajustes → Outros → Gerenciamento da barra de menus. Desative o interruptor ao lado de um ícone para ocultá-lo ou ative-o novamente para mostrá-lo. Os ícones ocultos continuam na lista. Para gerenciar os ícones de outros apps, é preciso permitir o acesso à Acessibilidade.",
       "Em Ajustes → Pet, veja uma prévia dos mascotes integrados e importados. “Mascote fixo” mantém o mesmo mascote. A rotação aleatória inclui todos por padrão. Escolha quem participa em “Mascotes para o sorteio”. O sorteio ocorre à meia-noite no horário local. Em “Intervalo de troca”, escolha “Personalizado” para definir uma duração de 1 segundo a 99:59:59. O valor inicial é de 1 hora.",
       "Ative agitar ao arrastar para revelar a prateleira. Notas de contexto usam sua própria tecla mantida.",
       "Escolha a saída de áudio na área de mídia e fonte automática ou player preferido nos Ajustes. Isso não atribui um dispositivo diferente a cada app.",

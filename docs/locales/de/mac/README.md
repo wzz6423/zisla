@@ -57,9 +57,7 @@ Das Schnellaktions-Popup vergibt `Command+1` bis `Command+9`, danach `Command+0`
 
 ### Menüleistenverwaltung
 
-Aktiviere unter Einstellungen → Sonstige → Menüleistenverwaltung die Trennlinie. Ziehe Symbole bei gedrückter ⌘-Taste auf die von der Uhr abgewandte Seite und klicke zum Ein- oder Ausblenden auf den Pfeil. Mit Zugriff auf die Bedienungshilfen kannst du einzelne Symbole auch auf dieser Seite auswählen.
-
-Verschiebbare Symbole lassen sich auch ohne Ausblendoption in der jeweiligen App einklappen. Uhr und Kontrollzentrum haben in macOS einen festen Platz. Sind die angeschlossenen Displays sehr unterschiedlich breit, können unter macOS 27 auf dem breiteren Display einige Symbole sichtbar bleiben.
+Öffne Einstellungen → Sonstige → Menüleistenverwaltung. Schalte den Schalter neben einem Symbol aus, um es auszublenden, oder wieder ein, um es anzuzeigen. Ausgeblendete Symbole bleiben in der Liste. Für Symbole anderer Apps ist der Zugriff auf die Bedienungshilfen erforderlich.
 
 ### Speicherorte
 

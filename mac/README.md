@@ -57,9 +57,7 @@ The Quick Actions popup assigns `Command+1` through `Command+9`, then `Command+0
 
 ### Menu Bar Management
 
-In Settings → Other → Menu Bar Management, enable the divider. Hold ⌘ and drag icons to the side away from the clock, then click the arrow to hide or show them. With Accessibility access, you can also select individual icons on this page.
-
-Movable icons can be tucked away even when their app has no hide option. macOS fixes the clock and Control Center in place. On macOS 27, when connected displays have very different widths, some icons may remain visible on the wider display.
+Open Settings → Other → Menu Bar Management. Turn an icon’s switch off to hide it or on to show it again. Hidden icons stay in the list. Managing other apps’ icons requires Accessibility access.
 
 ### Save locations
 

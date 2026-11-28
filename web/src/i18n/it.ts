@@ -493,7 +493,7 @@ export const it = createCatalog({
     "videoNotice": "Estratti della presentazione esistente con dati dimostrativi. I sottotitoli del video sono in inglese; i passaggi seguono la tua lingua. Il video completo di 2:40 e i crediti musicali sono sotto.",
     "preferencesTitle": "Preferenze utili",
     "preferences": [
-      "In Impostazioni → Altri → Gestione della barra dei menu attiva il separatore. Tieni premuto ⌘ e trascina le icone sul lato opposto all’orologio, poi fai clic sulla freccia per nasconderle o mostrarle. Con il permesso di Accessibilità puoi anche selezionarle singolarmente in questa pagina.",
+      "Apri Impostazioni → Altri → Gestione della barra dei menu. Disattiva l’interruttore accanto a un’icona per nasconderla e riattivalo per mostrarla. Le icone nascoste restano nell’elenco. Per gestire quelle delle altre app è necessario il permesso di Accessibilità.",
       "In Impostazioni → Pet puoi vedere in anteprima gli animali integrati e importati. «Animale fisso» mantiene lo stesso animale. «Rotazione casuale» include tutti gli animali per impostazione predefinita. Limita la scelta in «Animali per il sorteggio». Il sorteggio avviene a mezzanotte, ora locale. In «Intervallo di cambio», seleziona «Personalizzato» per impostare una durata da 1 secondo a 99:59:59. Il valore iniziale è di 1 ora.",
       "Attiva lo scuotimento durante il trascinamento per mostrare il vassoio. Le note di contesto usano un proprio tasto da tenere premuto.",
       "Scegli l’uscita audio nell’area multimediale e sorgente automatica o lettore preferito nelle impostazioni. Questo non assegna dispositivi distinti alle app.",

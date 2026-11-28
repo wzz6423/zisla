@@ -55,7 +55,7 @@ zisla 可監控 Codex、Claude Code、Pi、GitHub Copilot、Gemini、Grok、Kimi
 - **每日簡報：** 8 種模板，預覽、手動或定時 PNG 匯出，選擇統計內容和獨立儲存位置。
 - **AI 賬戶：** 查看支援賬戶的剩餘額度、重置時間、低額度通知和採樣時間；本機 token 歷史可匯出 `.xlsx`。 Antigravity 的 Gemini 與 Claude/GPT 額度分別監控、展示和提醒。Gemini App 一般對話額度使用同一 Google 帳號的網站 Cookie 查詢；Gemini CLI 單獨監控。
 - **快捷操作：** 彈窗內 `Command+1` 到 `Command+0` 按動作順序執行；新配置額外預設觸發鍵為 `Command+N`，用於首個動作。已儲存組合和清空狀態在升級時保留。
-- **選單列管理** — 收合常駐選單列圖像後，所屬 App 會繼續執行。
+- **選單列管理** — 逐一顯示或隱藏選單列圖像，所屬 App 會繼續執行。
 
 [用戶幫助](https://wzz6423.github.io/zisla/help.html?lang=zh-Hant#help) 提供剪貼簿、截圖／螢幕錄影、中轉、會議、AI、媒體工具、每日簡報、桌面便箋／視窗預覽與播放／混音九組逐步指南，以及短片段示範。 [macOS 指南](mac/README.md#儲存位置)列出各工具儲存目錄與依賴。
 

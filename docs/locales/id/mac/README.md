@@ -57,9 +57,7 @@ Popup memberikan `Command+1` hingga `Command+9`, lalu `Command+0` sesuai urutan 
 
 ### Pengelolaan Bar Menu
 
-Di Pengaturan → Lainnya → Pengelolaan Bar Menu, aktifkan pemisah. Tahan ⌘ dan seret ikon ke sisi yang menjauhi jam, lalu klik panah untuk menyembunyikan atau menampilkannya. Dengan izin Aksesibilitas, Anda juga dapat memilih ikon satu per satu di halaman ini.
-
-Ikon yang dapat dipindahkan bisa diciutkan meski aplikasinya tidak menyediakan opsi untuk menyembunyikannya. macOS menetapkan posisi jam dan Pusat Kontrol. Pada macOS 27, jika lebar layar yang terhubung sangat berbeda, beberapa ikon mungkin tetap terlihat di layar yang lebih lebar.
+Buka Pengaturan → Lainnya → Pengelolaan Bar Menu. Matikan sakelar di samping ikon untuk menyembunyikannya atau nyalakan kembali untuk menampilkannya. Ikon tersembunyi tetap ada dalam daftar. Pengelolaan ikon aplikasi lain memerlukan izin Aksesibilitas.
 
 ### Lokasi penyimpanan
 

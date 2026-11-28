@@ -57,9 +57,7 @@ Açılır pencere işlem sırasına göre `Command+1` ile `Command+9`, ardından
 
 ### Menü Çubuğu Yönetimi
 
-Ayarlar → Diğer → Menü Çubuğu Yönetimi bölümünde ayırıcıyı etkinleştirin. ⌘ tuşunu basılı tutarak simgeleri ayırıcının saatten uzak tarafına sürükleyin. Ardından gizlemek veya göstermek için oka tıklayın. Erişilebilirlik izniyle bu sayfada simgeleri tek tek de seçebilirsiniz.
-
-Uygulamada gizleme seçeneği olmasa bile taşınabilir simgeleri daraltabilirsiniz. Saat ve Denetim Merkezi’nin konumunu macOS sabitler. macOS 27’de bağlı ekranların genişlikleri çok farklıysa geniş ekranda bazı simgeler görünür kalabilir.
+Ayarlar → Diğer → Menü Çubuğu Yönetimi bölümünü açın. Bir simgeyi gizlemek için yanındaki anahtarı kapatın, yeniden göstermek için açın. Gizli simgeler listede kalır. Diğer uygulamaların simgelerini yönetmek için Erişilebilirlik izni gerekir.
 
 ### Kayıt konumları
 

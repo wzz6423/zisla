@@ -24,7 +24,7 @@ Les panneaux de notification gauche et droit sont créés à la demande et masqu
 ## État et concurrence
 
 - AppKit, l'état SwiftUI et le contrôle des fenêtres restent sur `MainActor`.
-- Lorsque la gestion de la barre des menus est activée, zisla crée deux contrôles `NSStatusItem`. Pendant l’affichage de la liste des icônes, zisla lit `AXExtrasMenuBar` et vérifie la position de l’icône choisie après son déplacement.
+- Zisla contrôle ses propres icônes avec `NSStatusItem`. Pour les autres apps, il lit `AXExtrasMenuBar` et vérifie la disposition de la barre des menus avant d’enregistrer la modification.
 - Les téléchargements, la météo et les requêtes GitHub utilisent des actors.
 - L'état d'IA écrit par les hooks est surveillé via les événements du système de fichiers des répertoires. Chaque source de session compare la date de modification et la taille du dernier fichier local de session ou d'activité et réutilise le cache d'analyse si rien n'a changé.
 - La détection automatique lit seulement les événements structurés, marqueurs d'état fixes et métadonnées nécessaires pour déterminer l'état des tâches. Elle ne lit pas les invites ni les réponses, et l'échec d'un parseur de fournisseur ne bloque pas les autres.

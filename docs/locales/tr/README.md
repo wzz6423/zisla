@@ -55,7 +55,7 @@ Adada 12 modül vardır: Ana Sayfa, Aktarım, Pano, Yapay Zekâ İzleme, Klavye 
 - **Günlük özet:** 8 şablon, önizleme, elle veya zamanlanmış PNG dışa aktarma, seçilen ölçümler ve bağımsız kayıt klasörü.
 - **Yapay zekâ hesapları:** Desteklenen hesapların kotalarını, yenilenme zamanlarını, düşük kota bildirimlerini ve örnekleme zamanlarını görün; yerel token geçmişini `.xlsx` olarak dışa aktarın. Antigravity Gemini ve Claude/GPT kotalarının izleme, gösterim ve uyarıları ayrıdır. Gemini App sohbet kotası aynı Google hesabının web Cookie bilgisiyle sorgulanır; Gemini CLI ayrı izlenir.
 - **Hızlı İşlemler:** Açılır penceredeki işlemler sırasıyla `Command+1` ile `Command+0` kullanır. Yeni yapılandırmalarda ilk işlem için ek varsayılan tetikleyici `Command+N`'dir. Yükseltmeler kayıtlı kısayolları ve temizlenmiş tetikleyicileri korur.
-- **Menü Çubuğu Yönetimi** — Uygulamalar çalışmaya devam ederken kalıcı menü çubuğu simgelerini gizleyin.
+- **Menü Çubuğu Yönetimi** — Uygulamalar çalışmaya devam ederken menü çubuğu simgelerini tek tek gösterin veya gizleyin.
 
 [Kullanıcı yardımı](https://wzz6423.github.io/zisla/help.html?lang=tr#help) dokuz adım adım kılavuz sunar: pano, yakalama, raf, toplantılar, yapay zekâ, medya araçları, günlük özetler, masaüstü notları/pencere önizlemeleri ve oynatma/karıştırma. [macOS kılavuzu](mac/README.md) araçların kayıt klasörlerini ve bağımlılıklarını listeler.
 

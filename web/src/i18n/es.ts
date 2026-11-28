@@ -493,7 +493,7 @@ export const es = createCatalog({
     "videoNotice": "Fragmentos de la presentación existente con datos de demostración. Los subtítulos del vídeo están en inglés; los pasos usan tu idioma. La presentación completa de 2:40 y los créditos musicales están abajo.",
     "preferencesTitle": "Preferencias útiles",
     "preferences": [
-      "En Ajustes → Otros → Gestión de la barra de menús, activa el separador. Mantén pulsada ⌘ y arrastra los iconos al lado opuesto al reloj. Haz clic en la flecha para ocultarlos o mostrarlos. Con permiso de Accesibilidad, también puedes elegirlos uno a uno en esta página.",
+      "Abre Ajustes → Otros → Gestión de la barra de menús. Desactiva el interruptor de un icono para ocultarlo y vuelve a activarlo para mostrarlo. Los iconos ocultos permanecen en la lista. Para gestionar los de otras apps se necesita permiso de Accesibilidad.",
       "En Ajustes → Mascota puedes previsualizar las mascotas integradas e importadas. «Mascota fija» mantiene una sola mascota. «Rotación aleatoria» incluye todas por defecto. Limita la lista en «Mascotas para el sorteo». El cambio se hace a medianoche según la hora local. En «Intervalo de cambio», elige «Personalizado» para indicar una duración entre 1 segundo y 99:59:59. El valor inicial es de 1 hora.",
       "Activa agitar al arrastrar para mostrar la bandeja. Las notas de contexto tienen su propia tecla mantenida.",
       "Elige salida de audio en la zona multimedia y fuente automática o reproductor preferido en Ajustes. Esta opción no asigna dispositivos distintos por app.",

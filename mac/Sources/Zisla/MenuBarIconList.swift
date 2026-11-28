@@ -4,76 +4,73 @@ import ZislaCore
 import ZislaKit
 
 struct MenuBarIconList: View {
-    let manager: MenuBarManager
+    @ObservedObject var manager: MenuBarManager
+    @ObservedObject var store: FeatureSettingsStore
+    let hasAccessibility: Bool
+    let requestAccess: () -> Void
     @Environment(\.locale) private var locale
-    @State private var icons: [MenuBarIcon] = []
-    @State private var layout: MenuBarManager.Layout?
-    @State private var revision = 0
-    @State private var loading = true
-    @State private var movement: Task<Void, Never>?
-    @State private var failed: AXUIElement?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                AppLocalizedText("收起时隐藏")
-                    .font(.headline)
-                Spacer()
-                if loading { ProgressView().controlSize(.small) }
-                Button(AppLocalization.string("刷新", locale: locale)) { revision += 1 }
-                    .disabled(loading || movement != nil)
-            }
-            ForEach(icons) { icon in
+        VStack(alignment: .leading, spacing: 0) {
+            if !hasAccessibility {
                 HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: icon.title)
-                        if icon.title != icon.app {
-                            Text(verbatim: icon.app).font(.caption).foregroundStyle(.secondary)
-                        }
-                        if failed == icon.id {
-                            AppLocalizedText("未能移动图标。按住 ⌘，将分隔线拖过这个图标。")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
+                    AppLocalizedText("管理其他应用的图标需要辅助功能权限。")
+                        .foregroundStyle(.secondary)
                     Spacer()
-                    if icon.isFixed {
-                        AppLocalizedText("系统固定").foregroundStyle(.secondary)
-                    } else if let hidden = layout?.onHiddenSide(icon.frame) {
-                        Toggle(isOn: Binding(get: { hidden }, set: { wanted in
-                            failed = nil
-                            movement = Task {
-                                if !(await manager.move(icon, hidden: wanted)) { failed = icon.id }
-                                movement = nil
-                                revision += 1
-                            }
-                        })) {
-                            Text(verbatim: icon.title)
-                        }
-                        .labelsHidden().toggleStyle(.switch)
-                        .disabled(movement != nil || loading)
-                    } else {
-                        AppLocalizedText("当前无法移动").foregroundStyle(.secondary)
-                    }
+                    Button(AppLocalization.string("去授权", locale: locale), action: requestAccess)
                 }
-                .frame(minHeight: 32)
+                .padding(.vertical, 6)
             }
-            if icons.isEmpty && !loading {
-                AppLocalizedText("暂未找到菜单栏图标").foregroundStyle(.secondary)
+            ForEach(manager.rows) { row in
+                if row != manager.rows.first { Divider() }
+                HStack(spacing: 10) {
+                    rowImage(row)
+                        .frame(width: 20, height: 20)
+                        .accessibilityHidden(true)
+                    Text(verbatim: row.label(locale: locale))
+                    Spacer()
+                    Toggle(isOn: Binding(
+                        get: { manager.isShown(row) },
+                        set: { shown in Task { await manager.setVisible(shown, row: row) } }
+                    )) { Text(verbatim: row.label(locale: locale)) }
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .accessibilityIdentifier("menu-bar-visibility-\(row.id)")
+                        .disabled(manager.busy || (!row.isLocal && !hasAccessibility && store.settings.hiddenMenuBarIcons[row.id] == nil))
+                }
+                .frame(minHeight: 38)
+                if manager.failedID == row.id {
+                    AppLocalizedText("无法更改此图标的显示状态。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if manager.rows.isEmpty && hasAccessibility {
+                if manager.loading { ProgressView().controlSize(.small) }
+                else { AppLocalizedText("暂未找到菜单栏图标").foregroundStyle(.secondary) }
             }
         }
-        .padding(.vertical, 10)
-        .task(id: revision) {
-            loading = true
-            let snapshot = await MenuBarIcon.inventory()
-            let boundary = await manager.layout()
-            guard !Task.isCancelled else { return }
-            layout = boundary
-            icons = snapshot.sorted { $0.frame.midX < $1.frame.midX }
-            loading = false
-        }
-        .onDisappear { movement?.cancel() }
+        .onAppear { manager.setPageOpen(true) }
+        .onDisappear { manager.setPageOpen(false) }
+        .task(id: hasAccessibility) { await manager.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            if movement == nil { revision += 1 }
+            Task { await manager.refresh() }
         }
     }
+    @ViewBuilder private func rowImage(_ row: MenuBarIconRow) -> some View {
+        if row.isLocal {
+            if let metric = SystemMonitorMenuBarMetric(rawValue: String(row.id.dropFirst("zisla:".count))) {
+                Image(systemName: metric.symbolName)
+            } else if row.id == MenuBarIconRow.localID("application") {
+                Image(nsImage: NSApp.applicationIconImage).resizable().scaledToFit()
+            } else {
+                Image(systemName: "gauge.with.dots.needle.67percent")
+            }
+        } else if let owner = row.id.split(separator: "|", maxSplits: 1).first, row.id.contains("|"),
+                  let image = SettingsView.appIcon(forBundleIdentifier: String(owner)) {
+            Image(nsImage: image).resizable().scaledToFit()
+        } else {
+            Image(systemName: MenuBarIcon.symbol(for: row))
+        }
+    }
+
 }

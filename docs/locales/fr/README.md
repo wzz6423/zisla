@@ -55,7 +55,7 @@ L'îlot comporte 12 modules : Accueil, Transfert, Presse-papiers, Surveillance d
 - **Bulletin quotidien :** 8 modèles, aperçu, export PNG manuel ou programmé, choix des indicateurs et dossier d'enregistrement indépendant.
 - **Comptes d'IA :** Consultez les quotas disponibles des comptes pris en charge, les heures de réinitialisation, les alertes de quota faible et les heures d'échantillonnage ; exportez l'historique local des tokens au format `.xlsx`. Les quotas Gemini et Claude/GPT d’Antigravity ont un suivi, un affichage et des alertes indépendants. Les quotas de conversation de Gemini App utilisent un Cookie web du même compte Google ; Gemini CLI reste distinct.
 - **Actions rapides :** Les actions de la fenêtre utilisent `Command+1` à `Command+0` dans l'ordre. Le déclencheur supplémentaire par défaut des nouvelles configurations est `Command+N` pour la première action. Les mises à niveau conservent les raccourcis enregistrés et les déclencheurs effacés.
-- **Gestion de la barre des menus** — Masquez les icônes persistantes de la barre des menus tout en laissant leurs apps ouvertes.
+- **Gestion de la barre des menus** — Affichez ou masquez chaque icône de la barre des menus tout en laissant son app ouverte.
 
 [L'aide utilisateur](https://wzz6423.github.io/zisla/help.html?lang=fr#help) fournit neuf guides pas à pas : presse-papiers, capture, étagère, réunions, IA, outils multimédias, bulletins quotidiens, notes de bureau/aperçus des fenêtres et lecture/mixage. Le [guide macOS](mac/README.md) indique les dossiers d'enregistrement des outils et leurs dépendances.
 

@@ -3091,38 +3091,10 @@ struct SettingsView: View {
     }
 
     private var menuBarManagementContent: some View {
-        let mode = settingsStore.settings.menuBarManagementMode
-        return settingsGroup("菜单栏图标") {
-            settingRow(symbol: "menubar.rectangle", title: "启用菜单栏分隔线",
-                       detail: "按住 ⌘，将要收起的图标拖到分隔线远离时钟的一侧。") {
-                Toggle(AppLocalization.text("启用菜单栏分隔线"), isOn: Binding(
-                    get: { mode != .disabled },
-                    set: { settingsStore.settings.menuBarManagementMode = $0 ? .expanded : .disabled }
-                )).labelsHidden().toggleStyle(.switch)
-            }
-            if mode != .disabled {
-                rowDivider
-                settingRow(symbol: "chevron.left.2", title: "收起图标",
-                           detail: "点按菜单栏中的箭头也可以展开或收起图标。") {
-                    Toggle(AppLocalization.text("收起图标"), isOn: Binding(
-                        get: { mode == .collapsed },
-                        set: { settingsStore.settings.menuBarManagementMode = $0 ? .collapsed : .expanded }
-                    )).labelsHidden().toggleStyle(.switch)
-                }
-            }
-            if mode == .expanded {
-                rowDivider
-                if model.assistantAccessibilityGranted {
-                    MenuBarIconList(manager: menuBarManager)
-                } else {
-                    settingRow(symbol: "hand.raised", title: "辅助功能",
-                               detail: "授权后可以直接在此选择要收起的图标。") {
-                        Button(AppLocalization.text("去授权")) {
-                            selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
+        settingsGroup("在菜单栏显示") {
+            MenuBarIconList(manager: menuBarManager, store: settingsStore,
+                            hasAccessibility: model.assistantAccessibilityGranted) {
+                selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
             }
         }
     }
@@ -4125,7 +4097,7 @@ struct SettingsView: View {
         return bundleIdentifier
     }
 
-    private static func appIcon(forBundleIdentifier bundleIdentifier: String) -> NSImage? {
+    static func appIcon(forBundleIdentifier bundleIdentifier: String) -> NSImage? {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
             return nil
         }
@@ -5311,7 +5283,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "配置语音输入、整理模型与本机记录。"
         case .pet: "设置灵动岛内部的宠物形象。"
         case .download: "管理下载与文档转换所需组件。"
-        case .menuBarManagement: "整理菜单栏图标，按需收起或展开。"
+        case .menuBarManagement: "选择要在菜单栏显示的图标。"
         case .saveLocations: "分别设置各类内容的默认保存位置。"
         case .scheduledCleanup: "管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。"
         case .networkProxy: "配置本地代理，用于更新、安装、下载与 GitHub 访问。"

@@ -57,9 +57,7 @@ De popup gebruikt `Command+1`…`Command+9` en `Command+0` in actievolgorde. Nie
 
 ### Menubalkbeheer
 
-Schakel in Instellingen → Overig → Menubalkbeheer het scheidingsteken in. Houd ⌘ ingedrukt en sleep symbolen naar de kant die van de klok af ligt. Klik op de pijl om ze te verbergen of te tonen. Met toestemming voor Toegankelijkheid kun je ze ook op deze pagina afzonderlijk kiezen.
-
-Verplaatsbare symbolen kunnen worden ingeklapt, ook als hun app geen optie heeft om ze te verbergen. De klok en het bedieningspaneel hebben een vaste positie in macOS. Als de aangesloten beeldschermen sterk in breedte verschillen, kunnen op het bredere scherm in macOS 27 enkele symbolen zichtbaar blijven.
+Open Instellingen → Overig → Menubalkbeheer. Zet de schakelaar bij een symbool uit om het te verbergen of weer aan om het te tonen. Verborgen symbolen blijven in de lijst staan. Voor symbolen van andere apps is toestemming voor Toegankelijkheid nodig.
 
 ### Opslaglocaties
 

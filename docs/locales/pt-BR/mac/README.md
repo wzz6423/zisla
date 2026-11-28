@@ -57,9 +57,7 @@ O aviso de Ações rápidas atribui `Command+1` até `Command+9`, depois `Comman
 
 ### Gerenciamento da barra de menus
 
-Em Ajustes → Outros → Gerenciamento da barra de menus, ative o divisor. Mantenha ⌘ pressionada e arraste os ícones para o lado oposto ao relógio. Clique na seta para ocultá-los ou mostrá-los. Com a permissão de Acessibilidade, você também pode selecioná-los individualmente nesta página.
-
-Os ícones que podem ser movidos podem ser recolhidos mesmo que o app não ofereça uma opção para ocultá-los. O macOS fixa a posição do relógio e da Central de Controle. No macOS 27, se as telas conectadas tiverem larguras muito diferentes, alguns ícones poderão continuar visíveis na tela mais larga.
+Abra Ajustes → Outros → Gerenciamento da barra de menus. Desative o interruptor ao lado de um ícone para ocultá-lo ou ative-o novamente para mostrá-lo. Os ícones ocultos continuam na lista. Para gerenciar os ícones de outros apps, é preciso permitir o acesso à Acessibilidade.
 
 ### Locais de salvamento
 

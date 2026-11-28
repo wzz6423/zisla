@@ -24,7 +24,7 @@
 ## 狀態與併發
 
 - AppKit、SwiftUI 狀態和視窗控制限制在 `MainActor`。
-- 啟用選單列管理後，zisla 會建立兩個 `NSStatusItem` 控制項。開啟圖像列表時，zisla 會讀取 `AXExtrasMenuBar`，並在移動後核對所選圖像的位置。
+- Zisla 使用 `NSStatusItem` 控制自己的圖像。對於其他 App，Zisla 會讀取 `AXExtrasMenuBar`，並在儲存選擇前檢查選單列佈局。
 - 下載、天氣和 GitHub 請求使用 actor。
 - hook 寫入的 AI 狀態使用目錄檔案系統事件監聽；各 AI 會話源定期比較最近本地會話或活動檔案的 mtime/size，未變化時復用解析緩存。
 - 自動檢測只讀取判斷任務狀態所需的結構化事件、固定狀態 marker 或活動元資料，不讀取 prompt/answer 正文；任一 Provider 解析失敗不會阻斷其他 Provider。

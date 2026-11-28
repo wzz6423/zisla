@@ -24,7 +24,7 @@ Left and right notification panels are created on demand and are hidden as soon 
 ## State and concurrency
 
 - AppKit, SwiftUI state, and window control stay on `MainActor`.
-- Menu Bar Management creates two `NSStatusItem` controls when enabled. While the icon list is open, it reads `AXExtrasMenuBar` and checks the selected icon’s position after a move.
+- Zisla controls its own icons with `NSStatusItem`. For other apps, it reads `AXExtrasMenuBar` and checks the menu bar layout before saving a change.
 - Downloads, weather, and GitHub requests use actors.
 - AI state written by hooks is monitored through directory filesystem events. Each AI session source compares the latest local session or activity file by mtime and size and reuses the parse cache when nothing changed.
 - Automatic detection reads only structured events, fixed status markers, and activity metadata needed to determine task state. It does not read prompt or answer bodies, and a provider parser failure does not block other providers.

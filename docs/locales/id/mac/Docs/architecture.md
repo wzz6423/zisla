@@ -24,7 +24,7 @@ Panel notifikasi kiri/kanan dibuat sesuai kebutuhan dan disembunyikan begitu ant
 ## Status dan konkurensi
 
 - AppKit, status SwiftUI, dan kontrol jendela tetap pada `MainActor`.
-- Saat pengelolaan bar menu diaktifkan, zisla membuat dua kontrol `NSStatusItem`. Selama daftar ikon terbuka, zisla membaca `AXExtrasMenuBar` dan memeriksa posisi ikon yang dipilih setelah dipindahkan.
+- Zisla mengendalikan ikonnya sendiri dengan `NSStatusItem`. Untuk aplikasi lain, Zisla membaca `AXExtrasMenuBar` dan memeriksa tata letak bar menu sebelum menyimpan perubahan.
 - Unduhan, cuaca, dan permintaan GitHub memakai actor.
 - Status AI dari hook dipantau lewat peristiwa sistem berkas direktori. Tiap sumber sesi membandingkan mtime dan ukuran berkas sesi/aktivitas lokal terbaru, lalu menggunakan ulang cache parser jika tidak berubah.
 - Deteksi otomatis hanya membaca peristiwa terstruktur, penanda status tetap, dan metadata yang perlu untuk status tugas. Isi prompt/jawaban tidak dibaca; kegagalan parser satu penyedia tidak memblokir lainnya.

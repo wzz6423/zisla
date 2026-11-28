@@ -57,9 +57,7 @@ Il popup assegna `Command+1`…`Command+9`, poi `Command+0`, nell'ordine delle a
 
 ### Gestione della barra dei menu
 
-In Impostazioni → Altri → Gestione della barra dei menu attiva il separatore. Tieni premuto ⌘ e trascina le icone sul lato opposto all’orologio, poi fai clic sulla freccia per nasconderle o mostrarle. Con il permesso di Accessibilità puoi anche selezionarle singolarmente in questa pagina.
-
-Puoi comprimere le icone spostabili anche se l’app non offre un’opzione per nasconderle. macOS fissa la posizione dell’orologio e del Centro di Controllo. Su macOS 27, se gli schermi collegati hanno larghezze molto diverse, alcune icone possono rimanere visibili sullo schermo più largo.
+Apri Impostazioni → Altri → Gestione della barra dei menu. Disattiva l’interruttore accanto a un’icona per nasconderla e riattivalo per mostrarla. Le icone nascoste restano nell’elenco. Per gestire quelle delle altre app è necessario il permesso di Accessibilità.
 
 ### Posizioni di salvataggio
 

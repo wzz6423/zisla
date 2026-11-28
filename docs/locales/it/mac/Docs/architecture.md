@@ -24,7 +24,7 @@ I pannelli di notifica sinistro e destro vengono creati quando servono e nascost
 ## Stato e concorrenza
 
 - AppKit, stato SwiftUI e gestione delle finestre restano su `MainActor`.
-- Quando la gestione della barra dei menu è attiva, zisla crea due controlli `NSStatusItem`. Mentre l’elenco delle icone è aperto, legge `AXExtrasMenuBar` e verifica la posizione dell’icona selezionata dopo lo spostamento.
+- Zisla controlla le proprie icone con `NSStatusItem`. Per le altre app legge `AXExtrasMenuBar` e controlla la disposizione della barra dei menu prima di salvare la modifica.
 - Download, meteo e richieste GitHub usano actor.
 - Lo stato AI scritto dagli hook viene osservato tramite eventi del filesystem sulla directory. Ogni fonte di sessioni AI confronta data di modifica e dimensione dell'ultimo file locale di sessione o attività e riutilizza la cache di parsing se nulla cambia.
 - Il rilevamento automatico legge solo eventi strutturati, marcatori fissi e metadati necessari a determinare lo stato delle attività. Non legge prompt o risposte; un errore del parser di un provider non blocca gli altri.

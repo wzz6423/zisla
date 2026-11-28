@@ -24,7 +24,7 @@ Bảng thông báo trái/phải tạo khi cần và ẩn ngay khi hết hàng.
 ## Trạng thái và đồng thời
 
 - AppKit, trạng thái SwiftUI, điều khiển cửa sổ ở `MainActor`.
-- Khi bật quản lý thanh menu, zisla tạo hai điều khiển `NSStatusItem`. Trong lúc danh sách biểu tượng đang mở, zisla đọc `AXExtrasMenuBar` và kiểm tra vị trí của biểu tượng đã chọn sau khi di chuyển.
+- Zisla điều khiển biểu tượng của chính mình bằng `NSStatusItem`. Với các ứng dụng khác, Zisla đọc `AXExtrasMenuBar` và kiểm tra bố cục thanh menu trước khi lưu thay đổi.
 - Tải, thời tiết và yêu cầu GitHub dùng actor.
 - AI hook được theo dõi qua sự kiện hệ thống tệp thư mục. Mỗi nguồn phiên so thời gian sửa/kích thước tệp phiên hoặc hoạt động mới nhất, dùng lại bộ đệm phân tích nếu không đổi.
 - Phát hiện chỉ đọc sự kiện có cấu trúc, dấu trạng thái cố định, siêu dữ liệu cần. Không đọc lời nhắc/đáp án; lỗi parser một nhà cung cấp không chặn khác.

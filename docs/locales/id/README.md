@@ -55,7 +55,7 @@ Pulau memiliki 12 modul: Beranda, Serah Terima, Papan Klip, Pemantauan AI, Suara
 - **Ringkasan harian:** 8 templat, pratinjau, ekspor PNG manual atau terjadwal, metrik pilihan, dan folder simpan terpisah.
 - **Akun AI:** Lihat kuota akun yang didukung, waktu reset, pemberitahuan kuota rendah, dan waktu pengambilan sampel; ekspor riwayat token lokal sebagai `.xlsx`. Kuota Gemini dan Claude/GPT Antigravity memiliki pemantauan, tampilan, dan peringatan terpisah. Kuota percakapan Gemini App memakai Cookie web dari akun Google yang sama; Gemini CLI tetap terpisah.
 - **Tindakan Cepat:** Tindakan popup memakai `Command+1` sampai `Command+0` secara berurutan. Pemicu tambahan default untuk konfigurasi baru adalah `Command+N` bagi tindakan pertama. Peningkatan mempertahankan pintasan tersimpan dan pemicu yang dikosongkan.
-- **Pengelolaan Bar Menu** — Sembunyikan ikon bar menu yang selalu terlihat sementara aplikasinya tetap berjalan.
+- **Pengelolaan Bar Menu** — Tampilkan atau sembunyikan setiap ikon bar menu sementara aplikasinya tetap berjalan.
 
 [Bantuan pengguna](https://wzz6423.github.io/zisla/help.html?lang=id#help) menyediakan sembilan panduan langkah demi langkah: papan klip, tangkapan, rak, rapat, AI, alat media, ringkasan harian, catatan desktop/pratinjau jendela, serta pemutaran/mixing. [Panduan macOS](mac/README.md) mencantumkan folder simpan dan dependensi alat.
 

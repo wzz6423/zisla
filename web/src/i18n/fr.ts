@@ -515,7 +515,7 @@ export const fr: SiteContent = {
     "videoNotice": "Extraits de la présentation existante, avec données de démonstration. Les sous-titres vidéo sont en anglais ; les étapes suivent votre langue. La présentation complète de 2 min 40 et les crédits musicaux sont plus bas.",
     "preferencesTitle": "Préférences utiles",
     "preferences": [
-      "Dans Réglages → Autre → Gestion de la barre des menus, activez le séparateur. Maintenez ⌘ et faites glisser les icônes du côté opposé à l’horloge. Cliquez sur la flèche pour les masquer ou les afficher. L’autorisation d’accessibilité permet aussi de les choisir individuellement sur cette page.",
+      "Ouvrez Réglages → Autre → Gestion de la barre des menus. Désactivez l’interrupteur d’une icône pour la masquer ou réactivez-le pour la retrouver. Les icônes masquées restent dans la liste. L’accès aux fonctions d’accessibilité est nécessaire pour gérer celles des autres apps.",
       "Dans Réglages → Compagnon, prévisualisez les compagnons intégrés ou importés. « Compagnon fixe » conserve le même compagnon. La rotation aléatoire inclut tous les compagnons par défaut. Limitez la sélection dans « Compagnons du tirage ». Le tirage a lieu à minuit, heure locale. Pour fixer une durée entre 1 seconde et 99:59:59, choisissez « Personnalisé » sous « Intervalle de rotation ». La durée initiale est de 1 heure.",
       "Activez le dépôt par secousse dans Réglages. Les notes de contexte utilisent leur propre touche maintenue.",
       "Choisissez la sortie audio dans la zone média, puis la source automatique ou le lecteur préféré dans Réglages. Ce choix ne répartit pas les applications entre appareils.",

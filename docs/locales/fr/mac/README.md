@@ -57,9 +57,7 @@ La fenêtre des actions rapides attribue `Command+1` à `Command+9`, puis `Comma
 
 ### Gestion de la barre des menus
 
-Dans Réglages → Autre → Gestion de la barre des menus, activez le séparateur. Maintenez ⌘ et faites glisser les icônes du côté opposé à l’horloge. Cliquez sur la flèche pour les masquer ou les afficher. L’autorisation d’accessibilité permet aussi de les choisir individuellement sur cette page.
-
-Les icônes déplaçables peuvent être repliées même si leur app ne permet pas de les masquer. macOS fixe la position de l’horloge et du centre de contrôle. Sous macOS 27, si les écrans connectés ont des largeurs très différentes, certaines icônes peuvent rester visibles sur l’écran le plus large.
+Ouvrez Réglages → Autre → Gestion de la barre des menus. Désactivez l’interrupteur d’une icône pour la masquer ou réactivez-le pour la retrouver. Les icônes masquées restent dans la liste. L’accès aux fonctions d’accessibilité est nécessaire pour gérer celles des autres apps.
 
 ### Emplacements d'enregistrement
 

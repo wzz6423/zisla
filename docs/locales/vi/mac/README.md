@@ -57,9 +57,7 @@ Cửa sổ Thao tác Nhanh gán `Command+1` đến `Command+9`, rồi `Command+0
 
 ### Quản lý thanh menu
 
-Trong Cài đặt → Khác → Quản lý thanh menu, hãy bật vạch ngăn. Giữ ⌘ rồi kéo các biểu tượng sang phía cách xa đồng hồ. Bấm vào mũi tên để ẩn hoặc hiển thị chúng. Với quyền Trợ năng, bạn cũng có thể chọn từng biểu tượng trên trang này.
-
-Bạn có thể thu gọn các biểu tượng di chuyển được ngay cả khi ứng dụng không có tùy chọn ẩn. macOS cố định vị trí của đồng hồ và Trung tâm điều khiển. Trên macOS 27, nếu các màn hình kết nối có chiều rộng chênh lệch lớn, một số biểu tượng có thể vẫn hiển thị trên màn hình rộng hơn.
+Mở Cài đặt → Khác → Quản lý thanh menu. Tắt công tắc bên cạnh biểu tượng để ẩn hoặc bật lại để hiện. Biểu tượng đã ẩn vẫn nằm trong danh sách. Bạn cần cấp quyền Trợ năng để quản lý biểu tượng của ứng dụng khác.
 
 ### Nơi lưu
 

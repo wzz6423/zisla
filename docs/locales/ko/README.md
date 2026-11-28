@@ -55,7 +55,7 @@ Codex, Claude Code, Pi, GitHub Copilot, Gemini, Grok, Kimi Code, Qwen Code, Qode
 - **일일 브리핑:** 8개 템플릿, 미리보기, 수동·예약 PNG, 통계 선택과 별도 폴더.
 - **AI 계정:** 남은 한도, 재설정, 부족 알림, 샘플 시각과 로컬 token .xlsx 내보내기. Antigravity의 Gemini와 Claude/GPT 한도는 모니터링, 표시, 알림을 각각 설정합니다. Gemini App의 일반 대화 한도는 같은 Google 계정의 웹 Cookie로 조회하며 Gemini CLI는 별도로 모니터링합니다.
 - **빠른 작업:** Command+1부터 Command+0까지 순서대로. 새 설정의 추가 Command+N은 첫 동작이며 저장한 키와 해제 상태는 업데이트해도 유지합니다.
-- **메뉴 막대 관리** — 앱을 실행한 채로 메뉴 막대에 상주하는 아이콘을 숨길 수 있습니다.
+- **메뉴 막대 관리** — 앱을 실행한 채로 메뉴 막대 아이콘을 하나씩 표시하거나 숨길 수 있습니다.
 
 [사용자 도움말](https://wzz6423.github.io/zisla/help.html?lang=ko#help)은 클립보드, 화면 캡처·녹화, 선반, 회의, AI, 미디어 도구, 일일 브리핑, 위치 메모·창 미리보기, 재생·믹싱의 9가지 단계별 가이드와 짧은 영상을 제공합니다. [macOS 가이드](mac/README.md#저장-위치)에서 폴더와 의존성을 확인합니다.
 

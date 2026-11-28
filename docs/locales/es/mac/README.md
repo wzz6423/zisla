@@ -57,9 +57,7 @@ El aviso asigna `Command+1` a `Command+9` y después `Command+0` según el orden
 
 ### Gestión de la barra de menús
 
-En Ajustes → Otros → Gestión de la barra de menús, activa el separador. Mantén pulsada ⌘ y arrastra los iconos al lado opuesto al reloj. Haz clic en la flecha para ocultarlos o mostrarlos. Con permiso de Accesibilidad, también puedes elegirlos uno a uno en esta página.
-
-Puedes contraer los iconos que se puedan mover aunque su app no ofrezca la opción de ocultarlos. macOS fija el reloj y el centro de control. En macOS 27, si las pantallas conectadas tienen anchuras muy diferentes, algunos iconos pueden seguir visibles en la más ancha.
+Abre Ajustes → Otros → Gestión de la barra de menús. Desactiva el interruptor de un icono para ocultarlo y vuelve a activarlo para mostrarlo. Los iconos ocultos permanecen en la lista. Para gestionar los de otras apps se necesita permiso de Accesibilidad.
 
 ### Ubicaciones de guardado
 

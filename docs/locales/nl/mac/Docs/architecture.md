@@ -24,7 +24,7 @@ Linker- en rechtermeldingspanelen worden op aanvraag gemaakt en verdwijnen zodra
 ## Toestand en gelijktijdigheid
 
 - AppKit, SwiftUI-toestand en vensterbediening blijven op `MainActor`.
-- Als menubalkbeheer is ingeschakeld, maakt zisla twee `NSStatusItem`-elementen aan. Zolang de lijst met symbolen open is, leest zisla `AXExtrasMenuBar` en controleert het na een verplaatsing de positie van het gekozen symbool.
+- Zisla beheert zijn eigen symbolen met `NSStatusItem`. Voor andere apps leest het `AXExtrasMenuBar` en controleert het de indeling van de menubalk voordat het een wijziging opslaat.
 - Downloads, weer en GitHub-verzoeken gebruiken actors.
 - AI-status die hooks schrijven wordt via bestandssysteemgebeurtenissen op de map gevolgd. Elke AI-sessiebron vergelijkt wijzigingstijd en grootte van het nieuwste lokale sessie- of activiteitsbestand en gebruikt de parsercache opnieuw als niets veranderde.
 - Automatische detectie leest alleen gestructureerde gebeurtenissen, vaste statusmarkeringen en activiteitsmetadata die nodig zijn om de taakstatus te bepalen. Prompt- en antwoordteksten worden niet gelezen; een parserfout bij één provider blokkeert andere providers niet.

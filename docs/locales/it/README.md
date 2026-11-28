@@ -55,7 +55,7 @@ L'isola contiene 12 moduli: Home, Trasferimento, Appunti, Monitoraggio AI, Suoni
 - **Riepilogo giornaliero:** 8 modelli, anteprima, esportazione PNG manuale o programmata, statistiche selezionate e cartella di salvataggio indipendente.
 - **Account AI:** consulta quote disponibili, orari di ripristino, avvisi di quota bassa e tempi di campionamento supportati; esporta la cronologia locale dei token in `.xlsx`. Le quote Gemini e Claude/GPT di Antigravity hanno monitoraggio, visualizzazione e avvisi indipendenti. Le quote di chat di Gemini App usano un Cookie web dello stesso account Google; Gemini CLI resta separato.
 - **Azioni rapide:** nel popup, `Command+1` fino a `Command+0` seguono l'ordine delle azioni. Per le nuove configurazioni, il comando aggiuntivo predefinito `Command+N` esegue la prima azione. Gli aggiornamenti conservano scorciatoie salvate e comandi rimossi.
-- **Gestione della barra dei menu** — Nascondi le icone sempre presenti nella barra dei menu mentre le app continuano a funzionare.
+- **Gestione della barra dei menu** — Mostra o nascondi le singole icone della barra dei menu mentre le app continuano a funzionare.
 
 La [guida utente](https://wzz6423.github.io/zisla/help.html?lang=it#help) offre nove guide passo dopo passo: appunti, cattura, scaffale, riunioni, AI, strumenti media, riepiloghi giornalieri, note del desktop/anteprime delle finestre e riproduzione/mixer. La [guida macOS](mac/README.md#posizioni-di-salvataggio) elenca cartelle di output e dipendenze.
 

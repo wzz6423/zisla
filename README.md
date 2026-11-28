@@ -55,7 +55,7 @@ The island has 12 modules: Home, Handoff, Clipboard, AI monitoring, Keyboard sou
 - **Daily briefing:** 8 templates, preview, manual or scheduled PNG export, selected metrics, and an independent save folder.
 - **AI accounts:** View supported account allowances, reset times, low-quota notices, and sampling times; export local token history as `.xlsx`. Antigravity’s Gemini and Claude/GPT pools have independent monitoring, display and alerts. Gemini App chat allowances use a web Cookie for the same Google account; Gemini CLI remains separate.
 - **Quick Actions:** Popup actions use `Command+1` through `Command+0` in order. The additional default trigger for new configurations is `Command+N` for the first action. Upgrades retain saved shortcuts and cleared triggers.
-- **Menu Bar Management** — Hide persistent menu bar icons while their apps keep running.
+- **Menu Bar Management** — Show or hide individual menu bar icons while their apps keep running.
 
 [User help](https://wzz6423.github.io/zisla/help.html?lang=en#help) provides nine step-by-step guides: clipboard, capture, shelf, meetings, AI, media tools, daily briefings, desktop notes/window previews, and playback/mixing. The [macOS guide](mac/README.md#save-locations) lists tool save folders and dependencies.
 

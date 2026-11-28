@@ -586,7 +586,7 @@ test('menu bar management instructions are authored in all 17 locales and match 
     const title = table.match(/^"菜单栏管理" = "([^"]+)";$/m)?.[1];
     assert.ok(title, locale);
     const copy = site.getSiteContent(locale).help.preferences.find(text => text.includes(title));
-    assert.ok(copy?.includes('⌘'), locale);
+    assert.ok(copy && !copy.includes('⌘'), locale);
     const guide = locale === 'en' ? 'mac/README.md' : locale === 'zh-Hans' ? 'mac/README.zh-CN.md' :
       'docs/locales/' + locale + '/mac/README.md';
     assert.ok(readFileSync(new URL('../../' + guide, import.meta.url), 'utf8').includes(copy), locale);

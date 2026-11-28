@@ -55,7 +55,7 @@ A ilha tem 12 módulos: Início, Transferência, Área de transferência, Monito
 - **Resumo diário:** 8 modelos, prévia, exportação PNG manual ou agendada, métricas escolhidas e pasta independente.
 - **Contas de IA:** Veja cotas de contas compatíveis, horários de redefinição, avisos de cota baixa e horários de amostragem; exporte histórico local de tokens em `.xlsx`. As cotas Gemini e Claude/GPT do Antigravity têm monitoramento, exibição e alertas independentes. As cotas de conversa do Gemini App usam um Cookie da web da mesma conta Google; o Gemini CLI continua separado.
 - **Ações rápidas:** Ações do aviso usam `Command+1` até `Command+0` em ordem. O gatilho adicional padrão para configurações novas é `Command+N` para a primeira ação. Atualizações preservam atalhos salvos e gatilhos apagados.
-- **Gerenciamento da barra de menus** — Oculte ícones permanentes da barra de menus enquanto os apps continuam em execução.
+- **Gerenciamento da barra de menus** — Mostre ou oculte cada ícone da barra de menus enquanto o app continua em execução.
 
 A [ajuda ao usuário](https://wzz6423.github.io/zisla/help.html?lang=pt-BR#help) oferece nove guias passo a passo: área de transferência, captura, prateleira, reuniões, IA, ferramentas de mídia, resumos diários, notas da área de trabalho/prévias de janelas e reprodução/mixagem. O [guia macOS](mac/README.md) lista pastas e dependências.
 
