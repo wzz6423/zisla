@@ -152,6 +152,38 @@ struct OverlayCoordinatorPointerRecoveryTests {
     }
 
     @Test(arguments: [false, true])
+    func captureReleasePresentsAPendingCollapsedNotice(cancelled: Bool) throws {
+        let fixture = Fixture()
+        defer { fixture.coordinator.stop() }
+        let panel = try #require(fixture.content.window as? IslandPanel)
+        panel.orderOut(nil)
+        var presentations = 0
+        var activations = 0
+        var visibilityChanges: [Bool] = []
+        panel.panelOrderFrontHandler = { panel in
+            presentations += 1
+            panel.orderFrontRegardless()
+        }
+        fixture.coordinator.applicationActivationHandler = { activations += 1 }
+        fixture.coordinator.onVisibilityChanged = { visibilityChanges.append($0) }
+        fixture.coordinator.setScreenshotCaptureInProgress(true)
+        fixture.coordinator.setTransientNoticePresented(true, at: fixture.outside)
+        #expect(!panel.isVisible)
+        #expect(presentations == 0)
+        if cancelled { fixture.coordinator.setTransientNoticePresented(false) }
+
+        fixture.coordinator.setScreenshotCaptureInProgress(false)
+        #expect(panel.isVisible == !cancelled)
+        #expect(presentations == (cancelled ? 0 : 1))
+        #expect(panel.ignoresMouseEvents)
+        #expect(!panel.isKeyWindow)
+        #expect(visibilityChanges.isEmpty)
+        #expect(activations == 0)
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(presentations == (cancelled ? 0 : 1))
+    }
+
+    @Test(arguments: [false, true])
     func captureReleaseRestoresARevealRequestedOverAStationaryPointer(pinned: Bool) throws {
         let fixture = Fixture()
         defer { fixture.coordinator.stop() }
