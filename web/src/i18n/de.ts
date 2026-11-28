@@ -245,7 +245,7 @@ export const de: SiteContent = {
       browserDownloads: {
         title: 'Fortschritt von Browser-Downloads',
         description:
-          'Erkennt Downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera und Arc und zeigt Quelle und Fortschritt in Echtzeit am oberen Bildschirmrand. Der Fortschritt zeigt den tatsächlichen Zieldateinamen, wenn der Browser ihn bereitstellt.',
+          'Erkennt Downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera und Arc und zeigt Quelle und Fortschritt in Echtzeit am oberen Bildschirmrand. Der Fortschritt zeigt den tatsächlichen Zieldateinamen, wenn der Browser ihn bereitstellt. Eine .crdownload-Datei im temporären Systemordner allein löst keine Downloadanzeige aus.',
         detail: '8 Browser · Quelle erkannt · Hinweis bei Abschluss',
       },
       copyAssistant: {
@@ -661,7 +661,7 @@ export const de: SiteContent = {
       multiDisplay: {
         question: 'Unterstützt zisla mehrere Displays?',
         answer:
-          'Ja – mehrere Displays, Spaces und gewöhnliche Vollbild-Apps, und das Öffnen nimmt nie den Fokus. Bei mehreren angeschlossenen Bildschirmen lässt sich unter Einstellungen → Allgemein → Bildschirmmodi für jeden Bildschirm der Dynamic Island-Modus (Kameraposition oder eigene Position), der Notch-Modus oder das Ausblenden wählen. Bei einem Bildschirm ist diese Einstellung verborgen und die globale Darstellung gilt; beim erneuten Anschließen werden die gespeicherten Einstellungen wiederhergestellt. Auf allen eingeblendeten Bildschirmen bleibt die eingeklappte Insel gleichzeitig sichtbar. Aufklappen, Schnellaktionen, Aufnahmen und vorübergehende Meldungen ersetzen nur die Insel auf dem jeweiligen Bildschirm; die Auswahl der Benachrichtigungsbildschirme filtert Inhalte, ohne die inaktive Insel auszublenden.',
+          'Ja – mehrere Displays, Spaces und gewöhnliche Vollbild-Apps, und das Öffnen nimmt nie den Fokus. Im Vollbildmodus des Browsers lässt sich die Insel im selben Space öffnen, indem du den Zeiger darüber bewegst. Bei mehreren angeschlossenen Bildschirmen lässt sich unter Einstellungen → Allgemein → Bildschirmmodi für jeden Bildschirm der Dynamic Island-Modus (Kameraposition oder eigene Position), der Notch-Modus oder das Ausblenden wählen. Bei einem Bildschirm ist diese Einstellung verborgen und die globale Darstellung gilt; beim erneuten Anschließen werden die gespeicherten Einstellungen wiederhergestellt. Auf allen eingeblendeten Bildschirmen bleibt die eingeklappte Insel gleichzeitig sichtbar. Aufklappen, Schnellaktionen, Aufnahmen und vorübergehende Meldungen ersetzen nur die Insel auf dem jeweiligen Bildschirm; die Auswahl der Benachrichtigungsbildschirme filtert Inhalte, ohne die inaktive Insel auszublenden.',
       },
       intel: {
         question: 'Läuft es auf einem Intel-Mac?',

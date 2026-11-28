@@ -232,7 +232,7 @@ export const ptBR = createCatalog({
       browserDownloads: {
         title: 'Progresso de downloads do navegador',
         description:
-          'Detecta downloads do Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera e Arc, mostrando origem e progresso ao vivo no topo. O progresso mostra o nome real do arquivo de destino quando o navegador o fornece.',
+          'Detecta downloads do Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera e Arc, mostrando origem e progresso ao vivo no topo. O progresso mostra o nome real do arquivo de destino quando o navegador o fornece. A presença de um arquivo .crdownload na pasta temporária do sistema, por si só, não exibe um cartão de download.',
         detail: '8 navegadores · Detecção de origem · Aviso de conclusão',
       },
       copyAssistant: {
@@ -637,7 +637,7 @@ export const ptBR = createCatalog({
       },
       multiDisplay: {
         question: 'O zisla funciona com vários monitores?',
-        answer: 'Sim: vários monitores, Spaces e apps em tela cheia; expandir nunca rouba o foco. Com várias telas conectadas, Ajustes → Geral → Modos de tela permite escolher para cada tela o modo Dynamic Island (posição da câmera ou personalizada), o modo notch ou ocultar. Com uma tela, esse ajuste fica oculto e vale a aparência global; ao reconectar, as configurações salvas de cada tela são restauradas. Todas as telas visíveis mantêm a ilha recolhida ao mesmo tempo. Expandir a ilha, usar ações rápidas, gravar e exibir mensagens temporárias substitui apenas a ilha da própria tela; selecionar telas para notificações filtra o conteúdo sem ocultar a ilha inativa.',
+        answer: 'Sim: vários monitores, Spaces e apps em tela cheia; expandir nunca rouba o foco. Com o navegador em tela cheia, passe o cursor sobre a ilha para expandi-la no mesmo espaço. Com várias telas conectadas, Ajustes → Geral → Modos de tela permite escolher para cada tela o modo Dynamic Island (posição da câmera ou personalizada), o modo notch ou ocultar. Com uma tela, esse ajuste fica oculto e vale a aparência global; ao reconectar, as configurações salvas de cada tela são restauradas. Todas as telas visíveis mantêm a ilha recolhida ao mesmo tempo. Expandir a ilha, usar ações rápidas, gravar e exibir mensagens temporárias substitui apenas a ilha da própria tela; selecionar telas para notificações filtra o conteúdo sem ocultar a ilha inativa.',
       },
       intel: {
         question: 'Posso usar em um Mac Intel?',

@@ -499,7 +499,7 @@ struct BrowserDownloadCompletionTracker {
         identity: BrowserDownloadFileIdentity,
         fileManager: FileManager
     ) -> URL? {
-        guard !fileManager.fileExists(atPath: temporaryURL.path),
+        guard BrowserDownloadFileIdentity(url: temporaryURL) != identity,
               let files = try? fileManager.contentsOfDirectory(
                   at: temporaryURL.deletingLastPathComponent(), includingPropertiesForKeys: nil
               ) else { return nil }
@@ -590,18 +590,27 @@ public final class BrowserDownloadMonitor: ObservableObject {
     private var isRunning = false
     private let directories: [URL]
     private let eventPaths: [URL]
+    private let excludedEventPaths: [URL]
     private let pollInterval: Double
     private let fileManager: FileManager
     private let holdSleeper: @Sendable (Duration) async throws -> Void
     private let fileNameResolver: @Sendable ([URL: BrowserDownloadAgent]) async -> [URL: String]
 
     public convenience init() {
-        self.init(directories: [Self.defaultDownloadsDirectory].compactMap { $0 })
+        self.init(
+            directories: [Self.defaultDownloadsDirectory].compactMap { $0 },
+            excludedEventPaths: [
+                FileManager.default.temporaryDirectory,
+                URL(fileURLWithPath: "/private/tmp", isDirectory: true),
+                URL(fileURLWithPath: "/private/var/tmp", isDirectory: true),
+            ]
+        )
     }
 
     init(
         directories: [URL],
         eventPaths: [URL] = [URL(fileURLWithPath: "/", isDirectory: true)],
+        excludedEventPaths: [URL] = [],
         pollInterval: Double = 0.35,
         fileManager: FileManager = .default,
         holdSleeper: @escaping @Sendable (Duration) async throws -> Void = {
@@ -617,6 +626,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     ) {
         self.directories = directories
         self.eventPaths = eventPaths
+        self.excludedEventPaths = excludedEventPaths
         self.pollInterval = pollInterval
         self.fileManager = fileManager
         self.holdSleeper = holdSleeper
@@ -639,7 +649,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
             guard let self, self.lifecycle.accepts(callbackGeneration) else { return }
             self.handleFileEvent(at: url, fileID: fileID, renamed: renamed, removed: removed)
         }
-        if stream.start() { fileEventStream = stream }
+        if stream.start(excluding: excludedEventPaths) { fileEventStream = stream }
     }
 
     private func subscribe(to directory: URL, callbackGeneration: UInt64) {
@@ -872,10 +882,9 @@ public final class BrowserDownloadMonitor: ObservableObject {
         Progress.removeSubscriber(token)
     }
 
-    private func pruneMissingDownloads() {
-        let now = Date()
+    private func pruneMissingDownloads(at now: Date) {
         for (identity, observed) in observedDownloads {
-            if fileManager.fileExists(atPath: observed.temporaryURL.path) {
+            if BrowserDownloadFileIdentity(url: observed.temporaryURL) == identity {
                 observedDownloads[identity]?.missingSince = nil
             } else if let finalURL = BrowserDownloadCompletionTracker.renamedFinalURL(
                 for: observed.temporaryURL, identity: identity, fileManager: fileManager
@@ -932,18 +941,18 @@ public final class BrowserDownloadMonitor: ObservableObject {
         guard timer == nil else { return }
         timer = Timer.publish(every: pollInterval, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in
-                MainActor.assumeIsolated { self?.poll() }
+            .sink { [weak self] now in
+                MainActor.assumeIsolated { self?.poll(at: now) }
             }
     }
 
-    private func poll() {
+    func poll(at now: Date) {
         guard !progressBoxes.isEmpty || completionTracker.hasPending || !observedDownloads.isEmpty else {
             timer?.cancel()
             timer = nil
             return
         }
-        pruneMissingDownloads()
+        pruneMissingDownloads(at: now)
         var runningBundleIdentifiers: Set<String>?
         for (token, box) in progressBoxes {
             let progress = box.progress
@@ -1145,6 +1154,7 @@ private final class BrowserDownloadFileEventStream {
 
     private let onEvent: @MainActor (URL, ino_t, Bool, Bool) -> Void
     private let paths: [URL]
+    private let startedAt = Date()
     private var stream: FSEventStreamRef?
 
     init(paths: [URL], onEvent: @escaping @MainActor (URL, ino_t, Bool, Bool) -> Void) {
@@ -1152,7 +1162,7 @@ private final class BrowserDownloadFileEventStream {
         self.onEvent = onEvent
     }
 
-    func start() -> Bool {
+    func start(excluding directories: [URL]) -> Bool {
         var context = FSEventStreamContext(
             version: 0,
             info: Unmanaged.passUnretained(self).toOpaque(),
@@ -1182,8 +1192,10 @@ private final class BrowserDownloadFileEventStream {
             0.1,
             flags
         ) else { return false }
+        // Scratch files created by other apps can have the same extensions as browser downloads.
+        let configured = directories.isEmpty || FSEventStreamSetExclusionPaths(stream, directories.map(\.path) as CFArray)
         FSEventStreamSetDispatchQueue(stream, .main)
-        guard FSEventStreamStart(stream) else {
+        guard configured, FSEventStreamStart(stream) else {
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)
             return false
@@ -1207,9 +1219,14 @@ private final class BrowserDownloadFileEventStream {
     ) {
         let records = Unmanaged<CFArray>.fromOpaque(paths).takeUnretainedValue() as NSArray
         var events: [FileEvent] = []
+        let transferChanges = FSEventStreamEventFlags(
+            kFSEventStreamEventFlagItemCreated | kFSEventStreamEventFlagItemModified
+                | kFSEventStreamEventFlagItemRenamed | kFSEventStreamEventFlagItemRemoved
+        )
         for index in 0..<count {
             let eventFlags = flags[index]
             guard eventFlags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemIsFile) != 0,
+                  eventFlags & transferChanges != 0,
                   let data = records[index] as? [String: Any],
                   let path = data["path"] as? String,
                   let fileID = (data["fileID"] as? NSNumber)?.uint64Value
@@ -1218,11 +1235,16 @@ private final class BrowserDownloadFileEventStream {
             let renamed = eventFlags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRenamed) != 0
             guard renamed || BrowserDownloadTempExtension(rawValue: url.pathExtension.lowercased()) != nil
             else { continue }
+            let removed = eventFlags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRemoved) != 0
+            // A metadata change can carry coalesced creation and write flags from before this stream started.
+            if !renamed, !removed,
+               let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+               modified < startedAt { continue }
             events.append(FileEvent(
                 url: url,
                 fileID: ino_t(fileID),
                 renamed: renamed,
-                removed: eventFlags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRemoved) != 0
+                removed: removed
             ))
         }
         // The old temporary path may already be gone when a fast rename batch arrives.

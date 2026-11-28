@@ -36,6 +36,192 @@ struct OverlayCoordinatorPointerRecoveryTests {
         #expect(activations == 0, "Recovering hover must leave Chrome's keyboard focus alone")
     }
 
+    @Test
+    func stationaryHoverRestoresTheExpandedPanelAfterAFullScreenSpaceTransition() throws {
+        let fixture = Fixture()
+        defer { fixture.coordinator.stop() }
+        let panel = try #require(fixture.content.window as? IslandPanel)
+        var visibilityChanges: [Bool] = []
+        var activations = 0
+        fixture.coordinator.onVisibilityChanged = { visibilityChanges.append($0) }
+        fixture.coordinator.applicationActivationHandler = { activations += 1 }
+        fixture.pointer.location = fixture.trigger
+        fixture.coordinator.handlePointer(at: fixture.trigger)
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.activeSpaceDidChangeNotification, object: NSWorkspace.shared
+        )
+        panel.orderOut(nil)
+        #expect(!panel.isVisible)
+
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+
+        #expect(panel.isVisible)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(visibilityChanges == [true])
+        #expect(activations == 0)
+        #expect(!panel.isKeyWindow)
+
+        fixture.coordinator.collapseImmediately()
+        panel.orderOut(nil)
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(!panel.isVisible, "A stationary hover must respect an explicit collapse")
+        #expect(visibilityChanges == [true, false])
+    }
+
+    @Test(arguments: [false, true])
+    func hoveringReattachesAnOrderedPanelToAnotherSpaceOnTheSameDisplay(pinned: Bool) throws {
+        let fixture = Fixture()
+        defer { fixture.coordinator.stop() }
+        let panel = try #require(fixture.content.window as? IslandPanel)
+        var onActiveSpace = false
+        var orderOutCount = 0
+        var orderFrontCount = 0
+        panel.panelIsOnActiveSpace = { _ in onActiveSpace }
+        panel.panelOrderOutHandler = { panel in
+            orderOutCount += 1
+            panel.orderOut(nil)
+        }
+        panel.panelOrderFrontHandler = { panel in
+            // An already-ordered window stays attached to the old Space until it is ordered out.
+            if !panel.isVisible { onActiveSpace = true }
+            orderFrontCount += 1
+            panel.orderFrontRegardless()
+        }
+        var visibilityChanges: [Bool] = []
+        var activations = 0
+        fixture.coordinator.onVisibilityChanged = { visibilityChanges.append($0) }
+        fixture.coordinator.applicationActivationHandler = { activations += 1 }
+        fixture.pointer.location = fixture.trigger
+        let frame = panel.frame
+
+        fixture.coordinator.handlePointer(at: fixture.trigger)
+        #expect(onActiveSpace, "The first hover must present on the browser's current Space")
+        #expect(orderOutCount == 1)
+
+        if pinned { fixture.coordinator.setPinned(true) }
+        visibilityChanges.removeAll()
+        orderOutCount = 0
+        orderFrontCount = 0
+        onActiveSpace = false
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.activeSpaceDidChangeNotification, object: NSWorkspace.shared
+        )
+        #expect(onActiveSpace)
+        #expect(orderOutCount == 1)
+
+        onActiveSpace = false
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(onActiveSpace, "The window can lose its Space after the pointer has already entered")
+        #expect(orderOutCount == 2)
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(orderFrontCount == 2, "A healthy stationary hover must not re-order the panel")
+        #expect(visibilityChanges.isEmpty)
+        #expect(panel.isPinned == pinned)
+        #expect(panel.frame == frame)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(activations == 0)
+    }
+
+    @Test(arguments: ["capturing", "frozen", "locked"])
+    func recoveringAnExpandedPanelWaitsForCaptureOrUnlock(state: String) throws {
+        let fixture = Fixture()
+        defer { fixture.coordinator.stop() }
+        let panel = try #require(fixture.content.window as? IslandPanel)
+        fixture.pointer.location = fixture.trigger
+        fixture.coordinator.handlePointer(at: fixture.trigger)
+        func suppress(_ active: Bool) {
+            switch state {
+            case "capturing": fixture.coordinator.setScreenshotCaptureInProgress(active)
+            case "frozen": fixture.coordinator.setScreenshotActive(active)
+            default: fixture.coordinator.setScreenLocked(active)
+            }
+        }
+        suppress(true)
+        panel.orderOut(nil)
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.activeSpaceDidChangeNotification, object: NSWorkspace.shared
+        )
+        #expect(!panel.isVisible)
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(!panel.isVisible)
+
+        suppress(false)
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(panel.isVisible)
+        #expect(!panel.ignoresMouseEvents)
+    }
+
+    @Test(arguments: [false, true])
+    func captureReleasePresentsAPendingCollapsedNotice(cancelled: Bool) throws {
+        let fixture = Fixture()
+        defer { fixture.coordinator.stop() }
+        let panel = try #require(fixture.content.window as? IslandPanel)
+        panel.orderOut(nil)
+        var presentations = 0
+        var activations = 0
+        var visibilityChanges: [Bool] = []
+        panel.panelOrderFrontHandler = { panel in
+            presentations += 1
+            panel.orderFrontRegardless()
+        }
+        fixture.coordinator.applicationActivationHandler = { activations += 1 }
+        fixture.coordinator.onVisibilityChanged = { visibilityChanges.append($0) }
+        fixture.coordinator.setScreenshotCaptureInProgress(true)
+        fixture.coordinator.setTransientNoticePresented(true, at: fixture.outside)
+        #expect(!panel.isVisible)
+        #expect(presentations == 0)
+        if cancelled { fixture.coordinator.setTransientNoticePresented(false) }
+
+        fixture.coordinator.setScreenshotCaptureInProgress(false)
+        #expect(panel.isVisible == !cancelled)
+        #expect(presentations == (cancelled ? 0 : 1))
+        #expect(panel.ignoresMouseEvents)
+        #expect(!panel.isKeyWindow)
+        #expect(visibilityChanges.isEmpty)
+        #expect(activations == 0)
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(presentations == (cancelled ? 0 : 1))
+    }
+
+    @Test(arguments: [false, true])
+    func captureReleaseRestoresARevealRequestedOverAStationaryPointer(pinned: Bool) throws {
+        let fixture = Fixture()
+        defer { fixture.coordinator.stop() }
+        let panel = try #require(fixture.content.window as? IslandPanel)
+        var activations = 0
+        fixture.coordinator.applicationActivationHandler = { activations += 1 }
+        fixture.coordinator.setAllowsKeyWindow(true, focusesKeyboardInputSurface: false)
+        fixture.pointer.location = fixture.trigger
+        fixture.coordinator.handlePointer(at: fixture.trigger)
+        fixture.coordinator.collapseImmediately()
+        var visibilityChanges: [Bool] = []
+        fixture.coordinator.onVisibilityChanged = { visibilityChanges.append($0) }
+
+        fixture.coordinator.setScreenshotCaptureInProgress(true)
+        if pinned {
+            fixture.coordinator.setPinned(true)
+        } else {
+            fixture.coordinator.showExpanded()
+        }
+        #expect(panel.ignoresMouseEvents)
+        fixture.coordinator.setScreenshotCaptureInProgress(false)
+        #expect(panel.isVisible)
+        #expect(!panel.ignoresMouseEvents)
+        #expect(panel.isPinned == pinned)
+        #expect(visibilityChanges == [true])
+        #expect(activations == 0)
+        #expect(!panel.isKeyWindow)
+
+        fixture.coordinator.setScreenshotCaptureInProgress(true)
+        fixture.coordinator.collapseImmediately()
+        panel.orderOut(nil)
+        fixture.coordinator.setScreenshotCaptureInProgress(false)
+        fixture.coordinator.pointerRecoveryTimer?.fire()
+        #expect(!panel.isVisible)
+        #expect(panel.ignoresMouseEvents)
+        #expect(visibilityChanges == [true, false])
+    }
+
     @Test(arguments: [1, 2, 4])
     func recoveryWaitsForMouseReleaseInsteadOfTurningADragIntoHover(buttons: Int) throws {
         let fixture = Fixture()

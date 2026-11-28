@@ -230,7 +230,7 @@ export const en: SiteContent = {
       browserDownloads: {
         title: 'Browser download progress',
         description:
-          'Detects downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera and Arc, and shows their source and live progress at the top of the screen. Progress shows the actual target filename when the browser makes it available.',
+          'Detects downloads in Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera and Arc, and shows their source and live progress at the top of the screen. Progress shows the actual target filename when the browser makes it available. A .crdownload file in the system temporary folder alone does not trigger a download card.',
         detail: '8 browsers · Source detection · Completion notice',
       },
       copyAssistant: {
@@ -644,7 +644,7 @@ export const en: SiteContent = {
       multiDisplay: {
         question: 'Does zisla support multiple displays?',
         answer:
-          'Yes — multiple displays, Spaces and ordinary full-screen apps, and expanding never takes focus. When multiple displays are connected, Settings → General → Display Modes lets you choose Dynamic Island Mode (camera or custom position), Notch Mode, or Hide on This Display for each screen. With one screen, this setting is hidden and the global appearance applies; reconnecting restores each display’s saved configuration. All enabled displays show their collapsed islands on startup. Expanding the island, opening Quick Actions, recording, or showing a temporary message affects only that display. Choosing where to show notifications leaves the other islands visible.',
+          'Yes — multiple displays, Spaces and ordinary full-screen apps, and expanding never takes focus. With a browser in full screen, hover over the island to expand it in the same Space. When multiple displays are connected, Settings → General → Display Modes lets you choose Dynamic Island Mode (camera or custom position), Notch Mode, or Hide on This Display for each screen. With one screen, this setting is hidden and the global appearance applies; reconnecting restores each display’s saved configuration. All enabled displays show their collapsed islands on startup. Expanding the island, opening Quick Actions, recording, or showing a temporary message affects only that display. Choosing where to show notifications leaves the other islands visible.',
       },
       intel: {
         question: 'Can I use it on an Intel Mac?',

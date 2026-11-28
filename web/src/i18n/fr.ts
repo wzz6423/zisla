@@ -250,7 +250,7 @@ export const fr: SiteContent = {
       browserDownloads: {
         title: 'Progression des téléchargements',
         description:
-          'Détecte les téléchargements de Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera et Arc, et affiche leur source et leur progression en haut de l’écran. La progression indique le vrai nom du fichier cible lorsque le navigateur le fournit.',
+          'Détecte les téléchargements de Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera et Arc, et affiche leur source et leur progression en haut de l’écran. La progression indique le vrai nom du fichier cible lorsque le navigateur le fournit. La seule présence d’un fichier .crdownload dans le dossier temporaire du système ne déclenche pas de carte de téléchargement.',
         detail: '8 navigateurs · Source identifiée · Avis de fin',
       },
       copyAssistant: {
@@ -666,7 +666,7 @@ export const fr: SiteContent = {
       multiDisplay: {
         question: 'zisla prend-il en charge plusieurs écrans ?',
         answer:
-          'Oui : plusieurs écrans, les Spaces et les apps en plein écran classique, et l’ouverture ne prend jamais le focus. Lorsque plusieurs écrans sont connectés, Réglages → Général → Modes des écrans permet de choisir pour chaque écran le mode Dynamic Island (position de la caméra ou personnalisée), le mode encoche ou le masquage. Avec un seul écran, ce réglage est masqué et l’apparence globale s’applique ; la reconnexion rétablit la configuration de chaque écran. Chaque écran visible conserve son îlot replié en même temps que les autres. Le déploiement, les actions rapides, l’enregistrement et les messages temporaires remplacent uniquement l’îlot de leur écran ; la sélection des écrans de notification filtre le contenu sans masquer l’îlot au repos.',
+          'Oui : plusieurs écrans, les Spaces et les apps en plein écran classique, et l’ouverture ne prend jamais le focus. Lorsque le navigateur est en plein écran, survolez l’îlot pour le déployer dans le même espace. Lorsque plusieurs écrans sont connectés, Réglages → Général → Modes des écrans permet de choisir pour chaque écran le mode Dynamic Island (position de la caméra ou personnalisée), le mode encoche ou le masquage. Avec un seul écran, ce réglage est masqué et l’apparence globale s’applique ; la reconnexion rétablit la configuration de chaque écran. Chaque écran visible conserve son îlot replié en même temps que les autres. Le déploiement, les actions rapides, l’enregistrement et les messages temporaires remplacent uniquement l’îlot de leur écran ; la sélection des écrans de notification filtre le contenu sans masquer l’îlot au repos.',
       },
       intel: {
         question: 'Puis-je l’utiliser sur un Mac Intel ?',
