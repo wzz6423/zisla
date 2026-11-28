@@ -4,15 +4,15 @@ import {TourSurface, tourAt} from '../modules/tour/TourSurface';
 import {RecommendedDesktopTour} from '../modules/tour/RecommendedDesktopTour';
 import {LidCloseDesktopPreview, LID_PREVIEW_TIMING} from '../modules/tour/LidCloseDesktopPreview';
 
-export const SETTINGS_TOUR_DURATION = 1140;
+export const SETTINGS_TOUR_DURATION = 940;
 export const SETTINGS_TOUR_STEPS = [
-  {id: 'windows', title: 'See the window. Switch to it.', caption: 'Dock · Command-Tab · Click the window you need', from: 0, duration: 100, features: ['windowPreviews']},
-  {id: 'quickActions', title: 'Copy something. Choose the next step.', caption: 'Convert currencies · Inspect and repair an app before opening', from: 100, duration: 300, features: ['copyAssistant', 'applicationRepair']},
-  {id: 'information', title: 'Put your most-used tools first.', caption: 'Feature order · Scroll to Wellbeing', from: 400, duration: 160, features: ['island.featureOrder', 'userCare']},
-  {id: 'permissions', title: 'System permissions, in one place.', caption: 'Review access. Request it when you need it.', from: 560, duration: 140, features: ['permissions']},
-  {id: 'lockScreen', title: 'Useful information on the lock screen.', caption: 'Date · Status · Playback', from: 700, duration: 80, features: ['lockScreen']},
-  {id: 'management', title: 'Manage the tools behind your AI work.', caption: 'Install a CLI · Scroll to Skills and sync', from: 780, duration: 150, features: ['aiManagement']},
-  {id: 'recommended', title: 'Discover more tools. Keep control.', caption: 'Open Zshell · Close and reopen the lid', from: 930, duration: 210, features: ['recommendedTools', 'lidClose']},
+  {id: 'windows', title: 'Live window previews.', caption: 'Hover Dock icons or use Command-Tab, then click to switch', from: 0, duration: 88, features: ['windowPreviews']},
+  {id: 'quickActions', title: 'Quick Actions on copy (⌘N).', caption: 'Live currency conversion · Smart detectors · Safe app repair', from: 88, duration: 200, features: ['copyAssistant', 'applicationRepair']},
+  {id: 'information', title: 'Tailor module order, search & care.', caption: 'Drag-to-reorder island · 17-language search · Save locations · Wellbeing', from: 288, duration: 152, features: ['island.featureOrder', 'saveLocations', 'userCare']},
+  {id: 'permissions', title: 'Clear permission overview.', caption: 'Live authorization status with one-click requests & drag helper', from: 440, duration: 108, features: ['permissions']},
+  {id: 'lockScreen', title: 'Ambient lock screen.', caption: 'Date, battery, weather, and Now Playing — without stealing focus', from: 548, duration: 76, features: ['lockScreen']},
+  {id: 'management', title: 'AI CLI & Skills manager.', caption: 'Detect, install & update CLIs · Sync local Skills across agents', from: 624, duration: 132, features: ['aiManagement']},
+  {id: 'recommended', title: 'Curated Mac companions.', caption: 'Optional third-party tools like Zshell · Depth-aware lid close', from: 756, duration: 184, features: ['recommendedTools', 'lidClose']},
 ] as const;
 
 export const settingsTourAt = (frame: number, duration = SETTINGS_TOUR_DURATION) => tourAt(SETTINGS_TOUR_STEPS, frame, duration, SETTINGS_TOUR_DURATION);

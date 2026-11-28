@@ -74,6 +74,7 @@ test('quota cards preserve 5h and 7d windows, reset dates and a separate Cursor 
   assert.match(textOf(feature(normal, 'ai.quota.codex')), /^Codex5h 68%.*7d 31%/);
   assert.doesNotMatch(textOf(feature(normal, 'ai.quota.codex')), /ChatGPT/);
   assert.match(textOf(feature(normal, 'ai.budget.cursor')), /CursorAvailable budget \$68\.5.*12\/01 00:00 resets/);
+  assert.match(textOf(feature(normal, 'ai.quota.antigravity')), /Antigravity5h 86%.*11\/11 15:00 resets7d 62%.*11\/17 09:00 resets/);
   assert.doesNotMatch(textOf(normal), /gateway|Used |Checked |Input /);
   for (const balance of aiAccountBalances) for (const window of balance.windows) {
     assert.ok(quotaFraction(window) >= 0 && quotaFraction(window) <= 1);
@@ -130,7 +131,7 @@ test('clicking a date reveals its model breakdown and scrolling keeps the same s
   const atModels = aiSceneStateAt(AI_ACTIONS.models + 42);
   const atBalance = aiSceneStateAt(AI_ACTIONS.balance + 42);
   assert.equal(atModels.scroll, 180);
-  assert.equal(atBalance.scroll, 322);
+  assert.equal(atBalance.scroll, 415);
   assert.equal(atModels.selected, true);
   assert.equal(atBalance.selected, true);
 });

@@ -13,7 +13,7 @@ import {SceneDesktopTools} from './scenes/SceneDesktopTools';
 import {SceneSettings} from './scenes/SceneSettings';
 import {Scene5Outro} from './scenes/Scene5Outro';
 import {CROSSFADE, SCENES} from './timeline';
-import {clamp01} from './theme';
+import {ease} from './motion';
 import {soundtracks} from './soundtrack';
 import type {SoundtrackVariant} from './soundtrack';
 
@@ -40,10 +40,11 @@ export const ENTRIES: readonly Entry[] = [
 
 export const SceneLayer: FC<{entry: Entry; lead: number; music: SoundtrackVariant}> = ({entry, lead, music}) => {
   const frame = useCurrentFrame();
+  const opacity = lead > 0 ? ease(frame + 1, [0, lead + 1], [0, 1]) : 1;
   return (
     <CursorOpacityContext.Provider value={frame < lead ? 0 : 1}>
-      <Stage opacity={clamp01((frame + 1) / (lead + 1))}>
-      <entry.Scene duration={lead + entry.duration} globalFrom={entry.from - lead} music={music} />
+      <Stage opacity={opacity}>
+        <entry.Scene duration={lead + entry.duration} globalFrom={entry.from - lead} music={music} />
       </Stage>
     </CursorOpacityContext.Provider>
   );

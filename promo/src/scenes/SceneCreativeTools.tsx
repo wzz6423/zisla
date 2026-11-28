@@ -4,15 +4,15 @@ import {MenuBar, Notch, Wallpaper} from '../components/Desktop';
 import {GlassPanel} from '../components/Glass';
 import {RecordingStudioTour, ScreenshotsModule} from '../modules/ToolsModule';
 import {CreativeToolsModule} from '../modules/CreativeToolsModule';
-import {clamp01} from '../theme';
+import {easeOutAt} from '../motion';
 
 export const CREATIVE_TOUR_DURATION = 2160;
 export const creativeGroups = [
-  {id: 'capture', from: 0, duration: 360, title: 'Capture once. Keep every detail.', caption: 'HDR, annotation, slow auto-scroll, pins and local recognition.', features: ['capture']},
-  {id: 'recording', from: 360, duration: 720, title: 'Record your screen. Shape the story.', caption: 'Capture, edit the timeline, preview captions and an AI proposal, then export.', features: ['recording']},
-  {id: 'image', from: 1080, duration: 420, title: 'From the original to a useful image.', caption: 'Compare output sizes, recognize a table and apply a local freehand extraction.', features: ['imageTools']},
-  {id: 'audio', from: 1500, duration: 360, title: 'The sound you need, saved locally.', caption: 'Set a time range, normalize the saved clip, then generate a test tone.', features: ['audioTools']},
-  {id: 'pdf', from: 1860, duration: 300, title: 'Documents, finished on your Mac.', caption: 'Merge selected documents, then protect the resulting PDF.', features: ['pdf']},
+  {id: 'capture', from: 0, duration: 360, title: 'Precision capture, long scroll, and pins.', caption: 'HDR · Annotations · Auto-scroll stitch · Table OCR to .xlsx · Scalable pins', features: ['capture']},
+  {id: 'recording', from: 360, duration: 720, title: 'Screen Recording Studio.', caption: 'HDR capture · Portrait & voice polish · Multi-track edit · Captions & AI cut', features: ['recording']},
+  {id: 'image', from: 1080, duration: 420, title: 'Nine local image tools.', caption: 'Format size comparison · Table recognition · Freehand extraction', features: ['imageTools']},
+  {id: 'audio', from: 1500, duration: 360, title: 'Twenty-seven local audio tools.', caption: 'Trim, LUFS loudness normalization, effects & test tones via FFmpeg', features: ['audioTools']},
+  {id: 'pdf', from: 1860, duration: 300, title: 'Fourteen offline PDF tools.', caption: 'Merge in order, split, watermark, or password-protect locally', features: ['pdf']},
 ] as const;
 
 export const creativeTourAt = (frame: number, duration = CREATIVE_TOUR_DURATION) => {
@@ -23,14 +23,19 @@ export const creativeTourAt = (frame: number, duration = CREATIVE_TOUR_DURATION)
 
 export const SceneCreativeTools = ({duration = CREATIVE_TOUR_DURATION}: {duration?: number}) => {
   const {group, frame} = creativeTourAt(useCurrentFrame(), duration);
+  const contentIn = easeOutAt(frame, [0, 12], [0, 1]);
   return <>
     <Wallpaper dim={.36} /><MenuBar /><Notch />
-    <Headline lines={[group.title]} top={102} size={36} align="left" opacity={clamp01(frame / 14)} />
-    <GlassPanel style={{left: 96, top: 170, width: 1088, height: 466}} opacity={clamp01(frame / 12)}>
-      <div data-feature={group.features.join(' ')} style={{position: 'absolute', inset: 0}}>
+    <Headline lines={[group.title]} top={102} size={36} align="left" opacity={contentIn} />
+    {/* Keep the workspace glass panel steady across tools and crossfade inner content to avoid dark flashes. */}
+    <GlassPanel style={{left: 96, top: 170, width: 1088, height: 466}} opacity={1}>
+      <div
+        data-feature={group.features.join(' ')}
+        style={{position: 'absolute', inset: 0, opacity: contentIn, transform: `translateY(${(1 - contentIn) * 6}px)`}}
+      >
         {group.id === 'capture' ? <ScreenshotsModule frame={frame} /> : group.id === 'recording' ? <RecordingStudioTour frame={frame} /> : <CreativeToolsModule kind={group.id} frame={frame} />}
       </div>
     </GlassPanel>
-    <Caption text={group.caption} size={16} bottom={34} />
+    <Caption text={group.caption} size={16} bottom={34} opacity={contentIn} />
   </>;
 };

@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-160 秒、60 fps 的 zisla 产品宣传片，用 [Remotion](https://www.remotion.dev/) 逐帧渲染：React + TypeScript + Tailwind CSS，覆盖官网列出的 12 个模块和 19 项扩展功能。同一条画面时间轴提供放克与电影配乐两个版本，各支持 1080p 和 4K。布局、尺寸和弹簧参数取自原生应用源码，演示数据为虚构样例。
+120 秒、60 fps 的 zisla 产品宣传片，用 [Remotion](https://www.remotion.dev/) 逐帧渲染：React + TypeScript + Tailwind CSS，覆盖官网列出的 12 个模块、19 项扩展功能及近期原生能力（Antigravity 额度卡片、中转站 ZIP／图片／录屏工作室导入、剪贴板 OCR 与按来源应用分组、录屏 HDR、独立命名倒计时、快速清理垃圾、重复应用与孤立 AI 工作区清理、17 种语言设置搜索）。同一条画面时间轴提供放克与电影配乐两个版本，各支持 1080p 和 4K。布局、尺寸和弹簧参数取自原生应用源码，演示数据为虚构样例。
 
 ## 本地运行
 
@@ -50,27 +50,27 @@ npm test
 
 | 合成 id | 尺寸 | 帧数 | 内容 |
 | --- | --- | --- | --- |
-| `ZislaLaunchFilm` | 1920×1080 | 9600 | 2 分 40 秒，Funkorama 配乐 |
-| `ZislaLaunchFilm4K` | 3840×2160 | 9600 | 同画面放克版，4K |
-| `ZislaLaunchFilmCinematic` | 1920×1080 | 9600 | 同画面，The Miracle of Flight 配乐 |
-| `ZislaLaunchFilmCinematic4K` | 3840×2160 | 9600 | 同画面电影配乐版，4K |
-| `Scene1Awakening` | 1920×1080 | 300 | 0–5s，顶部触发和按应用汇总 |
-| `SceneLayouts` | 1920×1080 | 960 | 5–21s，刘海、摄像头、四边定位和宠物 |
-| `Scene2AICenter` | 1920×1080 | 840 | 21–35s，任务、按日模型统计、历史和双窗口额度 |
-| `Scene3Flow` | 1920×1080 | 900 | 35–50s，媒体、中转站多选和视频／音频下载 |
-| `SceneMail` | 1920×1080 | 480 | 50–58s，阅读、撰写、发送和全部已读 |
-| `SceneEveryday` | 1920×1080 | 1440 | 58–82s，随记、剪贴板、会议、位置便签、简报和语音 |
-| `SceneCreativeTools` | 1920×1080 | 1920 | 82–114s，截图、录屏、图片、音频和 PDF |
-| `SceneDesktopTools` | 1920×1080 | 1460 | 114–138.3s，混音、键盘、专注、清洁、系统历史和电池 |
-| `SceneSettings` | 1920×1080 | 1140 | 138.3–157.3s，窗口、快捷动作、权限、CLI／Skills、Zshell 和整屏合盖 |
+| `ZislaLaunchFilm` | 1920×1080 | 7200 | 2 分钟，Funkorama 配乐 |
+| `ZislaLaunchFilm4K` | 3840×2160 | 7200 | 同画面放克版，4K |
+| `ZislaLaunchFilmCinematic` | 1920×1080 | 7200 | 同画面，The Miracle of Flight 配乐 |
+| `ZislaLaunchFilmCinematic4K` | 3840×2160 | 7200 | 同画面电影配乐版，4K |
+| `Scene1Awakening` | 1920×1080 | 270 | 0–4.5s，顶部触发和按应用汇总 |
+| `SceneLayouts` | 1920×1080 | 600 | 4.5–14.5s，刘海、摄像头、四边定位和宠物 |
+| `Scene2AICenter` | 1920×1080 | 690 | 14.5–26s，任务、按日模型统计、历史和双窗口额度（含 Antigravity） |
+| `Scene3Flow` | 1920×1080 | 780 | 26–39s，媒体、中转站多选（ZIP／PDF／录屏工作室）和视频／音频下载 |
+| `SceneMail` | 1920×1080 | 420 | 39–46s，阅读、撰写、发送和全部已读 |
+| `SceneEveryday` | 1920×1080 | 1080 | 46–64s，随记、剪贴板（按应用分组与 OCR）、会议、位置便签、简报和语音 |
+| `SceneCreativeTools` | 1920×1080 | 1140 | 64–83s，截图（含贴图缩放）、HDR 录屏、图片、音频和 PDF |
+| `SceneDesktopTools` | 1920×1080 | 1140 | 83–102s，混音、键盘（含语音听写统计）、专注（命名倒计时与清理垃圾）、清洁、系统历史和电池 |
+| `SceneSettings` | 1920×1080 | 940 | 102–117.7s，设置搜索、保存位置、快捷动作、权限、CLI／Skills、Zshell 和整屏合盖 |
 | `Scene4Bento` | 1920×1080 | 600 | 独立工具快览预览 |
-| `Scene5Outro` | 1920×1080 | 160 | 157.3–160s，品牌、完整安装命令和对应音乐署名 |
+| `Scene5Outro` | 1920×1080 | 140 | 117.7–120s，品牌、完整安装命令和对应音乐署名 |
 
 相邻两幕有 16 帧叠化：后一幕提前 16 帧在仍不透明的前一幕之上淡入，到名义起点时完全显现。歌曲进度和番茄钟用 `filmFrame()` 换算成全片帧号。分幕合成按名义长度注册，用于无声预览；全片中的布局与工具导览按含叠化的幕长缩放，并保留各幕末态。
 
 ## 配乐
 
-两个版本均使用一首完整作品的连续前 160 秒，保留原曲编排，只在首尾淡入淡出。MP3 为 44.1 kHz 立体声、320 kbps，整体降低 2 dB，开头淡入 0.4 秒，155.8–159.6 秒淡出。
+两个版本均使用一首完整作品的连续前 120 秒，保留原曲编排，只在首尾淡入淡出。MP3 为 44.1 kHz 立体声、320 kbps，整体降低 2 dB，开头淡入 0.4 秒，115.8–119.6 秒淡出。
 
 - 放克版：[Kevin MacLeod《Funkorama》](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100474)。官网播放器采用此版。
 - 电影配乐版：[Scott Buckley《The Miracle of Flight》](https://www.scottbuckley.com.au/library/the-miracle-of-flight/)。

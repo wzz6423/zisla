@@ -567,7 +567,7 @@ test('the homepage stays concise while linked help retains translated guides and
     }
     for (const id of site.workflowIds) {
       const { start, end, guide } = site.workflowExcerpts[id];
-      assert.ok(start >= 0 && end > start && end <= 160, id);
+      assert.ok(start >= 0 && end > start && end <= 120, id);
       assert.ok(html.includes(`id="workflow-${id}"`), `${locale}: workflow destination`);
       assert.ok(html.includes(`src="${site.launchFilmMedia.video}#t=${start},${end}"`), `${locale}: inline excerpt`);
       assert.ok(html.includes(`href="#guide-${guide}"`), `${locale}: workflow has instructions`);

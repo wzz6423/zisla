@@ -26,7 +26,7 @@ export const Scene1Awakening = ({duration = 360}: {duration?: number}) => {
 
   // Compact artwork and waves appear only after playback starts.
   const playing = frame >= 404;
-  const wing = lerp(0, 74, clamp01((frame - 410) / 26));
+  const wing = easeOutAt(frame, [410, 438], [0, 74]);
   const levels = waveLevels(frame, 1, 0);
 
   const approach = easeOutAt(frame, [34, 150], [0, 1]);
@@ -80,7 +80,13 @@ export const Scene1Awakening = ({duration = 360}: {duration?: number}) => {
           active={TABS.home}
         >
           <div style={modulePhase(moduleIn, 1, true)}>
-            <HomeModule cards={['media', 'ai']} downloadProgress={downloadProgress} tasks={aiTasks.slice(0, frame >= 252 ? 3 : 1)} aiProgress={0.74} />
+            <HomeModule
+              cards={['media', 'ai']}
+              downloadProgress={downloadProgress}
+              tasks={aiTasks.slice(0, frame >= 252 ? 3 : 1)}
+              aiProgress={0.74}
+              extraCardEnter={clamp01(springAt(frame, fps, 252, ZislaMotion.surfaceResize, 24))}
+            />
           </div>
         </IslandBody>
       </Island>

@@ -94,15 +94,16 @@ test('capture draws once, scrolls slowly once and preserves annotations for pin 
     previousScroll = state.scroll;
     if (frame >= 124) assert.deepEqual([state.rectangle, state.arrow, state.obscure], [1, 1, 1]);
   }
-  assert.match(ui.render(ui.exports.ScreenshotsModule, {frame: 210}), /data-long-capture-preview/);
-  assert.doesNotMatch(ui.render(ui.exports.ScreenshotsModule, {frame: 270}), /data-long-capture-preview/);
-  assert.match(ui.render(ui.exports.ScreenshotsModule, {frame: 235}), /data-capture-recognition-menu/);
-  assert.match(ui.render(ui.exports.ScreenshotsModule, {frame: 250}), /data-capture-table-export/);
-  assert.match(textOf(ui.render(ui.exports.ScreenshotsModule, {frame: 282})), /Recognizing table…/);
-  assert.match(textOf(ui.render(ui.exports.ScreenshotsModule, {frame: 310})), /Review schedule.xlsx exported/);
-  assert.match(ui.render(ui.exports.ScreenshotsModule, {frame: 350}), /data-pinned-capture/);
-  assert.doesNotMatch(ui.render(ui.exports.ScreenshotsModule, {frame: 350}), /data-capture-table-export/);
-  assert.match(textOf(ui.render(ui.exports.ScreenshotsModule, {frame: 350})), /Pinned · Existing pins retained/);
+  assert.match(ui.render(ui.exports.ScreenshotsModule, {frame: 185}), /data-long-capture-preview/);
+  assert.doesNotMatch(ui.render(ui.exports.ScreenshotsModule, {frame: 245}), /data-long-capture-preview/);
+  assert.match(ui.render(ui.exports.ScreenshotsModule, {frame: 210}), /data-capture-recognition-menu/);
+  assert.match(ui.render(ui.exports.ScreenshotsModule, {frame: 224}), /data-capture-table-export/);
+  assert.match(textOf(ui.render(ui.exports.ScreenshotsModule, {frame: 245})), /Recognizing table…/);
+  assert.match(textOf(ui.render(ui.exports.ScreenshotsModule, {frame: 274})), /Review schedule.xlsx exported/);
+  assert.match(ui.render(ui.exports.ScreenshotsModule, {frame: 340}), /data-pinned-capture/);
+  assert.doesNotMatch(ui.render(ui.exports.ScreenshotsModule, {frame: 340}), /data-capture-table-export/);
+  assert.match(textOf(ui.render(ui.exports.ScreenshotsModule, {frame: 340})), /Pinned · Existing pins retained/);
+  assert.ok(at(340).pinScale > at(282).pinScale, 'Pinned screenshot scales smoothly');
 });
 
 test('recording phase ordering, selected caption and proposal result stay causal', () => {
@@ -167,6 +168,10 @@ test('recording phase ordering, selected caption and proposal result stay causal
   assert.ok(Number(styleOf(trail).opacity) > 0);
   assert.match(textOf(ui.render(ui.exports.RecordingStudioTour, {frame: 620})), /Exporting recording…/);
   assert.equal(at(654).exporting, false);
+  assert.equal(at(17).hdr, false);
+  assert.equal(at(18).hdr, true);
+  assert.match(ui.render(ui.exports.RecordingStudioTour, {frame: 40}), /data-recording-hdr="active"/);
+  assert.match(textOf(ui.render(ui.exports.RecordingStudioTour, {frame: 620})), /MP4 · HDR/);
 });
 
 test('every tool output follows its selected operation and a readable completion hold', () => {

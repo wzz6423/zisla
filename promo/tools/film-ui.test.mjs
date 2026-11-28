@@ -189,8 +189,14 @@ test('the actual film entries render every native module and advertised feature'
   for (const feature of ['island.notch', 'island.custom.top', 'island.custom.bottom', 'island.custom.left', 'island.custom.right', 'pet.left', 'pet.right']) {
     assert.ok(rendered.get('layouts').includes(feature), `${feature}: missing from the actual film`);
   }
-  for (const outcome of ['Subject.png', 'Interview-normalize.wav', 'Test-tone.wav']) assert.ok(rendered.get('creative').includes(outcome));
-  for (const outcome of ['Keyboard input resumed', 'Camera stopped', 'Review item kept', 'Low power mode applied', 'macOS background sounds', 'Charge to 100% requested']) assert.ok(rendered.get('desktop').includes(outcome), `${outcome}: the Desktop tour does not show its result`);
+  for (const outcome of ['Subject.png', 'Interview-normalize.wav', 'Test-tone.wav', 'MP4 · HDR']) assert.ok(rendered.get('creative').includes(outcome));
+  for (const outcome of ['Keyboard input resumed', 'Camera stopped', 'Review item kept', 'Low power mode applied', 'macOS background sounds', 'Charge to 100% requested', 'Clean Junk', 'data-toolbox-named-timer="Tea"', 'Duplicate apps &amp; update leftovers', 'Orphan AI workspaces']) assert.ok(rendered.get('desktop').includes(outcome), `${outcome}: the Desktop tour does not show its result`);
+  assert.ok(rendered.get('aiCenter').includes('Antigravity'), 'Antigravity quota must appear in the AI scene');
+  assert.ok(rendered.get('flow').includes('Compress to ZIP'), 'Shelf ZIP & image actions must appear in the Flow scene');
+  assert.ok(rendered.get('everyday').includes('data-clipboard-ocr'), 'Clipboard image OCR search must appear in the Everyday scene');
+  assert.ok(rendered.get('everyday').includes('By App'), 'Clipboard source-app grouping must appear in the Everyday scene');
+  assert.ok(rendered.get('settings').includes('Search settings · 17 languages'), '17-language settings search must appear in Settings');
+  assert.ok(rendered.get('settings').includes('Save locations'), 'Save locations must appear in Settings');
 });
 
 test('native link downloading chooses source format and reaches a saved audio file', () => {
